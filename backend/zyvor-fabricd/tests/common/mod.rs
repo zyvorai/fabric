@@ -71,8 +71,8 @@ pub async fn create_test_app() -> Router {
         .build()
         .unwrap();
 
-    let driver = zyvor_fabric_ephemera_driver::EphemeraDriver::new("http://127.0.0.1:7788")
-        .expect("failed to construct test Ephemera driver (no real connection made yet)");
+    let driver = zyvor_fabric_fluxvm_driver::FluxVmDriver::new("http://127.0.0.1:7788")
+        .expect("failed to construct test FluxVM driver (no real connection made yet)");
 
     let lock_manager = Arc::new(zyvor_fabric_lock_manager::LockManager::new(
         zyvor_fabric_lock_manager::LockConfig::default(),
@@ -163,8 +163,8 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         .build()
         .unwrap();
 
-    let driver = zyvor_fabric_ephemera_driver::EphemeraDriver::new("http://127.0.0.1:7788")
-        .expect("failed to construct test Ephemera driver (no real connection made yet)");
+    let driver = zyvor_fabric_fluxvm_driver::FluxVmDriver::new("http://127.0.0.1:7788")
+        .expect("failed to construct test FluxVM driver (no real connection made yet)");
 
     let lock_manager = Arc::new(zyvor_fabric_lock_manager::LockManager::new(
         zyvor_fabric_lock_manager::LockConfig::default(),

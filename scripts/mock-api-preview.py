@@ -11,7 +11,7 @@ TOKEN = "ux-preview-token"
 USER = {"id": "1", "username": "admin", "role": "admin", "user_id": "1"}
 
 CAPS = {
-    "vm_driver": {"phase": "live", "detail": "mock Ephemera"},
+    "vm_driver": {"phase": "live", "detail": "mock FluxVM"},
     "storage": {"phase": "live", "detail": "local"},
     "network_security": {"phase": "off", "detail": "preview"},
     "auth": {"phase": "live"},

@@ -19,7 +19,7 @@ Recommends: systemd-container,
             wireguard-tools
 Description: Virtual Machine Management Daemon
  zyvor-fabricd is a daemon for managing virtual machines, with a pluggable
- VM lifecycle driver (systemd-vmspawn/systemd-machined, or Ephemera — see
+ VM lifecycle driver (systemd-vmspawn/systemd-machined, or FluxVM — see
  driver.backend in zyvor-fabricd.toml). Provides REST API, WebSocket
  console, VNC proxy, and comprehensive VM lifecycle management. Runs under
  systemd or any other supervisor — nothing in this package requires it.

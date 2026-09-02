@@ -81,7 +81,7 @@
                          |         |         |         |         |
                        VM Ops   Storage  Networking  Security  Monitoring
                          |         |         |         |         |
-  Driver Layer        Ephemera   qemu-img   nftables    PAM    Prometheus
+  Driver Layer        FluxVM   qemu-img   nftables    PAM    Prometheus
                       driver    lvm/zfs   wireguard   JWT      metrics
                          |         |         |         |         |
   System Layer          Linux KVM / QEMU (no systemd dependency)
@@ -115,7 +115,7 @@
         <tr><td>Web UI Language</td><td>TypeScript</td></tr>
         <tr><td>Web UI Build</td><td>Vite</td></tr>
         <tr><td>Web UI Styling</td><td>TailwindCSS</td></tr>
-        <tr><td>VM Driver</td><td>Ephemera (no systemd dependency)</td></tr>
+        <tr><td>VM Driver</td><td>FluxVM (no systemd dependency)</td></tr>
         <tr><td>Hypervisor</td><td>Linux KVM / QEMU</td></tr>
         <tr><td>Monitoring</td><td>Prometheus</td></tr>
         <tr><td>VPN</td><td>WireGuard</td></tr>
@@ -147,8 +147,8 @@
       <h3>VM Infrastructure (7)</h3>
       <ul>
         <li><code>driver-core</code> - Driver abstractions</li>
-        <li><code>ephemera-driver</code> - VM lifecycle via Ephemera</li>
-        <li><code>ephemera-client</code> - Ephemera REST/WebSocket client</li>
+        <li><code>fluxvm-driver</code> - VM lifecycle via FluxVM</li>
+        <li><code>fluxvm-client</code> - FluxVM REST/WebSocket client</li>
         <li><code>zyvor-fabric-vm-driver</code> - mkosi image builds</li>
         <li><code>cloud-init</code> - Cloud config</li>
         <li><code>tpm-support</code> - TPM/vTPM</li>

@@ -10,7 +10,7 @@ export default function Product() {
       <section className="mkt-hero !min-h-0 !pb-16 !pt-24">
         <h1 className="mkt-reveal">The control plane<br />for your private cloud.</h1>
         <p className="lede mkt-reveal-delay">
-          Zyvor Fabric wraps a pluggable VM driver — Ephemera — in production ops: RBAC, HA, network security, storage, and automation.
+          Zyvor Fabric wraps a pluggable VM driver — FluxVM — in production ops: RBAC, HA, network security, storage, and automation.
         </p>
       </section>
       <section className="mkt-section !pt-0 space-y-16">

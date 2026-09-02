@@ -158,11 +158,11 @@ impl MigrationManager {
     /// Perform live synchronization using iterative rsync + final cutover.
     ///
     /// The source (local) VM's pause-for-final-sync goes through the
-    /// active `VmDriver` (machinectl or Ephemera, whichever this host is
+    /// active `VmDriver` (machinectl or FluxVM, whichever this host is
     /// configured for). Starting the VM on the *target* node still shells
     /// `ssh <target> machinectl start ...` directly — a local
     /// `Arc<dyn VmDriver>` only ever talks to this host's own D-Bus/
-    /// Ephemera instance, not a remote one, so backend-aware cross-host
+    /// FluxVM instance, not a remote one, so backend-aware cross-host
     /// VM control would need either an HTTP call to the target's own
     /// zyvor-fabricd API or an SSH-executed `zyvorctl`, neither of which
     /// this crate currently has the cluster/fleet context to do safely.

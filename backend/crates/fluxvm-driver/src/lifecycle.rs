@@ -8,11 +8,11 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use vm_model::{VMStartOptions, VMState, VM};
 use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
-use zyvor_fabric_ephemera_client::{
+use zyvor_fabric_fluxvm_client::{
     BackendKind, CreateVmRequest, NetworkSpec, PortForward, VmRecord, VmStatus,
 };
 
-use crate::EphemeraDriver;
+use crate::FluxVmDriver;
 
 fn generate_mac_address() -> String {
     use rand::Rng;
@@ -26,20 +26,20 @@ fn generate_mac_address() -> String {
 }
 
 #[async_trait]
-impl VMDriver for EphemeraDriver {
+impl VMDriver for FluxVmDriver {
     async fn start(&self, name: &str) -> Result<()> {
         let vm = self.resolve(name).await?;
         self.client.start_vm(vm.id).await.map(|_| ())
     }
 
     async fn start_with_options(&self, vm: &VM, opts: &VMStartOptions) -> Result<()> {
-        // Already known to Ephemera: options were (or should have been)
+        // Already known to FluxVM: options were (or should have been)
         // baked in at creation time — replay the stored request rather
         // than trying to apply a second, possibly-different option set.
         if let Some(record) = self.client.find_by_name(&vm.name).await? {
             return self.client.start_vm(record.id).await.map(|_| ());
         }
-        // First launch: translate into an Ephemera CreateVmRequest.
+        // First launch: translate into an FluxVM CreateVmRequest.
         let req = translate_start_options(vm, opts)?;
         self.client.create_vm(&req).await.map(|_| ())
     }
@@ -58,7 +58,7 @@ impl VMDriver for EphemeraDriver {
     }
 
     async fn terminate(&self, name: &str) -> Result<()> {
-        // Ephemera's `stop` already does graceful-shutdown-then-SIGKILL
+        // FluxVM's `stop` already does graceful-shutdown-then-SIGKILL
         // internally (see `VmManager::stop`) — there's no separate "force"
         // endpoint to escalate to, so terminate and poweroff are the same
         // call here.
@@ -72,7 +72,7 @@ impl VMDriver for EphemeraDriver {
     }
 
     async fn reboot(&self, name: &str) -> Result<()> {
-        // Ephemera has no reboot endpoint yet (would need a per-backend QMP
+        // FluxVM has no reboot endpoint yet (would need a per-backend QMP
         // `system_reset`/`ch-remote` call — see the migration plan). Stop
         // then start is a coarser substitute: the guest sees a full
         // poweroff and cold boot rather than a soft reset, but it's a
@@ -111,7 +111,7 @@ impl VMDriver for EphemeraDriver {
     }
 
     async fn enable(&self, _name: &str) -> Result<()> {
-        // "Enable at boot" doesn't belong in Ephemera (a disposable-VM
+        // "Enable at boot" doesn't belong in FluxVM (a disposable-VM
         // engine, not a service manager) — per the migration plan this
         // becomes an `autostart` flag in zyvor-fabricd's own StateStore plus a
         // startup reconciliation pass, not yet wired up. No-op for now
@@ -161,7 +161,7 @@ fn to_machine_info(vm: VmRecord) -> MachineInfo {
     MachineInfo {
         name: vm.name,
         class: "vm".to_string(),
-        service: "ephemera".to_string(),
+        service: "fluxvm".to_string(),
         state: map_status(vm.status),
         leader_pid: vm.pid,
     }
@@ -171,7 +171,7 @@ fn properties_of(vm: &VmRecord) -> HashMap<String, String> {
     let mut props = HashMap::new();
     props.insert("Name".to_string(), vm.name.clone());
     props.insert("Class".to_string(), "vm".to_string());
-    props.insert("Service".to_string(), "ephemera".to_string());
+    props.insert("Service".to_string(), "fluxvm".to_string());
     props.insert(
         "State".to_string(),
         format!("{:?}", vm.status).to_lowercase(),
@@ -186,7 +186,7 @@ fn properties_of(vm: &VmRecord) -> HashMap<String, String> {
     if let Some(tap) = &vm.tap_name {
         props.insert("TapName".to_string(), tap.clone());
     }
-    // Only ever set for NetworkSpec::Tap { netns: true, .. } VMs (Ephemera
+    // Only ever set for NetworkSpec::Tap { netns: true, .. } VMs (FluxVM
     // resolves this fresh from the per-namespace DHCP lease file on every
     // read) -- the frontend's Network tab already reads properties
     // .IPAddress with no changes needed on that end.
@@ -197,63 +197,63 @@ fn properties_of(vm: &VmRecord) -> HashMap<String, String> {
 }
 
 /// Translate a `vm-model` `VM`/`VMStartOptions` pair — systemd-vmspawn's
-/// launch-option shape — into an Ephemera `CreateVmRequest`. Errors loudly
-/// on any option Ephemera has no equivalent for yet (per the
-/// systemd-removal migration plan's Ephemera gap list) rather than
+/// launch-option shape — into an FluxVM `CreateVmRequest`. Errors loudly
+/// on any option FluxVM has no equivalent for yet (per the
+/// systemd-removal migration plan's FluxVM gap list) rather than
 /// silently dropping it, since a dropped option is a correctness bug a
 /// caller has no way to notice.
 fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmRequest> {
     if opts.directory.is_some() {
         bail!(
-            "the ephemera backend does not support directory-based boot (VMStartOptions.directory)"
+            "the fluxvm backend does not support directory-based boot (VMStartOptions.directory)"
         );
     }
     if opts.tpm == Some(true) {
-        bail!("the ephemera backend does not yet support TPM (VMStartOptions.tpm)");
+        bail!("the fluxvm backend does not yet support TPM (VMStartOptions.tpm)");
     }
     if opts.secure_boot == Some(true) {
-        bail!("the ephemera backend does not yet support secure boot (VMStartOptions.secure_boot)");
+        bail!("the fluxvm backend does not yet support secure boot (VMStartOptions.secure_boot)");
     }
     if opts.vsock == Some(true) {
         bail!(
-            "the ephemera backend does not support raw vsock passthrough (VMStartOptions.vsock) \
+            "the fluxvm backend does not support raw vsock passthrough (VMStartOptions.vsock) \
              — use CreateVmRequest.agent for the in-guest vsock agent instead"
         );
     }
     if !opts.extra_drives.is_empty() {
-        bail!("the ephemera backend does not support extra drives (VMStartOptions.extra_drives)");
+        bail!("the fluxvm backend does not support extra drives (VMStartOptions.extra_drives)");
     }
     if !opts.bind_users.is_empty() {
-        bail!("the ephemera backend does not support bind users (VMStartOptions.bind_users)");
+        bail!("the fluxvm backend does not support bind users (VMStartOptions.bind_users)");
     }
     if !opts.credentials.is_empty() || !opts.load_credentials.is_empty() {
         bail!(
-            "the ephemera backend does not support systemd credentials \
+            "the fluxvm backend does not support systemd credentials \
              (VMStartOptions.credentials/load_credentials) — use cloud_init instead"
         );
     }
     if !opts.smbios11.is_empty() {
-        bail!("the ephemera backend does not support SMBIOS injection (VMStartOptions.smbios11)");
+        bail!("the fluxvm backend does not support SMBIOS injection (VMStartOptions.smbios11)");
     }
 
     let vcpus: u8 = vm.cpus.try_into().map_err(|_| {
         anyhow::anyhow!(
-            "vcpu count {} exceeds the ephemera backend's limit",
+            "vcpu count {} exceeds the fluxvm backend's limit",
             vm.cpus
         )
     })?;
 
     let network = if opts.network_tap {
         // Always pin an explicit MAC rather than letting QEMU auto-assign
-        // one: Ephemera never persists an auto-generated MAC anywhere on
+        // one: FluxVM never persists an auto-generated MAC anywhere on
         // VmRecord, so a later ssh_info lookup (get_mac_address, below)
         // would have nothing to resolve to a DHCP-leased IP.
         let mac = vm.mac_address.clone().unwrap_or_else(generate_mac_address);
         // netns: true rather than a shared host bridge -- gives the VM its
         // own network namespace with a per-namespace dnsmasq DHCP server
-        // (Ephemera's ephemera_network::netns), so it gets a real,
+        // (FluxVM's fluxvm_network::netns), so it gets a real,
         // externally-reachable IP with zero host bridge configuration
-        // needed on this end. `bridge` is ignored by Ephemera when netns
+        // needed on this end. `bridge` is ignored by FluxVM when netns
         // is set.
         NetworkSpec::Tap {
             tap_name: None,
@@ -301,8 +301,8 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         // for a stock Ubuntu cloud image, not something specific to a
         // hand-built test image. `static_network` stays gated on netns tap
         // networking -- it needs a reserved address to inject, which only
-        // that mode has (see Ephemera's ephemera_network::netns::NetnsHandle).
-        cloud_init: Some(zyvor_fabric_ephemera_client::CloudInitSpec {
+        // that mode has (see FluxVM's fluxvm_network::netns::NetnsHandle).
+        cloud_init: Some(zyvor_fabric_fluxvm_client::CloudInitSpec {
             hostname: vm.hostname.clone(),
             ssh_authorized_keys: opts.ssh_authorized_keys.clone(),
             static_network: opts.network_tap && opts.network_static_ip,
@@ -311,7 +311,7 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
             write_files: opts
                 .cloud_init_write_files
                 .iter()
-                .map(|f| zyvor_fabric_ephemera_client::CloudInitFile {
+                .map(|f| zyvor_fabric_fluxvm_client::CloudInitFile {
                     path: f.path.clone(),
                     content: f.content.clone(),
                     permissions: f.permissions.clone(),
@@ -324,16 +324,16 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         // Enabled by default: needed for ShellDriver::shell, ConsoleDriver,
         // and file copy to work on any VM without a separate opt-in. Was
         // gated off pending a real, live-verified fix for an intermittent
-        // guest-agent vsock listener bug — see Ephemera's README
-        // ("Interactive console" section) and docs/guides/vm-drivers/ephemera.md.
-        agent: Some(zyvor_fabric_ephemera_client::AgentSpec {
+        // guest-agent vsock listener bug — see FluxVM's README
+        // ("Interactive console" section) and docs/guides/vm-drivers/fluxvm.md.
+        agent: Some(zyvor_fabric_fluxvm_client::AgentSpec {
             enabled: true,
             ..Default::default()
         }),
         shared_folders: opts
             .bind_mounts
             .iter()
-            .map(|bm| zyvor_fabric_ephemera_client::SharedFolder {
+            .map(|bm| zyvor_fabric_fluxvm_client::SharedFolder {
                 host_path: PathBuf::from(&bm.source),
                 guest_path: bm.destination.clone().unwrap_or_else(|| bm.source.clone()),
                 read_only: bm.read_only,

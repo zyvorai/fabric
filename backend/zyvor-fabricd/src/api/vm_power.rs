@@ -79,13 +79,13 @@ pub async fn hibernate_vm(
             tracing::warn!("Failed to quit VM after hibernate: {}", e);
         }
 
-        // Tell Ephemera itself the VM stopped, not just zyvor-fabricd's own
+        // Tell FluxVM itself the VM stopped, not just zyvor-fabricd's own
         // store below -- found live: a raw QMP `quit` kills the QEMU
-        // process but Ephemera's own VmRecord.status has no way to learn
+        // process but FluxVM's own VmRecord.status has no way to learn
         // that on its own until its next reconcile() tick, so it kept
         // reporting Running with a now-dead PID. start_from_snapshot's
         // `if vm.status == Running { return Ok(vm) }` guard (see
-        // ephemera-scheduler::VmManager::start_impl) then short-circuited
+        // fluxvm-scheduler::VmManager::start_impl) then short-circuited
         // on that stale status and never actually relaunched anything --
         // resume_hibernate looked like it succeeded, but only
         // zyvor-fabricd's own store had changed. The process here is
@@ -94,7 +94,7 @@ pub async fn hibernate_vm(
         // `process_alive` check skips straight past its kill logic.
         if let Err(e) = state.driver.poweroff(&vm_name).await {
             tracing::warn!(
-                "Failed to sync Ephemera's own stopped-state after hibernate: {}",
+                "Failed to sync FluxVM's own stopped-state after hibernate: {}",
                 e
             );
         }
@@ -121,7 +121,7 @@ pub async fn hibernate_vm(
         tracing::info!("VM '{}' hibernated with snapshot '{}'", vm_name, snap_name);
         Ok(Json(json!({"status": "hibernated", "snapshot": snap_name})))
     } else {
-        // Fallback: no QMP socket available (or the ephemera backend, which
+        // Fallback: no QMP socket available (or the fluxvm backend, which
         // has no QMP savevm equivalent) — just power off via the driver.
         state.driver.poweroff(&vm_name).await.map_err(|e| {
             crate::api_error::json_error(

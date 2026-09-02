@@ -30,4 +30,4 @@ enabled = true
 # with a real certificate for anything beyond an internal network.
 
 [driver]
-ephemera_url = "http://127.0.0.1:7788"
+fluxvm_url = "http://127.0.0.1:7788"

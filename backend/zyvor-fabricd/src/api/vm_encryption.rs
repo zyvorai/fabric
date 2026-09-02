@@ -279,14 +279,14 @@ pub async fn encrypt_vm(
     let vm_name = req.vm_name.clone();
     let key_for_encrypt = key_id.clone();
     let disk_path = state.driver.get_disk_path(&vm_name).await;
-    // Ephemera only learns about a VM on its first start (see start_vm's
+    // FluxVM only learns about a VM on its first start (see start_vm's
     // lazy-create fallback in routes.rs) -- a VM made through the Create VM
-    // wizard and never started has no Ephemera-side record yet, so disk
+    // wizard and never started has no FluxVM-side record yet, so disk
     // resolution fails here. Surface that as a clear precondition instead of
-    // leaking "known to Ephemera" (an internal driver/dependency name the
+    // leaking "known to FluxVM" (an internal driver/dependency name the
     // customer has no reason to recognize) straight into the error toast.
     if let Err(e) = &disk_path {
-        if e.to_string().contains("known to Ephemera") {
+        if e.to_string().contains("known to FluxVM") {
             return (
                 StatusCode::CONFLICT,
                 Json(serde_json::json!({

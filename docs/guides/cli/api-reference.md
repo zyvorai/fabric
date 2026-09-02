@@ -249,7 +249,7 @@ Start a VM. Returns immediately with `202 Accepted`; the VM transitions through 
 
 **Auth level:** User+
 
-**Request body (optional):** `VMStartOptions` — low-level launch options. Ephemera honors `network_tap`, `bind_mounts` (translated into virtiofs shares), `linux`/`initrd`/`firmware`, and `extra_args`; fields with no Ephemera equivalent (`tpm`, `secure_boot`, `vsock`, `credentials`, `directory`, `extra_drives`, `bind_users`) fail with a clear "not supported" error rather than being silently dropped.
+**Request body (optional):** `VMStartOptions` — low-level launch options. FluxVM honors `network_tap`, `bind_mounts` (translated into virtiofs shares), `linux`/`initrd`/`firmware`, and `extra_args`; fields with no FluxVM equivalent (`tpm`, `secure_boot`, `vsock`, `credentials`, `directory`, `extra_drives`, `bind_users`) fail with a clear "not supported" error rather than being silently dropped.
 
 ```json
 {
@@ -1537,7 +1537,7 @@ Delete a storage pool.
 
 ## Machines (VM driver)
 
-Endpoints for machine-level lifecycle and management, routed through the VM driver — [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency (`driver.ephemera_url` in `zyvor-fabricd.toml`). There is no live bind-mount endpoint; declare `bind_mounts` on `VMStartOptions` at start time instead (see `POST /api/vms/:name/start` above), which Ephemera turns into a virtiofs share per entry.
+Endpoints for machine-level lifecycle and management, routed through the VM driver — [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (`driver.fluxvm_url` in `zyvor-fabricd.toml`). There is no live bind-mount endpoint; declare `bind_mounts` on `VMStartOptions` at start time instead (see `POST /api/vms/:name/start` above), which FluxVM turns into a virtiofs share per entry.
 
 ### GET /api/machines
 
@@ -1672,7 +1672,7 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/shell \
 
 ### GET /api/machines/images
 
-List images known to Ephemera's image catalog.
+List images known to FluxVM's image catalog.
 
 **Auth level:** Viewer+
 
@@ -1892,7 +1892,7 @@ curl -s http://localhost:3000/api/machines/my-vm/ssh \
 
 ### POST /api/machines/:name/copy-to
 
-Copy a file from the host into a running machine, via Ephemera's vsock guest-agent `PutFile` op (requires the VM to have been created with the agent enabled; capped at 64MiB). `mode` defaults to the source file's own permission bits if not supplied.
+Copy a file from the host into a running machine, via FluxVM's vsock guest-agent `PutFile` op (requires the VM to have been created with the agent enabled; capped at 64MiB). `mode` defaults to the source file's own permission bits if not supplied.
 
 **Auth level:** Admin only
 
@@ -1921,7 +1921,7 @@ curl -s -X POST http://localhost:3000/api/machines/my-vm/copy-to \
 
 ### POST /api/machines/:name/copy-from
 
-Copy a file from a running machine to the host, via Ephemera's vsock guest-agent `GetFile` op (same agent-enabled requirement and 64MiB cap as `copy-to`). The file's mode on the guest is preserved on the host copy.
+Copy a file from a running machine to the host, via FluxVM's vsock guest-agent `GetFile` op (same agent-enabled requirement and 64MiB cap as `copy-to`). The file's mode on the guest is preserved on the host copy.
 
 **Auth level:** Admin only
 
@@ -2672,7 +2672,7 @@ curl -s -X DELETE http://localhost:3000/api/secrets/550e8400-e29b-41d4-a716-4466
 
 ## Log Aggregation
 
-Query logs from individual VMs or from the host system. Host system logs (`/api/logs`) are always retrieved via `journalctl`. Per-VM logs (`/api/vms/:name/logs`) come from Ephemera's captured console output, drained through a bounded-wait read — a one-shot fetch, not a live tail.
+Query logs from individual VMs or from the host system. Host system logs (`/api/logs`) are always retrieved via `journalctl`. Per-VM logs (`/api/vms/:name/logs`) come from FluxVM's captured console output, drained through a bounded-wait read — a one-shot fetch, not a live tail.
 
 ### GET /api/vms/:name/logs
 

@@ -1106,7 +1106,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "zyvor-fabric-driver-core",
- "zyvor-fabric-ephemera-driver",
+ "zyvor-fabric-fluxvm-driver",
 ]
 
 [[package]]
@@ -3968,7 +3968,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zyvor-fabric-ephemera-client"
+name = "zyvor-fabric-fluxvm-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3987,7 +3987,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zyvor-fabric-ephemera-driver"
+name = "zyvor-fabric-fluxvm-driver"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -4000,7 +4000,7 @@ dependencies = [
  "tracing",
  "vm-model",
  "zyvor-fabric-driver-core",
- "zyvor-fabric-ephemera-client",
+ "zyvor-fabric-fluxvm-client",
 ]
 
 [[package]]
@@ -4137,7 +4137,7 @@ dependencies = [
  "vpn-mesh",
  "zyvor-fabric-dnsmasq-manager",
  "zyvor-fabric-driver-core",
- "zyvor-fabric-ephemera-driver",
+ "zyvor-fabric-fluxvm-driver",
  "zyvor-fabric-lock-manager",
  "zyvor-fabric-storage",
  "zyvor-fabric-system",

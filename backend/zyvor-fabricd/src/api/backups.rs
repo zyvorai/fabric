@@ -939,7 +939,7 @@ async fn process_restore_job(
 
     // Destination for the restored disk: if target_vm already exists,
     // restore onto its real, live disk location (not a naming-convention
-    // guess); if it's a brand new name Ephemera has never heard of, fall
+    // guess); if it's a brand new name FluxVM has never heard of, fall
     // back to the default path a VM by that name would use.
     let dest_path = match state.driver.get_disk_path(&target_vm).await {
         Ok(p) => p.display().to_string(),

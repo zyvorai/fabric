@@ -89,14 +89,14 @@ if command -v systemctl &>/dev/null; then
     fi
 
 
-    # Only relevant to the "machinectl" driver backend — the "ephemera"
+    # Only relevant to the "machinectl" driver backend — the "fluxvm"
     # backend has no systemd-machined dependency at all.
     if systemctl is-active systemd-machined &>/dev/null; then
         pass "systemd-machined: running"
         MACHINE_COUNT=$(machinectl list --no-legend 2>/dev/null | wc -l || echo "0")
         pass "Machines registered (machinectl backend): $MACHINE_COUNT"
     else
-        warn "systemd-machined: not running (fine if driver.backend = \"ephemera\")"
+        warn "systemd-machined: not running (fine if driver.backend = \"fluxvm\")"
     fi
 else
     section "Systemd (optional)"
@@ -144,13 +144,13 @@ if ! $QUICK && curl -sf -o /dev/null "http://localhost:${API_PORT}/health" 2>/de
         warn "GET /api/vms: connection failed"
     fi
 
-    # Ephemera control plane (optional — only relevant when
-    # driver.backend = "ephemera" in zyvor-fabricd.toml)
-    EPHEMERA_URL="${EPHEMERA_URL:-http://127.0.0.1:7788}"
-    if curl -sf -o /dev/null "${EPHEMERA_URL}/healthz" 2>/dev/null; then
-        pass "Ephemera at ${EPHEMERA_URL}: healthy"
+    # FluxVM control plane (optional — only relevant when
+    # driver.backend = "fluxvm" in zyvor-fabricd.toml)
+    FLUXVM_URL="${FLUXVM_URL:-http://127.0.0.1:7788}"
+    if curl -sf -o /dev/null "${FLUXVM_URL}/healthz" 2>/dev/null; then
+        pass "FluxVM at ${FLUXVM_URL}: healthy"
     else
-        warn "Ephemera at ${EPHEMERA_URL}: not reachable (fine if driver.backend = \"machinectl\")"
+        warn "FluxVM at ${FLUXVM_URL}: not reachable (fine if driver.backend = \"machinectl\")"
     fi
 elif ! $QUICK; then
     section "API Health"

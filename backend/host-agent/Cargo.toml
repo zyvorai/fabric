@@ -24,4 +24,4 @@ reqwest = { version = "0.12", features = ["json"] }
 hostname = "0.4"
 
 zyvor-fabric-driver-core = { path = "../crates/driver-core" }
-zyvor-fabric-ephemera-driver = { path = "../crates/ephemera-driver" }
+zyvor-fabric-fluxvm-driver = { path = "../crates/fluxvm-driver" }

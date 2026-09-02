@@ -91,7 +91,7 @@ Messages sent from the server to the client contain output from the VM's stdout.
 ### Protocol Notes
 
 - There is no JSON wrapper or framing protocol. Messages are raw byte streams, making this protocol compatible with any terminal emulator library (xterm.js, hterm, etc.).
-- The server opens an interactive shell on the VM over Ephemera's vsock guest agent (a real PTY, with job control -- Ctrl-C, Ctrl-Z work normally) and bridges it bidirectionally with the WebSocket connection. There is no live terminal resize once the session is open -- the PTY is sized once at connect time from the `cols`/`rows` query parameters.
+- The server opens an interactive shell on the VM over FluxVM's vsock guest agent (a real PTY, with job control -- Ctrl-C, Ctrl-Z work normally) and bridges it bidirectionally with the WebSocket connection. There is no live terminal resize once the session is open -- the PTY is sized once at connect time from the `cols`/`rows` query parameters.
 - Close frames are handled normally per the WebSocket specification.
 
 ---

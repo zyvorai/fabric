@@ -1,6 +1,6 @@
 # zyvor-fabric User Stories
 
-**Product:** private cloud control plane with VM lifecycle handled by Ephemera (no systemd dependency)
+**Product:** private cloud control plane with VM lifecycle handled by FluxVM (no systemd dependency)
 
 Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
@@ -8,7 +8,7 @@ Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
 | Persona | Name | Focus |
 |---------|------|-------|
-| Private Cloud Admin | Alex | VM lifecycle via the active driver (Ephemera by default, or Ephemera) |
+| Private Cloud Admin | Alex | VM lifecycle via the active driver (FluxVM by default, or FluxVM) |
 | Platform Engineer | Morgan | K8s operator and Terraform |
 | Developer | Jordan | CLI/web console/API for VM operations |
 

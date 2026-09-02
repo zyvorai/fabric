@@ -75,7 +75,7 @@ fn is_command_allowed(command: &str) -> bool {
 /// Minimal QMP (QEMU Machine Protocol) client for communicating with a
 /// QEMU monitor socket, at a path resolved by `state.driver.get_control_socket()`
 /// (backend-specific: the systemd-vmspawn convention for `MachinectlDriver`,
-/// `VmRecord.control_socket` for `EphemeraDriver`).
+/// `VmRecord.control_socket` for `FluxVmDriver`).
 pub struct QmpClient {
     socket_path: String,
 }

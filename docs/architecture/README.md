@@ -2,7 +2,7 @@
 
 This document describes the architecture of Zyvor Fabric, a comprehensive virtual machine
 management platform built on the Linux KVM hypervisor, with VM lifecycle owned by
-[Ephemera](https://github.com/hypersdk/ephemera) -- a disposable-VM engine with no
+[FluxVM](https://github.com/zyvorai/fluxvm) -- a disposable-VM engine with no
 systemd dependency of its own. Zyvor Fabric provides a production-grade REST API,
 web UI, and CLI for managing the full lifecycle of virtual machines.
 
@@ -64,11 +64,11 @@ web UI, and CLI for managing the full lifecycle of virtual machines.
               +---------------+     |     +---------------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
-   |  VM Driver (Ephemera) |  | State Store |  | networking (netlink)  |
+   |  VM Driver (FluxVM) |  | State Store |  | networking (netlink)  |
    +----------+-----------+  +------+------+  +-----------+-----------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
-   |  Ephemera (registry) |  | SQLite      |  | Linux Kernel          |
+   |  FluxVM (registry) |  | SQLite      |  | Linux Kernel          |
    +----------+-----------+  +------+------+  +-----------+-----------+
               |                     |                     |
    +----------v----------+  +------v------+  +-----------v-----------+
@@ -121,7 +121,7 @@ structured as an Axum web server running on Tokio with the following subsystems:
 | Subsystem         | Description                                                |
 |-------------------|------------------------------------------------------------|
 | REST API          | 480+ endpoints across 53 API modules                       |
-| WebSocket         | Real-time VM console access via Ephemera's vsock guest agent |
+| WebSocket         | Real-time VM console access via FluxVM's vsock guest agent |
 | SSE Events        | Server-Sent Events for real-time VM state change delivery  |
 | Auth Middleware    | JWT token validation with RBAC (Admin/User/Viewer)         |
 | Background Tasks  | 20+ spawned tasks for reconciliation, monitoring, healing  |
@@ -168,13 +168,13 @@ VM
 
 The `VMStartOptions` struct's field names still echo its origin as a mirror of
 `systemd-vmspawn(1)`'s option set, but launch options are now translated into an
-Ephemera `CreateVmRequest` rather than a `systemd-vmspawn` CLI invocation:
+FluxVM `CreateVmRequest` rather than a `systemd-vmspawn` CLI invocation:
 
 - Image source (directory, image file, raw disk)
 - Hardware: CPUs, RAM, KVM toggle, vSock CID
 - Firmware: UEFI, Secure Boot, SMBIOS, TPM
 - Storage: bind mounts (translated into virtiofs shares, auto-mounted in the guest via a
-  generated cloud-init entry -- see `ephemera-driver::lifecycle`), extra drives
+  generated cloud-init entry -- see `fluxvm-driver::lifecycle`), extra drives
 - Networking: user/TAP mode, MAC address
 - Credentials and SSH key injection
 - Pass-through environment variables
@@ -182,9 +182,9 @@ Ephemera `CreateVmRequest` rather than a `systemd-vmspawn` CLI invocation:
 ### Driver Architecture
 
 The driver layer is a trait boundary (`VmDriver`, in `driver-core`) between the API
-handlers and Ephemera, the sole VM backend -- `AppState.driver` is one
-`Arc<dyn VmDriver>`, backed by `EphemeraDriver` and configured via `driver.ephemera_url`/
-`driver.ephemera_token` in `zyvor-fabricd.toml`. `VmDriver` is a blanket implementation
+handlers and FluxVM, the sole VM backend -- `AppState.driver` is one
+`Arc<dyn VmDriver>`, backed by `FluxVmDriver` and configured via `driver.fluxvm_url`/
+`driver.fluxvm_token` in `zyvor-fabricd.toml`. `VmDriver` is a blanket implementation
 over several component traits:
 
 ```
@@ -206,10 +206,10 @@ over several component traits:
 +------------------------------------------------------------------+
            |
            v
-+-- EphemeraDriver ------------------------------------------------+
-|  REST client to Ephemera (github.com/hypersdk/ephemera), plus a  |
++-- FluxVmDriver ------------------------------------------------+
+|  REST client to FluxVM (github.com/zyvorai/fluxvm), plus a  |
 |  WebSocket dial for ConsoleDriver and a vsock-backed guest agent |
-|  (via Ephemera) for shell/copy_to/copy_from. No systemd           |
+|  (via FluxVM) for shell/copy_to/copy_from. No systemd           |
 |  dependency. A few ImageDriver operations (tar-format images)    |
 |  intentionally error clearly -- a tar rootfs isn't a bootable    |
 |  disk image for a real hardware VM, so there's no equivalent to  |
@@ -251,7 +251,7 @@ See [crate-map.md](crate-map.md) for the complete listing.
                  |                   |                   |
          +-------+-------+    +-----+------+    +-------+-------+
          |       |       |    |     |      |    |       |       |
-      vm-model  state  security  driver  ephemera  networking  storage
+      vm-model  state  security  driver  fluxvm  networking  storage
                store            core    driver              manager
 ```
 
@@ -259,7 +259,7 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 **Core** (5 crates): `Zyvor Fabric`, `vm-model`, `state-store`, `security`, `Zyvor Fabric-vm`
 
-**Drivers** (4 crates): `zyvor-fabric-vm-driver` (mkosi image building only), `zyvor-fabric-driver-core`, `zyvor-fabric-ephemera-client`, `zyvor-fabric-ephemera-driver`
+**Drivers** (4 crates): `zyvor-fabric-vm-driver` (mkosi image building only), `zyvor-fabric-driver-core`, `zyvor-fabric-fluxvm-client`, `zyvor-fabric-fluxvm-driver`
 
 **Networking** (10 crates): `networking`, `network-policy`, `service-mesh`, `traffic-shaping`, `dns-policy`, `vm-firewall`, `vpn-mesh`, `packet-mirror`, `nat-gateway`, `net-monitor`
 
@@ -396,8 +396,8 @@ State transitions:
 1. Client POSTs to /api/v1/vms/{name}/start
 2. Handler acquires per-VM mutex lock
 3. State set to Starting, persisted
-4. state.driver.start(name) -- EphemeraClient issues a REST call to the
-     configured `ephemera serve` instance, which launches the VMM
+4. state.driver.start(name) -- FluxVmClient issues a REST call to the
+     configured `fluxvm serve` instance, which launches the VMM
      (QEMU/Cloud Hypervisor/Firecracker) directly
 5. PID captured
 6. State set to Running, PID stored, persisted

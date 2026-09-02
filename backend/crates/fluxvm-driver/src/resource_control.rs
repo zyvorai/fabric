@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! `ResourceStatsDriver`/`ResourceControlDriver`/`LogDriver` mapped onto
-//! Ephemera's cgroup-delegation and log-streaming extensions (systemd-removal
+//! FluxVM's cgroup-delegation and log-streaming extensions (systemd-removal
 //! migration plan, Phase 5): `GET/POST /v1/vms/{id}/resources|freeze|thaw|
 //! frozen|stats|pressure|logs`.
 
@@ -14,10 +14,10 @@ use zyvor_fabric_driver_core::{
     LogDriver, LogEntry, LogStream, ResourceControlDriver, ResourceStatsDriver,
 };
 
-use crate::EphemeraDriver;
+use crate::FluxVmDriver;
 
 fn convert_pressure(
-    p: Option<zyvor_fabric_ephemera_client::PressureRecord>,
+    p: Option<zyvor_fabric_fluxvm_client::PressureRecord>,
 ) -> Option<PressureRecord> {
     p.map(|p| PressureRecord {
         avg10: p.avg10,
@@ -28,20 +28,20 @@ fn convert_pressure(
 }
 
 #[async_trait]
-impl ResourceStatsDriver for EphemeraDriver {
+impl ResourceStatsDriver for FluxVmDriver {
     async fn get_metrics(&self, name: &str) -> Result<VMMetrics> {
         let record = self.resolve(name).await?;
         let m = self.client.stats(record.id).await?;
         Ok(VMMetrics {
             cpu_usage: m.cpu_usage_percent,
             memory_usage: m.memory_usage_bytes,
-            // Ephemera's cgroup stats have no disk-size concept (that's a
+            // FluxVM's cgroup stats have no disk-size concept (that's a
             // filesystem-level property, not a cgroup `io` controller one);
             // `disk_usage` here means "cgroup-attributed I/O bytes", so sum
             // read+write rather than leave it zeroed.
             disk_usage: m.disk_read_bytes + m.disk_write_bytes,
             // Network accounting isn't cgroup-scoped (no `net_cls`/`net_prio`
-            // delegation in the v2 hierarchy) — Ephemera doesn't expose it,
+            // delegation in the v2 hierarchy) — FluxVM doesn't expose it,
             // matching machinectl-driver's own stats gap for the same reason.
             network_rx: 0,
             network_tx: 0,
@@ -62,10 +62,10 @@ impl ResourceStatsDriver for EphemeraDriver {
 }
 
 #[async_trait]
-impl ResourceControlDriver for EphemeraDriver {
+impl ResourceControlDriver for FluxVmDriver {
     async fn set_cpu_quota(&self, name: &str, percent: u32) -> Result<()> {
         let record = self.resolve(name).await?;
-        let patch = zyvor_fabric_ephemera_client::ResourcePatch {
+        let patch = zyvor_fabric_fluxvm_client::ResourcePatch {
             cpu_quota_percent: Some(percent),
             ..Default::default()
         };
@@ -74,7 +74,7 @@ impl ResourceControlDriver for EphemeraDriver {
 
     async fn set_memory_max(&self, name: &str, bytes: u64) -> Result<()> {
         let record = self.resolve(name).await?;
-        let patch = zyvor_fabric_ephemera_client::ResourcePatch {
+        let patch = zyvor_fabric_fluxvm_client::ResourcePatch {
             memory_max_bytes: Some(bytes),
             ..Default::default()
         };
@@ -83,7 +83,7 @@ impl ResourceControlDriver for EphemeraDriver {
 
     async fn set_io_weight(&self, name: &str, weight: u32) -> Result<()> {
         let record = self.resolve(name).await?;
-        let patch = zyvor_fabric_ephemera_client::ResourcePatch {
+        let patch = zyvor_fabric_fluxvm_client::ResourcePatch {
             io_weight: Some(weight),
             ..Default::default()
         };
@@ -107,7 +107,7 @@ impl ResourceControlDriver for EphemeraDriver {
 
     async fn set_pids_max(&self, name: &str, max: u64) -> Result<()> {
         let record = self.resolve(name).await?;
-        let patch = zyvor_fabric_ephemera_client::ResourcePatch {
+        let patch = zyvor_fabric_fluxvm_client::ResourcePatch {
             pids_max: Some(max),
             ..Default::default()
         };
@@ -116,7 +116,7 @@ impl ResourceControlDriver for EphemeraDriver {
 
     async fn set_cpuset(&self, name: &str, cpus: &[u32]) -> Result<()> {
         let record = self.resolve(name).await?;
-        let patch = zyvor_fabric_ephemera_client::ResourcePatch {
+        let patch = zyvor_fabric_fluxvm_client::ResourcePatch {
             cpuset_cpus: Some(cpus.to_vec()),
             ..Default::default()
         };
@@ -130,14 +130,14 @@ impl ResourceControlDriver for EphemeraDriver {
 }
 
 #[async_trait]
-impl LogDriver for EphemeraDriver {
+impl LogDriver for FluxVmDriver {
     async fn stream_logs(&self, name: &str, lines: u32) -> Result<LogStream> {
         let record = self.resolve(name).await?;
         let unit = name.to_string();
         let lines_stream = self.client.stream_logs(record.id, lines, true).await?;
 
         // Raw serial console output has no journald-equivalent per-line
-        // priority/unit metadata (see `ephemera_api::vm_logs`), so every
+        // priority/unit metadata (see `fluxvm_api::vm_logs`), so every
         // entry is stamped with the same "info" priority and the VM's own
         // name as the unit — an accepted fidelity reduction versus
         // `MachinectlDriver`'s `journalctl --output=json` mapping.
@@ -152,7 +152,7 @@ impl LogDriver for EphemeraDriver {
                         unit,
                     }),
                     Err(e) => {
-                        tracing::warn!("Ephemera log stream for '{unit}' ended with error: {e:#}");
+                        tracing::warn!("FluxVM log stream for '{unit}' ended with error: {e:#}");
                         None
                     }
                 }

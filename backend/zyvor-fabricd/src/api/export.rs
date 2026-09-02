@@ -60,7 +60,7 @@ pub async fn export_vm(
         })?;
 
     // Determine disk path — the VM's actual, live disk (not a guess at a
-    // stale pre-Ephemera-migration path -- /var/lib/machines hasn't
+    // stale pre-FluxVM-migration path -- /var/lib/machines hasn't
     // existed since the systemd-machined removal) unless the caller
     // explicitly overrides it.
     let disk_path = match req.disk_path {

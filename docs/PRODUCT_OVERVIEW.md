@@ -14,7 +14,7 @@ Organizations running Linux infrastructure need a unified control plane for virt
 
 ## What Is Zyvor Fabric?
 
-Zyvor Fabric is a production-grade private cloud control plane built in Rust. It provides a complete management layer over [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency:
+Zyvor Fabric is a production-grade private cloud control plane built in Rust. It provides a complete management layer over [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency:
 
 - **One binary, one config file** — deploys in under 5 minutes (`zyvor-fabricd`), with systemd support built in but not required
 - **520+ REST API endpoints** with JWT authentication, RBAC, and audit logging
@@ -32,7 +32,7 @@ sudo systemctl enable --now zyvor-fabricd
 
 ### 1. VM Driver (Not a Custom Hypervisor)
 
-Zyvor Fabric runs entirely without systemd via [Ephemera](https://github.com/hypersdk/ephemera), its own disposable-VM engine (see [the Ephemera driver guide](guides/vm-drivers/ephemera.md) for the full capability matrix). This means:
+Zyvor Fabric runs entirely without systemd via [FluxVM](https://github.com/zyvorai/fluxvm), its own disposable-VM engine (see [the FluxVM driver guide](guides/vm-drivers/fluxvm.md) for the full capability matrix). This means:
 
 - No custom kernel modules or hypervisor patches
 - Works on Fedora, Ubuntu, Debian, RHEL, SUSE, and any other Linux distribution alike, with or without systemd
@@ -232,7 +232,7 @@ resource "zyvor_fabric_vm" "web" {
                               |   REST API + WebSocket    |
                               +-------------+-------------+
                                             |
-                                  VM Driver: Ephemera
+                                  VM Driver: FluxVM
 ```
 
 ---
@@ -298,7 +298,7 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | Web Framework | Axum 0.8 |
 | Web UI | React 19 + Vite |
 | Web UI | React 18 + TypeScript + Vite + TailwindCSS |
-| VM Backend | Ephemera (no systemd dependency) |
+| VM Backend | FluxVM (no systemd dependency) |
 | Monitoring | Prometheus |
 
 ---

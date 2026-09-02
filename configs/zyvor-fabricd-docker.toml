@@ -21,4 +21,4 @@ bridge = "br0"
 enabled = false
 
 [driver]
-ephemera_url = "http://127.0.0.1:7788"
+fluxvm_url = "http://127.0.0.1:7788"

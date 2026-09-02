@@ -73,7 +73,7 @@ export default function ZyvorAbout({ className = '' }: { className?: string }) {
             {ZYVOR_BRAND}
           </a>{' '}
           product family — clustering, networking, security, storage, HA, GPU passthrough, and
-          operators on Ephemera, a disposable-VM engine with no systemd dependency. Daemon:{' '}
+          operators on FluxVM, a disposable-VM engine with no systemd dependency. Daemon:{' '}
           <span className="font-mono text-[#6e6e73]">{ZYVOR_FABRIC_DAEMON}</span>.
         </p>
         <p className="text-xs text-[#6e6e73] leading-relaxed">

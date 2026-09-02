@@ -41,8 +41,8 @@ pub struct FirmwareCapabilities {
 
 /// Loads a VM's on-disk `config.json`, or synthesizes and persists a
 /// default one if it doesn't exist yet. Every VM created through the
-/// Ephemera driver has no such file -- it owns VM definition itself and
-/// never writes this legacy (pre-Ephemera) location -- so treating a
+/// FluxVM driver has no such file -- it owns VM definition itself and
+/// never writes this legacy (pre-FluxVM) location -- so treating a
 /// missing file as 404 blocked every firmware/UEFI operation for the
 /// driver this deployment actually uses. Firmware operations only need a
 /// name and a directory to create real OVMF NVRAM files in, so a

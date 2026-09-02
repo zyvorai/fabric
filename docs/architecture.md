@@ -2,7 +2,7 @@
 
 ## Overview
 
-Zyvor Fabric is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a Kubernetes operator, and a Terraform provider, backed by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency (`driver.ephemera_url` in `zyvor-fabricd.toml`). systemd itself is optional for the daemon's own packaging/init too -- it runs fine under systemd or any other supervisor.
+Zyvor Fabric is a virtual machine management platform built in Rust. It provides VM lifecycle management through a REST and WebSocket API, a React web UI, a CLI, a Kubernetes operator, and a Terraform provider, backed by [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (`driver.fluxvm_url` in `zyvor-fabricd.toml`). systemd itself is optional for the daemon's own packaging/init too -- it runs fine under systemd or any other supervisor.
 
 ## System Diagram
 
@@ -34,7 +34,7 @@ Zyvor Fabric is a virtual machine management platform built in Rust. It provides
         +---------+      +------+  |  +------+  +---------+
                                     v
                         +-----------------------+
-                        |   VM Driver: Ephemera |
+                        |   VM Driver: FluxVM |
                         +-----------------------+
 ```
 
@@ -47,7 +47,7 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 | Crate | Purpose |
 |-------|---------|
 | `zyvor-fabricd` | Main daemon -- HTTP/WebSocket server, route registration, config loading |
-| `zyvor-fabric-vm-driver` | Builds VM images via `mkosi` -- unrelated to VM lifecycle, which is entirely Ephemera's job |
+| `zyvor-fabric-vm-driver` | Builds VM images via `mkosi` -- unrelated to VM lifecycle, which is entirely FluxVM's job |
 | `vm-model` | Core data structures: VM definitions, state enums, request/response types |
 | `state-store` | Persistent VM state with JSON storage, in-memory caching, file persistence |
 | `zyvorctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
@@ -124,7 +124,7 @@ User --> CLI  /  Web UI / K8s Operator / Terraform Provider
           VM Driver      State Store (/var/lib/zyvor-fabricd/)
               |
               v
-          Ephemera --> Virtual Machines
+          FluxVM --> Virtual Machines
 ```
 
 ## Storage Layout
@@ -149,7 +149,7 @@ systemd is no longer required to install or run zyvor-fabricd -- packaging has n
 |------|---------|
 | `zyvor-fabricd.service` | Main daemon (`Type=simple`; systemd hardening via `ProtectSystem=strict`, capability bounding -- no socket activation, no watchdog) |
 
-VMs themselves are never systemd units -- their lifecycle is owned by [Ephemera](https://github.com/hypersdk/ephemera), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly (see [the Ephemera driver guide](guides/vm-drivers/ephemera.md)). There is no per-VM systemd unit template.
+VMs themselves are never systemd units -- their lifecycle is owned by [FluxVM](https://github.com/zyvorai/fluxvm), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly (see [the FluxVM driver guide](guides/vm-drivers/fluxvm.md)). There is no per-VM systemd unit template.
 
 ## Security Model
 

@@ -155,7 +155,7 @@ pub async fn create_snapshot(
 
     let _lock = state.vm_lock(&vm_name).lock_owned().await;
 
-    // The VM's actual, live disk (Ephemera's copy-on-write instance disk,
+    // The VM's actual, live disk (FluxVM's copy-on-write instance disk,
     // not a naming-convention guess at its base image -- see
     // VMDriver::get_disk_path's doc comment for why that distinction
     // matters).

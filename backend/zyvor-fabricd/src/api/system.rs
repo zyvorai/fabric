@@ -250,8 +250,8 @@ pub async fn set_memory_limit(
     tracing::debug!("system::{}", stringify!(set_memory_limit));
     validate_vm_name(&vm_name)?;
 
-    // Ephemera-backed VMs' real cgroups live at ephemera.slice/<uuid>.scope,
-    // keyed by Ephemera's own internal VM id, not the VM name -- resolve it
+    // FluxVM-backed VMs' real cgroups live at fluxvm.slice/<uuid>.scope,
+    // keyed by FluxVM's own internal VM id, not the VM name -- resolve it
     // via the driver rather than guessing at a name-based cgroup path (see
     // VmDriver::get_cgroup_path).
     let cgroup_path = state.driver.get_cgroup_path(&vm_name).await.map_err(|e| {

@@ -4,8 +4,8 @@
 #
 # Both services use network_mode: host: zyvor-fabricd's nftables/rtnetlink
 # calls need to act on the host's real network namespace to manage actual
-# VM traffic, and it's what lets zyvor-fabricd reach ephemera at its default
-# 127.0.0.1:7788 with no config changes -- the same reason Ephemera's own
+# VM traffic, and it's what lets zyvor-fabricd reach fluxvm at its default
+# 127.0.0.1:7788 with no config changes -- the same reason FluxVM's own
 # Kubernetes DaemonSet uses hostNetwork: true.
 #
 # Port is overridable (e.g. to run alongside a bare-metal zyvor-fabricd on
@@ -19,7 +19,7 @@ services:
     container_name: zyvor-fabricd
     network_mode: host
     depends_on:
-      ephemera:
+      fluxvm:
         condition: service_started
     environment:
       ZYVOR_FABRICD_LISTEN: "0.0.0.0:${ZYVOR_FABRICD_PORT:-9095}"
@@ -49,17 +49,17 @@ services:
   # its build needs the sibling guestkit repo as a second BuildKit build
   # context, which this compose file's build: key can't express portably
   # across Docker Compose and Podman Compose versions.
-  ephemera:
-    image: zyvor-fabric-ephemera:local
-    container_name: ephemera
+  fluxvm:
+    image: zyvor-fabric-fluxvm:local
+    container_name: fluxvm
     network_mode: host
     cgroup: host
-    command: ["ephemera", "serve"]
+    command: ["fluxvm", "serve"]
     devices:
       - /dev/kvm
     volumes:
-      - ephemera-data:/var/lib/ephemera
-      - ephemera-run:/run/ephemera
+      - fluxvm-data:/var/lib/fluxvm
+      - fluxvm-run:/run/fluxvm
       - /run/netns:/run/netns
     cap_add:
       - NET_ADMIN
@@ -72,5 +72,5 @@ services:
 volumes:
   zyvor-fabricd-data:
   zyvor-fabricd-etc:
-  ephemera-data:
-  ephemera-run:
+  fluxvm-data:
+  fluxvm-run:

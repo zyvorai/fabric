@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers installing Zyvor Fabric on a Linux system, along with QEMU/KVM for virtual machine execution. Zyvor Fabric's VM lifecycle is entirely owned by [Ephemera](https://github.com/hypersdk/ephemera) (`driver.ephemera_url` in `zyvor-fabricd.toml`), which has no systemd version requirement at all. Zyvor Fabric itself (the daemon) doesn't require systemd either — it can run under systemd or as a plain process.
+This guide covers installing Zyvor Fabric on a Linux system, along with QEMU/KVM for virtual machine execution. Zyvor Fabric's VM lifecycle is entirely owned by [FluxVM](https://github.com/zyvorai/fluxvm) (`driver.fluxvm_url` in `zyvor-fabricd.toml`), which has no systemd version requirement at all. Zyvor Fabric itself (the daemon) doesn't require systemd either — it can run under systemd or as a plain process.
 
 ---
 
@@ -20,7 +20,7 @@ This guide covers installing Zyvor Fabric on a Linux system, along with QEMU/KVM
 | Requirement | Minimum Version | Notes |
 |-------------|-----------------|-------|
 | Linux kernel | 5.15+ | x86_64 architecture |
-| Ephemera | latest | See [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` |
+| FluxVM | latest | See [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` |
 | QEMU | 8.0+ | KVM acceleration recommended |
 | Rust | 1.75+ | Only for building from source |
 
@@ -49,13 +49,13 @@ sudo dnf install -y \
     nftables
 ```
 
-### 2. Verify Ephemera is reachable
+### 2. Verify FluxVM is reachable
 
 ```bash
 curl -sf http://127.0.0.1:7788/healthz
 ```
 
-See [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` if this doesn't succeed yet.
+See [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` if this doesn't succeed yet.
 
 ### 3. Enable KVM
 
@@ -110,13 +110,13 @@ sudo apt install -y \
     nftables
 ```
 
-### 2. Verify Ephemera is reachable
+### 2. Verify FluxVM is reachable
 
 ```bash
 curl -sf http://127.0.0.1:7788/healthz
 ```
 
-See [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for running `ephemera serve` if this doesn't succeed yet.
+See [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` if this doesn't succeed yet.
 
 ### 3. Enable KVM
 
@@ -292,15 +292,15 @@ This performs a deep check of API availability, disk space, database integrity, 
 
 ## Troubleshooting
 
-### Cannot connect to Ephemera
+### Cannot connect to FluxVM
 
-VM operations will fail if `ephemera serve` isn't running or isn't reachable at the URL configured in `zyvor-fabricd.toml` (`driver.ephemera_url`, default `http://127.0.0.1:7788`):
+VM operations will fail if `fluxvm serve` isn't running or isn't reachable at the URL configured in `zyvor-fabricd.toml` (`driver.fluxvm_url`, default `http://127.0.0.1:7788`):
 
 ```bash
 curl -sf http://127.0.0.1:7788/healthz
 ```
 
-If that fails, see [Ephemera's README](https://github.com/hypersdk/ephemera#readme) for starting it.
+If that fails, see [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) for starting it.
 
 ### KVM not available
 

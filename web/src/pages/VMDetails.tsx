@@ -617,7 +617,7 @@ function NetworkTab({ vm, onUpdated }: { vm: VM; onUpdated: () => void }) {
     // Only live interface info (driver properties) failed to load -- the
     // VM's own stored config (port forwards) is independent of that and
     // should still be manageable, e.g. for a never-started VM with no
-    // Ephemera-side instance yet to query properties from.
+    // FluxVM-side instance yet to query properties from.
     return (
       <div className="space-y-6">
         <div className="zf-panel p-8 text-center">

@@ -33,7 +33,7 @@ below is illustrative and close to it, with commentary added:
 [Unit]
 Description=zyvor-fabricd - Virtual Machine Management Daemon
 Documentation=https://github.com/ssahani/zyvor-fabric
-# VM lifecycle is entirely Ephemera's job (driver.ephemera_url) — nothing
+# VM lifecycle is entirely FluxVM's job (driver.fluxvm_url) — nothing
 # here depends on systemd-machined or systemd-networkd, so there's nothing
 # service-specific to order After= beyond basic network availability.
 After=network-online.target

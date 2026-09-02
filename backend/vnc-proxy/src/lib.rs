@@ -22,7 +22,7 @@ pub struct VncQuery {
 }
 
 /// VNC WebSocket proxy handler.
-/// Bridges WebSocket (browser) <-> VNC server (Ephemera's per-VM UNIX
+/// Bridges WebSocket (browser) <-> VNC server (FluxVM's per-VM UNIX
 /// socket at `<workspace>/vnc.sock`, resolved via `VmDriver::get_vnc_socket`
 /// rather than a guessed TCP port — see driver-core's doc comment).
 pub async fn vnc_handler<S>(

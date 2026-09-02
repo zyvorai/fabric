@@ -1,32 +1,32 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-//! Thin REST client for [Ephemera](https://github.com/hypersdk/ephemera)'s
+//! Thin REST client for [FluxVM](https://github.com/zyvorai/fluxvm)'s
 //! `/v1/vms...` API — the disposable-VM control plane that is replacing
 //! systemd-machined/systemd-vmspawn as zyvor-fabricd's VM lifecycle backend.
 //!
 //! This crate only wraps the wire protocol (request/response types + HTTP
 //! calls); it does not implement `driver-core`'s `VMDriver` trait family —
-//! that mapping lives in a separate `ephemera-driver` crate so the raw
+//! that mapping lives in a separate `fluxvm-driver` crate so the raw
 //! client can be reused/tested independently of that trait boundary.
 //!
-//! The DTOs below mirror `ephemera-core::model` and `ephemera-api::router`.
+//! The DTOs below mirror `fluxvm-core::model` and `fluxvm-api::router`.
 //! Because integration is out-of-process (REST, not a Cargo path/git
-//! dependency on Ephemera's own crates), these types must be kept in sync
-//! by hand when Ephemera's API changes — that's the deliberate trade for
-//! not coupling zyvor-fabric's build to Ephemera's crate versions. Ephemera
+//! dependency on FluxVM's own crates), these types must be kept in sync
+//! by hand when FluxVM's API changes — that's the deliberate trade for
+//! not coupling zyvor-fabric's build to FluxVM's crate versions. FluxVM
 //! has grown a bearer-token auth layer (`Role::Admin`/`Role::ReadOnly`)
-//! since this client was first written; `EphemeraClient::with_token` covers
+//! since this client was first written; `FluxVmClient::with_token` covers
 //! it, and stays a no-op against a deployment that leaves `auth.tokens`
 //! empty (auth off — today's default posture, see the migration plan's
 //! "Auth boundary" note).
 //!
-//! As of Ephemera v0.1.0, `CreateVmRequest`/`VmRecord` here are missing the
+//! As of FluxVM v0.1.0, `CreateVmRequest`/`VmRecord` here are missing the
 //! fields behind its newer per-VM storage backends (`storage`: LVM thin/NBD/
 //! Ceph RBD), per-VM network namespaces (`NetworkSpec::Tap.netns`), and the
 //! Firecracker-jailer/vsock-proxy bookkeeping (`jail_path`, `vsock_socket`,
-//! `lvm_lv`, `nbd_pid`) — see `ephemera-driver`'s crate doc comment for the
-//! full gap list. Every VM created through this client still gets Ephemera's
+//! `lvm_lv`, `nbd_pid`) — see `fluxvm-driver`'s crate doc comment for the
+//! full gap list. Every VM created through this client still gets FluxVM's
 //! default qcow2/raw storage and shared-bridge networking until those fields
 //! are added here.
 
@@ -40,7 +40,7 @@ use tokio::io::AsyncBufReadExt;
 use uuid::Uuid;
 
 // ============================================================================
-// Wire types (mirror ephemera-core::model)
+// Wire types (mirror fluxvm-core::model)
 // ============================================================================
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -71,8 +71,8 @@ pub enum NetworkSpec {
         mac: Option<String>,
         /// Give the VM its own network namespace with a per-namespace
         /// dnsmasq DHCP server, instead of a tap on a shared host bridge
-        /// (`bridge` is ignored when this is true) — see Ephemera's
-        /// `ephemera_network::netns`. Mirrors `ephemera_core::model::
+        /// (`bridge` is ignored when this is true) — see FluxVM's
+        /// `fluxvm_network::netns`. Mirrors `fluxvm_core::model::
         /// NetworkSpec::Tap.netns`.
         #[serde(default)]
         netns: bool,
@@ -110,7 +110,7 @@ pub struct AgentSpec {
     #[serde(default = "default_agent_port")]
     pub port: u32,
     /// Shared secret the guest agent requires on every request. Leave unset
-    /// on a request with `enabled: true` and Ephemera generates one and
+    /// on a request with `enabled: true` and FluxVM generates one and
     /// burns it into the VM's disk before boot.
     #[serde(default)]
     pub token: Option<String>,
@@ -143,7 +143,7 @@ pub struct CloudInitSpec {
     pub runcmd: Vec<String>,
     /// Configure the guest's network address statically via cloud-init
     /// instead of DHCP -- only meaningful for `NetworkSpec::Tap { netns:
-    /// true, .. }`. Mirrors `ephemera_core::model::CloudInitSpec.
+    /// true, .. }`. Mirrors `fluxvm_core::model::CloudInitSpec.
     /// static_network`.
     #[serde(default)]
     pub static_network: bool,
@@ -193,7 +193,7 @@ pub struct CreateVmRequest {
 }
 
 /// A host directory shared into the guest via virtiofs, declared at create
-/// time — see Ephemera's own `ephemera_core::model::SharedFolder` doc
+/// time — see FluxVM's own `fluxvm_core::model::SharedFolder` doc
 /// comment for why this replaces `machinectl bind`'s live mount instead of
 /// having a live equivalent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -246,19 +246,19 @@ pub struct VmRecord {
     #[serde(default)]
     pub cgroup_path: Option<PathBuf>,
     /// Set for `NetworkSpec::Tap { netns: true, .. }` — the VM's private
-    /// network namespace name. Mirrors `ephemera_core::model::VmRecord.netns`.
+    /// network namespace name. Mirrors `fluxvm_core::model::VmRecord.netns`.
     #[serde(default)]
     pub netns: Option<String>,
     /// The guest's DHCP-leased IP on its own private subnet, resolved by
-    /// Ephemera on every read for `netns: true` VMs — `None` for every
+    /// FluxVM on every read for `netns: true` VMs — `None` for every
     /// other networking mode, or until the guest completes a DHCP
-    /// handshake. Mirrors `ephemera_core::model::VmRecord.guest_ip`.
+    /// handshake. Mirrors `fluxvm_core::model::VmRecord.guest_ip`.
     #[serde(default)]
     pub guest_ip: Option<String>,
 }
 
 /// cgroup v2 resource-control settings to apply to a running VM. Mirrors
-/// `ephemera_core::model::ResourcePatch`.
+/// `fluxvm_core::model::ResourcePatch`.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ResourcePatch {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -273,7 +273,7 @@ pub struct ResourcePatch {
     pub cpuset_cpus: Option<Vec<u32>>,
 }
 
-/// Mirrors `ephemera_core::model::VmMetrics`.
+/// Mirrors `fluxvm_core::model::VmMetrics`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct VmMetrics {
     pub cpu_usage_percent: f64,
@@ -282,7 +282,7 @@ pub struct VmMetrics {
     pub disk_write_bytes: u64,
 }
 
-/// Mirrors `ephemera_cgroup::PressureRecord`.
+/// Mirrors `fluxvm_cgroup::PressureRecord`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PressureRecord {
     pub avg10: f64,
@@ -291,7 +291,7 @@ pub struct PressureRecord {
     pub total: u64,
 }
 
-/// Mirrors `ephemera_core::model::VmPressure`.
+/// Mirrors `fluxvm_core::model::VmPressure`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct VmPressure {
     pub cpu_some: Option<PressureRecord>,
@@ -308,7 +308,7 @@ struct VmListResponse {
 
 /// A warm pool: `size` VMs pre-booted from `template`, then paused, ready
 /// to be handed out instantly by `claim_pool` instead of cold-created.
-/// Mirrors `ephemera_core::model::PoolRecord`.
+/// Mirrors `fluxvm_core::model::PoolRecord`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoolRecord {
     pub name: String,
@@ -332,7 +332,7 @@ struct PoolListResponse {
 
 /// Applied to the VM handed back by a pool claim, replacing whatever the
 /// template said for these two fields. Mirrors
-/// `ephemera_core::model::ClaimOverrides`.
+/// `fluxvm_core::model::ClaimOverrides`.
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct ClaimOverrides {
     #[serde(default)]
@@ -341,8 +341,8 @@ pub struct ClaimOverrides {
     pub ttl_seconds: Option<u64>,
 }
 
-/// One entry in Ephemera's image catalog. Mirrors
-/// `ephemera_image::catalog::CatalogEntry` on the wire, plus
+/// One entry in FluxVM's image catalog. Mirrors
+/// `fluxvm_image::catalog::CatalogEntry` on the wire, plus
 /// `signature_valid` which only `GET /v1/images/catalog`'s
 /// `CatalogListEntry` wrapper adds (`None` when the client's own requests —
 /// add/rename/clone/export — return a bare `CatalogEntry` with no
@@ -424,7 +424,7 @@ struct GetFileRequest {
     path: String,
 }
 
-/// Mirrors `ephemera_guest_protocol::AgentResponse`. `Error` is an
+/// Mirrors `fluxvm_guest_protocol::AgentResponse`. `Error` is an
 /// agent/protocol-level failure (bad token, malformed request) — a command
 /// that ran but exited non-zero is still `Exec` with that `exit_code`, not
 /// this variant.
@@ -452,26 +452,26 @@ pub enum AgentResponse {
 // Client
 // ============================================================================
 
-/// A REST client for one `ephemera serve` instance.
+/// A REST client for one `fluxvm serve` instance.
 #[derive(Clone)]
-pub struct EphemeraClient {
+pub struct FluxVmClient {
     base_url: reqwest::Url,
     http: reqwest::Client,
-    /// Bearer token sent on every request once Ephemera's `auth.tokens` is
+    /// Bearer token sent on every request once FluxVM's `auth.tokens` is
     /// non-empty. `None` is correct (and required) against a deployment
     /// that leaves auth disabled — there's nothing to send.
     token: Option<String>,
 }
 
-impl EphemeraClient {
-    /// `base_url` is Ephemera's listen address, e.g. `http://127.0.0.1:7788`.
+impl FluxVmClient {
+    /// `base_url` is FluxVM's listen address, e.g. `http://127.0.0.1:7788`.
     pub fn new(base_url: impl AsRef<str>) -> Result<Self> {
         let base_url = reqwest::Url::parse(base_url.as_ref())
-            .with_context(|| format!("invalid Ephemera base URL: {}", base_url.as_ref()))?;
+            .with_context(|| format!("invalid FluxVM base URL: {}", base_url.as_ref()))?;
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .context("failed to build Ephemera HTTP client")?;
+            .context("failed to build FluxVM HTTP client")?;
         Ok(Self {
             base_url,
             http,
@@ -480,7 +480,7 @@ impl EphemeraClient {
     }
 
     /// Attach a bearer token, required once the target instance has
-    /// `auth.tokens` configured (see `ephemera_core::config::AuthConfig`).
+    /// `auth.tokens` configured (see `fluxvm_core::config::AuthConfig`).
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.token = Some(token.into());
         self
@@ -489,7 +489,7 @@ impl EphemeraClient {
     fn url(&self, path: &str) -> Result<reqwest::Url> {
         self.base_url
             .join(path)
-            .with_context(|| format!("failed to build Ephemera URL for {path}"))
+            .with_context(|| format!("failed to build FluxVM URL for {path}"))
     }
 
     fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -501,7 +501,7 @@ impl EphemeraClient {
 
     /// `GET /healthz` — used at startup and by capability probes. Unlike
     /// every other endpoint, `/healthz` is reachable without a bearer token
-    /// even when auth is enabled (see `ephemera_api::auth_middleware`), so
+    /// even when auth is enabled (see `fluxvm_api::auth_middleware`), so
     /// this deliberately does not go through `authed()`.
     pub async fn healthy(&self) -> bool {
         matches!(
@@ -612,7 +612,7 @@ impl EphemeraClient {
     }
 
     /// `POST /v1/vms/{id}/agent` — exec a command over the in-guest vsock
-    /// agent (requires `CreateVmRequest.agent.enabled`; Ephemera itself
+    /// agent (requires `CreateVmRequest.agent.enabled`; FluxVM itself
     /// returns a clear error for a VM that doesn't have it, rather than a
     /// silent hang).
     pub async fn agent_exec(
@@ -670,7 +670,7 @@ impl EphemeraClient {
         Self::parse(resp).await
     }
 
-    /// `GET /v1/vms/{id}/console?cols=..&rows=..` — dials Ephemera's
+    /// `GET /v1/vms/{id}/console?cols=..&rows=..` — dials FluxVM's
     /// interactive-console WebSocket and returns a raw byte stream: reads
     /// yield whatever the guest's shell wrote, writes go straight to its
     /// stdin, with no framing on this side either (WS binary frames only,
@@ -684,7 +684,7 @@ impl EphemeraClient {
                 "ws"
             })
             .map_err(|_| {
-                anyhow::anyhow!("failed to convert Ephemera base URL to a ws(s):// scheme")
+                anyhow::anyhow!("failed to convert FluxVM base URL to a ws(s):// scheme")
             })?;
         ws_url
             .query_pairs_mut()
@@ -713,7 +713,7 @@ impl EphemeraClient {
             .map_err(|e| {
                 // tungstenite's `Error::Http` Display only prints the status
                 // line ("HTTP error: 400 Bad Request") -- the actual reason
-                // (e.g. Ephemera's own `{"error": "connect(vsock ...): ..."}`
+                // (e.g. FluxVM's own `{"error": "connect(vsock ...): ..."}`
                 // body) is right there in the response but silently dropped
                 // unless pulled out explicitly. Without this, every console
                 // failure looked identical to the browser regardless of cause.
@@ -841,7 +841,7 @@ impl EphemeraClient {
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            bail!("Ephemera request failed: {status} — {body}");
+            bail!("FluxVM request failed: {status} — {body}");
         }
 
         let byte_stream = resp
@@ -1050,7 +1050,7 @@ impl EphemeraClient {
             Ok(())
         } else {
             let body = resp.text().await.unwrap_or_default();
-            bail!("Ephemera request failed: {status} — {body}")
+            bail!("FluxVM request failed: {status} — {body}")
         }
     }
 
@@ -1059,21 +1059,21 @@ impl EphemeraClient {
         let bytes = resp
             .bytes()
             .await
-            .context("failed to read Ephemera response body")?;
+            .context("failed to read FluxVM response body")?;
         if !status.is_success() {
             let body = String::from_utf8_lossy(&bytes);
-            bail!("Ephemera request failed: {status} — {body}");
+            bail!("FluxVM request failed: {status} — {body}");
         }
         serde_json::from_slice(&bytes)
-            .with_context(|| format!("failed to parse Ephemera response ({status})"))
+            .with_context(|| format!("failed to parse FluxVM response ({status})"))
     }
 }
 
 /// A live console WebSocket, adapted to plain `AsyncRead`/`AsyncWrite` —
 /// callers (e.g. `zyvor-fabricd`'s own browser-facing console WebSocket)
 /// just read/write raw bytes; the WS binary-frame boundary underneath is
-/// invisible on this side, matching Ephemera's own console protocol (see
-/// `ephemera_api::relay_console`'s doc comment on the other end of this
+/// invisible on this side, matching FluxVM's own console protocol (see
+/// `fluxvm_api::relay_console`'s doc comment on the other end of this
 /// connection).
 pub struct ConsoleWs {
     stream: tokio_tungstenite::WebSocketStream<

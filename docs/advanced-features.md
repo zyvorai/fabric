@@ -89,7 +89,7 @@ write_files:
 ### How It Works
 
 1. `POST /api/vms/:name/cloud-init` parses `user_data` and persists `hostname`, `ssh_authorized_keys`, `packages`, `runcmd`, and `write_files` onto the VM record.
-2. On the VM's next (re)start, those fields are passed to Ephemera as part of its own `CloudInitSpec`, which is what makes Ephemera attach a cloud-init seed disk (NoCloud datasource) to the VM.
+2. On the VM's next (re)start, those fields are passed to FluxVM as part of its own `CloudInitSpec`, which is what makes FluxVM attach a cloud-init seed disk (NoCloud datasource) to the VM.
 3. cloud-init inside the guest reads that seed on first boot.
 4. Because attaching the seed is what brings up cloud-init's own default network config, this is also what makes the guest's DHCP client come up — a VM with no cloud-init config at all gets no seed and no automatic networking.
 

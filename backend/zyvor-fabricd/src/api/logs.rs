@@ -41,7 +41,7 @@ pub struct LogResponse {
 
 /// GET /api/vms/:name/logs - Returns recent log entries for a specific VM,
 /// via `state.driver`'s `LogDriver` (journald for `MachinectlDriver`,
-/// Ephemera's captured console output for `EphemeraDriver`).
+/// FluxVM's captured console output for `FluxVmDriver`).
 pub async fn get_vm_logs(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,

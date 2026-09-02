@@ -10,7 +10,7 @@ This section provides evaluation materials to help teams assess Zyvor Fabric aga
 
 Zyvor Fabric is a strong fit when your environment meets these criteria:
 
-- **No systemd requirement** -- VM lifecycle is managed by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency of its own; host networking uses direct netlink calls (not systemd-networkd). systemd itself is entirely optional -- only as a way to supervise the `zyvor-fabricd` daemon process, for operators who choose that supervisor.
+- **No systemd requirement** -- VM lifecycle is managed by [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency of its own; host networking uses direct netlink calls (not systemd-networkd). systemd itself is entirely optional -- only as a way to supervise the `zyvor-fabricd` daemon process, for operators who choose that supervisor.
 - **API-first automation** -- You need a comprehensive REST API (480+ endpoints) for infrastructure-as-code workflows, CI/CD pipelines, or custom tooling.
 - **Single-host or small-cluster deployments** -- You want lightweight VM management without the operational overhead of full cluster orchestration platforms.
 - **Security-conscious environments** -- You value PAM-based authentication, role-based access control, audit logging, and network policy enforcement built into the platform.

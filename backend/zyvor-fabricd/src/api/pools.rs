@@ -3,7 +3,7 @@
 
 //! Warm VM pools -- pre-boot N VMs from a template, pause each once ready,
 //! then hand one out instantly on claim instead of a slow cold create+boot.
-//! Backed by `state.driver`'s `PoolDriver` (Ephemera's `/v1/pools` API).
+//! Backed by `state.driver`'s `PoolDriver` (FluxVM's `/v1/pools` API).
 //! Named `vm-pools` in the URL, not `pools`, to stay unambiguous next to
 //! the unrelated `/api/resource-pools` (CPU/memory share allocation).
 
@@ -113,7 +113,7 @@ pub async fn get_pool(
     Ok(Json(pool.into()))
 }
 
-/// DELETE /api/vm-pools/:name -- Ephemera tears down every member VM as
+/// DELETE /api/vm-pools/:name -- FluxVM tears down every member VM as
 /// part of this one call, which for a pool of any real size easily runs
 /// past the server's 60s request timeout even though the deletion itself
 /// keeps going and eventually succeeds. Confirm the pool exists (fast),
@@ -179,7 +179,7 @@ pub async fn claim_pool(
             )
         })?;
 
-    // The claimed VM is already running in Ephemera -- mirror it into
+    // The claimed VM is already running in FluxVM -- mirror it into
     // zyvor-fabric's own store so it shows up like any other VM from here.
     state.store.save_vm(&vm).map_err(|e| {
         crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())

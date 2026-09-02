@@ -16,9 +16,9 @@ Recommends:     wireguard-tools
 
 %description
 zyvor-fabricd is a daemon for managing virtual machines, with VM lifecycle
-handled by Ephemera (https://github.com/hypersdk/ephemera), a standalone
+handled by FluxVM (https://github.com/zyvorai/fluxvm), a standalone
 disposable-VM control plane with no systemd dependency of its own — see
-driver.ephemera_url in zyvor-fabricd.toml. Provides REST API, WebSocket
+driver.fluxvm_url in zyvor-fabricd.toml. Provides REST API, WebSocket
 console, VNC proxy, and comprehensive VM lifecycle management. Runs under
 systemd or any other supervisor — nothing in this package requires it.
 

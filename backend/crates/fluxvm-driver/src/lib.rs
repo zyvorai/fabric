@@ -1,34 +1,34 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-//! `driver-core` implementation backed by [Ephemera](https://github.com/hypersdk/ephemera)
+//! `driver-core` implementation backed by [FluxVM](https://github.com/zyvorai/fluxvm)
 //! — the only `VmDriver` implementation left as of the systemd-removal
 //! migration's final phase; the systemd-machined/systemd-vmspawn backend
 //! this replaced (`machinectl-driver`/`machined-dbus`) is gone. `VMDriver`'s
 //! create/stop/pause/resume/list/state/properties/leader-pid map directly
-//! onto Ephemera's REST API. `ResourceControlDriver`/`ResourceStatsDriver`
-//! are backed by Ephemera's cgroup-delegation extension (see
+//! onto FluxVM's REST API. `ResourceControlDriver`/`ResourceStatsDriver`
+//! are backed by FluxVM's cgroup-delegation extension (see
 //! `resource_control.rs`). `LogDriver` streams real captured console output
-//! over Ephemera's `GET /v1/vms/{id}/logs` (see `resource_control.rs`'s
+//! over FluxVM's `GET /v1/vms/{id}/logs` (see `resource_control.rs`'s
 //! `stream_logs` impl); the one fidelity reduction versus the old
 //! journald-backed driver is that raw serial console output has no
 //! per-line priority/unit metadata, so every entry is stamped uniformly.
 //! `ConsoleDriver` (see `console.rs`) gives an interactive shell over
-//! Ephemera's console WebSocket, itself backed by the vsock guest agent's
+//! FluxVM's console WebSocket, itself backed by the vsock guest agent's
 //! `OpenShell` op.
 //!
-//! **Known gap as of Ephemera v0.1.0**: `ephemera-client`'s wire types are a
-//! hand-synced mirror of `ephemera-core::model` (see that crate's own doc
+//! **Known gap as of FluxVM v0.1.0**: `fluxvm-client`'s wire types are a
+//! hand-synced mirror of `fluxvm-core::model` (see that crate's own doc
 //! comment for why), and haven't yet picked up several fields/capabilities
-//! Ephemera has since grown — `CreateVmRequest.storage` (LVM thin/NBD/Ceph
+//! FluxVM has since grown — `CreateVmRequest.storage` (LVM thin/NBD/Ceph
 //! RBD backends), `NetworkSpec::Tap.netns` (per-VM network namespaces), and
 //! `VmRecord`'s `jail_path`/`vsock_socket`/`lvm_lv`/`nbd_pid` fields. Every
-//! VM created through this driver still gets Ephemera's default qcow2/raw
+//! VM created through this driver still gets FluxVM's default qcow2/raw
 //! storage and shared-bridge networking — those newer per-VM choices simply
 //! aren't reachable through `driver-core` yet. Also orthogonal to this
-//! driver entirely: Ephemera's `ephemera-kube` Kubernetes CRD/operator and
-//! `ephemera-agent` distributed fleet registry are separate ways to run
-//! Ephemera, not something this REST-client-based driver consumes.
+//! driver entirely: FluxVM's `fluxvm-kube` Kubernetes CRD/operator and
+//! `fluxvm-agent` distributed fleet registry are separate ways to run
+//! FluxVM, not something this REST-client-based driver consumes.
 
 mod console;
 mod images;
@@ -38,7 +38,7 @@ mod resource_control;
 mod shell;
 
 use anyhow::{Context, Result};
-use zyvor_fabric_ephemera_client::EphemeraClient;
+use zyvor_fabric_fluxvm_client::FluxVmClient;
 
 pub use zyvor_fabric_driver_core::{
     CapabilityProvider, ConsoleDriver, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
@@ -46,17 +46,17 @@ pub use zyvor_fabric_driver_core::{
     VMDriver, VmDriver,
 };
 
-/// Driver backed by one `ephemera serve` instance's REST API.
+/// Driver backed by one `fluxvm serve` instance's REST API.
 #[derive(Clone)]
-pub struct EphemeraDriver {
-    client: EphemeraClient,
+pub struct FluxVmDriver {
+    client: FluxVmClient,
 }
 
-impl EphemeraDriver {
-    /// `base_url` is Ephemera's listen address, e.g. `http://127.0.0.1:7788`.
+impl FluxVmDriver {
+    /// `base_url` is FluxVM's listen address, e.g. `http://127.0.0.1:7788`.
     pub fn new(base_url: impl AsRef<str>) -> Result<Self> {
         Ok(Self {
-            client: EphemeraClient::new(base_url)?,
+            client: FluxVmClient::new(base_url)?,
         })
     }
 
@@ -65,25 +65,25 @@ impl EphemeraDriver {
         self
     }
 
-    /// Resolve a `driver-core` name to Ephemera's `Uuid`, since `VmRecord`
+    /// Resolve a `driver-core` name to FluxVM's `Uuid`, since `VmRecord`
     /// is keyed by id while `VMDriver` is keyed by name (systemd-machined's
     /// model). Fails loudly rather than silently no-op'ing on an unknown
     /// name, matching machinectl-driver's behavior for the same case.
-    async fn resolve(&self, name: &str) -> Result<zyvor_fabric_ephemera_client::VmRecord> {
+    async fn resolve(&self, name: &str) -> Result<zyvor_fabric_fluxvm_client::VmRecord> {
         self.client
             .find_by_name(name)
             .await?
-            .with_context(|| format!("no VM named '{name}' known to Ephemera"))
+            .with_context(|| format!("no VM named '{name}' known to FluxVM"))
     }
 }
 
-impl CapabilityProvider for EphemeraDriver {
+impl CapabilityProvider for FluxVmDriver {
     fn backend_name(&self) -> &'static str {
-        "ephemera"
+        "fluxvm"
     }
 
     fn has_resource_control(&self) -> bool {
-        // Backed by Ephemera's cgroup-delegation extension — see `resource_control.rs`.
+        // Backed by FluxVM's cgroup-delegation extension — see `resource_control.rs`.
         true
     }
 }

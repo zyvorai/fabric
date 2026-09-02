@@ -91,13 +91,13 @@ records, and resolution policies.
 **Driver**: An abstraction layer between Zyvor Fabric and the underlying VM
 lifecycle tooling. The `VmDriver` trait family defines lifecycle, resource
 control, logs, images, shell, and console operations. Implemented against
-Ephemera (see "Ephemera") -- there's no other backend to choose.
+FluxVM (see "FluxVM") -- there's no other backend to choose.
 
 ## E
 
-**Ephemera**: A disposable-VM engine ([github.com/hypersdk/ephemera](https://github.com/hypersdk/ephemera))
+**FluxVM**: A disposable-VM engine ([github.com/zyvorai/fluxvm](https://github.com/zyvorai/fluxvm))
 with no systemd dependency, reached over its REST API and vsock guest agent
-(`driver.ephemera_url` in `zyvor-fabricd.toml`). Zyvor Fabric's only VM
+(`driver.fluxvm_url` in `zyvor-fabricd.toml`). Zyvor Fabric's only VM
 driver.
 
 **Encryption**: VM disk encryption using key management providers. Supports

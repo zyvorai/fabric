@@ -64,11 +64,11 @@ on this host before you try).
 
 ## Known Gap: Target-Side Start
 
-Pausing the source VM for the final sync goes through the active `VmDriver` on this host (Ephemera
+Pausing the source VM for the final sync goes through the active `VmDriver` on this host (FluxVM
 or machinectl, whichever is configured) -- that part is driver-generic. Starting the VM on the
 *target* node after cutover still shells `ssh <target> machinectl start ...` directly, because a
 local `Arc<dyn VmDriver>` only talks to this host's own backend, not a remote one. Migrating **onto**
-a host running the Ephemera driver doesn't work end to end today -- the source-side pause does, the
+a host running the FluxVM driver doesn't work end to end today -- the source-side pause does, the
 target-side start doesn't.
 
 ---

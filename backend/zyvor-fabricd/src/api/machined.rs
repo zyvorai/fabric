@@ -3,7 +3,7 @@
 
 //! API endpoints for VM machine-level lifecycle, image management, shell
 //! exec, file copy, and SSH info — all routed through `state.driver`
-//! (`Arc<dyn VmDriver>`, Ephemera-backed), so nothing here shells out to
+//! (`Arc<dyn VmDriver>`, FluxVM-backed), so nothing here shells out to
 //! any external CLI directly. See `ssh_info`'s doc comment for how SSH
 //! info specifically is derived.
 //!
@@ -11,7 +11,7 @@
 //! shared-kernel mount trick for a live host-into-guest bind the way
 //! nspawn containers had. The replacement is declared at VM-create time
 //! instead: `VMStartOptions.bind_mounts`, translated into a virtiofs share
-//! per entry (see `ephemera-driver::lifecycle`'s translation).
+//! per entry (see `fluxvm-driver::lifecycle`'s translation).
 
 use axum::{
     extract::{Path, State},
@@ -259,7 +259,7 @@ pub struct SshInfo {
 /// GET /api/machines/:name/ssh - Get SSH connection info
 ///
 /// Resolves the VM's MAC (assigned at create time — see
-/// `EphemeraDriver::get_mac_address`) to a network IP via zyvor-fabricd's
+/// `FluxVmDriver::get_mac_address`) to a network IP via zyvor-fabricd's
 /// own DHCP lease file. Key management isn't something this lookup can
 /// speak to, so `key_path` is always `None` — the operator's own
 /// responsibility (e.g. injected via cloud-init).
@@ -313,7 +313,7 @@ pub struct CopyRequest {
     pub host_path: String,
     pub machine_path: String,
     /// Unix permission bits for the copied file, e.g. `0o644`. Only
-    /// consulted by `copy_to_machine` on the `ephemera` backend, which has
+    /// consulted by `copy_to_machine` on the `fluxvm` backend, which has
     /// no source file to inherit a mode from; ignored elsewhere.
     #[serde(default)]
     pub mode: Option<u32>,

@@ -126,16 +126,16 @@ impl Server {
         };
 
         // VM driver — see the systemd-removal migration plan's final phase.
-        // The systemd-machined/D-Bus backend this replaced is gone; Ephemera
+        // The systemd-machined/D-Bus backend this replaced is gone; FluxVM
         // is the only `VmDriver` implementation left.
         let driver: Arc<dyn VmDriver> = {
             let mut d =
-                zyvor_fabric_ephemera_driver::EphemeraDriver::new(&config.driver.ephemera_url)
-                    .map_err(|e| anyhow::anyhow!("Failed to initialize Ephemera driver: {}", e))?;
-            if let Some(token) = &config.driver.ephemera_token {
+                zyvor_fabric_fluxvm_driver::FluxVmDriver::new(&config.driver.fluxvm_url)
+                    .map_err(|e| anyhow::anyhow!("Failed to initialize FluxVM driver: {}", e))?;
+            if let Some(token) = &config.driver.fluxvm_token {
                 d = d.with_token(token.clone());
             }
-            tracing::info!(url = %config.driver.ephemera_url, "Using Ephemera VM driver");
+            tracing::info!(url = %config.driver.fluxvm_url, "Using FluxVM VM driver");
             Arc::new(d)
         };
 
@@ -3324,8 +3324,8 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
             // Check if the VM is actually still running via the driver.
             // Only a *confirmed* non-running status justifies a restart --
             // found live: `Ok(_) | Err(_)` here used to treat ANY error
-            // (a transient network blip talking to Ephemera's API, a
-            // timeout, Ephemera itself briefly restarting for its own
+            // (a transient network blip talking to FluxVM's API, a
+            // timeout, FluxVM itself briefly restarting for its own
             // deploy) as "the VM crashed", unconditionally force-restarting
             // a VM that might be perfectly healthy and just running
             // normally -- confirmed live: watched this fire and swap out a

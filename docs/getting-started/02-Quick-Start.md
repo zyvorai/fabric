@@ -236,7 +236,7 @@ Returns `204 No Content` on success.
 1. Started the zyvor-fabricd daemon
 2. Authenticated and obtained a JWT token
 3. Created a VM with specified resources
-4. Started the VM via Ephemera
+4. Started the VM via FluxVM
 5. Accessed the web dashboard
 6. Connected to the VM console
 7. Viewed real-time metrics

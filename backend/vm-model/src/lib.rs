@@ -36,7 +36,7 @@ pub struct VM {
     pub last_error: Option<String>,
     /// Host-port -> guest-port forwards for this VM's usermode networking
     /// (e.g. exposing guest port 22 for SSH). Only takes effect on the VM's
-    /// next (re)creation in Ephemera -- usermode/slirp networking has no
+    /// next (re)creation in FluxVM -- usermode/slirp networking has no
     /// way to add a forward to an already-running instance.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub port_forwards: Vec<PortForwardSpec>,
@@ -44,7 +44,7 @@ pub struct VM {
     /// instead of the default NAT/usermode networking. A bridged VM gets a
     /// real, externally-reachable IP (visible on its Network tab) instead
     /// of needing explicit `port_forwards`, at the cost of the VM needing a
-    /// full recreate in Ephemera to change once set (same one-shot-at-
+    /// full recreate in FluxVM to change once set (same one-shot-at-
     /// creation-time limitation `port_forwards` has under NAT).
     #[serde(default)]
     pub network_tap: bool,

@@ -503,7 +503,7 @@ cat /etc/zyvor-fabricd/zyvor-fabricd.toml | toml-lint  # or just try to start
 # Check KVM availability
 ls -la /dev/kvm
 
-# Check Ephemera is reachable
+# Check FluxVM is reachable
 curl http://127.0.0.1:7788/healthz
 
 # Check the VM state and last error

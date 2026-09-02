@@ -17,11 +17,11 @@ Complete these items before deploying Zyvor Fabric to production.
 
 ### Host Requirements
 
-`zyvor-fabricd` itself has no systemd dependency, and neither does VM lifecycle -- VMs run under [Ephemera](https://github.com/hypersdk/ephemera), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly.
+`zyvor-fabricd` itself has no systemd dependency, and neither does VM lifecycle -- VMs run under [FluxVM](https://github.com/zyvorai/fluxvm), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly.
 
 - [ ] **OS version** -- a modern Linux distribution (Fedora 41+, Ubuntu 24.10+, or equivalent)
 - [ ] **Kernel** -- Linux 6.x with KVM support (`/dev/kvm` exists and is accessible)
-- [ ] **Ephemera** -- `ephemera serve` running and reachable at the configured `driver.ephemera_url`
+- [ ] **FluxVM** -- `fluxvm serve` running and reachable at the configured `driver.fluxvm_url`
 - [ ] **CPU virtualization** -- Enabled in BIOS/UEFI (`grep -c vmx /proc/cpuinfo` or `grep -c svm /proc/cpuinfo`)
 - [ ] **Memory** -- Sufficient RAM for host + all planned VMs (2 GB minimum for host overhead)
 - [ ] **Disk space** -- Storage pools provisioned with adequate capacity for VM images and backups
@@ -268,7 +268,7 @@ See the [Backup Strategy Guide](backup-strategy.md) for detailed procedures.
 ### Updates
 
 - [ ] **Zyvor Fabric updates** -- Test new versions in a staging environment before production
-- [ ] **Ephemera updates** -- Test new Ephemera versions in staging before rolling out to hosts running production VMs
+- [ ] **FluxVM updates** -- Test new FluxVM versions in staging before rolling out to hosts running production VMs
 - [ ] **Image maintenance** -- Rebuild base images monthly to include OS security patches
 - [ ] **Certificate rotation** -- Rotate TLS certificates on the reverse proxy before expiration
 
@@ -311,7 +311,7 @@ curl -s http://localhost:9095/health
 curl -s http://127.0.0.1:7788/v1/vms
 ```
 
-VMs continue running even if `zyvor-fabricd` restarts. The daemon reconstructs state from Ephemera and the state store on startup.
+VMs continue running even if `zyvor-fabricd` restarts. The daemon reconstructs state from FluxVM and the state store on startup.
 
 ---
 
@@ -322,14 +322,14 @@ VMs continue running even if `zyvor-fabricd` restarts. The daemon reconstructs s
 **Recovery:**
 
 ```bash
-# 1. Check actual VM status via Ephemera
+# 1. Check actual VM status via FluxVM
 curl -s http://127.0.0.1:7788/v1/vms | jq '.[] | select(.name == "my-vm")'
 
 # 2. If the VM is running but state is stale, force a stop and restart
 curl -s -X POST http://localhost:3000/api/vms/my-vm/stop \
   -H "Authorization: Bearer $TOKEN" | jq
 
-# 3. If Ephemera reports no such VM, terminate via the API directly
+# 3. If FluxVM reports no such VM, terminate via the API directly
 curl -s -X POST http://localhost:3000/api/vms/my-vm/terminate \
   -H "Authorization: Bearer $TOKEN" | jq
 

@@ -35,7 +35,7 @@ export interface CreateVMRequest {
   /**
    * Host-port -> guest-port forwards for this VM's usermode networking
    * (e.g. exposing guest port 22 for SSH). Only applied on the VM's next
-   * (re)creation in Ephemera -- usermode/slirp networking has no way to
+   * (re)creation in FluxVM -- usermode/slirp networking has no way to
    * add a forward to an already-running instance.
    */
   port_forwards?: PortForwardSpec[]
@@ -118,7 +118,7 @@ export interface VMLogResponse {
   count: number
 }
 
-/** Real boot/runtime console output for this VM (Ephemera's captured
+/** Real boot/runtime console output for this VM (FluxVM's captured
     console log), not the audit trail of API actions taken against it. */
 export async function getVMLogs(name: string, opts?: { lines?: number; grep?: string }): Promise<VMLogResponse> {
   const params = new URLSearchParams()

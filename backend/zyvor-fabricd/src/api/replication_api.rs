@@ -311,7 +311,7 @@ pub async fn start_sync(
 
     // Perform the actual sync in a background task. Resolve the VM's
     // actual, live disk (a single qcow2 file, not a naming-convention
-    // guess at a directory) via the driver -- real (Ephemera-managed) VMs
+    // guess at a directory) via the driver -- real (FluxVM-managed) VMs
     // are almost never stored at /var/lib/zyvor-fabricd/images/<name>, so
     // the old guess found nothing for virtually every real VM, and even
     // when something existed there it was treated as a directory

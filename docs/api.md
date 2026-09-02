@@ -98,7 +98,7 @@ Content-Type: application/json
 
 The `POST /vms/:name/start` endpoint accepts an optional JSON body with `VMStartOptions` to control how the active VM driver launches the VM. All fields are optional and default sensibly when omitted.
 
-`VMStartOptions` only applies to a VM's first launch (translated into an Ephemera `CreateVmRequest`). Most fields are honored: cpus/memory (from the VM record), `network_tap`/`network_user_mode`, `linux`/`initrd`/`firmware`, `extra_args`, and `bind_mounts` (each entry becomes a launch-time virtiofs share, auto-mounted in the guest via cloud-init — no live bind-mount equivalent exists for a real hardware VM). The rest have no Ephemera equivalent and fail with a clear error rather than silently being ignored: `tpm`, `secure_boot`, `vsock`, `extra_drives`, `bind_users`, `credentials`/`load_credentials`, `smbios11`, `directory`.
+`VMStartOptions` only applies to a VM's first launch (translated into an FluxVM `CreateVmRequest`). Most fields are honored: cpus/memory (from the VM record), `network_tap`/`network_user_mode`, `linux`/`initrd`/`firmware`, `extra_args`, and `bind_mounts` (each entry becomes a launch-time virtiofs share, auto-mounted in the guest via cloud-init — no live bind-mount equivalent exists for a real hardware VM). The rest have no FluxVM equivalent and fail with a clear error rather than silently being ignored: `tpm`, `secure_boot`, `vsock`, `extra_drives`, `bind_users`, `credentials`/`load_credentials`, `smbios11`, `directory`.
 
 ```
 POST /api/vms/myvm/start
@@ -174,7 +174,7 @@ Content-Type: application/json
 | `uuid` | string | Machine UUID (must be valid UUID format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) |
 | `slice` | string | Systemd slice for scope unit (must end with `.slice`) |
 | `properties` | string[] | Resource-control properties only (e.g. `"MemoryMax=4G"`, `"CPUQuota=200%"`) |
-| `register` | bool? | Unused — no equivalent on the current (Ephemera) driver |
+| `register` | bool? | Unused — no equivalent on the current (FluxVM) driver |
 | `private_users` | string | User namespace mapping (e.g. `"1000:65536"`) |
 | `bind_mounts` | BindMount[] | Host-to-VM bind mounts (paths must not contain `..`) |
 | `extra_drives` | string[] | Additional disk images or block devices |
@@ -197,7 +197,7 @@ Content-Type: application/json
 
 **LoadCredential object:** `{ "id": string, "path": string }` — `path` is the file to load the credential from (`"value"` is accepted as an alias for backward compatibility)
 
-See the note above for which fields Ephemera actually honors versus rejects with an error.
+See the note above for which fields FluxVM actually honors versus rejects with an error.
 
 ## Snapshots
 

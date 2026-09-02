@@ -119,7 +119,7 @@ pub fn default_retention() -> u32 {
 const IMAGE_ALLOWED_PREFIXES: &[&str] = &[
     "/var/lib/machines",
     "/var/lib/zyvor-fabricd/images",
-    "/var/lib/ephemera/images",
+    "/var/lib/fluxvm/images",
 ];
 
 /// Find the disk image path for a VM by checking common locations.
@@ -133,8 +133,8 @@ const IMAGE_ALLOWED_PREFIXES: &[&str] = &[
 /// Every real call site (snapshots, backups, checkpoints, cloning,
 /// forking, resize, storage migration) has been switched to
 /// `state.driver.get_disk_path(name)` instead, which resolves the VM's
-/// actual live disk through Ephemera. What's left here is only the
-/// fallback path for a target name Ephemera doesn't know about yet
+/// actual live disk through FluxVM. What's left here is only the
+/// fallback path for a target name FluxVM doesn't know about yet
 /// (backup restore to a new VM, hibernate-resume default) -- a genuine
 /// "no live disk to query, so guess the default location" case, not a
 /// bug.
@@ -145,8 +145,8 @@ pub fn find_vm_image(name: &str) -> Option<String> {
         format!("/var/lib/machines/{}/{}.qcow2", name, name),
         format!("/var/lib/zyvor-fabricd/images/{}.qcow2", name),
         format!("/var/lib/zyvor-fabricd/images/{}.raw", name),
-        format!("/var/lib/ephemera/images/{}.qcow2", name),
-        format!("/var/lib/ephemera/images/{}.raw", name),
+        format!("/var/lib/fluxvm/images/{}.qcow2", name),
+        format!("/var/lib/fluxvm/images/{}.raw", name),
     ];
 
     for path in &candidates {
@@ -263,7 +263,7 @@ pub fn validate_host_path(path: &str) -> Result<(), (StatusCode, String)> {
     let allowed_prefixes = [
         "/var/lib/machines",
         "/var/lib/zyvor-fabricd",
-        "/var/lib/ephemera",
+        "/var/lib/fluxvm",
     ];
 
     // Try to canonicalize to resolve symlinks. If the file doesn't exist yet,

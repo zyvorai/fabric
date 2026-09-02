@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Phase 1 harness test (see the systemd-removal plan): boots a real
-//! `ephemera serve` process from the sibling Ephemera checkout and exercises
-//! the wire contract `zyvor-fabric-ephemera-client` depends on.
+//! `fluxvm serve` process from the sibling FluxVM checkout and exercises
+//! the wire contract `zyvor-fabric-fluxvm-client` depends on.
 //!
 //! This intentionally does NOT create a real VM (that needs a QEMU/Cloud
 //! Hypervisor/Firecracker binary and a base disk image — heavier
 //! integration coverage that belongs to the Phase 3/5 lifecycle-cutover
-//! tests). It only proves: the `ephemera` binary starts, serves `/healthz`,
+//! tests). It only proves: the `fluxvm` binary starts, serves `/healthz`,
 //! and returns wire-compatible JSON for the read-only endpoints this client
 //! parses.
 //!
-//! Skips (does not fail) if the `ephemera` binary can't be found, so this
+//! Skips (does not fail) if the `fluxvm` binary can't be found, so this
 //! passes on machines/CI that haven't built the sibling repo yet. Point it
-//! at a specific binary with `EPHEMERA_BIN=/path/to/ephemera`.
+//! at a specific binary with `FLUXVM_BIN=/path/to/fluxvm`.
 
 use std::{
     path::PathBuf,
@@ -22,36 +22,36 @@ use std::{
     time::Duration,
 };
 
-use zyvor_fabric_ephemera_client::EphemeraClient;
+use zyvor_fabric_fluxvm_client::FluxVmClient;
 
-struct EphemeraServe {
+struct FluxVmServe {
     child: Child,
     _workdir: PathBuf,
 }
 
-impl Drop for EphemeraServe {
+impl Drop for FluxVmServe {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
 }
 
-fn find_ephemera_binary() -> Option<PathBuf> {
-    if let Ok(path) = std::env::var("EPHEMERA_BIN") {
+fn find_fluxvm_binary() -> Option<PathBuf> {
+    if let Ok(path) = std::env::var("FLUXVM_BIN") {
         let path = PathBuf::from(path);
         return path.exists().then_some(path);
     }
-    // Sibling checkout: .../zyvor-fabric/backend/crates/ephemera-client -> .../tt/Ephemera
+    // Sibling checkout: .../zyvor-fabric/backend/crates/fluxvm-client -> .../tt/FluxVM
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let candidate = manifest_dir
-        .join("../../../../Ephemera/target/debug/ephemera")
+        .join("../../../../FluxVM/target/debug/fluxvm")
         .canonicalize()
         .ok()?;
     candidate.exists().then_some(candidate)
 }
 
-async fn spawn_ephemera(bin: &PathBuf, port: u16) -> anyhow::Result<EphemeraServe> {
-    let workdir = std::env::temp_dir().join(format!("ephemera-harness-{}", std::process::id()));
+async fn spawn_fluxvm(bin: &PathBuf, port: u16) -> anyhow::Result<FluxVmServe> {
+    let workdir = std::env::temp_dir().join(format!("fluxvm-harness-{}", std::process::id()));
     std::fs::create_dir_all(&workdir)?;
     let state_dir = workdir.join("state");
     let run_dir = workdir.join("run");
@@ -73,33 +73,33 @@ async fn spawn_ephemera(bin: &PathBuf, port: u16) -> anyhow::Result<EphemeraServ
         .stderr(Stdio::null())
         .spawn()?;
 
-    let client = EphemeraClient::new(format!("http://127.0.0.1:{port}"))?;
+    let client = FluxVmClient::new(format!("http://127.0.0.1:{port}"))?;
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     while std::time::Instant::now() < deadline {
         if client.healthy().await {
-            return Ok(EphemeraServe {
+            return Ok(FluxVmServe {
                 child,
                 _workdir: workdir,
             });
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    anyhow::bail!("ephemera serve did not become healthy within 10s")
+    anyhow::bail!("fluxvm serve did not become healthy within 10s")
 }
 
 #[tokio::test]
 async fn boots_and_serves_healthz() {
-    let Some(bin) = find_ephemera_binary() else {
+    let Some(bin) = find_fluxvm_binary() else {
         eprintln!(
-            "SKIP: no ephemera binary found (build ../Ephemera with `cargo build` or set EPHEMERA_BIN)"
+            "SKIP: no fluxvm binary found (build ../FluxVM with `cargo build` or set FLUXVM_BIN)"
         );
         return;
     };
 
-    let serve = spawn_ephemera(&bin, 17788)
+    let serve = spawn_fluxvm(&bin, 17788)
         .await
-        .expect("ephemera serve failed to start");
-    let client = EphemeraClient::new("http://127.0.0.1:17788").unwrap();
+        .expect("fluxvm serve failed to start");
+    let client = FluxVmClient::new("http://127.0.0.1:17788").unwrap();
 
     assert!(client.healthy().await, "healthz should report healthy");
 
@@ -109,7 +109,7 @@ async fn boots_and_serves_healthz() {
         .expect("list_vms should succeed against a fresh instance");
     assert!(
         vms.is_empty(),
-        "a fresh ephemera instance should have no VMs"
+        "a fresh fluxvm instance should have no VMs"
     );
 
     assert!(

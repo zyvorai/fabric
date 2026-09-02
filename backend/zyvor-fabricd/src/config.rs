@@ -59,31 +59,31 @@ fn default_tls_key_path() -> String {
 }
 
 /// Configures the `driver-core::VmDriver` (`Arc<dyn VmDriver>`) that
-/// `AppState.driver` is built from — always Ephemera. The systemd-machined/
+/// `AppState.driver` is built from — always FluxVM. The systemd-machined/
 /// D-Bus backend this replaced (`machinectl-driver`/`machined-dbus`) is
 /// gone as of the systemd-removal migration's final phase; there is no
 /// backend selector to configure anymore.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriverConfig {
-    /// Ephemera's REST API base URL, e.g. `http://127.0.0.1:7788`.
-    #[serde(default = "default_ephemera_url")]
-    pub ephemera_url: String,
-    /// Bearer token for Ephemera's auth layer, if it has `auth.tokens`
+    /// FluxVM's REST API base URL, e.g. `http://127.0.0.1:7788`.
+    #[serde(default = "default_fluxvm_url")]
+    pub fluxvm_url: String,
+    /// Bearer token for FluxVM's auth layer, if it has `auth.tokens`
     /// configured. Leave unset against a deployment with auth disabled.
     #[serde(default)]
-    pub ephemera_token: Option<String>,
+    pub fluxvm_token: Option<String>,
 }
 
 impl Default for DriverConfig {
     fn default() -> Self {
         Self {
-            ephemera_url: default_ephemera_url(),
-            ephemera_token: None,
+            fluxvm_url: default_fluxvm_url(),
+            fluxvm_token: None,
         }
     }
 }
 
-fn default_ephemera_url() -> String {
+fn default_fluxvm_url() -> String {
     "http://127.0.0.1:7788".to_string()
 }
 

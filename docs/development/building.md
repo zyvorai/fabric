@@ -250,7 +250,7 @@ cargo test -- --test-threads=1
 cargo test -p zyvor-fabricd --test '*'
 
 # Note: Some integration tests may require root access for KVM and
-# network bridge operations, plus a running `ephemera serve` instance
+# network bridge operations, plus a running `fluxvm serve` instance
 # for VM driver operations.
 ```
 

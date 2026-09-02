@@ -1,34 +1,34 @@
 # Running Zyvor Fabric in Docker or Podman
 
-Two containers: `zyvor-fabricd` (the daemon + web console) and `ephemera` (the VM engine Fabric
+Two containers: `zyvor-fabricd` (the daemon + web console) and `fluxvm` (the VM engine Fabric
 drives over REST at `127.0.0.1:7788`). Fabric alone can serve the API and console, but can't
-create/start/stop a real VM without Ephemera reachable.
+create/start/stop a real VM without FluxVM reachable.
 
 ## Host prerequisites
 
 These are genuine host-level requirements, not something either container's tooling papers over:
 
 - **`nbd` kernel module, loaded before you start the stack**: `sudo modprobe nbd max_part=16`.
-  Ephemera's NBD-backed storage and GuestKit's image-customization step both need this, and it
-  cannot be reliably loaded from inside a container (Ephemera's own Kubernetes docs already state
+  FluxVM's NBD-backed storage and GuestKit's image-customization step both need this, and it
+  cannot be reliably loaded from inside a container (FluxVM's own Kubernetes docs already state
   this as a host prerequisite there too).
-- **`/dev/kvm` present and accessible** (`ls -l /dev/kvm`) -- Ephemera's QEMU backend needs it
+- **`/dev/kvm` present and accessible** (`ls -l /dev/kvm`) -- FluxVM's QEMU backend needs it
   directly.
 - **A rootful container engine.** Both containers run with `network_mode: host`, `/dev/kvm` access,
   and capabilities like `CAP_SYS_CHROOT`/`CAP_SETUID`/`CAP_SETGID` that fight rootless Podman's user
   namespace model. Use `sudo podman ...` (or a rootful Podman machine), not rootless. Docker's
   default install is already rootful.
-- **cgroup v2** -- Ephemera's cgroup crate writes directly to `/sys/fs/cgroup`; the `ephemera`
+- **cgroup v2** -- FluxVM's cgroup crate writes directly to `/sys/fs/cgroup`; the `fluxvm`
   service's `cgroup: host` setting depends on this.
 
 ## Build
 
-Fabric's own image is a plain single-context build; Ephemera's needs the sibling `guestkit` repo
+Fabric's own image is a plain single-context build; FluxVM's needs the sibling `guestkit` repo
 supplied as a second BuildKit build context, which a compose `build:` block can't express portably
 across Docker Compose and Podman Compose versions -- so it's built with a small script instead:
 
 ```bash
-# Ephemera and guestkit checked out as siblings of this repo (../Ephemera, ../guestkit)
+# FluxVM and guestkit checked out as siblings of this repo (../FluxVM, ../guestkit)
 ./scripts/build-container-images.sh                 # defaults to podman
 BUILDER=docker ./scripts/build-container-images.sh  # or explicitly docker
 ```
@@ -83,8 +83,8 @@ building locally.
 
 `zyvor-fabricd`'s nftables/rtnetlink calls need to act on the *host's* real network namespace to
 manage actual VM traffic -- `CAP_NET_ADMIN` etc. only grant control over whatever netns the process
-is actually in. Running both containers on the host network is also what lets Fabric reach Ephemera
-at its default `127.0.0.1:7788` with zero config changes, the same reason Ephemera's own Kubernetes
+is actually in. Running both containers on the host network is also what lets Fabric reach FluxVM
+at its default `127.0.0.1:7788` with zero config changes, the same reason FluxVM's own Kubernetes
 DaemonSet sets `hostNetwork: true`. This is intentional, not a hardening gap to close later -- it
 mirrors the capability grants the bare-metal systemd deployment already has.
 

@@ -12,7 +12,7 @@ This section provides operational procedures for deploying, monitoring, and main
 
 Zyvor Fabric follows these operational principles:
 
-1. **No systemd dependency** -- `zyvor-fabricd` can run as a systemd service (use `systemctl` for lifecycle management if so) or under any other supervisor, or in the foreground -- nothing in packaging requires systemd. VM processes are managed by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency of its own -- see the [Ephemera driver guide](../vm-drivers/ephemera.md) for its capability matrix and known gaps.
+1. **No systemd dependency** -- `zyvor-fabricd` can run as a systemd service (use `systemctl` for lifecycle management if so) or under any other supervisor, or in the foreground -- nothing in packaging requires systemd. VM processes are managed by [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency of its own -- see the [FluxVM driver guide](../vm-drivers/fluxvm.md) for its capability matrix and known gaps.
 2. **API-driven** -- All operations are available through the REST API. The web UI and CLI are thin clients over the same API surface.
 3. **Event-driven observability** -- Real-time SSE event streams and configurable notification channels (Email, Slack, Webhook, Teams) provide immediate visibility into VM lifecycle changes.
 4. **Policy-based automation** -- Backup policies, resource quotas, autoscaling rules, and network policies reduce manual intervention.

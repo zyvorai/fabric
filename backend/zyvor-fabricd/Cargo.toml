@@ -45,7 +45,7 @@ cloud-init = { path = "../cloud-init" }
 tpm-support = { path = "../tpm-support" }
 prometheus-exporter = { path = "../prometheus-exporter" }
 zyvor-fabric-driver-core = { path = "../crates/driver-core" }
-zyvor-fabric-ephemera-driver = { path = "../crates/ephemera-driver" }
+zyvor-fabric-fluxvm-driver = { path = "../crates/fluxvm-driver" }
 zyvor-fabric-storage = { path = "../crates/storage" }
 zyvor-fabric-system = { path = "../crates/system" }
 zyvor-fabric-vm = { path = "../crates/vm" }

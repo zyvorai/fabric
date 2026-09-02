@@ -126,7 +126,7 @@ async fn send_console_open_error(mut socket: WebSocket, vm_name: &str, err: &any
         || err.to_string().contains("connect(vsock")
     {
         "\r\n[The in-guest agent isn't responding. This usually means the VM's image doesn't \
-         have ephemera-guest-agent installed/enabled, or the guest hasn't finished booting yet.]\r\n"
+         have fluxvm-guest-agent installed/enabled, or the guest hasn't finished booting yet.]\r\n"
     } else {
         ""
     };

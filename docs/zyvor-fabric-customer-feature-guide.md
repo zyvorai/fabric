@@ -2,7 +2,7 @@
 
 > **A private cloud control plane with no systemd dependency.**
 
-Zyvor Fabric is a complete Rust control plane giving you Proxmox- and KubeVirt-class capabilities without the heavyweight stack. Manage the same infrastructure four ways — CLI, web dashboard, Kubernetes operator, or Terraform — over a single daemon exposing 480+ REST endpoints and live WebSocket channels. VM lifecycle runs through [Ephemera](https://github.com/zyvorai/ephemera), a disposable-VM engine with no systemd dependency of its own (`driver.ephemera_url` in `zyvor-fabricd.toml`). There are no custom hypervisor patches or kernel modules to maintain, and the daemon itself runs fine under systemd or any other supervisor — it's no longer a hard requirement.
+Zyvor Fabric is a complete Rust control plane giving you Proxmox- and KubeVirt-class capabilities without the heavyweight stack. Manage the same infrastructure four ways — CLI, web dashboard, Kubernetes operator, or Terraform — over a single daemon exposing 480+ REST endpoints and live WebSocket channels. VM lifecycle runs through [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency of its own (`driver.fluxvm_url` in `zyvor-fabricd.toml`). There are no custom hypervisor patches or kernel modules to maintain, and the daemon itself runs fine under systemd or any other supervisor — it's no longer a hard requirement.
 
 **480+** REST API endpoints · **4** management interfaces · **40+** Rust backend crates · **6** storage backends · **37+** web dashboard pages · **1** binary, one config, one service
 
@@ -69,9 +69,9 @@ This is the customer-facing onboarding guide — how to access the product, your
 
 ## 1. VM Lifecycle & Provisioning
 
-_Create, run, and reshape virtual machines with declarative or interactive workflows, backed by Ephemera._
+_Create, run, and reshape virtual machines with declarative or interactive workflows, backed by FluxVM._
 
-- **Full VM Lifecycle** — Create, start, stop, restart, pause, resume, hibernate, and delete VMs backed by KVM, via Ephemera. — _One consistent lifecycle across CLI, web, Terraform, and Kubernetes._
+- **Full VM Lifecycle** — Create, start, stop, restart, pause, resume, hibernate, and delete VMs backed by KVM, via FluxVM. — _One consistent lifecycle across CLI, web, Terraform, and Kubernetes._
   - **How:** CLI `zyvorctl start|stop|restart|delete <name>` (pause/resume are REST/Web only) · Web dashboard VM-list quick actions VMs view (`s`/`t`/`r`/`d`) · REST `POST /api/vms/:name/{start,stop,restart,pause,resume}` and `DELETE /api/vms/:name`.
 - **Declarative Apply** — Define VMs in YAML and reconcile them with zyvorctl apply -f config.yaml. — _GitOps-friendly infrastructure without a control-plane rewrite._
   - **How:** CLI `zyvorctl apply -f config.yaml` reconciles a YAML spec (version it in git); equivalent imperative path is REST `POST /api/vms`, or a `VirtualMachine` CRD via the K8s operator.

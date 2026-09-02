@@ -64,7 +64,7 @@ async fn probe_vm_driver(state: &AppState) -> SubsystemStatus {
             tracing::debug!("capabilities: vm driver unreachable: {}", e);
             SubsystemStatus {
                 phase: SubsystemPhase::Unreachable,
-                detail: Some("Could not reach the Ephemera VM driver".to_string()),
+                detail: Some("Could not reach the FluxVM VM driver".to_string()),
             }
         }
     }

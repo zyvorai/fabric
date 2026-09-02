@@ -7,10 +7,10 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/zyvorai/fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?logo=rust&logoColor=white)](backend/)
-[![Built on Ephemera](https://img.shields.io/badge/VM%20engine-Ephemera-8a2be2)](https://github.com/zyvorai/ephemera)
+[![Built on FluxVM](https://img.shields.io/badge/VM%20engine-FluxVM-8a2be2)](https://github.com/zyvorai/fluxvm)
 [![Built on GuestKit](https://img.shields.io/badge/guest%20tooling-GuestKit-2ea44f)](https://github.com/zyvorai/guestkit)
 
-[Quick start](#quick-start) · [Why Zyvor Fabric](#why-zyvor-fabric) · [Sibling projects & architecture](#built-on-ephemera--guestkit) · [Docs](#documentation)
+[Quick start](#quick-start) · [Why Zyvor Fabric](#why-zyvor-fabric) · [Sibling projects & architecture](#built-on-fluxvm--guestkit) · [Docs](#documentation)
 
 </div>
 
@@ -18,7 +18,7 @@
 
 Run enterprise-grade virtual machines, software-defined networking, pluggable storage, and security policy on **any Linux server with KVM** — no vCenter, no heavyweight hypervisor stack, no systemd hard-requirement. One Rust daemon exposes **480+ REST endpoints** and live WebSocket channels; drive it from a **CLI, web dashboard, Kubernetes operator, or Terraform provider** — all four talk to the same daemon, so nothing drifts.
 
-Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API, auth, and UX layer on top of two independent, permissively-licensed sibling projects — see [Built on Ephemera + GuestKit](#built-on-ephemera--guestkit) below for how that split actually works end to end.
+Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API, auth, and UX layer on top of two independent, permissively-licensed sibling projects — see [Built on FluxVM + GuestKit](#built-on-fluxvm--guestkit) below for how that split actually works end to end.
 
 ### 📖 Feature guide
 
@@ -31,7 +31,7 @@ Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API,
 
 | Problem | Zyvor Fabric answer |
 |---------|---------------------|
-| Private cloud usually means a heavy hypervisor stack | A lightweight, disposable VM engine underneath ([Ephemera](https://github.com/zyvorai/ephemera)) — no systemd dependency, no vCenter |
+| Private cloud usually means a heavy hypervisor stack | A lightweight, disposable VM engine underneath ([FluxVM](https://github.com/zyvorai/fluxvm)) — no systemd dependency, no vCenter |
 | No unified API across interfaces | 480+ REST endpoints and 3 WebSocket channels, one daemon, four front doors |
 | Scripting vs. GUI is usually either/or | CLI (`zyvorctl`) + web console + Terraform provider + Kubernetes operator, all first-class |
 | Enterprise needs RBAC, audit, and encryption | JWT auth, roles, audit export, encryption at rest, out of the box |
@@ -40,21 +40,21 @@ Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API,
 
 ---
 
-## Built on Ephemera + GuestKit
+## Built on FluxVM + GuestKit
 
 Zyvor Fabric is deliberately a thin, opinionated layer. It doesn't own a hypervisor implementation or a guest-filesystem library — it composes two sibling projects, each useful on its own:
 
-### [Ephemera](https://github.com/zyvorai/ephemera) — the VM engine
+### [FluxVM](https://github.com/zyvorai/fluxvm) — the VM engine
 
 > *Disposable compute engine for QEMU, Cloud Hypervisor, and Firecracker.*
 
-`zyvor-fabricd` never touches QEMU directly. It talks to a local Ephemera instance over a plain REST API (`127.0.0.1:7788`) for everything that's actually *running a VM*: process lifecycle, disk provisioning (qcow2 CoW clones, LVM-thin, NBD, Ceph RBD), console/VNC/serial access, cgroup resource control, and per-VM network namespaces. Swapping VM backends — QEMU, Cloud Hypervisor, Firecracker — is an Ephemera-side concern; Fabric just calls the same API regardless of which one is behind it.
+`zyvor-fabricd` never touches QEMU directly. It talks to a local FluxVM instance over a plain REST API (`127.0.0.1:7788`) for everything that's actually *running a VM*: process lifecycle, disk provisioning (qcow2 CoW clones, LVM-thin, NBD, Ceph RBD), console/VNC/serial access, cgroup resource control, and per-VM network namespaces. Swapping VM backends — QEMU, Cloud Hypervisor, Firecracker — is an FluxVM-side concern; Fabric just calls the same API regardless of which one is behind it.
 
 ### [GuestKit](https://github.com/zyvorai/guestkit) — guest-side tooling
 
 > *Pure-Rust VM disk inspection — zero boot, zero agents, instant insight.*
 
-Before a VM ever boots, Ephemera uses GuestKit as a library to reach *inside* its disk image: mounting the guest filesystem via NBD, chrooting in to install packages or run commands, writing files, and baking in `ephemera-guest-agent` (the vsock-based in-guest agent that powers Fabric's browser Terminal) — all without a libguestfs appliance VM. The same GuestKit also ships as its own standalone CLI for offline migration assurance, boot-readiness scoring, and disk repair, independent of Fabric or Ephemera entirely.
+Before a VM ever boots, FluxVM uses GuestKit as a library to reach *inside* its disk image: mounting the guest filesystem via NBD, chrooting in to install packages or run commands, writing files, and baking in `fluxvm-guest-agent` (the vsock-based in-guest agent that powers Fabric's browser Terminal) — all without a libguestfs appliance VM. The same GuestKit also ships as its own standalone CLI for offline migration assurance, boot-readiness scoring, and disk repair, independent of Fabric or FluxVM entirely.
 
 ```mermaid
 flowchart TB
@@ -70,12 +70,12 @@ flowchart TB
   Op --> Daemon
 
   Daemon[Zyvor Fabric daemon<br/>API · auth · RBAC · networking · storage · monitoring]
-  Daemon -- REST :7788 --> Eph[Ephemera<br/>VM lifecycle · QEMU / Cloud Hypervisor / Firecracker]
-  Eph -- library call --> GK[GuestKit<br/>offline mount · chroot customize · agent bake-in]
-  Eph -- vsock --> Agent[ephemera-guest-agent<br/>inside the running guest]
+  Daemon -- REST :7788 --> Flux[FluxVM<br/>VM lifecycle · QEMU / Cloud Hypervisor / Firecracker]
+  Flux -- library call --> GK[GuestKit<br/>offline mount · chroot customize · agent bake-in]
+  Flux -- vsock --> Agent[fluxvm-guest-agent<br/>inside the running guest]
 ```
 
-Practically, that means: **Fabric decides *what* infrastructure should exist; Ephemera makes it exist; GuestKit prepares the disk before it does.** Each layer is independently useful, independently versioned, and Apache-2.0 licensed — you can take GuestKit or Ephemera without Fabric, but Fabric always needs both underneath it.
+Practically, that means: **Fabric decides *what* infrastructure should exist; FluxVM makes it exist; GuestKit prepares the disk before it does.** Each layer is independently useful, independently versioned, and Apache-2.0 licensed — you can take GuestKit or FluxVM without Fabric, but Fabric always needs both underneath it.
 
 ---
 
@@ -130,7 +130,7 @@ sudo systemctl start zyvor-fabricd
 
 | Product | Role |
 |---------|------|
-| **[Ephemera](https://github.com/zyvorai/ephemera)** | Disposable compute engine — QEMU / Cloud Hypervisor / Firecracker |
+| **[FluxVM](https://github.com/zyvorai/fluxvm)** | Disposable compute engine — QEMU / Cloud Hypervisor / Firecracker |
 | **[GuestKit](https://github.com/zyvorai/guestkit)** | Pure-Rust offline VM disk inspection, repair, and customization |
 | **hypercluster** | Bare-metal Kubernetes bootstrap |
 | **machina** | Physical hypervisor OS (libvirt/KVM) |

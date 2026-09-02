@@ -69,10 +69,10 @@ Open the UI at https://HOST:9095 (self-signed cert by default; config listens on
 --remote-check   Same but `cargo check` (faster compile smoke).
 --uninstall      Stop service, remove binaries/units; keeps /var/lib/zyvor-fabricd data.
 
-Vendor binaries (guestkit-agent-cli, zyvor-guest-agent, ephemera-guest-agent)
+Vendor binaries (guestkit-agent-cli, zyvor-guest-agent, fluxvm-guest-agent)
 live outside this repo's build and are NOT rebuilt by this script -- run
 ./scripts/build-vendor-binaries.sh USER@HOST after changing guestkit or
-Ephemera's guest-agent source.
+FluxVM's guest-agent source.
 
 Auth: SSH keys/agent by default; optional PASSWORD arg or SSHPASS env → sshpass.
 
@@ -553,24 +553,24 @@ if [ -f configs/pam.d/zyvor-fabricd ]; then
     echo '  ✅ PAM service -> /etc/pam.d/zyvor-fabricd'
 fi
 
-# Ephemera's own systemd unit only grants itself write access under
-# /var/lib/ephemera (ProtectSystem=strict) -- deliberately, since Ephemera
+# FluxVM's own systemd unit only grants itself write access under
+# /var/lib/fluxvm (ProtectSystem=strict) -- deliberately, since FluxVM
 # is a standalone product with no reason to know zyvor-fabric's directory
 # layout. Disk hotplug (attaching an image from zyvor-fabric's own catalog
-# as a second, writable drive on a running VM) needs Ephemera's QEMU child
+# as a second, writable drive on a running VM) needs FluxVM's QEMU child
 # to open a file under /var/lib/zyvor-fabricd/images though -- found live:
 # 'blockdev-add failed ... Read-only file system'. Granted via a drop-in
-# on ephemera.service instead of editing Ephemera's unit directly, so this
+# on fluxvm.service instead of editing FluxVM's unit directly, so this
 # zyvor-fabric-specific grant lives in zyvor-fabric's own install step.
-if \$SUDO test -f /usr/lib/systemd/system/ephemera.service -o -f /etc/systemd/system/ephemera.service; then
-    EPHEMERA_DROPIN_DIR=/etc/systemd/system/ephemera.service.d
-    EPHEMERA_DROPIN=\"\$EPHEMERA_DROPIN_DIR/zyvor-fabricd-images.conf\"
-    if [ ! -f \"\$EPHEMERA_DROPIN\" ]; then
-        \$SUDO install -d -m 755 \"\$EPHEMERA_DROPIN_DIR\"
-        printf '[Service]\nReadWritePaths=/var/lib/zyvor-fabricd/images\n' | \$SUDO tee \"\$EPHEMERA_DROPIN\" >/dev/null
+if \$SUDO test -f /usr/lib/systemd/system/fluxvm.service -o -f /etc/systemd/system/fluxvm.service; then
+    FLUXVM_DROPIN_DIR=/etc/systemd/system/fluxvm.service.d
+    FLUXVM_DROPIN=\"\$FLUXVM_DROPIN_DIR/zyvor-fabricd-images.conf\"
+    if [ ! -f \"\$FLUXVM_DROPIN\" ]; then
+        \$SUDO install -d -m 755 \"\$FLUXVM_DROPIN_DIR\"
+        printf '[Service]\nReadWritePaths=/var/lib/zyvor-fabricd/images\n' | \$SUDO tee \"\$FLUXVM_DROPIN\" >/dev/null
         \$SUDO systemctl daemon-reload
-        \$SUDO systemctl restart ephemera 2>/dev/null || true
-        echo '  ✅ Granted ephemera write access to /var/lib/zyvor-fabricd/images (disk hotplug)'
+        \$SUDO systemctl restart fluxvm 2>/dev/null || true
+        echo '  ✅ Granted fluxvm write access to /var/lib/zyvor-fabricd/images (disk hotplug)'
     fi
 fi
 

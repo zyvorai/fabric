@@ -3,11 +3,11 @@
 Fine-tune VM behavior with VMStartOptions, CPU and memory hotplug, online disk
 resize, cloud-init customization, bind mounts, and credentials. `VMStartOptions`'
 shape traces back to `systemd-vmspawn`'s own CLI options; VM lifecycle itself
-is handled by [Ephemera](https://github.com/hypersdk/ephemera), which
+is handled by [FluxVM](https://github.com/zyvorai/fluxvm), which
 interprets this same request shape rather than shelling out to systemd-vmspawn.
 
 > **Note:** `VMStartOptions` is only honored for a VM's first launch, not
-> replayed on every restart. A handful of options have no Ephemera equivalent
+> replayed on every restart. A handful of options have no FluxVM equivalent
 > yet and are rejected with a clear error rather than silently ignored: TPM,
 > SecureBoot, VSOCK passthrough, extra drives, systemd credentials, and
 > SMBIOS injection. Bind mounts *are* supported -- each entry becomes a
@@ -179,7 +179,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
 #### systemd Integration
 
 These fields describe `systemd-vmspawn`/`systemd-machined` concepts that
-Ephemera has no equivalent for. They're accepted (not rejected like the
+FluxVM has no equivalent for. They're accepted (not rejected like the
 fields in the note above) but currently silently no-op'd rather than
 applied -- included here for completeness of the request shape, not as
 something that presently takes effect.

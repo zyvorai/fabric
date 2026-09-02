@@ -41,16 +41,16 @@ struct AgentConfig {
     #[arg(long, default_value = "/var/lib/zyvor-fabricd/host-id")]
     host_id_file: PathBuf,
 
-    /// Base URL of the local Ephemera daemon this host's VMs run under
-    /// (`ephemera serve`) — every VM command from the controller is
+    /// Base URL of the local FluxVM daemon this host's VMs run under
+    /// (`fluxvm serve`) — every VM command from the controller is
     /// executed against it.
     #[arg(long, default_value = "http://127.0.0.1:7788")]
-    ephemera_url: String,
+    fluxvm_url: String,
 
-    /// Bearer token for Ephemera's auth layer, if `auth.tokens` is
-    /// configured on that `ephemera serve` instance.
+    /// Bearer token for FluxVM's auth layer, if `auth.tokens` is
+    /// configured on that `fluxvm serve` instance.
     #[arg(long)]
-    ephemera_token: Option<String>,
+    fluxvm_token: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -647,9 +647,9 @@ async fn main() -> Result<()> {
 
     let heartbeat_interval = Duration::from_secs(config.heartbeat_interval);
 
-    let mut driver = zyvor_fabric_ephemera_driver::EphemeraDriver::new(&config.ephemera_url)
-        .context("failed to initialize Ephemera driver")?;
-    if let Some(token) = config.ephemera_token {
+    let mut driver = zyvor_fabric_fluxvm_driver::FluxVmDriver::new(&config.fluxvm_url)
+        .context("failed to initialize FluxVM driver")?;
+    if let Some(token) = config.fluxvm_token {
         driver = driver.with_token(token);
     }
     let driver: Arc<dyn VmDriver> = Arc::new(driver);
@@ -660,7 +660,7 @@ async fn main() -> Result<()> {
         address = %address,
         controller = %config.controller_url,
         heartbeat_secs = config.heartbeat_interval,
-        ephemera_url = %config.ephemera_url,
+        fluxvm_url = %config.fluxvm_url,
         "agent configured"
     );
 

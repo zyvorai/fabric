@@ -61,7 +61,7 @@ export default function Home() {
       <section className="mkt-section">
         <h2>Designed for operators.</h2>
         <p>
-          Create VMs, wire networks, and enforce policy from a calm console — backed by a single Rust daemon and Ephemera.
+          Create VMs, wire networks, and enforce policy from a calm console — backed by a single Rust daemon and FluxVM.
         </p>
       </section>
 

@@ -1,6 +1,6 @@
 # zyvor-fabric Documentation
 
-Private cloud control plane driving VM lifecycle over Ephemera's REST API -- no libvirt, no systemd-machined dependency for VM lifecycle itself
+Private cloud control plane driving VM lifecycle over FluxVM's REST API -- no libvirt, no systemd-machined dependency for VM lifecycle itself
 
 ## Start Here
 
@@ -10,7 +10,7 @@ Private cloud control plane driving VM lifecycle over Ephemera's REST API -- no 
 | **Docker / Podman** | [DOCKER.md](DOCKER.md) |
 | **Web UX** (marketing + `/app` console) | [web-ui.md](web-ui.md) · [ux.md](ux.md) |
 | **User journeys & acceptance criteria** | [User Stories](USER_STORIES.md) |
-| **Ephemera VM driver** — config, capability matrix, known gaps | [guides/vm-drivers/ephemera.md](guides/vm-drivers/ephemera.md) |
+| **FluxVM VM driver** — config, capability matrix, known gaps | [guides/vm-drivers/fluxvm.md](guides/vm-drivers/fluxvm.md) |
 | Customer page index | [customer/PAGE_INDEX.md](customer/PAGE_INDEX.md) |
 
 ## User Stories
@@ -19,7 +19,7 @@ Persona-based journeys with acceptance criteria: **[USER_STORIES.md](USER_STORIE
 
 | Persona | Focus |
 |---------|-------|
-| Alex (Private Cloud Admin) | VM lifecycle via the Ephemera driver |
+| Alex (Private Cloud Admin) | VM lifecycle via the FluxVM driver |
 | Morgan (Platform Engineer) | K8s operator and Terraform |
 | Jordan (Developer) | CLI/API for VM operations |
 
@@ -34,7 +34,7 @@ Part of the [Zyvor / HyperSDK platform stack](https://zyvor.dev):
 | **zeus-os (v9s)** | Cloud / KubeVirt control plane |
 | **forge** | AI infrastructure on K8s |
 | **hypersdk / hyper2kvm** | VM migration |
-| **ephemera** | Disposable-VM control plane — optional VM driver backend (see [above](guides/vm-drivers/ephemera.md)) |
+| **fluxvm** | Disposable-VM control plane — optional VM driver backend (see [above](guides/vm-drivers/fluxvm.md)) |
 | **guestkit** | Offline VM assurance |
 | **packetwolf** | Network intelligence |
 | **Axiom** | k8s-native private cloud control plane |

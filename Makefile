@@ -1,7 +1,7 @@
 .PHONY: all build build-backend build-web \
        install install-bin install-conf install-systemd install-web install-modules install-libexec \
        uninstall run dev cli test clean fmt lint \
-       docker-build docker-build-ephemera docker-up docker-down rpm deb help
+       docker-build docker-build-fluxvm docker-up docker-down rpm deb help
 
 PREFIX     ?= /usr
 DESTDIR    ?=
@@ -116,10 +116,10 @@ rpm:
 deb:
 	dpkg-buildpackage -us -uc -b
 
-docker-build: docker-build-ephemera
+docker-build: docker-build-fluxvm
 	docker compose build
 
-docker-build-ephemera:
+docker-build-fluxvm:
 	./scripts/build-container-images.sh
 
 docker-up:
@@ -149,7 +149,7 @@ help:
 	@echo "  lint            - Lint code"
 	@echo "  rpm             - Build RPM package"
 	@echo "  deb             - Build Debian package"
-	@echo "  docker-build    - Build zyvor-fabricd and ephemera images (see docs/DOCKER.md)"
+	@echo "  docker-build    - Build zyvor-fabricd and fluxvm images (see docs/DOCKER.md)"
 	@echo "  docker-up       - Start with Docker/Podman Compose"
 	@echo "  docker-down     - Stop Docker/Podman Compose"
 	@echo ""

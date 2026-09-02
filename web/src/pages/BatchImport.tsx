@@ -16,15 +16,15 @@ const exampleYAML = `vms:
   - name: web-01
     cpus: 2
     memory: 2G
-    image: /var/lib/ephemera/images/web-01.qcow2
+    image: /var/lib/fluxvm/images/web-01.qcow2
   - name: db-01
     cpus: 4
     memory: 8G
-    image: /var/lib/ephemera/images/db-01.qcow2
+    image: /var/lib/fluxvm/images/db-01.qcow2
   - name: app-01
     cpus: 2
     memory: 4G
-    image: /var/lib/ephemera/images/app-01.qcow2`
+    image: /var/lib/fluxvm/images/app-01.qcow2`
 
 function parseInput(text: string): VMEntry[] {
   const trimmed = text.trim()

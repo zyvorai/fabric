@@ -34,13 +34,13 @@ pub async fn list_images(
     let show_path = claims.role.can_manage();
     let mut images = Vec::new();
 
-    // Scan the configured image directory plus Ephemera's own image store
+    // Scan the configured image directory plus FluxVM's own image store
     // (VM lifecycle -- and image storage -- is handled entirely by
-    // Ephemera; /var/lib/machines was systemd-machined's directory and no
+    // FluxVM; /var/lib/machines was systemd-machined's directory and no
     // longer exists post-migration).
     for dir in &[
         state.config.storage.image_path.as_str(),
-        "/var/lib/ephemera/images",
+        "/var/lib/fluxvm/images",
     ] {
         let mut entries = match tokio::fs::read_dir(dir).await {
             Ok(e) => e,

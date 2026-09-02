@@ -53,7 +53,7 @@ pub(crate) fn not_available_response() -> impl IntoResponse {
 }
 
 /// Resolve `vm_name`'s QMP control socket via the active driver backend
-/// (`MachinectlDriver`'s systemd-vmspawn convention, or Ephemera's
+/// (`MachinectlDriver`'s systemd-vmspawn convention, or FluxVM's
 /// `VmRecord.control_socket`), returning `None` if the driver has no
 /// socket for it (not running, unknown, or a backend/hypervisor with no
 /// QMP equivalent) — the caller falls back to `not_available_response()`.
@@ -68,10 +68,10 @@ pub(crate) async fn resolve_qmp(state: &AppState, vm_name: &str) -> Option<QmpCl
     }
 }
 
-/// Number of empty `pcie-root-port` slots Ephemera reserves at boot for
-/// device hotplug (see `ephemera-qemu::HOTPLUG_PCIE_PORTS` -- this
+/// Number of empty `pcie-root-port` slots FluxVM reserves at boot for
+/// device hotplug (see `fluxvm-qemu::HOTPLUG_PCIE_PORTS` -- this
 /// convention is mirrored here rather than shared as code, since the two
-/// talk over Ephemera's REST API, not a Rust dependency).
+/// talk over FluxVM's REST API, not a Rust dependency).
 const HOTPLUG_PCIE_PORTS: u8 = 4;
 
 /// `device_add` onto the first of `bus_candidates` that accepts it, trying
@@ -446,7 +446,7 @@ pub async fn hotplug_disk(
 
     // Add device, onto whichever bus its driver actually needs: the
     // virtio-blk-pci default goes through a pre-reserved hotplug PCIe root
-    // port, scsi-hd through the single virtio-scsi controller Ephemera
+    // port, scsi-hd through the single virtio-scsi controller FluxVM
     // adds at boot -- see device_add_on_hotplug_bus's doc comment. (`ide`
     // was already rejected above, before we got here.)
     let driver = if req.bus == "scsi" {

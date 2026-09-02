@@ -19,7 +19,7 @@
 - Create, start, stop, restart, delete, clone VMs
 - VM templates
 - VM state persistence
-- VM driver: [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency (QEMU/Cloud Hypervisor/Firecracker)
+- VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU/Cloud Hypervisor/Firecracker)
 - CPU and memory configuration (`--cpus`, `--ram`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)
@@ -63,7 +63,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 ### WebSocket Console
 
 - Real-time browser-based terminal via xterm.js
-- PTY streaming over Ephemera's vsock guest agent
+- PTY streaming over FluxVM's vsock guest agent
 - Full terminal emulation
 
 ### VNC
@@ -74,7 +74,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 
 ## Cloud-Init
 
-- NoCloud seed generation via Ephemera's `CloudInitSpec`, attached on the VM's next (re)start
+- NoCloud seed generation via FluxVM's `CloudInitSpec`, attached on the VM's next (re)start
 - User-data and meta-data support
 - Network configuration
 - SSH key injection
@@ -356,4 +356,4 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 - GitHub Actions CI/CD
 - Automated builds, formatting checks, linting
 - Makefile for common tasks
-- Docker and Podman support -- `zyvor-fabricd` + an Ephemera companion container, see `docs/DOCKER.md`
+- Docker and Podman support -- `zyvor-fabricd` + an FluxVM companion container, see `docs/DOCKER.md`

@@ -319,17 +319,17 @@ pub async fn delete_vm(
     // if still running and reclaims its real disk/storage (LVM thin
     // snapshot, qemu-nbd export, Ceph RBD clone, ...). Previously this only
     // removed zyvor-fabricd's own store record and guessed at a disk file
-    // to unlink by naming convention, which never reached Ephemera at all:
+    // to unlink by naming convention, which never reached FluxVM at all:
     // every deleted VM left its full instance (disk, and if it was still
     // running, the live QEMU process) permanently orphaned. A VM that was
-    // created here but never started has no Ephemera-side counterpart yet
-    // ("no VM named ... known to Ephemera") -- that's fine, there's nothing
-    // to destroy. Any other failure (including Ephemera's own safety
+    // created here but never started has no FluxVM-side counterpart yet
+    // ("no VM named ... known to FluxVM") -- that's fine, there's nothing
+    // to destroy. Any other failure (including FluxVM's own safety
     // refusal when a process won't die) must block the delete, or we'd
     // recreate the exact leak this fixes by dropping the record anyway.
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
-        if !msg.contains("known to Ephemera") {
+        if !msg.contains("known to FluxVM") {
             audit(
                 &state,
                 &claims.sub,
@@ -391,12 +391,12 @@ pub struct AddPortForwardRequest {
 /// Usermode/slirp networking only accepts forwards at instance-creation
 /// time -- there is no way to add one to an already-running VM -- so a
 /// running VM gets destroyed and relaunched with its full, updated forward
-/// set; a stopped VM has its Ephemera-side record cleared too (if it has
+/// set; a stopped VM has its FluxVM-side record cleared too (if it has
 /// one) so its next Start creates fresh with the forward included, instead
 /// of `start_with_options` finding the old record still there and
 /// replaying its stale original request (found live: adding a forward to
 /// a VM that had already been started once before, then stopped, silently
-/// never took effect on the next Start -- `EphemeraDriver::start_with_options`
+/// never took effect on the next Start -- `FluxVmDriver::start_with_options`
 /// deliberately replays a known VM's stored request rather than
 /// re-translating fresh options, so the only way to pick up a forward
 /// added afterward is to not have a stale record sitting there at all).
@@ -467,7 +467,7 @@ pub async fn add_port_forward(
             .into_response();
     }
 
-    // Clear any existing Ephemera-side record regardless of current running
+    // Clear any existing FluxVM-side record regardless of current running
     // state -- a stopped VM that was previously started still has one, and
     // leaving it in place means the next Start replays its stale original
     // forward set instead of picking up what was just added (see doc
@@ -475,7 +475,7 @@ pub async fn add_port_forward(
     // harmless outcome for a VM that's never been started at all.
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
-        if !msg.contains("known to Ephemera") {
+        if !msg.contains("known to FluxVM") {
             audit(
                 &state,
                 &claims.sub,
@@ -586,7 +586,7 @@ pub async fn remove_port_forward(
 
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
-        if !msg.contains("known to Ephemera") {
+        if !msg.contains("known to FluxVM") {
             audit(
                 &state,
                 &claims.sub,
@@ -737,11 +737,11 @@ pub async fn start_vm(
             return;
         }
 
-        // Always go through start_with_options: Ephemera only learns about a
-        // VM on its first start (see EphemeraDriver::start_with_options's
-        // "First launch" branch, which lazily calls Ephemera's create API).
+        // Always go through start_with_options: FluxVM only learns about a
+        // VM on its first start (see FluxVmDriver::start_with_options's
+        // "First launch" branch, which lazily calls FluxVM's create API).
         // The plain start() has no such fallback and fails with "not known
-        // to Ephemera" for any VM that was only ever `POST /vms`-created —
+        // to FluxVM" for any VM that was only ever `POST /vms`-created —
         // which is every VM made through the Create VM wizard, since it
         // never sends start options. Using opts.unwrap_or_default() here
         // routes that common case through the same lazy-create path as an
@@ -761,7 +761,7 @@ pub async fn start_vm(
         // VM's own stored port_forwards/network_tap (set at Create VM time)
         // rather than a bare default, so a VM created with an exposed SSH
         // port or bridged networking actually gets that applied on its
-        // first real launch in Ephemera.
+        // first real launch in FluxVM.
         let opts = start_opts.unwrap_or_else(|| vm_model::VMStartOptions {
             port_forwards: vm.port_forwards.clone(),
             network_tap: vm.network_tap,
@@ -882,21 +882,21 @@ pub async fn restart_vm(
         }
     };
 
-    // `driver.reboot()` (Ephemera stop+start, replaying its own stored
+    // `driver.reboot()` (FluxVM stop+start, replaying its own stored
     // launch request) used to be used here directly -- found live: any
     // cloud-init/ssh-key change made via configure_cloud_init *after* a
     // VM's first boot silently never took effect on a later restart,
     // contradicting the Cloud-init tab's own "applied on next (re)start"
-    // promise. `EphemeraDriver::start_with_options` only re-translates
-    // fresh options for a VM Ephemera doesn't already know about --
+    // promise. `FluxVmDriver::start_with_options` only re-translates
+    // fresh options for a VM FluxVM doesn't already know about --
     // for an existing record it just replays what was stored at creation
     // time. Same delete-then-recreate fix already used by
-    // add_port_forward/remove_port_forward: clear the stale Ephemera
+    // add_port_forward/remove_port_forward: clear the stale FluxVM
     // record first so the restart actually picks up this VM's current
     // fields, not its original ones.
     if let Err(e) = state.driver.delete(&name).await {
         let msg = e.to_string();
-        if !msg.contains("known to Ephemera") {
+        if !msg.contains("known to FluxVM") {
             audit(
                 &state,
                 &claims.sub,
@@ -1286,7 +1286,7 @@ fn extract_packages_from_user_data(user_data: &str) -> Vec<String> {
 /// Pulls `runcmd` (top-level `runcmd:` list) out of arbitrary cloud-config
 /// YAML. Each entry may be a plain string or a YAML sequence
 /// (`[bash, -lc, "..."]`); sequence entries are rejoined with spaces since
-/// Ephemera's own `CloudInitSpec.runcmd` is a flat `Vec<String>` of shell
+/// FluxVM's own `CloudInitSpec.runcmd` is a flat `Vec<String>` of shell
 /// commands, not argv arrays.
 fn extract_runcmd_from_user_data(user_data: &str) -> Vec<String> {
     let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(user_data) else {
@@ -1341,10 +1341,10 @@ fn extract_write_files_from_user_data(user_data: &str) -> Vec<vm_model::CloudIni
 
 /// `hostname`, `ssh_authorized_keys`, `packages`, `runcmd`, and
 /// `write_files` found in `user_data` are all persisted onto the VM record
-/// and applied on its next (re)launch, via Ephemera's own CloudInitSpec (see
-/// EphemeraDriver::translate_start_options). Persisting even just the empty
+/// and applied on its next (re)launch, via FluxVM's own CloudInitSpec (see
+/// FluxVmDriver::translate_start_options). Persisting even just the empty
 /// case matters beyond the values themselves: any cloud-init config at all
-/// is what makes Ephemera attach a cloud-init seed disk, which is what lets
+/// is what makes FluxVM attach a cloud-init seed disk, which is what lets
 /// cloud-init find a datasource and run its own default network config --
 /// without one, a guest's DHCP client never comes up (found live: this
 /// endpoint used to write an ISO no VM ever received, so cloud-init and

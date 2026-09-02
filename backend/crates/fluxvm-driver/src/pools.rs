@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-//! `PoolDriver` backed by Ephemera's warm-pool API (`/v1/pools...`) --
+//! `PoolDriver` backed by FluxVM's warm-pool API (`/v1/pools...`) --
 //! pre-boot `size` VMs from a template, pause each once ready, then hand
 //! one out instantly on claim instead of a slow cold create+boot.
 
@@ -11,10 +11,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use vm_model::VM;
 use zyvor_fabric_driver_core::{PoolDriver, PoolInfo};
-use zyvor_fabric_ephemera_client::{BackendKind, ClaimOverrides, CreateVmRequest, PoolRecord};
+use zyvor_fabric_fluxvm_client::{BackendKind, ClaimOverrides, CreateVmRequest, PoolRecord};
 
 use crate::lifecycle::map_status;
-use crate::EphemeraDriver;
+use crate::FluxVmDriver;
 
 fn to_pool_info(pool: PoolRecord) -> PoolInfo {
     PoolInfo {
@@ -28,7 +28,7 @@ fn to_pool_info(pool: PoolRecord) -> PoolInfo {
 }
 
 #[async_trait]
-impl PoolDriver for EphemeraDriver {
+impl PoolDriver for FluxVmDriver {
     async fn create_pool(
         &self,
         name: &str,

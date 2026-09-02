@@ -43,7 +43,7 @@ pub fn check_quorum(quorum_path: &str, host_id: &str) -> Result<bool> {
 }
 
 /// Self-fence: stop all FT-protected VMs when quorum is lost, via the
-/// active `VmDriver` (machinectl or Ephemera) rather than shelling out to
+/// active `VmDriver` (machinectl or FluxVM) rather than shelling out to
 /// machinectl directly.
 pub async fn self_fence(driver: &Arc<dyn VmDriver>) -> Result<()> {
     tracing::error!("QUORUM LOST: self-fencing - stopping all FT VMs");

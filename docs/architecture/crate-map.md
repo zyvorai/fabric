@@ -34,14 +34,14 @@ These crates form the foundation of the Zyvor Fabric platform.
 
 ## Drivers
 
-Zyvor Fabric's VM lifecycle is entirely owned by [Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with no systemd dependency of its own, reached over its REST API. `driver-core` defines the trait boundary (`VmDriver`) between the daemon and that backend; there is no other backend to select — the systemd-machined/systemd-vmspawn driver (`machinectl-driver`/`machined-dbus`) that used to fill this role has been deleted.
+Zyvor Fabric's VM lifecycle is entirely owned by [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency of its own, reached over its REST API. `driver-core` defines the trait boundary (`VmDriver`) between the daemon and that backend; there is no other backend to select — the systemd-machined/systemd-vmspawn driver (`machinectl-driver`/`machined-dbus`) that used to fill this role has been deleted.
 
 | Crate                        | Path                              | Description                                              |
 |------------------------------|-----------------------------------|----------------------------------------------------------|
 | `zyvor-fabric-driver-core`       | `backend/crates/driver-core`      | Trait definitions the driver implements: `VMDriver` (lifecycle), `ResourceControlDriver`/`ResourceStatsDriver` (cgroup quotas, freeze/thaw, metrics, PSI pressure), `LogDriver` (log streaming), `ImageDriver` (image registry CRUD), `ShellDriver` (exec/copy), `ConsoleDriver` (interactive console), `CapabilityProvider`. Blanket-impl'd as `VmDriver`. |
-| `zyvor-fabric-vm-driver`             | `backend/zyvor-fabric-vm-driver`          | Builds VM disk images via `mkosi` (an offline OS-image-building tool) -- unrelated to VM lifecycle, which is entirely Ephemera's job. |
-| `zyvor-fabric-ephemera-client`   | `backend/crates/ephemera-client`  | REST client for Ephemera's API -- hand-maintained DTO mirror, since the integration is out-of-process REST rather than a Cargo dependency on Ephemera's own crates. |
-| `zyvor-fabric-ephemera-driver`   | `backend/crates/ephemera-driver`  | `VmDriver` implementation backed by Ephemera. A few `ImageDriver` operations (tar-format images) intentionally error rather than fake an equivalent that can't exist -- a tar rootfs isn't a bootable disk image for a real hardware VM. |
+| `zyvor-fabric-vm-driver`             | `backend/zyvor-fabric-vm-driver`          | Builds VM disk images via `mkosi` (an offline OS-image-building tool) -- unrelated to VM lifecycle, which is entirely FluxVM's job. |
+| `zyvor-fabric-fluxvm-client`   | `backend/crates/fluxvm-client`  | REST client for FluxVM's API -- hand-maintained DTO mirror, since the integration is out-of-process REST rather than a Cargo dependency on FluxVM's own crates. |
+| `zyvor-fabric-fluxvm-driver`   | `backend/crates/fluxvm-driver`  | `VmDriver` implementation backed by FluxVM. A few `ImageDriver` operations (tar-format images) intentionally error rather than fake an equivalent that can't exist -- a tar rootfs isn't a bootable disk image for a real hardware VM. |
 
 ## Networking
 
@@ -166,8 +166,8 @@ Zyvor Fabric (main binary)
   |-- security
   |-- zyvor-fabric-vm-driver
   |-- zyvor-fabric-driver-core --> vm-model
-  |-- zyvor-fabric-ephemera-client
-  |-- zyvor-fabric-ephemera-driver --> zyvor-fabric-driver-core, zyvor-fabric-ephemera-client
+  |-- zyvor-fabric-fluxvm-client
+  |-- zyvor-fabric-fluxvm-driver --> zyvor-fabric-driver-core, zyvor-fabric-fluxvm-client
   |-- Zyvor Fabric-storage
   |-- Zyvor Fabric-system
   |-- Zyvor Fabric-vm

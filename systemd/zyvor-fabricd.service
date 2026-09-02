@@ -28,7 +28,7 @@ ReadWritePaths=/etc/systemd/network
 ReadWritePaths=/run/systemd/machines
 ReadWritePaths=-/run/systemd/nspawn
 ReadWritePaths=/tmp
-# /var/lib/ephemera: VM disks Ephemera actually manages (see
+# /var/lib/fluxvm: VM disks FluxVM actually manages (see
 # VMDriver::get_disk_path) -- snapshot/checkpoint/resize/clone/fork/
 # storage-migrate all run qemu-img directly against a VM's real,
 # live disk there, not a file zyvor-fabricd's own store manages.
@@ -37,7 +37,7 @@ ReadWritePaths=/tmp
 # permissions (found live: qemu-img reported EROFS, not a permissions
 # error, on a disk that was actually mode 644 root:root and unheld by
 # any process).
-ReadWritePaths=/var/lib/ephemera
+ReadWritePaths=/var/lib/fluxvm
 # qemu-nbd (used by GuestKit's `doctor`/`agent-inject` guestfs mounting,
 # invoked from ux_extensions.rs's golden-image scoring) writes its lock
 # socket to /var/lock (-> /run/lock) on every mount -- without this,

@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-//! `ImageDriver` backed by Ephemera's image catalog
+//! `ImageDriver` backed by FluxVM's image catalog
 //! (`GET/POST/DELETE /v1/images/catalog...`) rather than machinectl's
 //! `/var/lib/machines` image directory. The two models don't map 1:1 — see
 //! the per-method notes below for what's a real equivalent versus a clear
@@ -11,14 +11,14 @@ use anyhow::{bail, Result};
 use async_trait::async_trait;
 use zyvor_fabric_driver_core::{ImageDriver, ImageInfo};
 
-use crate::EphemeraDriver;
+use crate::FluxVmDriver;
 
 fn unsupported(op: &str, why: &str) -> anyhow::Error {
-    anyhow::anyhow!("'{op}' is not supported by the ephemera backend — {why}")
+    anyhow::anyhow!("'{op}' is not supported by the fluxvm backend — {why}")
 }
 
 #[async_trait]
-impl ImageDriver for EphemeraDriver {
+impl ImageDriver for FluxVmDriver {
     async fn list_images(&self) -> Result<Vec<ImageInfo>> {
         let entries = self.client.list_catalog().await?;
         Ok(entries
@@ -65,7 +65,7 @@ impl ImageDriver for EphemeraDriver {
         if verify {
             bail!(unsupported(
                 "pull_raw_image(verify=true)",
-                "catalog signature verification is a separate offline flow (`ephemera catalog sign` \
+                "catalog signature verification is a separate offline flow (`fluxvm catalog sign` \
                  at authoring time, automatic re-verification at VM-create time when trusted_signers \
                  is configured) — there's no per-request \"verify now\" equivalent",
             ));
@@ -118,7 +118,7 @@ impl ImageDriver for EphemeraDriver {
         // entry (e.g. after a rename or remove). Clean those.
         let removed = self.client.clean_catalog().await?;
         tracing::info!(
-            "ephemera clean_images: removed {} orphaned download(s)",
+            "fluxvm clean_images: removed {} orphaned download(s)",
             removed.len()
         );
         Ok(())

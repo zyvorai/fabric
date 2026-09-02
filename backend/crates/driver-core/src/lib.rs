@@ -44,13 +44,13 @@ pub type LogStream = Pin<Box<dyn Stream<Item = LogEntry> + Send>>;
 // These use `#[async_trait]` (boxed futures) rather than native RPITIT
 // (`impl Future<...> + Send`) specifically so `VmDriver` below is
 // dyn-compatible — `zyvor-fabricd`'s `AppState.driver` holds an
-// `EphemeraDriver` behind `Arc<dyn VmDriver>`, and RPITIT traits cannot be
-// turned into trait objects. This also matches the convention Ephemera's
+// `FluxVmDriver` behind `Arc<dyn VmDriver>`, and RPITIT traits cannot be
+// turned into trait objects. This also matches the convention FluxVM's
 // own `VmBackend` trait already uses.
 
 /// Core VM lifecycle operations (`name`-keyed, "enable at boot" semantics)
 /// — a shape kept from this trait's original systemd-machined-backed
-/// design; implementations backed by a different engine (e.g. Ephemera)
+/// design; implementations backed by a different engine (e.g. FluxVM)
 /// adapt to this shape rather than the trait adapting to them, so callers
 /// don't need to care which backend is active.
 #[async_trait]
@@ -62,7 +62,7 @@ pub trait VMDriver: Send + Sync {
     /// secure-boot, vsock, network-tap, bind mounts, credentials, ...).
     /// Unlike `start`, this bypasses whatever the backend would otherwise
     /// derive/replay for the machine — a backend that bakes launch options
-    /// in at creation time rather than at start time (Ephemera) may not be
+    /// in at creation time rather than at start time (FluxVM) may not be
     /// able to honor every field and should error clearly rather than
     /// silently ignore what it can't apply.
     async fn start_with_options(&self, vm: &VM, opts: &VMStartOptions) -> Result<()>;
@@ -117,30 +117,30 @@ pub trait VMDriver: Send + Sync {
     async fn get_control_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
 
     /// The MAC address the machine's primary NIC was launched with, if
-    /// known — `EphemeraDriver` returns the MAC it assigned at create
+    /// known — `FluxVmDriver` returns the MAC it assigned at create
     /// time, which callers can resolve to an IP via a DHCP lease lookup.
     async fn get_mac_address(&self, name: &str) -> Result<Option<String>>;
 
     /// Path to the machine's VNC UNIX-domain socket, if it has one.
-    /// `EphemeraDriver` derives this as `<workspace>/vnc.sock` — the fixed
-    /// path Ephemera's QEMU backend always listens on (`-vnc unix:...`),
+    /// `FluxVmDriver` derives this as `<workspace>/vnc.sock` — the fixed
+    /// path FluxVM's QEMU backend always listens on (`-vnc unix:...`),
     /// no port allocation involved. `None` for a machine with no VNC
     /// server (not currently running, or a backend with no VNC equivalent).
     async fn get_vnc_socket(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
 
-    /// Path to the VM's actual, live disk image -- `EphemeraDriver` returns
-    /// `VmRecord.disk` (the real copy-on-write instance disk Ephemera
+    /// Path to the VM's actual, live disk image -- `FluxVmDriver` returns
+    /// `VmRecord.disk` (the real copy-on-write instance disk FluxVM
     /// created and is using right now, e.g.
-    /// `/var/lib/ephemera/instances/<uuid>/root.qcow2`), which is *not*
+    /// `/var/lib/fluxvm/instances/<uuid>/root.qcow2`), which is *not*
     /// the same thing as the base image path the VM was created from.
     /// Callers doing anything disk-level (snapshots, backups, cloning)
     /// need this, not a naming-convention guess at the base image.
     async fn get_disk_path(&self, name: &str) -> Result<std::path::PathBuf>;
 
     /// The cgroup v2 path the machine's VMM process was migrated into, if
-    /// cgroup delegation has completed for it. `EphemeraDriver` returns
-    /// `VmRecord.cgroup_path` (real path is `ephemera.slice/<uuid>.scope`,
-    /// keyed by Ephemera's own internal VM id -- NOT the VM name). `None`
+    /// cgroup delegation has completed for it. `FluxVmDriver` returns
+    /// `VmRecord.cgroup_path` (real path is `fluxvm.slice/<uuid>.scope`,
+    /// keyed by FluxVM's own internal VM id -- NOT the VM name). `None`
     /// if the VM isn't running yet or cgroup delegation failed for it.
     async fn get_cgroup_path(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
 }
@@ -203,7 +203,7 @@ pub struct ShellOutput {
 }
 
 /// Run a single non-interactive command inside a machine and collect its
-/// output — Ephemera's vsock guest-agent `Exec` op (requires the VM to
+/// output — FluxVM's vsock guest-agent `Exec` op (requires the VM to
 /// have been created with the agent enabled; see `CreateVmRequest.agent`).
 /// Not a substitute for a real interactive console/PTY.
 #[async_trait]
@@ -215,7 +215,7 @@ pub trait ShellDriver: Send + Sync {
         timeout_seconds: Option<u64>,
     ) -> Result<ShellOutput>;
 
-    /// Copy a file from the host into the machine — Ephemera's vsock
+    /// Copy a file from the host into the machine — FluxVM's vsock
     /// guest-agent `PutFile` op (same agent-enabled requirement as
     /// [`Self::shell`]). `mode` is Unix permission bits (e.g. `0o644`);
     /// `None` lets the backend pick its own default.
@@ -227,18 +227,18 @@ pub trait ShellDriver: Send + Sync {
         mode: Option<u32>,
     ) -> Result<()>;
 
-    /// Copy a file from the machine to the host — Ephemera's vsock
+    /// Copy a file from the machine to the host — FluxVM's vsock
     /// guest-agent `GetFile` op.
     async fn copy_from(&self, name: &str, machine_path: &str, host_path: &str) -> Result<()>;
 }
 
-/// One entry in the image registry — Ephemera's checksummed image catalog
+/// One entry in the image registry — FluxVM's checksummed image catalog
 /// (see `ImageDriver`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageInfo {
     pub name: String,
     /// Free-form backend-specific label, e.g. the on-disk format
-    /// (`"qcow2"`) for Ephemera.
+    /// (`"qcow2"`) for FluxVM.
     pub image_type: String,
     pub read_only: bool,
     /// Free-form, backend-specific size representation rather than a
@@ -247,9 +247,9 @@ pub struct ImageInfo {
 }
 
 /// Manage named base/VM images independent of any specific machine —
-/// Ephemera's checksummed image catalog. Every method must be implemented
+/// FluxVM's checksummed image catalog. Every method must be implemented
 /// by every backend; one with no real equivalent for a given operation
-/// (see `EphemeraDriver`'s tar-format methods — a tar rootfs isn't a
+/// (see `FluxVmDriver`'s tar-format methods — a tar rootfs isn't a
 /// bootable disk image for a real hardware VM) should return a clear "not
 /// supported" error rather than silently no-op'ing — a caller has no way
 /// to notice a silently-dropped image operation.
@@ -285,7 +285,7 @@ pub struct PoolInfo {
 }
 
 /// Warm-pool management for instant VM provisioning. Not every backend has
-/// an equivalent (this is Ephemera-specific pre-boot-and-pause pooling) --
+/// an equivalent (this is FluxVM-specific pre-boot-and-pause pooling) --
 /// an implementation with none should return a clear "not supported" error
 /// rather than silently no-op'ing, same convention as `ImageDriver`.
 #[async_trait]
@@ -315,7 +315,7 @@ pub trait PoolDriver: Send + Sync {
 
 /// Feature detection for optional capabilities.
 pub trait CapabilityProvider: Send + Sync {
-    /// A short, stable identifier for the active backend (`"ephemera"`)
+    /// A short, stable identifier for the active backend (`"fluxvm"`)
     /// — surfaced by health/capability endpoints.
     fn backend_name(&self) -> &'static str;
 
@@ -335,10 +335,10 @@ pub type ConsoleSession = std::pin::Pin<Box<dyn ConsoleIo>>;
 pub trait ConsoleIo: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}
 impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send> ConsoleIo for T {}
 
-/// Open an interactive shell on a machine — Ephemera's vsock `OpenShell` op,
+/// Open an interactive shell on a machine — FluxVM's vsock `OpenShell` op,
 /// relayed to the caller as a raw byte stream. No live terminal resize (the
 /// size is fixed at open time — see `AgentRequest::OpenShell`'s doc comment
-/// on the Ephemera side of this connection).
+/// on the FluxVM side of this connection).
 #[async_trait]
 pub trait ConsoleDriver: Send + Sync {
     async fn open_console(&self, name: &str, cols: u16, rows: u16) -> Result<ConsoleSession>;

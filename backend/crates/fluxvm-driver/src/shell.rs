@@ -1,9 +1,9 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-//! `ShellDriver` backed by Ephemera's vsock guest-agent `Exec` op
+//! `ShellDriver` backed by FluxVM's vsock guest-agent `Exec` op
 //! (`POST /v1/vms/{id}/agent`) — requires the VM to have been created with
-//! `CreateVmRequest.agent.enabled`; Ephemera itself errors clearly
+//! `CreateVmRequest.agent.enabled`; FluxVM itself errors clearly
 //! (`"guest agent is not enabled for this VM"`) rather than hanging when
 //! it wasn't.
 
@@ -11,17 +11,17 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use zyvor_fabric_driver_core::{ShellDriver, ShellOutput};
-use zyvor_fabric_ephemera_client::AgentResponse;
+use zyvor_fabric_fluxvm_client::AgentResponse;
 
-use crate::EphemeraDriver;
+use crate::FluxVmDriver;
 
-/// Matches `ephemera_guest_protocol::MAX_FILE_TRANSFER_BYTES` — checked
+/// Matches `fluxvm_guest_protocol::MAX_FILE_TRANSFER_BYTES` — checked
 /// host-side too so a too-large file fails fast instead of base64-encoding
 /// the whole thing into memory first.
 const MAX_FILE_TRANSFER_BYTES: u64 = 64 * 1024 * 1024;
 
 #[async_trait]
-impl ShellDriver for EphemeraDriver {
+impl ShellDriver for FluxVmDriver {
     async fn shell(
         &self,
         name: &str,

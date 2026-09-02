@@ -177,7 +177,7 @@ pub async fn trigger_failover(
     let start_time = std::time::Instant::now();
 
     // Fence the old primary via the active VM driver (machinectl/D-Bus or
-    // Ephemera, per driver.backend) rather than a direct systemd shellout.
+    // FluxVM, per driver.backend) rather than a direct systemd shellout.
     tracing::info!(vm = %vm_name, host = %old_primary, "FT failover: fencing VM on old primary");
     let fence_method = match state.driver.poweroff(&vm_name).await {
         Ok(()) => "poweroff".to_string(),

@@ -10,21 +10,21 @@
 #   zyvor-guest-agent    the in-guest agent CloudInitTab.tsx's default
 #                        user-data curls from /vendor/zyvor-guest-agent and
 #                        installs into new VMs at first boot.
-#   ephemera-guest-agent Ephemera's own in-guest vsock agent (ping/exec/
+#   fluxvm-guest-agent FluxVM's own in-guest vsock agent (ping/exec/
 #                        put-file/get-file/shutdown) -- required for
 #                        Console/Terminal access on any VM. Built as a musl
 #                        static binary so it runs on any guest libc.
 #
-# All three come from source trees OUTSIDE this repo (guestkit, Ephemera are
+# All three come from source trees OUTSIDE this repo (guestkit, FluxVM are
 # separate git repos) and are not part of zyvor-fabricd's own `cargo build`,
 # so they can't live in deploy-remote.sh's normal build step. Run this
-# whenever guestkit or Ephemera's guest-agent source changes and you want
+# whenever guestkit or FluxVM's guest-agent source changes and you want
 # that reflected in the vendor binaries new VMs receive -- it is NOT run
 # automatically by deploy-remote.sh.
 #
 # Usage: scripts/build-vendor-binaries.sh user@host
 #   GUESTKIT_DIR=/path/to/guestkit    (default: ~/guestkit on the remote)
-#   EPHEMERA_DIR=/path/to/Ephemera    (default: ~/Ephemera on the remote)
+#   FLUXVM_DIR=/path/to/FluxVM    (default: ~/FluxVM on the remote)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,7 +42,7 @@ REMOTE="${1:-}"
 
 VENDOR_DIR="/var/lib/zyvor-fabricd/vendor"
 
-deploy_ui_banner "Build vendor binaries → ${REMOTE}" "guestkit-agent-cli · zyvor-guest-agent · ephemera-guest-agent"
+deploy_ui_banner "Build vendor binaries → ${REMOTE}" "guestkit-agent-cli · zyvor-guest-agent · fluxvm-guest-agent"
 
 phase 1 3 "Build guestkit binaries (agent feature)" "guestkit + zyvor-guest-agent"
 ssh "$REMOTE" bash -s <<EOS
@@ -56,24 +56,24 @@ echo "  ✅ guestkit (agent feature) + zyvor-guest-agent built"
 EOS
 ok "guestkit binaries built"
 
-phase 2 3 "Build ephemera-guest-agent (musl static)" "cargo build --target x86_64-unknown-linux-musl"
+phase 2 3 "Build fluxvm-guest-agent (musl static)" "cargo build --target x86_64-unknown-linux-musl"
 ssh "$REMOTE" bash -s <<EOS
 set -euo pipefail
 export PATH="\${HOME}/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:\${PATH}"
-EPHEMERA_DIR="${EPHEMERA_DIR:-\$HOME/Ephemera}"
-[ -d "\$EPHEMERA_DIR" ] || { echo "Ephemera checkout not found at \$EPHEMERA_DIR (set EPHEMERA_DIR=)" >&2; exit 1; }
-cd "\$EPHEMERA_DIR"
+FLUXVM_DIR="${FLUXVM_DIR:-\$HOME/FluxVM}"
+[ -d "\$FLUXVM_DIR" ] || { echo "FluxVM checkout not found at \$FLUXVM_DIR (set FLUXVM_DIR=)" >&2; exit 1; }
+cd "\$FLUXVM_DIR"
 rustup target add x86_64-unknown-linux-musl 2>/dev/null || true
-cargo build --release -p ephemera-guest-agent --target x86_64-unknown-linux-musl
-echo "  ✅ ephemera-guest-agent (musl) built"
+cargo build --release -p fluxvm-guest-agent --target x86_64-unknown-linux-musl
+echo "  ✅ fluxvm-guest-agent (musl) built"
 EOS
-ok "ephemera-guest-agent built"
+ok "fluxvm-guest-agent built"
 
 phase 3 3 "Install into $VENDOR_DIR" "atomic swap, preserves service uptime"
 ssh "$REMOTE" bash -s <<EOS
 set -euo pipefail
 GUESTKIT_DIR="${GUESTKIT_DIR:-\$HOME/guestkit}"
-EPHEMERA_DIR="${EPHEMERA_DIR:-\$HOME/Ephemera}"
+FLUXVM_DIR="${FLUXVM_DIR:-\$HOME/FluxVM}"
 VENDOR_DIR="$VENDOR_DIR"
 SUDO="sudo"
 command -v sudo >/dev/null 2>&1 || SUDO=""
@@ -88,11 +88,11 @@ install_atomic() {
 
 install_atomic "\$GUESTKIT_DIR/target/release/guestkit" "\$VENDOR_DIR/guestkit-agent-cli"
 install_atomic "\$GUESTKIT_DIR/target/release/zyvor-guest-agent" "\$VENDOR_DIR/zyvor-guest-agent"
-install_atomic "\$EPHEMERA_DIR/target/x86_64-unknown-linux-musl/release/ephemera-guest-agent" "\$VENDOR_DIR/ephemera-guest-agent"
+install_atomic "\$FLUXVM_DIR/target/x86_64-unknown-linux-musl/release/fluxvm-guest-agent" "\$VENDOR_DIR/fluxvm-guest-agent"
 
-if [ -f "\$EPHEMERA_DIR/systemd/ephemera-guest-agent.service" ]; then
-    \$SUDO install -m 644 "\$EPHEMERA_DIR/systemd/ephemera-guest-agent.service" "\$VENDOR_DIR/ephemera-guest-agent.service"
-    echo "  ✅ ephemera-guest-agent.service -> \$VENDOR_DIR/ephemera-guest-agent.service"
+if [ -f "\$FLUXVM_DIR/systemd/fluxvm-guest-agent.service" ]; then
+    \$SUDO install -m 644 "\$FLUXVM_DIR/systemd/fluxvm-guest-agent.service" "\$VENDOR_DIR/fluxvm-guest-agent.service"
+    echo "  ✅ fluxvm-guest-agent.service -> \$VENDOR_DIR/fluxvm-guest-agent.service"
 fi
 
 echo

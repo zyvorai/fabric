@@ -9,23 +9,23 @@
 Zyvor Fabric is an open-source virtual machine management platform built in Rust. It
 provides a REST API, web UI, and CLI for managing the full lifecycle of virtual
 machines on Linux hosts, using QEMU (and Cloud Hypervisor/Firecracker) via
-[Ephemera](https://github.com/hypersdk/ephemera), a disposable-VM engine with
-no systemd dependency -- see "What is the role of Ephemera?" below.
+[FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with
+no systemd dependency -- see "What is the role of FluxVM?" below.
 
 ### How is Zyvor Fabric different from libvirt/virt-manager?
 
-Zyvor Fabric talks to Ephemera's own REST API instead of libvirt's abstraction
+Zyvor Fabric talks to FluxVM's own REST API instead of libvirt's abstraction
 layer -- no libvirtd, no XML domain definitions. Host networking always uses
 direct netlink calls rather than systemd-networkd, and DHCP is served by a
 directly-managed `dnsmasq` process per bridge. Neither zyvor-fabricd nor
-Ephemera has a systemd dependency; systemd is optional only as a way to
+FluxVM has a systemd dependency; systemd is optional only as a way to
 supervise the zyvor-fabricd *process* itself, for operators who choose that
 supervisor.
 
 ### What VM driver is Zyvor Fabric built on?
 
-VM lifecycle is handled entirely by [Ephemera](https://github.com/hypersdk/ephemera),
-reached over its REST API (`driver.ephemera_url` in `zyvor-fabricd.toml`).
+VM lifecycle is handled entirely by [FluxVM](https://github.com/zyvorai/fluxvm),
+reached over its REST API (`driver.fluxvm_url` in `zyvor-fabricd.toml`).
 This covers VM lifecycle, cgroup resource control, log streaming, hotplug,
 image management, shell exec, file copy, SSH info, and interactive console --
 all through the same zyvor-fabricd API. Tar-format images are the one
@@ -36,7 +36,7 @@ a bootable disk image for a real hardware VM (that model only worked for
 ### What hypervisor does Zyvor Fabric use?
 
 Zyvor Fabric uses QEMU with KVM hardware acceleration by default (Cloud
-Hypervisor and Firecracker are also available through Ephemera). Ephemera
+Hypervisor and Firecracker are also available through FluxVM). FluxVM
 launches and supervises each VM's hypervisor process directly -- there's no
 systemd-vmspawn or any other intermediary managing VM lifecycle.
 
@@ -72,10 +72,10 @@ guarantees, excellent async performance via Tokio, and low resource overhead.
 These properties are well-suited for a systems management daemon that handles
 concurrent VM operations, network configuration, and real-time event streaming.
 
-### What is the role of Ephemera?
+### What is the role of FluxVM?
 
-[Ephemera](https://github.com/hypersdk/ephemera) is the disposable-VM control
-plane zyvor-fabricd's `EphemeraDriver` speaks to over REST (`driver-core`'s
+[FluxVM](https://github.com/zyvorai/fluxvm) is the disposable-VM control
+plane zyvor-fabricd's `FluxVmDriver` speaks to over REST (`driver-core`'s
 `VmDriver` trait). It launches and supervises each VM's QEMU/Cloud
 Hypervisor/Firecracker process directly, tracks state in its own JSON-file
 store, and exposes cgroup delegation, log capture, image catalog, and a
@@ -382,7 +382,7 @@ curl -s "http://127.0.0.1:9095/api/v1/logs?query=error&limit=50" \
 ```
 
 Logs can also be streamed in real-time via SSE at
-`GET /api/v1/logs/{vm_name}/stream`. Logs are sourced from Ephemera's captured
+`GET /api/v1/logs/{vm_name}/stream`. Logs are sourced from FluxVM's captured
 console output; raw serial console output has no journald-equivalent
 per-line priority/unit metadata, so every entry is stamped uniformly.
 
@@ -476,15 +476,15 @@ cors_origins = ["https://zyvor-fabric.example.com", "http://localhost:5173"]
 
 ## Troubleshooting
 
-### Zyvor Fabric fails to start with "Failed to initialize Ephemera driver"
+### Zyvor Fabric fails to start with "Failed to initialize FluxVM driver"
 
-This means `driver.ephemera_url` in `zyvor-fabricd.toml` doesn't point at a
-reachable `ephemera serve` instance (wrong URL, Ephemera not started yet, or
-a firewall blocking the connection). Confirm Ephemera itself is up:
+This means `driver.fluxvm_url` in `zyvor-fabricd.toml` doesn't point at a
+reachable `fluxvm serve` instance (wrong URL, FluxVM not started yet, or
+a firewall blocking the connection). Confirm FluxVM itself is up:
 ```bash
 curl http://127.0.0.1:7788/healthz
 ```
-and start it if it isn't (see [Ephemera's own README](https://github.com/hypersdk/ephemera#readme)).
+and start it if it isn't (see [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme)).
 
 ### VMs fail to start with permission errors
 
@@ -509,7 +509,7 @@ If using the Vite dev server, add `http://localhost:5173`.
 
 ### VM state shows "Unknown"
 
-The VM may have been started outside of Zyvor Fabric, or Ephemera may have
+The VM may have been started outside of Zyvor Fabric, or FluxVM may have
 lost track of it. Check `curl http://127.0.0.1:7788/v1/vms` and verify the VM
 is registered.
 

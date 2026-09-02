@@ -7,7 +7,7 @@
 #   # Edit secrets (ZYVOR_FABRICD_ADMIN_PASSWORD, ZYVOR_FABRICD_JWT_SECRET)
 #   docker compose -f docker-compose.prod.yml up -d
 #
-# Assumes zyvor-fabricd and zyvor-fabric-ephemera images are already built
+# Assumes zyvor-fabricd and zyvor-fabric-fluxvm images are already built
 # and pushed to a registry you control (adapt scripts/build-container-images.sh
 # with PUSH=1 and a REGISTRY, or build+tag them yourself) -- pin a real TAG,
 # do not use :latest in production. See docs/DOCKER.md for host prerequisites
@@ -22,7 +22,7 @@ services:
     container_name: zyvor-fabricd
     network_mode: host
     depends_on:
-      ephemera:
+      fluxvm:
         condition: service_started
     environment:
       ZYVOR_FABRICD_ADMIN_PASSWORD: ${ZYVOR_FABRICD_ADMIN_PASSWORD:?set ZYVOR_FABRICD_ADMIN_PASSWORD}
@@ -51,17 +51,17 @@ services:
       timeout: 10s
       retries: 3
 
-  ephemera:
-    image: ${REGISTRY:?set REGISTRY}/zyvor-fabric-ephemera:${TAG:?set TAG e.g. v1.0.1}
-    container_name: ephemera
+  fluxvm:
+    image: ${REGISTRY:?set REGISTRY}/zyvor-fabric-fluxvm:${TAG:?set TAG e.g. v1.0.1}
+    container_name: fluxvm
     network_mode: host
     cgroup: host
-    command: ["ephemera", "serve"]
+    command: ["fluxvm", "serve"]
     devices:
       - /dev/kvm
     volumes:
-      - ephemera-data:/var/lib/ephemera
-      - ephemera-run:/run/ephemera
+      - fluxvm-data:/var/lib/fluxvm
+      - fluxvm-run:/run/fluxvm
       - /run/netns:/run/netns
     cap_add:
       - NET_ADMIN
@@ -74,5 +74,5 @@ services:
 volumes:
   zyvor-fabricd-data:
   zyvor-fabricd-etc:
-  ephemera-data:
-  ephemera-run:
+  fluxvm-data:
+  fluxvm-run:
