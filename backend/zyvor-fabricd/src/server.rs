@@ -3682,8 +3682,25 @@ async fn autoscaler_hotplug_cpu(
     };
     let qmp = crate::qmp::QmpClient::for_socket(socket.to_string_lossy().into_owned());
     if new_cpus > old_cpus {
-        // Scale up: query hotpluggable CPU slots and add unrealized ones
-        match qmp.execute("query-hotpluggable-cpus", serde_json::Value::Null) {
+        // Scale up: query hotpluggable CPU slots and add unrealized ones.
+        // One held-open session for the whole query+add-loop sequence --
+        // reconnecting per call (the old pattern here) is the same
+        // anti-pattern that wedged QEMU's single-client QMP monitor for
+        // live_snapshot_via_qmp (see its doc comment); a query then a
+        // device_add loop is exactly the kind of multi-command sequence
+        // QmpClient::execute's own doc comment warns against.
+        let mut session = match qmp.open_session() {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    "Autoscaler: failed to open QMP session for '{}': {}",
+                    vm_name,
+                    e
+                );
+                return;
+            }
+        };
+        match session.execute("query-hotpluggable-cpus", serde_json::Value::Null) {
             Ok(cpus) => {
                 let mut added = 0u32;
                 let needed = new_cpus - old_cpus;
@@ -3704,7 +3721,7 @@ async fn autoscaler_hotplug_cpu(
                                 "core-id": props.get("core-id").and_then(|v| v.as_u64()).unwrap_or(0),
                                 "thread-id": props.get("thread-id").and_then(|v| v.as_u64()).unwrap_or(0),
                             });
-                            match qmp.execute("device_add", args) {
+                            match session.execute("device_add", args) {
                                 Ok(_) => added += 1,
                                 Err(e) => {
                                     tracing::warn!(
@@ -3770,7 +3787,23 @@ async fn autoscaler_hotplug_memory(
     };
     let qmp = crate::qmp::QmpClient::for_socket(socket.to_string_lossy().into_owned());
     if new_memory > old_memory {
-        // Scale up: add a new memory DIMM for the delta
+        // Scale up: add a new memory DIMM for the delta. One held-open
+        // session for object-add + device_add (+ object-del rollback) --
+        // see hotplug.rs::hotplug_memory and QmpClient::execute's doc
+        // comment: device_add referencing an object-add from a separate
+        // reconnected connection is exactly the sequence that doesn't
+        // reliably see the new object yet.
+        let mut session = match qmp.open_session() {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    "Autoscaler: failed to open QMP session for '{}': {}",
+                    vm_name,
+                    e
+                );
+                return;
+            }
+        };
         let delta_mb = new_memory - old_memory;
         let size_bytes = delta_mb * 1024 * 1024;
         let backend_id = format!("mem-auto-{}", uuid::Uuid::new_v4().simple());
@@ -3781,7 +3814,7 @@ async fn autoscaler_hotplug_memory(
             "id": backend_id,
             "size": size_bytes,
         });
-        if let Err(e) = qmp.execute("object-add", backend_args) {
+        if let Err(e) = session.execute("object-add", backend_args) {
             tracing::warn!(
                 "Autoscaler: failed to add memory backend for '{}': {}",
                 vm_name,
@@ -3795,7 +3828,7 @@ async fn autoscaler_hotplug_memory(
             "id": dimm_id,
             "memdev": backend_id,
         });
-        match qmp.execute("device_add", dimm_args) {
+        match session.execute("device_add", dimm_args) {
             Ok(_) => {
                 tracing::info!(
                     "Autoscaler: hotplugged {}MB memory for '{}'",
@@ -3811,7 +3844,7 @@ async fn autoscaler_hotplug_memory(
                 );
                 // Rollback: remove the memory backend
                 if let Err(rollback_err) =
-                    qmp.execute("object-del", serde_json::json!({"id": backend_id}))
+                    session.execute("object-del", serde_json::json!({"id": backend_id}))
                 {
                     tracing::warn!(
                         "Autoscaler: failed to rollback memory backend '{}': {}",

@@ -59,8 +59,23 @@ fn default_snapshot_type() -> SnapshotType {
 /// savevm has not been found" -- and `human-monitor-command` is
 /// deliberately never allow-listed (see qmp::ALLOWED_QMP_COMMANDS), so
 /// this is the supported replacement: an async job, polled to completion.
+///
+/// Runs the whole sequence (query-block, snapshot-save, the query-jobs
+/// poll loop, job-dismiss) over one held-open `QmpSession` -- see
+/// `QmpClient::execute`'s doc comment for why a fresh reconnect per call
+/// is wrong here. Found live: reconnecting for every poll iteration (up
+/// to 50 reconnects for one snapshot) reliably wedged QEMU's monitor --
+/// a `server=on,wait=off` QMP unix socket accepts only one live client,
+/// and rapid connect/disconnect cycling against it left QEMU stuck
+/// servicing a half-torn-down connection, starving every new connection
+/// attempt's greeting read -- including unrelated ones, confirmed by a
+/// concurrent raw probe against the same socket also stalling -- for
+/// ~10s (the read timeout) until it eventually cleared on its own. One
+/// held-open connection for the whole operation never triggers this.
 pub(crate) fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> Result<(), String> {
-    let blocks = qmp
+    let mut session = qmp.open_session().map_err(|e| e.to_string())?;
+
+    let blocks = session
         .execute("query-block", serde_json::Value::Null)
         .map_err(|e| e.to_string())?;
     let node_name = blocks
@@ -72,30 +87,29 @@ pub(crate) fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> R
         .to_string();
 
     let job_id = format!("snap-{}", &Uuid::new_v4().simple().to_string()[..8]);
-    qmp.execute(
-        "snapshot-save",
-        serde_json::json!({
-            "job-id": job_id,
-            "tag": tag,
-            "vmstate": node_name,
-            "devices": [node_name],
-        }),
-    )
-    .map_err(|e| e.to_string())?;
+    session
+        .execute(
+            "snapshot-save",
+            serde_json::json!({
+                "job-id": job_id,
+                "tag": tag,
+                "vmstate": node_name,
+                "devices": [node_name],
+            }),
+        )
+        .map_err(|e| e.to_string())?;
 
     let outcome = (|| {
         let mut last_err = String::new();
         for _ in 0..50 {
-            // A query-jobs poll can itself time out while QEMU's monitor is
-            // busy mid-dump (found live: a full vmstate write briefly
-            // starves new QMP connections' greeting read, surfacing as
-            // "Resource temporarily unavailable" here) -- that's a reason
-            // to keep polling, not to give up, since the underlying job
+            // A query-jobs poll can itself error while QEMU's monitor is
+            // busy mid-dump -- that's a reason to keep polling on this
+            // same session, not to give up, since the underlying job
             // reliably completed regardless (confirmed by inspecting the
             // resulting qcow2's own snapshot list directly). Only a
             // definite job status matters; a failed poll just means we
             // don't know yet.
-            let jobs = match qmp.execute("query-jobs", serde_json::Value::Null) {
+            let jobs = match session.execute("query-jobs", serde_json::Value::Null) {
                 Ok(v) => v,
                 Err(e) => {
                     last_err = e.to_string();
@@ -123,7 +137,7 @@ pub(crate) fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> R
         ))
     })();
 
-    let _ = qmp.execute("job-dismiss", serde_json::json!({"id": job_id}));
+    let _ = session.execute("job-dismiss", serde_json::json!({"id": job_id}));
     outcome
 }
 
