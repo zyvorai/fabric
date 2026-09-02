@@ -19,7 +19,11 @@ pub struct DiscoveredNftPolicyChain {
 fn skip_table(table: &str) -> bool {
     matches!(
         table,
-        "zyvor-fabricd" | "zyvor-fabricd6" | "zyvor-fabricd_policy" | "zyvor-fabricd_nat" | "zyvor-fabricd_dnat"
+        "zyvor-fabricd"
+            | "zyvor-fabricd6"
+            | "zyvor-fabricd_policy"
+            | "zyvor-fabricd_nat"
+            | "zyvor-fabricd_dnat"
     )
 }
 

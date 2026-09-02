@@ -10,7 +10,11 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{controller::Context, crd::{VirtualMachine, VirtualMachineStatus}, error::OperatorError};
+use crate::{
+    controller::Context,
+    crd::{VirtualMachine, VirtualMachineStatus},
+    error::OperatorError,
+};
 
 fn with_auth(ctx: &Context, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
     if let Some(ref token) = ctx.zyvor_fabricd_token {
@@ -93,10 +97,7 @@ pub async fn reconcile(
                 if let Some(state) = body.get("state").and_then(|v| v.as_str()) {
                     observed_state = state.to_string();
                 }
-                observed_ip = body
-                    .get("ip")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string);
+                observed_ip = body.get("ip").and_then(|v| v.as_str()).map(str::to_string);
             }
         }
     }

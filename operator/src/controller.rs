@@ -24,7 +24,9 @@ pub async fn run(client: Client) -> Result<()> {
 
     let zyvor_fabricd_url = std::env::var("ZYVOR_FABRICD_URL")
         .unwrap_or_else(|_| "http://zyvor-fabricd:9095".to_string());
-    let zyvor_fabricd_token = std::env::var("ZYVOR_FABRICD_TOKEN").ok().filter(|s| !s.is_empty());
+    let zyvor_fabricd_token = std::env::var("ZYVOR_FABRICD_TOKEN")
+        .ok()
+        .filter(|s| !s.is_empty());
 
     let context = Arc::new(Context {
         client: client.clone(),
