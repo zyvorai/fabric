@@ -398,7 +398,7 @@ State transitions:
 3. State set to Starting, persisted
 4. state.driver.start(name) -- FluxVmClient issues a REST call to the
      configured `fluxvm serve` instance, which launches the VMM
-     (QEMU/Cloud Hypervisor/Firecracker) directly
+     (QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor) directly
 5. PID captured
 6. State set to Running, PID stored, persisted
 7. Prometheus gauges updated

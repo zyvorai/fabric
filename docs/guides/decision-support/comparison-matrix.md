@@ -30,7 +30,7 @@ Feature-by-feature comparison of Zyvor Fabric against alternative VM management 
 
 ### Key Architectural Differences
 
-**Zyvor Fabric** exposes VM lifecycle through one REST API backed by [FluxVM](https://github.com/zyvorai/fluxvm) -- a disposable-VM engine with no systemd dependency of its own. FluxVM supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly (never as a systemd unit); the API surface covers lifecycle, cgroup resource control, log streaming, hotplug, and image management.
+**Zyvor Fabric** exposes VM lifecycle through one REST API backed by [FluxVM](https://github.com/zyvorai/fluxvm) -- a disposable-VM engine with no systemd dependency of its own. FluxVM supervises each VM's QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor process directly (never as a systemd unit); the API surface covers lifecycle, cgroup resource control, log streaming, hotplug, and image management.
 
 **libvirt** provides its own abstraction layer over hypervisors. It manages VM lifecycle through its own daemon (libvirtd) and stores configuration as XML. VMs are tracked internally by libvirt, independent of any init system.
 

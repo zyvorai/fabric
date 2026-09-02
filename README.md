@@ -70,7 +70,7 @@ flowchart TB
   Op --> Daemon
 
   Daemon[Zyvor Fabric daemon<br/>API · auth · RBAC · networking · storage · monitoring]
-  Daemon -- REST :7788 --> Flux[FluxVM<br/>VM lifecycle · QEMU / Cloud Hypervisor / Firecracker]
+  Daemon -- REST :7788 --> Flux[FluxVM<br/>VM lifecycle · QEMU / CH / Firecracker / FluxVM hypervisor]
   Flux -- library call --> GK[GuestKit<br/>offline mount · chroot customize · agent bake-in]
   Flux -- vsock --> Agent[fluxvm-guest-agent<br/>inside the running guest]
 ```
@@ -130,7 +130,7 @@ sudo systemctl start zyvor-fabricd
 
 | Product | Role |
 |---------|------|
-| **[FluxVM](https://github.com/zyvorai/fluxvm)** | Disposable compute engine — QEMU / Cloud Hypervisor / Firecracker |
+| **[FluxVM](https://github.com/zyvorai/fluxvm)** | Disposable compute engine — QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor |
 | **[GuestKit](https://github.com/zyvorai/guestkit)** | Pure-Rust offline VM disk inspection, repair, and customization |
 | **hypercluster** | Bare-metal Kubernetes bootstrap |
 | **machina** | Physical hypervisor OS (libvirt/KVM) |

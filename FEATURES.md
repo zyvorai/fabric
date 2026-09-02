@@ -19,7 +19,7 @@
 - Create, start, stop, restart, delete, clone VMs
 - VM templates
 - VM state persistence
-- VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU/Cloud Hypervisor/Firecracker)
+- VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor)
 - CPU and memory configuration (`--cpus`, `--ram`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)

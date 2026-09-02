@@ -1,6 +1,6 @@
 # The VM driver: FluxVM
 
-Zyvor Fabric's VM lifecycle runs through `driver-core::VmDriver`, implemented against [FluxVM](https://github.com/zyvorai/fluxvm) — a standalone disposable-VM control plane with no systemd dependency, spoken to over its REST API and its vsock guest agent. This is the only VM driver; there's no backend to choose.
+Zyvor Fabric's VM lifecycle runs through `driver-core::VmDriver`, implemented against [FluxVM](https://github.com/zyvorai/fluxvm) — a standalone disposable-VM control plane with no systemd dependency, spoken to over its REST API and its vsock guest agent. FluxVM itself can run guests on **QEMU/KVM, Cloud Hypervisor, Firecracker, or the in-tree FluxVM hypervisor** (`backend: "flux-vm"`, agent-sandbox track). Fabric talks to whichever backends FluxVM has configured; there is no separate Fabric-side VMM picker.
 
 This page covers what's wired up today, what isn't yet, and how to configure it.
 
@@ -44,12 +44,13 @@ Log streaming's one fidelity reduction: raw serial console output has no journal
 - **Pluggable storage backends** — `CreateVmRequest.storage` (LVM thin snapshots, NBD-exported disks, Ceph RBD). Every VM created through this driver gets FluxVM's default qcow2 CoW overlay / raw reflink.
 - **Per-VM network namespaces** — `NetworkSpec::Tap.netns`. VMs created through this driver share FluxVM's default bridge-based networking.
 - **Firecracker jailer / vsock-proxy bookkeeping** — `VmRecord.jail_path`, `vsock_socket`, plus `lvm_lv`/`nbd_pid` (the storage-backend cleanup fields above).
+- **Agent-sandbox surface** — FluxVM's `/v1/sandboxes`, memory snapshots, AutoPause, L7 egress, and `/console` ops UI. Those stay on FluxVM's own API for now; Fabric continues to use the classic `/v1/vms` lifecycle.
 
-None of this is broken — it's simply not surfaced through `driver-core` yet. Closing this gap is a matter of extending `fluxvm-client`'s DTOs and `fluxvm-driver`'s trait mappings, not an FluxVM-side limitation.
+None of this is broken — it's simply not surfaced through `driver-core` yet. Closing this gap is a matter of extending `fluxvm-client`'s DTOs and `fluxvm-driver`'s trait mappings, not a FluxVM-side limitation.
 
 **Not applicable to this driver at all** (separate ways to run FluxVM, not something a REST-client driver consumes): FluxVM's `fluxvm-kube` Kubernetes `DisposableVm` CRD/operator, and its `fluxvm-agent` distributed fleet registry for multi-host placement. Those are alternatives to embedding FluxVM behind Zyvor Fabric, not features this driver would wrap.
 
 ## See also
 
-- [FluxVM README](https://github.com/zyvorai/fluxvm#readme) — the full feature set, storage backends, Kubernetes operator, and distributed node-agent.
+- [FluxVM README](https://github.com/zyvorai/fluxvm#readme) — the full feature set, storage backends, agent-sandbox track, Kubernetes operator, and distributed node-agent.
 - [Operations guide](../operations/README.md) — the driver in the broader operational context.

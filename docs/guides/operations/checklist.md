@@ -17,7 +17,7 @@ Complete these items before deploying Zyvor Fabric to production.
 
 ### Host Requirements
 
-`zyvor-fabricd` itself has no systemd dependency, and neither does VM lifecycle -- VMs run under [FluxVM](https://github.com/zyvorai/fluxvm), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly.
+`zyvor-fabricd` itself has no systemd dependency, and neither does VM lifecycle -- VMs run under [FluxVM](https://github.com/zyvorai/fluxvm), which supervises each VM's QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor process directly.
 
 - [ ] **OS version** -- a modern Linux distribution (Fedora 41+, Ubuntu 24.10+, or equivalent)
 - [ ] **Kernel** -- Linux 6.x with KVM support (`/dev/kvm` exists and is accessible)

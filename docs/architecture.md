@@ -149,7 +149,7 @@ systemd is no longer required to install or run zyvor-fabricd -- packaging has n
 |------|---------|
 | `zyvor-fabricd.service` | Main daemon (`Type=simple`; systemd hardening via `ProtectSystem=strict`, capability bounding -- no socket activation, no watchdog) |
 
-VMs themselves are never systemd units -- their lifecycle is owned by [FluxVM](https://github.com/zyvorai/fluxvm), which supervises each VM's QEMU/Cloud Hypervisor/Firecracker process directly (see [the FluxVM driver guide](guides/vm-drivers/fluxvm.md)). There is no per-VM systemd unit template.
+VMs themselves are never systemd units -- their lifecycle is owned by [FluxVM](https://github.com/zyvorai/fluxvm), which supervises each VM's QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor process directly (see [the FluxVM driver guide](guides/vm-drivers/fluxvm.md)). There is no per-VM systemd unit template.
 
 ## Security Model
 
