@@ -149,10 +149,8 @@ _JWT auth, enterprise SSO, RBAC, multi-tenancy, and encryption on every endpoint
 
 ## 5. High Availability & Disaster Recovery
 
-_Clustering, live migration, fault tolerance, and multi-site recovery._
+_Live migration, fault tolerance, and multi-site recovery._
 
-- **etcd Clustering** — Multi-node clustering on an etcd state store with leader election and heartbeat-based health. — _No single control-plane node to take the fleet down with it._
-  - **How:** Set `[controller] enabled=true, mode="controller"` in `zyvor-fabricd.toml` (etcd-backed state, leader election, heartbeat health) · cluster status via the cluster REST endpoints · Web Administration → datacenter.
 - **Live Migration** — Move running VMs between hosts with iterative rsync pre-copy and cutover, with progress tracking and cancel. — _Drain a host for maintenance without stopping workloads._
   - **How:** Migrate a running VM between hosts (iterative rsync pre-copy + cutover) via the migration REST endpoints with progress/cancel · Web Site Operations.
 - **Fault Tolerance & Fencing** — Continuous VM replication with automatic failover detection, fencing, and FT metrics. — _Survive a node loss with minimal recovery time._
@@ -185,8 +183,8 @@ _Low-level control over CPU topology, memory, accelerators, and firmware._
 
 _Metrics, scheduling, notifications, and self-checks that keep the fabric healthy._
 
-- **Prometheus Metrics** — A /metrics endpoint exposing per-VM CPU, memory, disk, and network stats plus API latency, with a prebuilt Grafana dashboard. — _Drop into your existing observability stack instantly._
-  - **How:** Scrape `GET /metrics` (no auth) into Prometheus; per-VM detail via `GET /api/vms/:name/metrics` · Web Monitoring page · import the bundled Grafana dashboard.
+- **Prometheus Metrics** — A /metrics endpoint exposing VM-count and lifecycle metrics (total/running/stopped, start/stop/create/delete counters), with a prebuilt Grafana dashboard. — _Drop into your existing observability stack instantly._
+  - **How:** Scrape `GET /metrics` (no auth) into Prometheus; live per-VM CPU/memory/disk/network detail via `GET /api/vms/:name/metrics` (not yet exported as Prometheus series) · Web Monitoring page · import the bundled Grafana dashboard.
 - **Scheduling & Auto Backups** — Once/daily/weekly VM schedules plus automated daily backups and weekly state-store cleanup via systemd timers. — _Routine operations run themselves, on time, every time._
   - **How:** Once/daily/weekly schedules via the schedule REST endpoints (backed by systemd timers) · Web Scheduling page (cron-style + one-time, with execution history).
 - **Backup & Restore** — Per-VM and bulk backups with retention policies and incremental backups from web UI. — _Recover a single VM or the whole fleet on your own terms._

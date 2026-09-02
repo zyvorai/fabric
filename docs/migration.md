@@ -1,218 +1,87 @@
 # VM Migration
 
-Zyvor Fabric supports live (zero-downtime) and offline VM migration between cluster nodes.
+Zyvor Fabric migrates a VM between hosts by copying its disk and configuration over SSH with
+`rsync` -- there's no shared storage requirement and no memory-state transfer. `live` and `offline`
+are two modes of the same rsync-based copy, not two different technologies:
+
+- **Offline** -- stop the VM, `rsync` its data to the target, done.
+- **Live** -- `rsync` the data across in the background while the VM keeps running, then pause it
+  briefly for a final sync and cutover. Downtime is whatever that last sync takes, not the whole
+  transfer.
 
 ---
 
-## Migration Types
-
-| | Live | Offline |
-|---|---|---|
-| **Downtime** | ~1-2 seconds | Full stop/start |
-| **Requires shared storage** | Yes (or high-bandwidth network) | No |
-| **CPU compatibility** | Same architecture required | Not required |
-| **Best for** | Production workloads | Large VMs, local storage |
-
----
-
-## Live Migration
-
-Migrate a running VM with minimal downtime. Memory is copied iteratively while the VM continues to run.
-
-### Basic
+## Start a Migration
 
 ```bash
-# CLI
-zyvorctl migrate myvm --to node2 --live
-
-# API
-curl -X POST http://localhost:9095/api/vms/myvm/migrate \
-  -H "Content-Type: application/json" \
-  -d '{"target_node": "node2", "live": true}'
-```
-
-### With Compression and Bandwidth Limit
-
-```bash
-zyvorctl migrate myvm --to node2 --live --compress --bandwidth 100
-
-# API equivalent
-curl -X POST http://localhost:9095/api/vms/myvm/migrate \
+curl -X POST http://localhost:9095/api/migrations \
   -H "Content-Type: application/json" \
   -d '{
-    "target_node": "node2",
-    "live": true,
+    "vm_name": "myvm",
+    "target_host": "node2",
+    "migration_type": "live",
     "compress": true,
     "bandwidth_mbps": 100
   }'
 ```
 
-### Live Migration Process
+`migration_type` is `"live"`, `"offline"`, or `"storage"`. `compress` and `bandwidth_mbps` are both
+optional and map straight to `rsync -z` / `rsync --bwlimit`. `target_host` must be reachable over
+SSH (key-based, no password prompt) as whatever user runs `zyvor-fabricd` -- that reachability is
+checked before anything else happens.
 
-1. **Pre-copy** -- Copy all memory pages while the VM runs
-2. **Iterative copy** -- Re-copy pages that changed since the last pass
-3. **Stop-and-copy** -- Brief pause (~1-2s), copy final state
-4. **Resume** -- Start VM on the target node
-5. **Cleanup** -- Remove VM from the source node
-
----
-
-## Offline Migration
-
-Stop the VM, copy its disk and configuration to the target, then start it there.
+## Track and Cancel
 
 ```bash
-# CLI
-zyvorctl migrate myvm --to node2 --offline
-
-# API
-curl -X POST http://localhost:9095/api/vms/myvm/migrate \
-  -H "Content-Type: application/json" \
-  -d '{"target_node": "node2", "live": false}'
-```
-
----
-
-## Track Progress
-
-```bash
-# CLI
-zyvorctl migrate status myvm
-
-# API
-curl http://localhost:9095/api/vms/myvm/migrate/status
+curl http://localhost:9095/api/migrations              # all migrations
+curl http://localhost:9095/api/migrations/{id}          # one migration's status
+curl -X POST http://localhost:9095/api/migrations/{id}/cancel
 ```
 
 ```json
 {
+  "id": "…",
   "vm_name": "myvm",
-  "status": "copying",
-  "progress_percent": 45,
+  "target_host": "node2",
+  "migration_type": "live",
+  "state": "syncing",
+  "progress_percent": 60,
+  "bytes_transferred": 1932735283,
+  "started": "2026-09-02T02:00:00Z",
+  "completed": null,
   "error": null
 }
 ```
 
-### Cancel a Migration
+`state` moves through `pending` -> `precheck` -> `syncing` -> `switching` -> `completed` (or
+`failed` / `cancelled`).
 
-```bash
-zyvorctl migrate cancel myvm
-
-curl -X POST http://localhost:9095/api/vms/myvm/migrate/cancel
-```
-
----
-
-## Shared Storage Setup
-
-Live migration requires that both nodes can access the same VM disk. Two common approaches:
-
-### NFS
-
-On the NFS server:
-```bash
-# /etc/exports
-/var/lib/zyvor-fabricd/images 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
-```
-
-```bash
-sudo exportfs -ra
-```
-
-On each Zyvor Fabric node:
-```bash
-sudo mount node1:/var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/images
-
-# Persist across reboots
-echo "node1:/var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/images nfs defaults 0 0" \
-  | sudo tee -a /etc/fstab
-```
-
-### Ceph/RBD
-
-```toml
-# /etc/zyvor-fabricd/zyvor-fabricd.toml
-[storage]
-backend = "rbd"
-pool = "Zyvor Fabric"
-monitors = ["mon1:6789", "mon2:6789", "mon3:6789"]
-```
+Two related read-only endpoints: `GET /api/migrations/history` (past migrations) and
+`GET /api/migrations/readiness` (checks whether `rsync` and SSH connectivity are actually available
+on this host before you try).
 
 ---
 
-## Network Requirements
+## Known Gap: Target-Side Start
 
-| | Minimum | Recommended |
-|---|---|---|
-| **Live migration bandwidth** | 1 Gbps | 10 Gbps |
-| **Offline migration bandwidth** | 100 Mbps | 1 Gbps |
-| **Live migration latency** | < 5ms RTT | < 1ms RTT |
-| **Offline migration latency** | < 100ms RTT | < 10ms RTT |
-
-Required ports: SSH (22) for rsync, Zyvor Fabric API (8080).
+Pausing the source VM for the final sync goes through the active `VmDriver` on this host (Ephemera
+or machinectl, whichever is configured) -- that part is driver-generic. Starting the VM on the
+*target* node after cutover still shells `ssh <target> machinectl start ...` directly, because a
+local `Arc<dyn VmDriver>` only talks to this host's own backend, not a remote one. Migrating **onto**
+a host running the Ephemera driver doesn't work end to end today -- the source-side pause does, the
+target-side start doesn't.
 
 ---
 
-## Pre-Migration Checklist
+## Requirements
 
-```bash
-zyvorctl node status node2          # Target node is healthy
-zyvorctl node resources node2       # Sufficient CPU/memory available
-ping -c 3 node2                  # Network connectivity
-ssh node2 echo "OK"              # SSH access works
-```
+- Key-based SSH from the source host to the target host (no shared storage, no cluster membership).
+- `rsync` installed on both ends.
+- Enough free disk on the target for the VM's full disk image.
 
 ---
 
-## Advanced Options
-
-### Auto-Converge
-
-Throttles VM CPU to reduce the memory dirty rate, improving convergence for write-heavy workloads:
-
-```bash
-curl -X POST http://localhost:9095/api/vms/myvm/migrate \
-  -H "Content-Type: application/json" \
-  -d '{"target_node": "node2", "live": true, "auto_converge": true}'
-```
-
-### Memory Dirty Rate Limit
-
-```bash
-curl -X POST http://localhost:9095/api/vms/myvm/migrate \
-  -H "Content-Type: application/json" \
-  -d '{"target_node": "node2", "live": true, "max_dirty_rate_mbps": 50}'
-```
-
-### CPU Model Compatibility
-
-For heterogeneous clusters, specify a common CPU model:
-
-```bash
-zyvorctl migrate myvm --to node2 --live --cpu-model Nehalem
-```
-
----
-
-## Monitoring
-
-### Migration Statistics
-
-```bash
-curl http://localhost:9095/api/vms/myvm/migrate/stats
-```
-
-```json
-{
-  "total_bytes": 4294967296,
-  "transferred_bytes": 1932735283,
-  "remaining_bytes": 2362232013,
-  "transfer_rate_mbps": 125,
-  "downtime_ms": 1500,
-  "duration_seconds": 45
-}
-```
-
-### Prometheus Metrics
+## Prometheus Metrics
 
 > **Not yet implemented.** The daemon's Prometheus exporter currently only exports VM-count and
 > lifecycle metrics (`zyvor_fabricd_vms_total`, `_vms_running`, `_vms_stopped`,
@@ -221,61 +90,11 @@ curl http://localhost:9095/api/vms/myvm/migrate/stats
 
 ---
 
-## Automated Migration
-
-### Load-Based Auto-Migration
-
-```bash
-curl -X POST http://localhost:9095/api/cluster/config \
-  -H "Content-Type: application/json" \
-  -d '{
-    "auto_migrate": true,
-    "target_utilization": 70,
-    "check_interval_seconds": 300
-  }'
-```
-
-### Scheduled Migration
-
-```bash
-curl -X POST http://localhost:9095/api/vms/myvm/migrate/schedule \
-  -H "Content-Type: application/json" \
-  -d '{
-    "target_node": "node2",
-    "scheduled_time": "2026-02-19T02:00:00Z",
-    "live": true
-  }'
-```
-
----
-
-## Performance Reference
-
-| VM Memory | Network | Live Downtime | Total Time |
-|-----------|---------|:-------------:|:----------:|
-| 2 GB | 1 Gbps | 1-2s | ~30s |
-| 8 GB | 1 Gbps | 2-3s | ~90s |
-| 16 GB | 10 Gbps | 1-2s | ~20s |
-| 64 GB | 10 Gbps | 3-5s | ~60s |
-
----
-
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Migration fails | Check logs (`journalctl -u Zyvor Fabric`), verify network connectivity and SSH access |
-| High downtime | Reduce memory dirty rate, enable auto-converge, increase bandwidth, enable compression |
-| Incompatible CPUs | Use a lowest-common-denominator CPU model (`--cpu-model Nehalem`) |
+| Migration fails at the pre-check step | Confirm `ssh <target_host> echo ok` works non-interactively (key-based, `BatchMode=yes`) |
+| Migration fails during sync | Check `journalctl -u zyvor-fabricd`, verify `rsync` is installed on both hosts |
 | Insufficient disk space | Check `df -h /var/lib/zyvor-fabricd` on the target node |
-
----
-
-## Best Practices
-
-1. **Test in staging first** before migrating production workloads
-2. **Use shared storage** (NFS or Ceph) for seamless live migration
-3. **Dedicate a network** for migration traffic to avoid impacting VM I/O
-4. **Migrate during low-traffic periods** to minimize dirty page rate
-5. **Monitor metrics** during migration to catch problems early
-6. **Keep the source VM available** until the target is verified
+| VM won't start on the target after cutover | See [Known Gap](#known-gap-target-side-start) above -- this step isn't driver-generic yet |

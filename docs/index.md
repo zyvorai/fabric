@@ -152,8 +152,6 @@ Detailed documentation for each major feature area.
 
 | Document | Description |
 |----------|-------------|
-| [HA Overview](high-availability.md) | Clustering architecture and failover |
-| Clustering | etcd-based cluster formation and leader election |
 | DRS | Distributed Resource Scheduling and placement |
 | Affinity Rules | VM-to-VM and VM-to-host affinity/anti-affinity |
 | Fault Tolerance | Automatic failover, fencing, and recovery |

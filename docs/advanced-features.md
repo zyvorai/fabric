@@ -252,34 +252,7 @@ scrape_configs:
 
 ### Grafana Dashboard
 
-Import the pre-built dashboard from `monitoring/grafana-dashboard.json` for:
-- VM overview panel with running/stopped/error counts
-- Per-VM CPU and memory graphs
-- Network and disk I/O graphs
-- API request rate and latency panels
-- Alert panels for resource threshold violations
-
----
-
-## High Availability
-
-Multi-node deployment for fault-tolerant operation.
-
-- **etcd-based state store** for consistent, replicated state
-- **Multi-node support** with concurrent Zyvor Fabric instances
-- **Live migration** of running VMs between hosts
-- **Automatic failover** on node failure
-- **Health monitoring** with heartbeats and fencing
-
-```toml
-[ha]
-enabled = true
-etcd_endpoints = ["http://etcd1:2379", "http://etcd2:2379", "http://etcd3:2379"]
-node_name = "node-01"
-heartbeat_interval = "5s"
-failover_timeout = "30s"
-```
-
-Requirements: etcd cluster (3+ nodes), network connectivity between nodes, shared/replicated storage for live migration.
-
-See [high-availability.md](high-availability.md) for the full setup guide.
+Import the pre-built dashboard from `monitoring/grafana-dashboard.json` for four panels: Total VMs,
+Running VMs, VM States, and VM Operations (start/stop/create/delete rates) -- the same metrics listed
+above. Per-VM resource graphs, network/disk I/O, and API latency panels aren't available yet since the
+underlying metrics don't exist (see the note above).

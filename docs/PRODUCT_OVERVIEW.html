@@ -441,7 +441,6 @@ endpoints</li>
 </ul>
 <h3 id="high-availability">High Availability</h3>
 <ul>
-<li>etcd-based clustering with leader election</li>
 <li>Predictive DRS (Distributed Resource Scheduling)</li>
 <li><strong>Affinity / anti-affinity rules</strong> for VM placement
 constraints</li>
@@ -463,14 +462,12 @@ retry + backoff</strong>, Microsoft Teams</li>
 <li>Backup/restore with retention policies and incremental backups</li>
 <li><strong>Per-VM backup</strong> from web UI (single or
 bulk)</li>
-<li><strong>Automated daily backups</strong> via systemd timer
-(configurable schedule, retention, cleanup)</li>
-<li><strong>Automated weekly state store cleanup</strong> via systemd
-timer (events, audit logs, webhook deliveries, history)</li>
-<li><strong>Backup configuration</strong> via <code>[backup]</code>
-section in config file or
-<code>ZYVOR_FABRICD_BACKUP_DIR</code>/<code>ZYVOR_FABRICD_BACKUP_RETAIN</code>/<code>ZYVOR_FABRICD_BACKUP_TYPE</code>
-env vars</li>
+<li><strong>Automated daily backups</strong> via an internal scheduler
+inside the daemon (2:00 AM), not a separate systemd timer</li>
+<li><strong>Automated weekly state store cleanup</strong> via the same
+internal scheduler (Sunday 3:00 AM)</li>
+<li><strong>Backup configuration</strong> via the <code>[backup]</code>
+section in <code>zyvor-fabricd.toml</code></li>
 <li><strong>Post-install auto-verify</strong> — smoke test runs
 automatically after deploy/reinstall (API, auth, VM CRUD, backups)</li>
 <li><strong>Deep health check</strong> — API, disk space, DB integrity,
