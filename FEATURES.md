@@ -351,9 +351,9 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 
 ## Build and Development
 
-- Cargo workspace (40 crates)
+- Cargo workspace (52 crates)
 - npm/Vite for web UI
 - GitHub Actions CI/CD
 - Automated builds, formatting checks, linting
 - Makefile for common tasks
-- Docker support
+- Docker and Podman support -- `zyvor-fabricd` + an Ephemera companion container, see `docs/DOCKER.md`

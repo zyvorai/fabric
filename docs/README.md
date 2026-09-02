@@ -7,6 +7,7 @@ Private cloud control plane driving VM lifecycle over Ephemera's REST API -- no 
 | Goal | Document |
 |------|----------|
 | Main README | [README.md](../README.md) |
+| **Docker / Podman** | [DOCKER.md](DOCKER.md) |
 | **Web UX** (marketing + `/app` console) | [web-ui.md](web-ui.md) · [ux.md](ux.md) |
 | **User journeys & acceptance criteria** | [User Stories](USER_STORIES.md) |
 | **Ephemera VM driver** — config, capability matrix, known gaps | [guides/vm-drivers/ephemera.md](guides/vm-drivers/ephemera.md) |

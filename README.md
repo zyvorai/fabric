@@ -110,6 +110,7 @@ sudo systemctl start zyvor-fabricd
 | Scenario | Path |
 |----------|------|
 | Declarative VMs | `zyvorctl apply -f config.yaml` |
+| Docker / Podman | `docker compose up -d` (or `podman compose up -d`) — see [docs/DOCKER.md](docs/DOCKER.md) |
 | Terraform | [terraform-provider/](terraform-provider/) |
 | K8s operator | [operator/](operator/) |
 | Ansible | [ansible/](ansible/) |
@@ -121,6 +122,7 @@ sudo systemctl start zyvor-fabricd
 | Goal | Document |
 |------|----------|
 | Docs index | [docs/README.md](docs/README.md) |
+| Docker / Podman | [docs/DOCKER.md](docs/DOCKER.md) |
 | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | Integrations | [integrations/](integrations/) |
 
