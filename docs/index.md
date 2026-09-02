@@ -249,7 +249,9 @@ Detailed documentation for each major feature area.
 | `zyvorctl apply` | Apply declarative YAML specification |
 | `zyvorctl policy` | Manage network policies |
 | `zyvorctl ceph` | Ceph storage management |
-| `zyvorctl console` | Attach to VM console |
+| `zyvorctl metrics` | Get VM metrics |
+
+VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`) — there is no `zyvorctl console` command.
 
 ### zyvor-fabricd-ctl Reference
 

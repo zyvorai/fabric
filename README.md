@@ -98,8 +98,8 @@ git clone https://github.com/zyvorai/fabric.git && cd fabric
 make build && sudo make install
 
 # CLI
-zyvorctl vm list
-zyvorctl vm create --name web-01 --cpus 2 --memory 4G
+zyvorctl list
+zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096
 
 # Web UI → http://localhost:9095 (marketing) · console at /app
 sudo zyvor-fabricd                   # run directly (no systemd required)
