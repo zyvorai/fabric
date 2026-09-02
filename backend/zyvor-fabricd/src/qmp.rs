@@ -119,7 +119,22 @@ impl QmpClient {
         let mut stream = UnixStream::connect(&self.socket_path)
             .with_context(|| format!("Failed to connect to QMP socket: {}", self.socket_path))?;
 
-        stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+        // 300s, not 10s: found live via strace on a real snapshot-save call --
+        // qmp_capabilities and query-block both come back in under a
+        // millisecond, but snapshot-save's own command-level {"return":{}}
+        // doesn't arrive until *after* its vmstate dump finishes (it fires a
+        // QMP "STOP" event pausing the VM, then the monitor's reply to the
+        // command itself -- not just job completion, reported separately via
+        // query-jobs -- waits on that dump). This is genuinely variable, not
+        // a fixed cost: repeated live tests against the same idle VM under
+        // real disk/host contention saw it take anywhere from under a
+        // second to well past 60s with no other change to the VM or
+        // request -- 60s still wasn't consistently enough. A slow disk
+        // under load is exactly the situation this shouldn't give up on;
+        // a stuck connection taking 30x longer to be detected as dead is a
+        // fine trade against killing a snapshot that's still genuinely in
+        // progress.
+        stream.set_read_timeout(Some(Duration::from_secs(300)))?;
         stream.set_write_timeout(Some(Duration::from_secs(5)))?;
 
         let mut reader = BufReader::new(stream.try_clone()?);
