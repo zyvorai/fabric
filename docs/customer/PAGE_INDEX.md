@@ -4,7 +4,7 @@ Marketing: `/`, `/product`, `/platform`, `/security`, `/sign-in`.
 
 Console routes under `/app` — every primary navigable ops route.
 
-_Generated: 2026-08-29 · 84 routes_
+_Generated: 2026-09-02 · 84 routes_
 
 Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 
@@ -140,7 +140,7 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 
 | Page | Route | Purpose | Guide |
 |------|-------|---------|-------|
-| Login | `/app/sign-in` | Login — Auth surface. | [Open](pages/auth/sign-in.md) |
+| Login | `/app/sign-in` | Login — Auth surface. | [Open](pages/auth/login.md) |
 
 ## Related
 

@@ -27,6 +27,25 @@ function slug(path) {
   return path.replace(/^\//, '').replace(/\//g, '-').replace(/\?.*/, '') || 'home'
 }
 
+// The console router mounts everything under /app (see web/src/App.tsx) --
+// routes.json stores paths relative to that mount point, so they need the
+// prefix added back for a customer-facing URL. A couple of legacy paths
+// (like /login) redirect to a different real destination; consoleUrl()
+// follows those so the doc shows where the browser actually ends up.
+const REDIRECTS = { '/login': '/sign-in' }
+function consoleUrl(path) {
+  const resolved = REDIRECTS[path] || path
+  return resolved === '/' ? '/app' : `/app${resolved}`
+}
+
+const MARKETING_ROUTES = [
+  { label: 'Home', path: '/', purpose: 'Public marketing home' },
+  { label: 'Product', path: '/product', purpose: 'Product story' },
+  { label: 'Platform', path: '/platform', purpose: 'Interfaces (Web, CLI, Operator, Terraform)' },
+  { label: 'Security', path: '/security', purpose: 'Security story' },
+  { label: 'Sign in', path: '/sign-in', purpose: 'Console authentication (`/login` redirects here)' },
+]
+
 const guides = discoverGuides(GUIDES)
 const byCat = new Map()
 for (const r of routes) {
@@ -37,11 +56,19 @@ for (const r of routes) {
 const lines = [
   `# ${PRODUCT} — Complete page index`,
   '',
-  'Every primary navigable dashboard route.',
+  `Marketing: ${MARKETING_ROUTES.map((m) => `\`${m.path}\``).join(', ')}.`,
+  '',
+  'Console routes under `/app` — every primary navigable ops route.',
   '',
   `_Generated: ${new Date().toISOString().slice(0, 10)} · ${routes.length} routes_`,
   '',
   'Regenerate: `node scripts/customer-docs/generate-page-index.mjs`',
+  '',
+  '## Marketing & auth',
+  '',
+  '| Page | Route | Purpose |',
+  '|------|-------|---------|',
+  ...MARKETING_ROUTES.map((m) => `| ${m.label} | \`${m.path}\` | ${m.purpose} |`),
   '',
 ]
 
@@ -50,7 +77,7 @@ for (const [cat, list] of byCat) {
   for (const it of list) {
     const purpose = (purposes[it.path] || '').replace(/\|/g, '\\|')
     const g = guides.get(slug(it.path))
-    lines.push(`| ${it.label} | \`${it.path}\` | ${purpose} | ${g ? `[Open](${g})` : '—'} |`)
+    lines.push(`| ${it.label} | \`${consoleUrl(it.path)}\` | ${purpose} | ${g ? `[Open](${g})` : '—'} |`)
   }
   lines.push('')
 }
