@@ -156,7 +156,7 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 ### Cloud & Virtualization
 - cloud-init integration (NoCloud datasource)
 - TPM/vTPM support (1.2 and 2.0 via swtpm)
-- GPU passthrough (NVIDIA, AMD, Intel GVT-g)
+- GPU passthrough (NVIDIA, AMD — generic PCI/VFIO, no vGPU/Intel GVT-g)
 - **Live migration** with iterative rsync pre-copy and cutover
 - CPU pinning and NUMA optimization
 - **IPv6 support** — dual-stack nftables (ip + ip6)

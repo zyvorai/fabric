@@ -188,7 +188,7 @@ Detailed documentation for each major feature area.
 
 | Document | Description |
 |----------|-------------|
-| [GPU Passthrough](gpu-passthrough.md) | NVIDIA, AMD, Intel GVT-g configuration |
+| [GPU Passthrough](gpu-passthrough.md) | Generic PCI/VFIO passthrough for NVIDIA and AMD GPUs (no vGPU/Intel GVT-g) |
 | [CPU/NUMA Optimization](CPU_NUMA_OPTIMIZATION_GUIDE.md) | CPU pinning, NUMA topology, hugepages |
 | KSM Memory Dedup | Kernel Same-page Merging configuration |
 | Nested Virtualization | Running VMs inside VMs |

@@ -60,7 +60,7 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 |-------|---------|
 | `cloud-init` | NoCloud ISO generation for automated VM initialization |
 | `vnc-proxy` | WebSocket-to-TCP VNC proxy for noVNC |
-| `gpu-passthrough` | VFIO GPU passthrough (NVIDIA, AMD, Intel GVT-g) |
+| `gpu-passthrough` | VFIO GPU passthrough (NVIDIA, AMD — generic PCI, no vGPU/Intel GVT-g) |
 
 ### High Availability
 

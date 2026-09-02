@@ -1,6 +1,12 @@
-# GPU Passthrough
+# GPU (PCI Device) Passthrough
 
-Pass physical GPUs through to VMs for graphics workloads, machine learning, and gaming using VFIO and IOMMU.
+Pass a physical PCI device — including a GPU — through to a VM using VFIO and IOMMU.
+
+Zyvor Fabric's passthrough support is **generic PCI hotplug**: it can attach any host PCI
+device (a GPU, a NIC, an NVMe controller, ...) to an already-running VM once that device is
+bound to the `vfio-pci` driver. There is no GPU-specific API, no vGPU/mediated-device support,
+and no `zyvorctl gpu` command — driver binding, ROM handling beyond a simple on/off flag, and
+guest driver setup are all done by hand, outside the platform.
 
 ---
 
@@ -9,7 +15,7 @@ Pass physical GPUs through to VMs for graphics workloads, machine learning, and 
 ### Hardware
 
 - CPU with IOMMU support (Intel VT-d or AMD-Vi)
-- Dedicated GPU for passthrough (separate from the host display GPU)
+- A device you can dedicate to the VM (for a GPU: one separate from the host's own display GPU)
 - Motherboard with IOMMU support enabled in BIOS/UEFI
 
 ### Enable IOMMU
@@ -41,125 +47,117 @@ find /sys/kernel/iommu_groups/ -type l
 
 ---
 
-## Detect Available GPUs
+## List host PCI devices
 
 ```bash
-# CLI
-zyvorctl gpu list
-
-# API
-curl http://localhost:9095/api/gpu/devices
+curl -H "Authorization: Bearer $TOKEN" http://localhost:9095/api/system/pci-devices
 ```
 
 ```json
 [
   {
-    "pci_address": "0000:01:00.0",
-    "vendor": "10de:1b80",
-    "device_name": "NVIDIA GeForce GTX 1080",
+    "address": "0000:01:00.0",
+    "vendor_id": "10de",
+    "device_id": "1b80",
+    "vendor_name": "NVIDIA Corporation",
+    "device_name": "GP104 [GeForce GTX 1080]",
+    "class_name": "VGA compatible controller",
+    "iommu_group": 14,
     "driver": "nvidia",
-    "is_available": false
-  },
-  {
-    "pci_address": "0000:02:00.0",
-    "vendor": "10de:1c03",
-    "device_name": "NVIDIA GeForce GTX 1050 Ti",
-    "driver": "",
-    "is_available": true
+    "numa_node": 0,
+    "attached_to": null
   }
 ]
 ```
 
-A GPU is `is_available: true` when it is not bound to a host driver and can be assigned to a VM.
+This lists **every** PCI device on the host, not just GPUs — filter on `class_name` (e.g. `VGA
+compatible controller`, `3D controller`) to find candidates. There is no `zyvorctl` command for
+this or any other step below; it's REST-only.
 
 ---
 
-## Bind GPU to VFIO
+## Bind the device to VFIO
 
-Before passing a GPU to a VM, bind it to the `vfio-pci` driver:
+The platform will not rebind a device's driver for you — doing so automatically risks yanking a
+device the host itself depends on (its GPU console, a storage or network controller sharing an
+IOMMU group, etc). Bind it yourself first, ideally with `driverctl` so the override survives a
+reboot:
 
 ```bash
-# CLI
-zyvorctl gpu bind 0000:02:00.0
+sudo driverctl set-override 0000:02:00.0 vfio-pci
+```
 
-# API
-curl -X POST http://localhost:9095/api/gpu/bind \
+Or by hand, for a one-off/non-persistent bind:
+
+```bash
+echo "0000:02:00.0" | sudo tee /sys/bus/pci/devices/0000:02:00.0/driver/unbind
+echo "10de 1c03" | sudo tee /sys/bus/pci/drivers/vfio-pci/new_id
+```
+
+Confirm the device now shows `"driver": "vfio-pci"` in the `GET /api/system/pci-devices` list
+above — attaching it will be rejected otherwise.
+
+---
+
+## Attach the device to a running VM
+
+Create and start the VM normally first (there is no `gpu_passthrough`/`gpus` field on VM
+creation) — the device is attached as a hotplug operation against an already-running VM:
+
+```bash
+curl -X POST http://localhost:9095/api/vms/gaming-vm/devices/pci \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"pci_address": "0000:02:00.0"}'
+  -d '{"address": "0000:02:00.0", "rombar": true}'
+```
 
-# Manual
-echo "0000:02:00.0" > /sys/bus/pci/drivers/nouveau/unbind
-echo "10de 1c03" > /sys/bus/pci/drivers/vfio-pci/new_id
+`rombar` is optional and only a boolean (enable/disable the device's own option ROM) — the API
+has no way to supply a custom ROM file. If you actually need a non-default ROM dumped from the
+card, that's outside the platform: dump it yourself (`echo 1 > rom; cat rom > file; echo 0 >
+rom` under `/sys/bus/pci/devices/<address>/`) and feed it to QEMU directly, which this endpoint
+does not support.
+
+Detach it the same way:
+
+```bash
+curl -X DELETE http://localhost:9095/api/vms/gaming-vm/devices/pci/0000:02:00.0 \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
-## Create a VM with GPU Passthrough
+## Multiple devices / SLI groups
+
+Attach devices one at a time with repeated `POST .../devices/pci` calls — there is no batch
+"pass N GPUs at once" request shape.
+
+For SLI/CrossFire, keep the devices in the same IOMMU group in mind when planning what else
+shares that group (anything else in the group either has to also be passed through or isn't
+available to the host at all once one member is bound to vfio-pci):
 
 ```bash
-curl -X POST http://localhost:9095/api/vms \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "gaming-vm",
-    "image": "/var/lib/zyvor-fabricd/images/windows10.qcow2",
-    "cpus": 8,
-    "memory": 16384,
-    "gpu_passthrough": {
-      "pci_address": "0000:02:00.0",
-      "multifunction": false,
-      "romfile": "/usr/share/vgabios/GTX1050Ti.rom"
-    }
-  }'
-```
-
-### VM Configuration File
-
-```toml
-# /etc/zyvor-fabricd/vms/gaming-vm.toml
-[vm]
-name = "gaming-vm"
-cpus = 8
-memory = 16384
-
-[gpu]
-enabled = true
-pci_address = "0000:02:00.0"
-multifunction = false
-romfile = "/usr/share/vgabios/GTX1050Ti.rom"
-
-[display]
-type = "none"     # Disable emulated display when using passthrough GPU
-vnc = false
-```
-
-### Extract GPU ROM (if needed)
-
-Some GPUs require a ROM file for passthrough:
-
-```bash
-cd /sys/bus/pci/devices/0000:02:00.0
-echo 1 > rom
-cat rom > /usr/share/vgabios/GTX1050Ti.rom
-echo 0 > rom
+for d in /sys/kernel/iommu_groups/*/devices/*; do
+    n=${d#*/iommu_groups/*}; n=${n%%/*}
+    printf 'IOMMU Group %s ' "$n"
+    lspci -nns "${d##*/}"
+done
 ```
 
 ---
 
-## Guest Driver Setup
+## Guest driver setup
+
+This part is entirely outside the platform's API — it's the same guest-OS-level work as any
+KVM/QEMU passthrough setup:
 
 ### NVIDIA on Windows
 
-1. Install NVIDIA drivers normally
-2. If you get "Error 43", add hypervisor hiding to the VM config:
-
-```xml
-<hyperv>
-  <vendor_id state='on' value='1234567890ab'/>
-</hyperv>
-<kvm>
-  <hidden state='on'/>
-</kvm>
-```
+Install NVIDIA drivers normally. If you hit "Error 43", NVIDIA's consumer driver is detecting a
+virtualized GPU and refusing to initialize — the usual fix is a CPU vendor-id-hiding flag QEMU
+supports (`-cpu ...,hv_vendor_id=...`/hidden-KVM-signature style options). **Zyvor Fabric doesn't
+expose that knob today** — there is no API or config field for it, so this workaround currently
+requires modifying the QEMU invocation outside the platform, or isn't achievable at all through
+the supported surface.
 
 ### NVIDIA on Linux
 
@@ -185,115 +183,30 @@ sudo modprobe vendor-reset
 
 ---
 
-## Multi-GPU Passthrough
-
-Pass multiple GPUs to a single VM:
-
-```json
-{
-  "name": "multi-gpu-vm",
-  "gpus": [
-    {"pci_address": "0000:01:00.0", "primary": true},
-    {"pci_address": "0000:02:00.0", "primary": false}
-  ]
-}
-```
-
-For SLI/CrossFire, ensure GPUs are in the same IOMMU group:
-
-```bash
-for d in /sys/kernel/iommu_groups/*/devices/*; do
-    n=${d#*/iommu_groups/*}; n=${n%%/*}
-    printf 'IOMMU Group %s ' "$n"
-    lspci -nns "${d##*/}"
-done
-```
-
----
-
-## vGPU (Virtual GPU)
-
-### NVIDIA GRID
-
-For NVIDIA GRID/vGPU (requires license):
-
-```bash
-sudo systemctl start nvidia-vgpud
-zyvorctl gpu create-vgpu --physical-gpu 0000:02:00.0 --type nvidia-256
-```
-
-### Intel GVT-g
-
-For Intel integrated graphics virtualization:
-
-```bash
-echo "i915.enable_gvt=1" >> /etc/modprobe.d/i915.conf
-zyvorctl gpu create-vgpu --physical-gpu 0000:00:02.0 --type i915-GVTg_V5_4
-```
-
----
-
-## Performance Optimization
-
-### CPU Pinning
-
-Pin VM vCPUs for consistent GPU performance:
-
-```toml
-[cpu]
-mode = "host-passthrough"
-pins = [0, 1, 2, 3, 4, 5, 6, 7]
-```
-
-### Huge Pages
-
-Reduce memory overhead:
-
-```bash
-echo 8192 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-```
-
-```toml
-[memory]
-hugepages = true
-```
-
-### MSI Interrupts
-
-Enable MSI for better interrupt performance:
-
-```bash
-echo 1 > /sys/bus/pci/devices/0000:02:00.0/msi_bus
-```
-
----
-
-## Monitoring
-
-```bash
-# GPU assignment status
-zyvorctl gpu list --assigned
-
-# Per-VM GPU stats
-zyvorctl gpu stats gaming-vm
-```
-
----
-
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| NVIDIA Error 43 | Add `<kvm><hidden state='on'/></kvm>` to VM config |
-| Black screen | Check if GPU ROM is needed; verify IOMMU groups; try different display port |
-| GPU not releasing after VM shutdown | `zyvorctl gpu unbind 0000:02:00.0` then `modprobe -r vfio-pci && modprobe vfio-pci` |
-| IOMMU group contains other devices | Use ACS override (`pcie_acs_override=downstream,multifunction`) -- not recommended for production |
+| `400 Bad Request` on attach | Device isn't bound to `vfio-pci` yet — check `GET /api/system/pci-devices`, bind it (see above), retry |
+| Black screen in guest | Verify IOMMU groups don't split the device from something it needs; try a different display port |
+| Device not releasing after VM shutdown | `sudo driverctl unset-override <address>` (or `modprobe -r vfio-pci && modprobe vfio-pci`), then rebind to the host driver if you want it back |
+| IOMMU group contains other devices | Use ACS override (`pcie_acs_override=downstream,multifunction`) — not recommended for production |
 
 ---
 
-## Security Considerations
+## Security considerations
 
-- A passthrough GPU has direct memory access (DMA) to VM memory
-- IOMMU provides isolation between the GPU and other system memory
+- A passed-through device has direct memory access (DMA) to VM memory
+- IOMMU provides isolation between the device and the rest of host memory
 - Always verify driver signatures in the guest OS
-- Do not pass through GPUs on multi-tenant hosts without understanding the DMA risk
+- Do not pass through devices on multi-tenant hosts without understanding the DMA risk
+
+## Not supported today
+
+- **vGPU / mediated devices** (NVIDIA GRID, Intel GVT-g) — no support of any kind; only a whole
+  physical PCI device can be passed through, not a slice of one.
+- **Per-device stats** — there's no GPU/PCI-device-specific metrics endpoint; `GET
+  /api/vms/:name/metrics` reports VM-level CPU/memory/disk, not per-passthrough-device data.
+- **Automated driver bind/unbind** — deliberately manual (see above); the API refuses to do it
+  for you.
+- **Custom ROM files** — only the on/off `rombar` flag is exposed, not a `romfile` path.

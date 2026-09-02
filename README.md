@@ -35,7 +35,7 @@ Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API,
 | No unified API across interfaces | 480+ REST endpoints and 3 WebSocket channels, one daemon, four front doors |
 | Scripting vs. GUI is usually either/or | CLI (`zyvorctl`) + web console + Terraform provider + Kubernetes operator, all first-class |
 | Enterprise needs RBAC, audit, and encryption | JWT auth, roles, audit export, encryption at rest, out of the box |
-| GPU passthrough is bolted on elsewhere | First-class GPU API on Linux KVM |
+| GPU passthrough is bolted on elsewhere | Generic PCI/VFIO passthrough REST API on Linux KVM |
 | Guest images ship without your tooling baked in | Offline image customization via [GuestKit](https://github.com/zyvorai/guestkit) — inject packages, files, and the in-guest agent before first boot, no appliance VM needed |
 
 ---

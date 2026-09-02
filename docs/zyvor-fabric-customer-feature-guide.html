@@ -261,8 +261,8 @@ blockquote{border-left:3px solid #2dd4bf;padding:.2em .9em;color:#475569;margin:
 <h2>6. Compute, GPU &amp; Virtualization</h2>
 <p><em>Low-level control over CPU topology, memory, accelerators, and firmware.</em></p>
 <ul>
-<li><strong>GPU Passthrough</strong> — First-class GPU passthrough for NVIDIA, AMD, and Intel GVT-g on Linux KVM. — <em>Run AI, rendering, and CAD workloads at near-bare-metal speed.</em><ul>
-<li><strong>How:</strong> Attach host PCI/GPU devices via the Web VM detail Devices tab and the device-passthrough REST endpoints (NVIDIA/AMD/Intel GVT-g); requires matching IOMMU/hardware.</li>
+<li><strong>GPU Passthrough</strong> — Pass a physical NVIDIA or AMD GPU through to a VM via VFIO once it&#39;s bound to <code>vfio-pci</code> (generic PCI passthrough — no vGPU/mediated-device support). — <em>Run AI, rendering, and CAD workloads at near-bare-metal speed.</em><ul>
+<li><strong>How:</strong> REST <code>GET /api/system/pci-devices</code>, <code>POST</code>/<code>DELETE /api/vms/:name/devices/pci</code> · Web VM detail Devices tab; requires matching IOMMU/hardware and manually binding the device to <code>vfio-pci</code> first (no <code>zyvorctl</code> command for this).</li>
 </ul>
 </li>
 <li><strong>CPU Pinning &amp; NUMA</strong> — CPU topology control, pinning, NUMA-aware placement, and nested virtualization. — <em>Squeeze predictable performance from latency-sensitive VMs.</em><ul>

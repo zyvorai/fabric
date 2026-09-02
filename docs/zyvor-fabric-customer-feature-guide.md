@@ -166,8 +166,8 @@ _Live migration, fault tolerance, and multi-site recovery._
 
 _Low-level control over CPU topology, memory, accelerators, and firmware._
 
-- **GPU Passthrough** — First-class GPU passthrough for NVIDIA, AMD, and Intel GVT-g on Linux KVM. — _Run AI, rendering, and CAD workloads at near-bare-metal speed._
-  - **How:** Attach host PCI/GPU devices via the Web VM detail Devices tab and the device-passthrough REST endpoints (NVIDIA/AMD/Intel GVT-g); requires matching IOMMU/hardware.
+- **GPU Passthrough** — Pass a physical NVIDIA or AMD GPU through to a VM via VFIO once it's bound to `vfio-pci` (generic PCI passthrough — no vGPU/mediated-device support). — _Run AI, rendering, and CAD workloads at near-bare-metal speed._
+  - **How:** REST `GET /api/system/pci-devices`, `POST`/`DELETE /api/vms/:name/devices/pci` · Web VM detail Devices tab; requires matching IOMMU/hardware and manually binding the device to `vfio-pci` first (no `zyvorctl` command for this).
 - **CPU Pinning & NUMA** — CPU topology control, pinning, NUMA-aware placement, and nested virtualization. — _Squeeze predictable performance from latency-sensitive VMs._
   - **How:** REST `GET /api/system/numa-topology`, placement hint `GET /api/system/numa/placement`, and `POST /api/system/vms/:name/cpu-pinning` (Auto/NumaNode/Socket/Explicit) · Web VM advanced CPU settings.
 - **Memory Optimization** — Memory ballooning, hugepages, and KSM page deduplication via a system resource manager. — _Fit more VMs per host without starving any of them._
