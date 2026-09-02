@@ -1,13 +1,19 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-// Same mark as the app favicon/apple-touch-icon (index.html) and zyvor.dev's
-// brand tile: a dark rounded square with a bold white "Z".
+// The exact brand mark used at zyvor.dev's top-left nav: an open, rounded
+// stroked "Z" glyph in the brand accent orange, no background shape.
 export default function ZyvorMark({ className = 'w-6 h-6' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-      <rect width="64" height="64" rx="14" fill="#1d1d1f" />
-      <path d="M19 18h26v7L29 40h16v7H19v-7l16-15H19z" fill="#fff" />
+    <svg viewBox="0 0 18 18" className={className} aria-hidden="true">
+      <path
+        d="M2 2h14L6.6 16H16"
+        fill="none"
+        stroke="#ff5a15"
+        strokeWidth="2.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }

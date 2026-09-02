@@ -10,7 +10,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 | Page | What it covers |
 |------|----------------|
-| [Sign in](auth/sign-in.md) | Sign in — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host. |
+| [Sign in](auth/login.md) | Sign in — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host. |
 
 ## Core
 
