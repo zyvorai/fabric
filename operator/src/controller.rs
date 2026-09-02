@@ -15,22 +15,22 @@ use crate::{crd::VirtualMachine, reconcile};
 pub struct Context {
     pub client: Client,
     pub http: reqwest::Client,
-    pub vmspawnd_url: String,
-    pub vmspawnd_token: Option<String>,
+    pub zyvor_fabricd_url: String,
+    pub zyvor_fabricd_token: Option<String>,
 }
 
 pub async fn run(client: Client) -> Result<()> {
     let vms = Api::<VirtualMachine>::all(client.clone());
 
-    let vmspawnd_url = std::env::var("ZYVOR_FABRICD_URL")
+    let zyvor_fabricd_url = std::env::var("ZYVOR_FABRICD_URL")
         .unwrap_or_else(|_| "http://zyvor-fabricd:9095".to_string());
-    let vmspawnd_token = std::env::var("ZYVOR_FABRICD_TOKEN").ok().filter(|s| !s.is_empty());
+    let zyvor_fabricd_token = std::env::var("ZYVOR_FABRICD_TOKEN").ok().filter(|s| !s.is_empty());
 
     let context = Arc::new(Context {
         client: client.clone(),
         http: reqwest::Client::new(),
-        vmspawnd_url,
-        vmspawnd_token,
+        zyvor_fabricd_url,
+        zyvor_fabricd_token,
     });
 
     Controller::new(vms, Config::default())

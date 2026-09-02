@@ -214,13 +214,10 @@ curl http://localhost:9095/api/vms/myvm/migrate/stats
 
 ### Prometheus Metrics
 
-```
-zyvor_fabricd_migration_duration_seconds
-zyvor_fabricd_migration_downtime_seconds
-zyvor_fabricd_migration_total_bytes
-zyvor_fabricd_migration_success_total
-zyvor_fabricd_migration_failure_total
-```
+> **Not yet implemented.** The daemon's Prometheus exporter currently only exports VM-count and
+> lifecycle metrics (`zyvor_fabricd_vms_total`, `_vms_running`, `_vms_stopped`,
+> `_vm_{starts,stops,creates,deletes}_total`) -- no migration-specific series exist yet. Poll
+> `GET /api/migrations` for live progress in the meantime (see the JSON example above).
 
 ---
 

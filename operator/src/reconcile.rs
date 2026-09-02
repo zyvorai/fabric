@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::{controller::Context, crd::{VirtualMachine, VirtualMachineStatus}, error::OperatorError};
 
 fn with_auth(ctx: &Context, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-    if let Some(ref token) = ctx.vmspawnd_token {
+    if let Some(ref token) = ctx.zyvor_fabricd_token {
         req.bearer_auth(token)
     } else {
         req
@@ -31,7 +31,7 @@ pub async fn reconcile(
 
     let vm_api: Api<VirtualMachine> = Api::namespaced(ctx.client.clone(), &namespace);
     let http_client = &ctx.http;
-    let vm_url = format!("{}/api/vms", ctx.vmspawnd_url);
+    let vm_url = format!("{}/api/vms", ctx.zyvor_fabricd_url);
 
     let create_req = json!({
         "name": name,
@@ -40,7 +40,7 @@ pub async fn reconcile(
         "memory": vm.spec.memory,
     });
 
-    let vm_check_url = format!("{}/api/vms/{}", ctx.vmspawnd_url, name);
+    let vm_check_url = format!("{}/api/vms/{}", ctx.zyvor_fabricd_url, name);
     let exists = with_auth(&ctx, http_client.get(&vm_check_url))
         .send()
         .await?
@@ -64,7 +64,7 @@ pub async fn reconcile(
         tracing::info!("Created VM {}", name);
 
         if let Some(cloud_init) = &vm.spec.cloud_init {
-            let cloud_init_url = format!("{}/api/vms/{}/cloud-init", ctx.vmspawnd_url, name);
+            let cloud_init_url = format!("{}/api/vms/{}/cloud-init", ctx.zyvor_fabricd_url, name);
             let cloud_init_req = json!({
                 "instance_id": name,
                 "hostname": name,
@@ -81,7 +81,7 @@ pub async fn reconcile(
             }
         }
 
-        let start_url = format!("{}/api/vms/{}/start", ctx.vmspawnd_url, name);
+        let start_url = format!("{}/api/vms/{}/start", ctx.zyvor_fabricd_url, name);
         if let Err(e) = with_auth(&ctx, http_client.post(&start_url)).send().await {
             tracing::error!("Failed to start VM '{}': {}", name, e);
         }

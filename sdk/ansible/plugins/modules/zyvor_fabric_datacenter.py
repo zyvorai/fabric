@@ -130,7 +130,7 @@ except ImportError:
 from ansible.module_utils.basic import AnsibleModule
 
 
-class VmspawndAPI:
+class ZyvorFabricdAPI:
     """Minimal API wrapper for zyvor-fabricd datacenter/cluster endpoints."""
 
     def __init__(self, base_url, token=None):
@@ -295,7 +295,7 @@ def run_module():
     api_url = module.params['api_url']
     api_token = module.params['api_token']
 
-    api = VmspawndAPI(api_url, api_token)
+    api = ZyvorFabricdAPI(api_url, api_token)
 
     try:
         if resource_type == 'datacenter':

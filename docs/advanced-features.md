@@ -229,19 +229,15 @@ See [terraform-provider/README.md](../terraform-provider/README.md) for full doc
 |--------|-------------|
 | `zyvor_fabricd_vms_total` | Total VM count |
 | `zyvor_fabricd_vms_running` | Running VM count |
-| `zyvor_fabricd_vm_cpu_usage` | Per-VM CPU utilization |
-| `zyvor_fabricd_vm_memory_usage` | Per-VM memory utilization |
-| `zyvor_fabricd_vm_disk_read_bytes` | Per-VM disk read throughput |
-| `zyvor_fabricd_vm_disk_write_bytes` | Per-VM disk write throughput |
-| `zyvor_fabricd_vm_network_rx_bytes` | Per-VM network receive |
-| `zyvor_fabricd_vm_network_tx_bytes` | Per-VM network transmit |
+| `zyvor_fabricd_vms_stopped` | Stopped VM count |
+| `zyvor_fabricd_vm_starts_total` | Total VM start operations |
+| `zyvor_fabricd_vm_stops_total` | Total VM stop operations |
+| `zyvor_fabricd_vm_creates_total` | Total VM create operations |
+| `zyvor_fabricd_vm_deletes_total` | Total VM delete operations |
 
-### API Metrics
-
-| Metric | Description |
-|--------|-------------|
-| `zyvor_fabricd_api_requests_total` | Total API requests (by method, path) |
-| `zyvor_fabricd_api_request_duration_seconds` | Request latency histogram |
+These seven are the full metric set the daemon exports today. Per-VM CPU/memory/disk/network
+utilization and API request/latency metrics are not yet implemented as Prometheus series -- use
+`GET /api/vms/{name}/metrics` for live per-VM resource figures in the meantime.
 
 ### Prometheus Configuration
 

@@ -537,7 +537,7 @@ curl -sf http://127.0.0.1:9095/api/v1/vms > /dev/null && echo "OK" || echo "FAIL
 groups:
   - name: Zyvor Fabric
     rules:
-      - alert: VMSpawndDown
+      - alert: ZyvorFabricdDown
         expr: up{job="Zyvor Fabric"} == 0
         for: 1m
         labels:
