@@ -136,6 +136,13 @@ pub trait VMDriver: Send + Sync {
     /// Callers doing anything disk-level (snapshots, backups, cloning)
     /// need this, not a naming-convention guess at the base image.
     async fn get_disk_path(&self, name: &str) -> Result<std::path::PathBuf>;
+
+    /// The cgroup v2 path the machine's VMM process was migrated into, if
+    /// cgroup delegation has completed for it. `EphemeraDriver` returns
+    /// `VmRecord.cgroup_path` (real path is `ephemera.slice/<uuid>.scope`,
+    /// keyed by Ephemera's own internal VM id -- NOT the VM name). `None`
+    /// if the VM isn't running yet or cgroup delegation failed for it.
+    async fn get_cgroup_path(&self, name: &str) -> Result<Option<std::path::PathBuf>>;
 }
 
 /// Resource metrics collection from cgroup v2.

@@ -141,6 +141,10 @@ impl VMDriver for EphemeraDriver {
     async fn get_disk_path(&self, name: &str) -> Result<std::path::PathBuf> {
         Ok(self.resolve(name).await?.disk)
     }
+
+    async fn get_cgroup_path(&self, name: &str) -> Result<Option<std::path::PathBuf>> {
+        Ok(self.resolve(name).await?.cgroup_path)
+    }
 }
 
 pub(crate) fn map_status(status: VmStatus) -> VMState {

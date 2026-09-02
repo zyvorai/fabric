@@ -243,29 +243,44 @@ pub async fn get_cpu_affinity(
 /// PUT /api/vms/:name/memory/limit - Set memory limit for a VM
 pub async fn set_memory_limit(
     RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
     Json(req): Json<SetMemoryLimitRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(set_memory_limit));
     validate_vm_name(&vm_name)?;
-    let controller = MemoryController::new(&vm_name);
+
+    // Ephemera-backed VMs' real cgroups live at ephemera.slice/<uuid>.scope,
+    // keyed by Ephemera's own internal VM id, not the VM name -- resolve it
+    // via the driver rather than guessing at a name-based cgroup path (see
+    // VmDriver::get_cgroup_path).
+    let cgroup_path = state.driver.get_cgroup_path(&vm_name).await.map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("VM '{}' not found: {}", vm_name, e),
+        )
+    })?;
+
+    let controller = match cgroup_path {
+        Some(path) => MemoryController::for_path(&vm_name, &path),
+        None => {
+            return Err((
+                StatusCode::CONFLICT,
+                format!(
+                    "Memory limit control isn't available for '{}': it has no cgroup yet \
+                     (VM isn't running, or cgroup delegation failed at launch).",
+                    vm_name
+                ),
+            ));
+        }
+    };
 
     if !controller.exists() {
-        // MemoryController::exists() looks up a cgroup by the VM's *name*
-        // (CgroupManager::for_machine, the pre-Ephemera-migration
-        // systemd-machined convention) -- Ephemera-backed VMs' real cgroups
-        // live at ephemera.slice/<uuid>.scope, keyed by Ephemera's internal
-        // UUID, not the VM name, so this never matches for a real running
-        // VM. Found live: a genuinely running VM still 404s here. Say so
-        // honestly instead of implying the VM itself doesn't exist -- see
-        // GET /api/vms/{name} for whether it's actually running.
         return Err((
-            StatusCode::NOT_IMPLEMENTED,
+            StatusCode::CONFLICT,
             format!(
-                "Memory limit control isn't available for '{}': it isn't wired up for the \
-                 Ephemera driver's cgroup layout yet (this looks up a cgroup by VM name, the old \
-                 systemd-machined convention -- Ephemera's real cgroups are keyed by its own \
-                 internal VM id).",
+                "Memory limit control isn't available for '{}': its cgroup path is stale \
+                 (VM likely stopped between resolving it and this call).",
                 vm_name
             ),
         ));
@@ -293,22 +308,39 @@ pub async fn set_memory_limit(
 /// GET /api/vms/:name/memory/usage - Get memory usage for a VM
 pub async fn get_memory_usage(
     RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
     Path(vm_name): Path<String>,
 ) -> Result<Json<zyvor_fabric_system::MemoryStats>, (StatusCode, String)> {
     tracing::debug!("system::{}", stringify!(get_memory_usage));
     validate_vm_name(&vm_name)?;
-    let controller = MemoryController::new(&vm_name);
+
+    let cgroup_path = state.driver.get_cgroup_path(&vm_name).await.map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("VM '{}' not found: {}", vm_name, e),
+        )
+    })?;
+
+    let controller = match cgroup_path {
+        Some(path) => MemoryController::for_path(&vm_name, &path),
+        None => {
+            return Err((
+                StatusCode::CONFLICT,
+                format!(
+                    "Memory usage stats aren't available for '{}': it has no cgroup yet \
+                     (VM isn't running, or cgroup delegation failed at launch).",
+                    vm_name
+                ),
+            ));
+        }
+    };
 
     if !controller.exists() {
-        // Same Ephemera/systemd-machined cgroup-naming mismatch as
-        // set_memory_limit above -- see its comment for the full story.
         return Err((
-            StatusCode::NOT_IMPLEMENTED,
+            StatusCode::CONFLICT,
             format!(
-                "Memory usage stats aren't available for '{}': it isn't wired up for the \
-                 Ephemera driver's cgroup layout yet (this looks up a cgroup by VM name, the old \
-                 systemd-machined convention -- Ephemera's real cgroups are keyed by its own \
-                 internal VM id).",
+                "Memory usage stats aren't available for '{}': its cgroup path is stale \
+                 (VM likely stopped between resolving it and this call).",
                 vm_name
             ),
         ));
@@ -648,19 +680,29 @@ pub async fn optimize_vm(
     }
 
     // Try to set memory limit via cgroup
-    let controller = MemoryController::new(&vm_name);
-    if controller.exists() {
-        let limit_bytes = vm.memory * 1024 * 1024;
-        match controller.set_limit(limit_bytes) {
-            Ok(_) => {
-                applied.push(format!("Memory limit set to {} MB", vm.memory));
-            }
-            Err(e) => {
-                skipped.push(format!("Memory limit: {}", e));
+    let cgroup_controller = match state.driver.get_cgroup_path(&vm_name).await {
+        Ok(Some(path)) => Some(MemoryController::for_path(&vm_name, &path)),
+        Ok(None) => None,
+        Err(e) => {
+            skipped.push(format!("Memory limit: failed to resolve cgroup: {e}"));
+            None
+        }
+    };
+    match cgroup_controller {
+        Some(controller) if controller.exists() => {
+            let limit_bytes = vm.memory * 1024 * 1024;
+            match controller.set_limit(limit_bytes) {
+                Ok(_) => {
+                    applied.push(format!("Memory limit set to {} MB", vm.memory));
+                }
+                Err(e) => {
+                    skipped.push(format!("Memory limit: {}", e));
+                }
             }
         }
-    } else {
-        skipped.push("Memory limit: cgroup not found (VM may not be running)".to_string());
+        _ => {
+            skipped.push("Memory limit: cgroup not found (VM may not be running)".to_string());
+        }
     }
 
     Ok(Json(OptimizationResult {

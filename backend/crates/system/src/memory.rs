@@ -111,6 +111,17 @@ impl MemoryController {
         }
     }
 
+    /// Build a controller from an already-resolved cgroup path -- for
+    /// drivers (Ephemera) whose real cgroup path isn't derivable from the
+    /// VM name alone. See `VmDriver::get_cgroup_path`.
+    pub fn for_path(vm_name: &str, cgroup_path: &std::path::Path) -> Self {
+        let mgr = CgroupManager::from_path(cgroup_path.to_path_buf()).ok();
+        Self {
+            vm_name: vm_name.to_string(),
+            mgr,
+        }
+    }
+
     /// Check if cgroup exists
     pub fn exists(&self) -> bool {
         self.mgr.is_some()
