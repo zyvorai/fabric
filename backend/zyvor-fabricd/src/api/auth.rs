@@ -141,7 +141,11 @@ pub async fn login(
     }
 
     let jwt_config = state.jwt_config.as_ref().ok_or_else(|| {
-        crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+        crate::api_error::json_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Authentication is disabled on this server (auth.enabled = false); login is not available. \
+             All requests are treated as an anonymous, read-only viewer.",
+        )
     })?;
 
     enum AuthSource {

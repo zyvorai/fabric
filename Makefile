@@ -1,7 +1,7 @@
 .PHONY: all build build-backend build-web \
        install install-bin install-conf install-systemd install-web install-modules install-libexec \
        uninstall run dev cli test clean fmt lint \
-       docker-build docker-up docker-down rpm deb help
+       docker-build docker-build-ephemera docker-up docker-down rpm deb help
 
 PREFIX     ?= /usr
 DESTDIR    ?=
@@ -116,14 +116,17 @@ rpm:
 deb:
 	dpkg-buildpackage -us -uc -b
 
-docker-build:
-	docker-compose build
+docker-build: docker-build-ephemera
+	docker compose build
+
+docker-build-ephemera:
+	./scripts/build-container-images.sh
 
 docker-up:
-	docker-compose up -d
+	docker compose up -d
 
 docker-down:
-	docker-compose down
+	docker compose down
 
 help:
 	@echo "Available targets:"
@@ -146,9 +149,9 @@ help:
 	@echo "  lint            - Lint code"
 	@echo "  rpm             - Build RPM package"
 	@echo "  deb             - Build Debian package"
-	@echo "  docker-build    - Build Docker image"
-	@echo "  docker-up       - Start with Docker Compose"
-	@echo "  docker-down     - Stop Docker Compose"
+	@echo "  docker-build    - Build zyvor-fabricd and ephemera images (see docs/DOCKER.md)"
+	@echo "  docker-up       - Start with Docker/Podman Compose"
+	@echo "  docker-down     - Stop Docker/Podman Compose"
 	@echo ""
 	@echo "Variables:"
 	@echo "  PREFIX=$(PREFIX)  DESTDIR=$(DESTDIR)"

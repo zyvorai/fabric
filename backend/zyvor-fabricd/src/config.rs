@@ -317,6 +317,18 @@ impl Default for AuthConfig {
 
 impl Config {
     pub fn load() -> Result<Self> {
+        let mut config = Self::load_from_file_or_default()?;
+        if let Ok(listen) = std::env::var("ZYVOR_FABRICD_LISTEN") {
+            tracing::info!(
+                "Overriding daemon.listen from ZYVOR_FABRICD_LISTEN: {}",
+                listen
+            );
+            config.daemon.listen = listen;
+        }
+        Ok(config)
+    }
+
+    fn load_from_file_or_default() -> Result<Self> {
         if let Ok(path) = std::env::var("ZYVOR_FABRICD_CONFIG") {
             if let Ok(config) = Self::from_file(&path) {
                 return Ok(config);
