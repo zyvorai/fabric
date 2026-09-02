@@ -93,15 +93,29 @@ impl QmpClient {
         std::path::Path::new(&self.socket_path).exists()
     }
 
-    /// Execute a QMP command and return the response
+    /// Execute a single QMP command over its own connection.
+    ///
+    /// Fine for one-shot commands, but do NOT use this for a sequence where
+    /// a later command references an object/device an earlier one just
+    /// created (`object-add` then `device_add` with `memdev`/`drive`
+    /// pointing at it, `blockdev-add` then `device_add`, `netdev_add` then
+    /// `device_add`, etc.) -- found live: memory hotplug's `object-add`
+    /// would return success, but the very next `device_add` referencing
+    /// that same backend id failed with "Device '<id>' not found", even
+    /// though replaying the exact same two commands over one held-open
+    /// connection worked every time. Reconnecting and renegotiating
+    /// `qmp_capabilities` between the two calls is enough for QEMU to not
+    /// yet consider the object visible to the new monitor connection. Use
+    /// [`QmpClient::open_session`] for any multi-command sequence instead.
     pub fn execute(&self, command: &str, args: Value) -> Result<Value> {
-        if !is_command_allowed(command) {
-            return Err(anyhow::anyhow!(
-                "QMP command '{}' is not in the allowed list",
-                command
-            ));
-        }
+        self.open_session()?.execute(command, args)
+    }
 
+    /// Open one QMP connection (greeting + capabilities negotiated once)
+    /// for a caller to run a whole related command sequence over -- see
+    /// the warning on [`QmpClient::execute`] for why this matters for
+    /// anything beyond a single command.
+    pub fn open_session(&self) -> Result<QmpSession> {
         let mut stream = UnixStream::connect(&self.socket_path)
             .with_context(|| format!("Failed to connect to QMP socket: {}", self.socket_path))?;
 
@@ -123,34 +137,61 @@ impl QmpClient {
         let mut caps_response = String::new();
         reader.read_line(&mut caps_response)?;
 
-        // Send the actual command
+        Ok(QmpSession { stream, reader })
+    }
+}
+
+/// A single QMP connection, already past the greeting/`qmp_capabilities`
+/// handshake, that can run more than one command in sequence -- see
+/// [`QmpClient::execute`]'s doc comment for why this exists.
+pub struct QmpSession {
+    stream: UnixStream,
+    reader: BufReader<UnixStream>,
+}
+
+impl QmpSession {
+    pub fn execute(&mut self, command: &str, args: Value) -> Result<Value> {
+        if !is_command_allowed(command) {
+            return Err(anyhow::anyhow!(
+                "QMP command '{}' is not in the allowed list",
+                command
+            ));
+        }
+
         let cmd = if args.is_null() {
             serde_json::json!({"execute": command})
         } else {
             serde_json::json!({"execute": command, "arguments": args})
         };
 
-        writeln!(stream, "{}", cmd)?;
-        stream.flush()?;
+        writeln!(self.stream, "{}", cmd)?;
+        self.stream.flush()?;
 
-        // Read the response
-        let mut response_str = String::new();
-        reader.read_line(&mut response_str)?;
+        // Events can be interleaved with command responses on the same
+        // connection -- skip any line that isn't the reply to this command
+        // (no "return"/"error" key) rather than treating it as the answer.
+        loop {
+            let mut response_str = String::new();
+            self.reader.read_line(&mut response_str)?;
 
-        let response: Value = serde_json::from_str(&response_str)
-            .with_context(|| format!("Failed to parse QMP response: {}", response_str))?;
+            let response: Value = serde_json::from_str(&response_str)
+                .with_context(|| format!("Failed to parse QMP response: {}", response_str))?;
 
-        if let Some(error) = response.get("error") {
-            return Err(anyhow::anyhow!(
-                "QMP error: {}",
-                error
-                    .get("desc")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("unknown")
-            ));
+            if let Some(error) = response.get("error") {
+                return Err(anyhow::anyhow!(
+                    "QMP error: {}",
+                    error
+                        .get("desc")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("unknown")
+                ));
+            }
+
+            if let Some(ret) = response.get("return") {
+                return Ok(ret.clone());
+            }
+            // else: an async event line (e.g. ACPI_DEVICE_OST) -- keep reading.
         }
-
-        Ok(response.get("return").cloned().unwrap_or(Value::Null))
     }
 }
 

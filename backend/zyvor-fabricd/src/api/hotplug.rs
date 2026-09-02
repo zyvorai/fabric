@@ -11,7 +11,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::api::events;
-use crate::qmp::QmpClient;
+use crate::qmp::{QmpClient, QmpSession};
 use crate::server::AppState;
 use security::RequireWrite;
 
@@ -78,7 +78,7 @@ const HOTPLUG_PCIE_PORTS: u8 = 4;
 /// each in turn -- used for PCIe hotplug (`hotplug-pcie-0..N`, one device
 /// per port).
 fn device_add_trying_buses(
-    qmp: &QmpClient,
+    session: &mut QmpSession,
     mut device_args: serde_json::Value,
     bus_candidates: &[String],
 ) -> Result<String, String> {
@@ -87,7 +87,7 @@ fn device_add_trying_buses(
         if let Some(obj) = device_args.as_object_mut() {
             obj.insert("bus".to_string(), serde_json::json!(bus));
         }
-        match qmp.execute("device_add", device_args.clone()) {
+        match session.execute("device_add", device_args.clone()) {
             Ok(_) => return Ok(bus.clone()),
             Err(e) => last_err = e.to_string(),
         }
@@ -151,6 +151,7 @@ fn occupied_hotplug_buses(qmp: &QmpClient) -> std::collections::HashSet<String> 
 /// already filled some of them.
 fn device_add_on_hotplug_bus(
     qmp: &QmpClient,
+    session: &mut QmpSession,
     device_args: serde_json::Value,
 ) -> Result<String, String> {
     let occupied = occupied_hotplug_buses(qmp);
@@ -163,7 +164,7 @@ fn device_add_on_hotplug_bus(
             "all {HOTPLUG_PCIE_PORTS} hotplug root ports already hold a device -- restart the VM to reclaim them"
         ));
     }
-    device_add_trying_buses(qmp, device_args, &candidates)
+    device_add_trying_buses(session, device_args, &candidates)
 }
 
 /// A short, unique-enough id for a QMP `node-name`/device `id`. QEMU caps
@@ -281,6 +282,25 @@ pub async fn hotplug_memory(
     let backend_id = format!("mem-hotplug-{}", uuid::Uuid::new_v4().simple());
     let dimm_id = format!("dimm-hotplug-{}", uuid::Uuid::new_v4().simple());
 
+    // object-add then device_add must run over the SAME QMP connection --
+    // found live: object-add succeeds, but a device_add on a fresh
+    // reconnect immediately after can't see the object it just created
+    // ("Device '<id>' not found"), even though the exact same two
+    // commands replayed over one held-open session always work.
+    let mut session = match qmp.open_session() {
+        Ok(s) => s,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to open QMP session: {}", e),
+                ),
+            )
+                .into_response();
+        }
+    };
+
     // Add memory backend
     let backend_args = serde_json::json!({
         "qom-type": "memory-backend-ram",
@@ -288,7 +308,7 @@ pub async fn hotplug_memory(
         "size": size_bytes,
     });
 
-    if let Err(e) = qmp.execute("object-add", backend_args) {
+    if let Err(e) = session.execute("object-add", backend_args) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             crate::api_error::json_error(
@@ -306,7 +326,7 @@ pub async fn hotplug_memory(
         "memdev": backend_id,
     });
 
-    match qmp.execute("device_add", dimm_args) {
+    match session.execute("device_add", dimm_args) {
         Ok(_) => {
             events::record_event(
                 &state,
@@ -324,7 +344,7 @@ pub async fn hotplug_memory(
         Err(e) => {
             // Rollback: remove the memory backend object since device_add failed
             if let Err(rollback_err) =
-                qmp.execute("object-del", serde_json::json!({"id": backend_id}))
+                session.execute("object-del", serde_json::json!({"id": backend_id}))
             {
                 tracing::warn!(
                     "Failed to rollback memory backend '{}': {}",
@@ -385,6 +405,24 @@ pub async fn hotplug_disk(
     let node_name = short_hotplug_id("drive-hotplug");
     let device_id = short_hotplug_id("disk-hotplug");
 
+    // blockdev-add then device_add (referencing that node-name via
+    // "drive") must run over the SAME QMP connection -- see QmpClient::
+    // execute's doc comment for why a fresh reconnect between the two
+    // breaks it.
+    let mut session = match qmp.open_session() {
+        Ok(s) => s,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to open QMP session: {}", e),
+                ),
+            )
+                .into_response();
+        }
+    };
+
     // Add block device
     let blockdev_args = serde_json::json!({
         "driver": "qcow2",
@@ -395,7 +433,7 @@ pub async fn hotplug_disk(
         }
     });
 
-    if let Err(e) = qmp.execute("blockdev-add", blockdev_args) {
+    if let Err(e) = session.execute("blockdev-add", blockdev_args) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             crate::api_error::json_error(
@@ -424,13 +462,14 @@ pub async fn hotplug_disk(
     });
 
     let result = if driver == "virtio-blk-pci" {
-        device_add_on_hotplug_bus(&qmp, device_args)
+        device_add_on_hotplug_bus(&qmp, &mut session, device_args)
     } else {
         let mut device_args = device_args;
         if let Some(obj) = device_args.as_object_mut() {
             obj.insert("bus".to_string(), serde_json::json!("scsi0.0"));
         }
-        qmp.execute("device_add", device_args)
+        session
+            .execute("device_add", device_args)
             .map(|_| String::from("scsi0.0"))
             .map_err(|e| e.to_string())
     };
@@ -530,6 +569,23 @@ pub async fn hotplug_nic(
         .into_response();
     }
 
+    // netdev_add then device_add (referencing that netdev id) must run
+    // over the SAME QMP connection -- see QmpClient::execute's doc comment
+    // for why a fresh reconnect between the two breaks it.
+    let mut session = match qmp.open_session() {
+        Ok(s) => s,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to open QMP session: {}", e),
+                ),
+            )
+                .into_response();
+        }
+    };
+
     // Add netdev (tap backend attached to bridge)
     let netdev_args = serde_json::json!({
         "type": "tap",
@@ -538,7 +594,7 @@ pub async fn hotplug_nic(
         "helper": "/usr/lib/qemu/qemu-bridge-helper",
     });
 
-    if let Err(e) = qmp.execute("netdev_add", netdev_args) {
+    if let Err(e) = session.execute("netdev_add", netdev_args) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             crate::api_error::json_error(
@@ -573,7 +629,7 @@ pub async fn hotplug_nic(
         "netdev": netdev_id,
     });
 
-    match device_add_on_hotplug_bus(&qmp, device_args) {
+    match device_add_on_hotplug_bus(&qmp, &mut session, device_args) {
         Ok(_) => Json(serde_json::json!({
             "status": "ok",
             "device_id": device_id,
@@ -583,7 +639,7 @@ pub async fn hotplug_nic(
         Err(e) => {
             // Rollback: remove the orphaned netdev since device_add failed
             if let Err(rollback_err) =
-                qmp.execute("netdev_del", serde_json::json!({"id": netdev_id}))
+                session.execute("netdev_del", serde_json::json!({"id": netdev_id}))
             {
                 tracing::warn!(
                     "Failed to rollback netdev '{}': {}",

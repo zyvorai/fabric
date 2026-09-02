@@ -251,9 +251,23 @@ pub async fn set_memory_limit(
     let controller = MemoryController::new(&vm_name);
 
     if !controller.exists() {
+        // MemoryController::exists() looks up a cgroup by the VM's *name*
+        // (CgroupManager::for_machine, the pre-Ephemera-migration
+        // systemd-machined convention) -- Ephemera-backed VMs' real cgroups
+        // live at ephemera.slice/<uuid>.scope, keyed by Ephemera's internal
+        // UUID, not the VM name, so this never matches for a real running
+        // VM. Found live: a genuinely running VM still 404s here. Say so
+        // honestly instead of implying the VM itself doesn't exist -- see
+        // GET /api/vms/{name} for whether it's actually running.
         return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' not found or not running", vm_name),
+            StatusCode::NOT_IMPLEMENTED,
+            format!(
+                "Memory limit control isn't available for '{}': it isn't wired up for the \
+                 Ephemera driver's cgroup layout yet (this looks up a cgroup by VM name, the old \
+                 systemd-machined convention -- Ephemera's real cgroups are keyed by its own \
+                 internal VM id).",
+                vm_name
+            ),
         ));
     }
 
@@ -286,9 +300,17 @@ pub async fn get_memory_usage(
     let controller = MemoryController::new(&vm_name);
 
     if !controller.exists() {
+        // Same Ephemera/systemd-machined cgroup-naming mismatch as
+        // set_memory_limit above -- see its comment for the full story.
         return Err((
-            StatusCode::NOT_FOUND,
-            format!("VM '{}' not found or not running", vm_name),
+            StatusCode::NOT_IMPLEMENTED,
+            format!(
+                "Memory usage stats aren't available for '{}': it isn't wired up for the \
+                 Ephemera driver's cgroup layout yet (this looks up a cgroup by VM name, the old \
+                 systemd-machined convention -- Ephemera's real cgroups are keyed by its own \
+                 internal VM id).",
+                vm_name
+            ),
         ));
     }
 
