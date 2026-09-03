@@ -265,7 +265,7 @@ A successful response returns a JSON object with an empty VM list.
 On first start, Zyvor Fabric generates a random admin password:
 
 ```bash
-# Using zyvorctl
+# Using zyvor-fabricd-ctl
 ./zyvor-fabricd-ctl password
 
 # Or read directly
