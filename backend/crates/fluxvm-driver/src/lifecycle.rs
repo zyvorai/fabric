@@ -237,10 +237,7 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
     }
 
     let vcpus: u8 = vm.cpus.try_into().map_err(|_| {
-        anyhow::anyhow!(
-            "vcpu count {} exceeds the fluxvm backend's limit",
-            vm.cpus
-        )
+        anyhow::anyhow!("vcpu count {} exceeds the fluxvm backend's limit", vm.cpus)
     })?;
 
     let network = if opts.network_tap {

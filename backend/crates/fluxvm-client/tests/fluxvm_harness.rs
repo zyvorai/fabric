@@ -107,10 +107,7 @@ async fn boots_and_serves_healthz() {
         .list_vms()
         .await
         .expect("list_vms should succeed against a fresh instance");
-    assert!(
-        vms.is_empty(),
-        "a fresh fluxvm instance should have no VMs"
-    );
+    assert!(vms.is_empty(), "a fresh fluxvm instance should have no VMs");
 
     assert!(
         client

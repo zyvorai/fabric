@@ -129,9 +129,8 @@ impl Server {
         // The systemd-machined/D-Bus backend this replaced is gone; FluxVM
         // is the only `VmDriver` implementation left.
         let driver: Arc<dyn VmDriver> = {
-            let mut d =
-                zyvor_fabric_fluxvm_driver::FluxVmDriver::new(&config.driver.fluxvm_url)
-                    .map_err(|e| anyhow::anyhow!("Failed to initialize FluxVM driver: {}", e))?;
+            let mut d = zyvor_fabric_fluxvm_driver::FluxVmDriver::new(&config.driver.fluxvm_url)
+                .map_err(|e| anyhow::anyhow!("Failed to initialize FluxVM driver: {}", e))?;
             if let Some(token) = &config.driver.fluxvm_token {
                 d = d.with_token(token.clone());
             }
