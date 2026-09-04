@@ -15,6 +15,7 @@ members = [
     "crates/vm",
     "datacenter",
     "host-agent",
+    "host-lifecycle",
     "resource-pools",
     "encryption",
     "predictive-drs",
