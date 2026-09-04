@@ -1110,6 +1110,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-lifecycle"
+version = "0.2.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "datacenter",
+ "futures",
+ "serde",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "hostname"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
