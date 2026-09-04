@@ -766,6 +766,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "enterprise-identity"
+version = "0.2.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "security",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.20",
+ "uuid",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4106,6 +4120,7 @@ dependencies = [
  "distributed-storage",
  "dns-policy",
  "encryption",
+ "enterprise-identity",
  "fault-tolerance",
  "futures",
  "lettre",

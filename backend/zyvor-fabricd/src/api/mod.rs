@@ -73,6 +73,7 @@ pub mod export;
 pub mod external_auth;
 pub mod logs;
 pub mod resource_policy;
+pub mod scim;
 pub mod secrets;
 pub mod vm_power;
 pub mod webhook_retry;

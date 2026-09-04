@@ -553,7 +553,7 @@ pub async fn oidc_callback(
         .to_string();
 
     // 6. Determine the local role via role mapping
-    let role = if let Some(ref role_claim) = oidc_config.role_claim {
+    let oidc_role = if let Some(ref role_claim) = oidc_config.role_claim {
         let role_value = claims
             .get(role_claim)
             .and_then(|v| v.as_str())
@@ -564,6 +564,23 @@ pub async fn oidc_callback(
         }
     } else {
         parse_role(&provider.default_role)
+    };
+
+    // SCIM is authoritative for lifecycle/role when this auth provider is linked
+    // to an enabled provisioning profile. Providers without SCIM keep the
+    // existing OIDC claim/default-role behavior.
+    let role = match crate::api::scim::provisioning_decision(&state, &provider.id, &username)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Provisioning lookup failed: {e}")})),
+            )
+        })? {
+        enterprise_identity::ProvisioningDecision::NotManaged => oidc_role,
+        enterprise_identity::ProvisioningDecision::Allow(role) => role,
+        enterprise_identity::ProvisioningDecision::Deny(reason) => {
+            return Err((StatusCode::FORBIDDEN, Json(json!({"error": reason}))));
+        }
     };
 
     // 7. Issue a local JWT
