@@ -1940,6 +1940,23 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             delete(api::tenant::remove_member),
         )
         .route("/projects/{id}/vms", get(api::tenant::list_project_vms))
+        // SCIM provisioning administration
+        .route(
+            "/identity/scim/profiles",
+            get(api::scim::list_profiles).post(api::scim::create_profile),
+        )
+        .route(
+            "/identity/scim/profiles/{id}",
+            put(api::scim::update_profile).delete(api::scim::delete_profile),
+        )
+        .route(
+            "/identity/scim/tokens",
+            get(api::scim::list_tokens).post(api::scim::create_token),
+        )
+        .route(
+            "/identity/scim/tokens/{id}",
+            delete(api::scim::revoke_token),
+        )
         // External auth providers (LDAP/OIDC)
         .route(
             "/auth/providers",
@@ -2166,12 +2183,45 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         ));
     }
 
+    // SCIM uses its own profile-scoped provisioning token, not a Fabric JWT.
+    let scim_routes = Router::new()
+        .route(
+            "/ServiceProviderConfig",
+            get(api::scim::service_provider_config),
+        )
+        .route("/ResourceTypes", get(api::scim::resource_types))
+        .route("/Schemas", get(api::scim::schemas))
+        .route(
+            "/Users",
+            get(api::scim::list_users).post(api::scim::create_user),
+        )
+        .route(
+            "/Users/{id}",
+            get(api::scim::get_user)
+                .put(api::scim::replace_user)
+                .patch(api::scim::patch_user)
+                .delete(api::scim::delete_user),
+        )
+        .route(
+            "/Groups",
+            get(api::scim::list_groups).post(api::scim::create_group),
+        )
+        .route(
+            "/Groups/{id}",
+            get(api::scim::get_group)
+                .put(api::scim::replace_group)
+                .patch(api::scim::patch_group)
+                .delete(api::scim::delete_group),
+        )
+        .with_state(state.clone());
+
     // Serve API under /api/v1 (canonical) and /api (backward compat alias)
     let all_api_routes = public_auth_routes.merge(api_routes);
 
     Router::new()
         .nest("/api/v1", all_api_routes.clone())
         .nest("/api", all_api_routes)
+        .nest("/scim/v2", scim_routes)
         .nest("/ws", ws_routes)
         .route("/health", get(|| async { "OK" }))
         .route("/metrics", get(prometheus_exporter::metrics_handler))
