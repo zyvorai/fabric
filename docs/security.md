@@ -2,6 +2,9 @@
 
 Zyvor Fabric provides authentication, authorization, TLS, audit logging, and API keys for securing access to the VM management API.
 
+For enterprise identity provider (Entra ID / Okta) lifecycle provisioning and
+group-to-role sync via SCIM 2.0, see [scim-identity.md](scim-identity.md).
+
 ---
 
 ## Authentication

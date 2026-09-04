@@ -51,6 +51,45 @@ User authentication and session management.
 | POST | `/auth/roles` | Create a role |
 | GET | `/auth/roles` | List roles |
 
+## Enterprise Identity (SCIM)
+
+SCIM 2.0 lifecycle provisioning and group-to-role sync for Entra ID / Okta,
+layered on top of an existing OIDC/SAML/LDAP auth provider. Admin routes use
+a normal Fabric JWT; the `/scim/v2/*` data-plane routes use a dedicated,
+profile-scoped bearer token instead (minted below), not a Fabric JWT. See
+[docs/scim-identity.md](scim-identity.md) for the full walkthrough and
+security properties.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/identity/scim/profiles` | List provisioning profiles |
+| POST | `/identity/scim/profiles` | Create a provisioning profile |
+| PUT | `/identity/scim/profiles/:id` | Update a profile |
+| DELETE | `/identity/scim/profiles/:id` | Delete a profile (must have no active SCIM resources) |
+| GET | `/identity/scim/tokens` | List SCIM bearer tokens |
+| POST | `/identity/scim/tokens` | Mint a SCIM bearer token for a profile (plaintext shown once) |
+| DELETE | `/identity/scim/tokens/:id` | Revoke a SCIM bearer token |
+
+SCIM data-plane routes (outside `/api`, under `/scim/v2`, bearer-token auth):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/scim/v2/ServiceProviderConfig` | SCIM discovery: supported features |
+| GET | `/scim/v2/ResourceTypes` | SCIM discovery: resource types |
+| GET | `/scim/v2/Schemas` | SCIM discovery: schemas |
+| GET | `/scim/v2/Users` | List/filter users |
+| POST | `/scim/v2/Users` | Create a user |
+| GET | `/scim/v2/Users/:id` | Get a user |
+| PUT | `/scim/v2/Users/:id` | Replace a user |
+| PATCH | `/scim/v2/Users/:id` | Patch a user (activate/deactivate, etc.) |
+| DELETE | `/scim/v2/Users/:id` | Deprovision a user |
+| GET | `/scim/v2/Groups` | List/filter groups |
+| POST | `/scim/v2/Groups` | Create a group |
+| GET | `/scim/v2/Groups/:id` | Get a group |
+| PUT | `/scim/v2/Groups/:id` | Replace a group |
+| PATCH | `/scim/v2/Groups/:id` | Patch a group (membership changes) |
+| DELETE | `/scim/v2/Groups/:id` | Delete a group |
+
 ## VM Management
 
 Core virtual machine lifecycle operations.

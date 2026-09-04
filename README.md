@@ -83,7 +83,7 @@ Practically, that means: **Fabric decides *what* infrastructure should exist; Fl
 
 | Metric | Value |
 |--------|-------|
-| Rust crates | 40 |
+| Rust crates | 48 |
 | REST endpoints | 480+ |
 | LOC | ~87K (60K Rust + 27K TS) |
 | Interfaces | 4 (CLI, Web, Operator, Terraform) |

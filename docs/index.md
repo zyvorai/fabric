@@ -138,6 +138,7 @@ Detailed documentation for each major feature area.
 | RBAC | Admin, User, Viewer roles and endpoint permissions |
 | API Keys | Service-to-service authentication tokens |
 | External Auth | LDAP and OIDC/OAuth2 integration |
+| [SCIM Provisioning](scim-identity.md) | SCIM 2.0 lifecycle provisioning and group-to-role sync for Entra ID / Okta |
 | Audit Logging | Structured audit logs with JSON/CSV export |
 | Encryption | VM disk encryption with key management providers |
 | TLS/HTTPS | Certificate management and self-signed TLS generation |
@@ -154,6 +155,7 @@ Detailed documentation for each major feature area.
 |----------|-------------|
 | DRS | Distributed Resource Scheduling and placement |
 | Affinity Rules | VM-to-VM and VM-to-host affinity/anti-affinity |
+| [Host Maintenance Evacuation](host-lifecycle.md) | Preflight-checked workload evacuation before a host enters maintenance |
 | Fault Tolerance | Automatic failover, fencing, and recovery |
 | Live Migration | Iterative rsync pre-copy migration with cutover |
 | Site Recovery | Failover/reprotect workflows for disaster recovery |
@@ -207,7 +209,7 @@ Detailed documentation for each major feature area.
 | Document | Description |
 |----------|-------------|
 | [Architecture Overview](architecture.md) | System architecture and component diagram |
-| Crate Structure | 40 backend crates and their responsibilities |
+| Crate Structure | 48 backend crates and their responsibilities |
 | Data Model | VM, VMStartOptions, VMMetrics, VMPressure |
 | Driver Model | VMDriver and ResourceStatsDriver traits |
 | State Store | SQLite-based persistent state management |
@@ -309,7 +311,7 @@ VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`
 |----------|-------------|
 | Development Setup | Rust toolchain, IDE, and local development |
 | Build and Test | `cargo check`, `cargo test`, CI pipeline |
-| Crate Map | 40 crates and their dependencies |
+| Crate Map | 48 crates and their dependencies |
 | Adding an API Endpoint | Step-by-step guide for new endpoints |
 | Adding a Storage Backend | Driver trait implementation guide |
 | Adding a Network Feature | Integration with the netlink-based networking crate |
@@ -327,6 +329,7 @@ The REST API is organized into the following endpoint groups:
 | Category | Prefix | Endpoints | Description |
 |----------|--------|-----------|-------------|
 | Authentication | `/api/auth/` | 6 | Login, 2FA/TOTP setup, and session management |
+| SCIM Identity | `/api/identity/scim/`, `/scim/v2/` | 21 | Provisioning profiles/tokens (JWT) plus SCIM Users/Groups (bearer token) |
 | VM Lifecycle | `/api/vms/` | 12 | CRUD, start, stop, restart, pause, resume, clone |
 | VM Advanced | `/api/vms/{name}/` | 20+ | Hotplug, checkpoints, fork, disk resize, firmware |
 | Snapshots | `/api/vms/{name}/snapshots/` | 5 | Create, list, get, delete, revert |

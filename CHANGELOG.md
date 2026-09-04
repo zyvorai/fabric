@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `host-lifecycle` crate: deterministic host maintenance evacuation planner and async job manager — preflight blockers, capacity-aware target selection, live/cold migration policy, bounded-parallel execution, and failure semantics that leave a partially evacuated host cordoned rather than guessing. Not yet wired into the scheduler or server routes (see [docs/host-lifecycle.md](docs/host-lifecycle.md) for the intended follow-up integration).
+- `enterprise-identity` crate and `/api/identity/scim/*` + `/scim/v2/*` endpoints: SCIM 2.0 lifecycle provisioning and group-to-role sync for Entra ID / Okta on top of Fabric's existing OIDC/SAML/LDAP auth providers. Dedicated, hashed, constant-time-compared provisioning bearer tokens; deprovisioning takes effect on next login. See [docs/scim-identity.md](docs/scim-identity.md).
+- Redesigned the sign-in page (`/login`) with the Zyvor Z mark and Apple-style visual polish (depth, spacing, focus states).
+
+### Fixed
+- Workspace-wide clippy lint drift across ~24 crates that had accumulated under current stable Rust (mostly `new_without_default`, `derivable_impls`, and small iterator/idiom lints) — `cargo clippy -- -D warnings` is green again.
+- `fault-tolerance`'s test-only `MockDriver` was missing `get_cgroup_path`, a method `driver-core::VMDriver` gained since the mock was last updated — a real compile error in test code, not just a lint.
+
 ## 0.2.1
 
 ### Fixed

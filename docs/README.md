@@ -1,6 +1,6 @@
 # zyvor-fabric Documentation
 
-Private cloud control plane driving VM lifecycle over FluxVM's REST API -- no libvirt, no systemd-machined dependency for VM lifecycle itself
+Private cloud control plane driving VM lifecycle over FluxVM's REST API -- no libvirt, no systemd dependency for VM lifecycle itself
 
 ## Start Here
 
@@ -11,7 +11,10 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API -- no li
 | **Web UX** (marketing + `/app` console) | [web-ui.md](web-ui.md) · [ux.md](ux.md) |
 | **User journeys & acceptance criteria** | [User Stories](USER_STORIES.md) |
 | **FluxVM VM driver** — config, capability matrix, known gaps | [guides/vm-drivers/fluxvm.md](guides/vm-drivers/fluxvm.md) |
+| **Enterprise identity** (SCIM 2.0 provisioning) | [scim-identity.md](scim-identity.md) |
+| **Host maintenance evacuation** | [host-lifecycle.md](host-lifecycle.md) |
 | Customer page index | [customer/PAGE_INDEX.md](customer/PAGE_INDEX.md) |
+| Full documentation index | [index.md](index.md) |
 
 ## User Stories
 
