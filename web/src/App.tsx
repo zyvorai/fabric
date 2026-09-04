@@ -3,6 +3,7 @@
 
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router'
 import { Suspense, lazy, ReactNode } from 'react'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -263,17 +264,19 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <WebSocketProvider>
-          <PlatformInfoProvider>
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </PlatformInfoProvider>
-        </WebSocketProvider>
-      </ToastProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <WebSocketProvider>
+            <PlatformInfoProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </PlatformInfoProvider>
+          </WebSocketProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 

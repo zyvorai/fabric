@@ -6,6 +6,7 @@ import { Link, Navigate, useNavigate } from 'react-router'
 import { AlertCircle, Loader2, Lock, User } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { formatUserError } from '../utils/apiError'
+import ThemeToggle from '../components/ThemeToggle'
 
 function ZMark() {
   return (
@@ -51,6 +52,9 @@ export default function SignIn() {
   return (
     <div className="signin-page">
       <div className="signin-glow" aria-hidden="true" />
+      <div className="signin-theme-toggle">
+        <ThemeToggle />
+      </div>
 
       <Link to="/" className="signin-logo animate-fade-in">
         <span className="signin-logo-mark">

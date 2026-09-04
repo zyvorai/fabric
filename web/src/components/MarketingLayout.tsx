@@ -5,6 +5,7 @@ import { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
 import ZyvorMark from './ZyvorMark'
+import ThemeToggle from './ThemeToggle'
 
 const LINKS = [
   { label: 'Product', to: '/product' },
@@ -31,6 +32,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="flex items-center gap-5">
+            <ThemeToggle />
             {isAuthenticated ? (
               <Link to="/app" className="font-medium">
                 Open console

@@ -12,6 +12,7 @@ import Breadcrumb from './Breadcrumb'
 import HelpDialog, { type HelpTab } from './HelpDialog'
 import { useSequenceShortcuts } from '../hooks/useSequenceShortcut'
 import ZyvorMark from './ZyvorMark'
+import ThemeToggle from './ThemeToggle'
 import { useKeyboardShortcut, isInputFocused } from '../hooks/useKeyboardShortcut'
 import { useRecordRecentPage } from '../hooks/useRecordRecentPage'
 
@@ -134,6 +135,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
           <kbd className="text-[10px] text-[var(--zf-muted)] ml-1">⌘K</kbd>
         </button>
         <ConnectionStatus />
+        <ThemeToggle />
         <Link to="/" className="text-xs text-[var(--zf-muted)] hidden md:inline hover:text-[var(--zf-ink)]">
           Site
         </Link>

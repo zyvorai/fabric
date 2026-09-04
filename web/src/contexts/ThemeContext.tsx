@@ -3,60 +3,50 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 
-export type AppTheme = 'dark' | 'steel' | 'aurora'
+export type AppTheme = 'light' | 'dark'
 
-const THEME_CYCLE: AppTheme[] = ['dark', 'steel', 'aurora']
+const STORAGE_KEY = 'zyvor-fabricd-theme'
 
 interface ThemeContextType {
   theme: AppTheme
+  toggleTheme: () => void
   setTheme: (t: AppTheme) => void
-  cycleTheme: () => void
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
+  theme: 'light',
+  toggleTheme: () => {},
   setTheme: () => {},
-  cycleTheme: () => {},
 })
 
-function parseStoredTheme(raw: string | null): AppTheme {
-  if (raw === 'light') return 'dark'
-  if (raw === 'aurora' || raw === 'steel' || raw === 'dark') return raw
-  return 'dark'
+function initialTheme(): AppTheme {
+  if (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark') {
+    return 'dark'
+  }
+  return 'light'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<AppTheme>(() =>
-    parseStoredTheme(typeof localStorage !== 'undefined' ? localStorage.getItem('zyvor-fabricd-theme') : null),
-  )
-
-  const setTheme = useCallback((t: AppTheme) => {
-    setThemeState(t)
-  }, [])
+  const [theme, setThemeState] = useState<AppTheme>(initialTheme)
 
   useEffect(() => {
-    localStorage.setItem('zyvor-fabricd-theme', theme)
     const root = document.documentElement
-    root.classList.remove('steel-theme', 'aurora-theme')
-    if (theme === 'steel') {
-      root.classList.add('steel-theme')
-    } else if (theme === 'aurora') {
-      root.classList.add('aurora-theme')
+    if (theme === 'dark') {
+      root.setAttribute('data-theme', 'dark')
+    } else {
+      root.removeAttribute('data-theme')
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, theme)
+    } catch {
+      // localStorage unavailable (private mode, etc.) — theme just won't persist
     }
   }, [theme])
 
-  const cycleTheme = useCallback(() => {
-    setThemeState((t) => {
-      const i = THEME_CYCLE.indexOf(t)
-      return THEME_CYCLE[(i + 1) % THEME_CYCLE.length]
-    })
-  }, [])
+  const setTheme = useCallback((t: AppTheme) => setThemeState(t), [])
+  const toggleTheme = useCallback(() => setThemeState((t) => (t === 'dark' ? 'light' : 'dark')), [])
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, cycleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  )
+  return <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {

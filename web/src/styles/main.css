@@ -6,6 +6,7 @@
   --zf-secondary: #333336;
   --zf-muted: #6e6e73;
   --zf-canvas: #f5f5f7;
+  --zf-canvas-alt: #e8e8ed;
   --zf-surface: #ffffff;
   --zf-hairline: #d2d2d7;
   --zf-link: #0066cc;
@@ -18,7 +19,40 @@
   --zf-radius-sm: 8px;
   --layout-max-width: 61.25rem;
   --console-sidebar: 15.5rem;
+  /* Subtle press/hover/focus tints — swap polarity per theme (darken on light, lighten on dark) */
+  --zf-hover-tint: rgba(0, 0, 0, 0.04);
+  --zf-active-tint: rgba(0, 0, 0, 0.06);
+  --zf-focus-tint: rgba(0, 0, 0, 0.06);
+  --zf-nav-surface: rgba(251, 251, 253, 0.72);
+  --zf-nav-border: rgba(0, 0, 0, 0.08);
   color-scheme: light;
+}
+
+/* Apple-style dark theme — mirrors apple.com/ipad-pro's near-black canvas,
+   elevated dark cards, and #2997ff dark-mode link/accent blue. Applied via
+   [data-theme="dark"] on <html> (see index.html's early-set inline script
+   and ThemeContext), not prefers-color-scheme directly, so an explicit user
+   choice always wins over the system default. */
+:root[data-theme='dark'] {
+  --zf-ink: #f5f5f7;
+  --zf-secondary: #d2d2d7;
+  --zf-muted: #98989d;
+  --zf-canvas: #000000;
+  --zf-canvas-alt: #1c1c1e;
+  --zf-surface: #1c1c1e;
+  --zf-hairline: #38383a;
+  --zf-link: #2997ff;
+  --zf-link-hover: #6cb6ff;
+  --zf-accent: #f5f5f7;
+  --zf-success: #32d74b;
+  --zf-danger: #ff453a;
+  --zf-warning: #ff9f0a;
+  --zf-hover-tint: rgba(255, 255, 255, 0.06);
+  --zf-active-tint: rgba(255, 255, 255, 0.09);
+  --zf-focus-tint: rgba(255, 255, 255, 0.14);
+  --zf-nav-surface: rgba(0, 0, 0, 0.72);
+  --zf-nav-border: rgba(255, 255, 255, 0.1);
+  color-scheme: dark;
 }
 
 *,
@@ -66,8 +100,8 @@ a:hover {
   top: 0;
   z-index: 40;
   backdrop-filter: saturate(180%) blur(20px);
-  background: rgba(251, 251, 253, 0.72);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--zf-nav-surface);
+  border-bottom: 1px solid var(--zf-nav-border);
 }
 .mkt-nav-inner {
   max-width: 980px;
@@ -106,7 +140,7 @@ a:hover {
   text-align: center;
   padding: 72px 24px 96px;
   background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0, 0, 0, 0.04), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 0%, var(--zf-hover-tint), transparent 60%),
     var(--zf-canvas);
 }
 .mkt-hero h1 {
@@ -240,7 +274,7 @@ a:hover {
   border: 1px solid var(--zf-hairline);
 }
 .zf-btn-ghost:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--zf-hover-tint);
 }
 .zf-btn-danger {
   background: var(--zf-danger);
@@ -268,7 +302,7 @@ a:hover {
   align-items: center;
   gap: 16px;
   padding: 0 20px;
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--zf-nav-surface);
   backdrop-filter: saturate(180%) blur(16px);
   border-bottom: 1px solid var(--zf-hairline);
 }
@@ -322,7 +356,7 @@ a:hover {
   cursor: pointer;
 }
 .console-sidebar-collapse-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--zf-hover-tint);
   color: var(--zf-ink);
 }
 .console-sidebar.collapsed .console-sidebar-collapse-btn {
@@ -345,7 +379,7 @@ a:hover {
   gap: 10px;
   padding: 8px 10px;
   border-radius: var(--zf-radius-sm);
-  color: rgba(0, 0, 0, 0.8);
+  color: var(--zf-ink);
   font-size: 14px;
   font-weight: 400;
   letter-spacing: -0.016em;
@@ -356,11 +390,11 @@ a:hover {
   padding: 10px;
 }
 .console-nav-link:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--zf-hover-tint);
   color: var(--zf-ink);
 }
 .console-nav-link.active {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--zf-active-tint);
   color: var(--zf-ink);
   font-weight: 600;
 }
@@ -431,7 +465,7 @@ a:hover {
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--zf-hover-tint);
   color: var(--zf-ink);
 }
 .icon-tile-sm { width: 28px; height: 28px; }
@@ -443,7 +477,7 @@ a:hover {
 .icon-tile-orange,
 .icon-tile-red,
 .icon-tile-cyan {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--zf-hover-tint);
   color: var(--zf-ink);
 }
 
@@ -462,7 +496,7 @@ textarea.input-field {
 }
 .input-field:focus {
   border-color: var(--zf-ink);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 3px var(--zf-focus-tint);
 }
 
 .modal-backdrop,
@@ -531,6 +565,12 @@ textarea.input-field {
   padding: 32px 20px;
   background: var(--zf-canvas);
   overflow: hidden;
+}
+.signin-theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 2;
 }
 .signin-glow {
   position: absolute;
@@ -701,155 +741,210 @@ textarea.input-field {
 
 /* Compatibility: dark Tailwind leftovers → light Apple console
    Attribute selectors catch opacity variants (bg-slate-800/40, etc.) that
-   exact-class remaps miss — those were causing black-on-black text. */
-[class*="bg-slate-95"],
-[class*="bg-slate-9"],
-[class*="bg-slate-8"],
-[class*="bg-slate-7"],
-[class*="bg-[#0a"],
-[class*="bg-[#0b"],
-[class*="bg-[#0e"],
-[class*="bg-[#0f"] {
-  background-color: var(--zf-surface) !important;
-  background-image: none !important;
+   exact-class remaps miss — those were causing black-on-black text.
+
+   Scoped to `html:not([data-theme="dark"])` (i.e. light theme only): this
+   whole block exists to force originally dark-authored Tailwind markup
+   (bg-slate-900 + text-white pairs, mostly in older capability/detail
+   panels) to render correctly in the light-only console redesign. In dark
+   theme that original dark-authored markup is already correct as written,
+   so these overrides must NOT apply there — leaving them un-scoped would
+   force those specific elements light even while everything around them
+   is dark. */
+html:not([data-theme='dark']) {
+  [class*="bg-slate-95"],
+  [class*="bg-slate-9"],
+  [class*="bg-slate-8"],
+  [class*="bg-slate-7"],
+  [class*="bg-[#0a"],
+  [class*="bg-[#0b"],
+  [class*="bg-[#0e"],
+  [class*="bg-[#0f"] {
+    background-color: var(--zf-surface) !important;
+    background-image: none !important;
+  }
+
+  /* Soft canvas panels (capability-style cards) */
+  [class*="bg-slate-800\/"],
+  [class*="bg-slate-900\/"],
+  [class*="bg-slate-950\/"] {
+    background-color: var(--zf-canvas) !important;
+  }
+
+  .text-white,
+  .text-slate-50,
+  .text-slate-100,
+  .text-slate-200,
+  .text-\[\#e7ecf3\],
+  .text-\[\#d7dde5\],
+  .text-\[\#e8e4f8\],
+  .text-\[\#e2e8f0\] {
+    color: var(--zf-ink) !important;
+  }
+
+  /* Keep white text on solid primary / danger / success buttons & icon tiles.
+     Avoid matching opacity tints like bg-[#0066cc]/10 (substring would catch those). */
+  .zf-btn-primary,
+  .zf-btn-danger,
+  [class*="bg-blue-5"].text-white,
+  [class*="bg-blue-6"].text-white,
+  [class*="bg-blue-7"].text-white,
+  [class*="bg-red-5"].text-white,
+  [class*="bg-red-6"].text-white,
+  [class*="bg-green-5"].text-white,
+  [class*="bg-emerald-5"].text-white,
+  [class*="bg-emerald-6"].text-white,
+  [class*="bg-amber-5"].text-white,
+  [class*="bg-amber-6"].text-white,
+  /* CSS-variable form of the same solid-fill backgrounds (e.g. `bg-[var(--zf-ink)]
+     text-white`) — the literal-hex/Tailwind-color selectors above don't match this
+     syntax, so without these the text silently becomes invisible-on-dark via the
+     blanket `.text-white { color: var(--zf-ink) !important }` rule above. Found
+     live: an empty-looking active tab pill on the Certificates page. */
+  [class*="bg-[var(--zf-ink)]"].text-white,
+  [class*="bg-[var(--zf-link)]"].text-white,
+  [class*="bg-[var(--zf-danger)]"].text-white,
+  [class*="bg-[var(--zf-success)]"].text-white,
+  [class*="bg-[var(--zf-warning)]"].text-white,
+  .bg-\[\#0066cc\],
+  .bg-\[\#1d1d1f\],
+  .bg-black {
+    color: #fff !important;
+  }
+  [class*="from-blue-"] > .text-white,
+  [class*="from-green-"] > .text-white,
+  [class*="from-emerald-"] > .text-white,
+  [class*="from-red-"] > .text-white,
+  [class*="from-purple-"] > .text-white,
+  [class*="from-cyan-"] > .text-white,
+  [class*="from-orange-"] > .text-white,
+  [class*="bg-gradient-to"] > svg,
+  [class*="bg-gradient-to"] .text-white {
+    color: #fff !important;
+  }
+  .zf-btn-primary,
+  .zf-btn-danger {
+    color: #fff !important;
+  }
+
+  .text-slate-300 {
+    color: var(--zf-secondary) !important;
+  }
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-600 {
+    color: var(--zf-muted) !important;
+  }
+
+  /* Hardcoded faint gray leftovers from the dark→light pass */
+  .text-\[\#6e6e73\] {
+    color: var(--zf-muted) !important;
+  }
+
+  [class*="border-slate-6"],
+  [class*="border-slate-7"],
+  [class*="border-slate-8"],
+  [class*="border-slate-9"] {
+    border-color: var(--zf-hairline) !important;
+  }
+
+  [class*="hover:bg-slate-"]:hover,
+  [class*="hover:bg-slate-7"]:hover,
+  [class*="hover:bg-slate-8"]:hover,
+  [class*="hover:bg-slate-9"]:hover {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+  }
+
+  [class*="divide-slate-"] > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--zf-hairline) !important;
+  }
+
+  /* Soften dark gradient icon wells that survive remaps */
+  [class*="shadow-blue-"],
+  [class*="shadow-green-"],
+  [class*="shadow-purple-"],
+  [class*="shadow-red-"],
+  [class*="shadow-emerald-"] {
+    box-shadow: none !important;
+  }
+
+  /* Tables / lists often used dark zebra rows */
+  [class*="even:bg-slate-"],
+  [class*="odd:bg-slate-"] {
+    background-color: transparent !important;
+  }
+
+  .hover\:bg-slate-800\/40:hover,
+  .hover\:bg-slate-800\/30:hover,
+  .hover\:bg-slate-700\/30:hover,
+  .hover\:bg-slate-700\/40:hover {
+    background-color: rgba(0, 102, 204, 0.06) !important;
+  }
+
+  /* Tabs / selected chips */
+  [class*="bg-blue-500\/10"],
+  [class*="bg-blue-600\/10"],
+  [class*="bg-blue-500\/20"] {
+    background-color: rgba(0, 102, 204, 0.08) !important;
+    color: var(--zf-link) !important;
+  }
+
+  .zyvor-footer,
+  .zyvor-brand-line {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
 }
 
-/* Soft canvas panels (capability-style cards) */
-[class*="bg-slate-800\/"],
-[class*="bg-slate-900\/"],
-[class*="bg-slate-950\/"] {
-  background-color: var(--zf-canvas) !important;
-}
-
-.text-white,
-.text-slate-50,
-.text-slate-100,
-.text-slate-200,
-.text-\[\#e7ecf3\],
-.text-\[\#d7dde5\],
-.text-\[\#e8e4f8\],
-.text-\[\#e2e8f0\] {
-  color: var(--zf-ink) !important;
-}
-
-/* Keep white text on solid primary / danger / success buttons & icon tiles.
-   Avoid matching opacity tints like bg-[#0066cc]/10 (substring would catch those). */
-.zf-btn-primary,
-.zf-btn-danger,
-[class*="bg-blue-5"].text-white,
-[class*="bg-blue-6"].text-white,
-[class*="bg-blue-7"].text-white,
-[class*="bg-red-5"].text-white,
-[class*="bg-red-6"].text-white,
-[class*="bg-green-5"].text-white,
-[class*="bg-emerald-5"].text-white,
-[class*="bg-emerald-6"].text-white,
-[class*="bg-amber-5"].text-white,
-[class*="bg-amber-6"].text-white,
-/* CSS-variable form of the same solid-fill backgrounds (e.g. `bg-[var(--zf-ink)]
-   text-white`) — the literal-hex/Tailwind-color selectors above don't match this
-   syntax, so without these the text silently becomes invisible-on-dark via the
-   blanket `.text-white { color: var(--zf-ink) !important }` rule above. Found
-   live: an empty-looking active tab pill on the Certificates page. */
-[class*="bg-[var(--zf-ink)]"].text-white,
-[class*="bg-[var(--zf-link)]"].text-white,
-[class*="bg-[var(--zf-danger)]"].text-white,
-[class*="bg-[var(--zf-success)]"].text-white,
-[class*="bg-[var(--zf-warning)]"].text-white,
-.bg-\[\#0066cc\],
-.bg-\[\#1d1d1f\],
-.bg-black {
-  color: #fff !important;
-}
-[class*="from-blue-"] > .text-white,
-[class*="from-green-"] > .text-white,
-[class*="from-emerald-"] > .text-white,
-[class*="from-red-"] > .text-white,
-[class*="from-purple-"] > .text-white,
-[class*="from-cyan-"] > .text-white,
-[class*="from-orange-"] > .text-white,
-[class*="bg-gradient-to"] > svg,
-[class*="bg-gradient-to"] .text-white {
-  color: #fff !important;
-}
-.zf-btn-primary,
-.zf-btn-danger {
-  color: #fff !important;
-}
-
-.text-slate-300 {
-  color: var(--zf-secondary) !important;
-}
-.text-slate-400,
-.text-slate-500,
-.text-slate-600 {
-  color: var(--zf-muted) !important;
-}
-
-/* Hardcoded faint gray leftovers from the dark→light pass */
-.text-\[\#6e6e73\] {
-  color: var(--zf-muted) !important;
-}
-
-[class*="border-slate-6"],
-[class*="border-slate-7"],
-[class*="border-slate-8"],
-[class*="border-slate-9"] {
-  border-color: var(--zf-hairline) !important;
-}
-
-[class*="hover:bg-slate-"]:hover,
-[class*="hover:bg-slate-7"]:hover,
-[class*="hover:bg-slate-8"]:hover,
-[class*="hover:bg-slate-9"]:hover {
-  background-color: rgba(0, 0, 0, 0.04) !important;
-}
-
-[class*="divide-slate-"] > :not([hidden]) ~ :not([hidden]) {
-  border-color: var(--zf-hairline) !important;
-}
-
-/* Soften dark gradient icon wells that survive remaps */
-[class*="shadow-blue-"],
-[class*="shadow-green-"],
-[class*="shadow-purple-"],
-[class*="shadow-red-"],
-[class*="shadow-emerald-"] {
-  box-shadow: none !important;
-}
-
-/* Tables / lists often used dark zebra rows */
-[class*="even:bg-slate-"],
-[class*="odd:bg-slate-"] {
-  background-color: transparent !important;
-}
-
-.hover\:bg-slate-800\/40:hover,
-.hover\:bg-slate-800\/30:hover,
-.hover\:bg-slate-700\/30:hover,
-.hover\:bg-slate-700\/40:hover {
-  background-color: rgba(0, 102, 204, 0.06) !important;
-}
-
-/* Tabs / selected chips */
-[class*="bg-blue-500\/10"],
-[class*="bg-blue-600\/10"],
-[class*="bg-blue-500\/20"] {
-  background-color: rgba(0, 102, 204, 0.08) !important;
-  color: var(--zf-link) !important;
-}
-
-.zyvor-footer,
-.zyvor-brand-line {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-/* Explicit light panel utility for pages */
+/* Explicit light panel utility for pages — theme-aware via CSS vars already,
+   applies in both themes. */
 .zf-panel-muted {
   background: var(--zf-canvas) !important;
   border: 1px solid var(--zf-hairline) !important;
   border-radius: var(--zf-radius) !important;
   color: var(--zf-ink) !important;
+}
+
+/* Dark theme: the console's design-token classes (var(--zf-*)) already
+   adapt automatically. These are the ~450 spots across the app that wrote
+   the light palette's literal hex value directly (e.g. `text-[#1d1d1f]`)
+   or `bg-white` instead of the token — redirect those to the dark palette
+   too so nothing is left rendering hardcoded light colors on a dark page. */
+html[data-theme='dark'] {
+  /* `~=` matches a single space-separated class token exactly — unlike the
+     `*=` substring selectors above, this deliberately does NOT also catch
+     Tailwind opacity variants like `bg-[#0066cc]/20` or `bg-white/10`,
+     which are separate token strings and should keep their own (already
+     theme-agnostic, translucent) styling untouched. */
+  [class~="text-[#1d1d1f]"] {
+    color: var(--zf-ink) !important;
+  }
+  [class~="text-[#6e6e73]"] {
+    color: var(--zf-muted) !important;
+  }
+  [class~="border-[#d2d2d7]"] {
+    border-color: var(--zf-hairline) !important;
+  }
+  [class~="bg-[#0066cc]"] {
+    background-color: var(--zf-link) !important;
+  }
+  [class~="text-[#0066cc]"] {
+    color: var(--zf-link) !important;
+  }
+  [class~="bg-[#0077ed]"] {
+    background-color: var(--zf-link-hover) !important;
+  }
+  [class~="bg-[#f5f5f7]"] {
+    background-color: var(--zf-canvas) !important;
+  }
+  [class~="bg-[#e8e8ed]"] {
+    background-color: var(--zf-canvas-alt) !important;
+  }
+  [class~="bg-[#d2d2d7]"] {
+    background-color: var(--zf-hairline) !important;
+  }
+  [class~="bg-white"] {
+    background-color: var(--zf-surface) !important;
+  }
 }
