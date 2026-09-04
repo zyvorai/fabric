@@ -13,6 +13,12 @@ pub struct VMFirewall {
     pub enforcer: FirewallEnforcer,
 }
 
+impl Default for VMFirewall {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VMFirewall {
     pub fn new() -> Self {
         let compiler = FirewallCompiler::new();

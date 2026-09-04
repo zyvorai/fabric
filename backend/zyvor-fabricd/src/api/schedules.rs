@@ -214,7 +214,7 @@ fn calculate_next_run(
                 .with_nanosecond(0)?;
 
             if next <= now {
-                next = next + Duration::days(1);
+                next += Duration::days(1);
             }
 
             Some(next)
@@ -228,7 +228,7 @@ fn calculate_next_run(
                 .with_nanosecond(0)?;
 
             if next <= now {
-                next = next + Duration::days(1);
+                next += Duration::days(1);
             }
 
             Some(next)
@@ -695,7 +695,7 @@ pub async fn get_schedule_history(
         .filter(|h| h.schedule_id == schedule_id)
         .collect();
 
-    history.sort_by(|a, b| b.executed_at.cmp(&a.executed_at));
+    history.sort_by_key(|a| std::cmp::Reverse(a.executed_at));
 
     // Limit to last 100 entries
     history.truncate(100);
@@ -715,7 +715,7 @@ pub async fn get_all_schedule_history(
         .unwrap_or_default();
 
     // Sort by execution time (most recent first)
-    history.sort_by(|a, b| b.executed_at.cmp(&a.executed_at));
+    history.sort_by_key(|a| std::cmp::Reverse(a.executed_at));
 
     // Limit to last 100 entries
     history.truncate(100);

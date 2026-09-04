@@ -18,6 +18,12 @@ const CLASS_ID_BASE: u16 = 256;
 /// Resolves QoS policies against VM state to produce compiled rules.
 pub struct TrafficClassifier;
 
+impl Default for TrafficClassifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TrafficClassifier {
     pub fn new() -> Self {
         Self

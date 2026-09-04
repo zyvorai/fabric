@@ -15,6 +15,12 @@ pub struct VMSnapshot {
 /// Compiles NAT rules and gateways against VM state.
 pub struct NatCompiler;
 
+impl Default for NatCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NatCompiler {
     pub fn new() -> Self {
         Self

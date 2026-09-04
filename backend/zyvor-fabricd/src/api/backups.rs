@@ -715,10 +715,10 @@ pub async fn get_backup_stats(
         *by_vm.entry(backup.vm_name.clone()).or_insert(0) += 1;
 
         // Track oldest and newest
-        if oldest_backup.map_or(true, |o| backup.created < o) {
+        if oldest_backup.is_none_or(|o| backup.created < o) {
             oldest_backup = Some(backup.created);
         }
-        if newest_backup.map_or(true, |n| backup.created > n) {
+        if newest_backup.is_none_or(|n| backup.created > n) {
             newest_backup = Some(backup.created);
         }
     }

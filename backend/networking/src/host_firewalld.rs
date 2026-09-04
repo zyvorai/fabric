@@ -83,8 +83,6 @@ fn list_zone_items(zone: &str, flag: &str) -> Result<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn parse_zones_line() {
         let zones: Vec<_> = "public home internal"

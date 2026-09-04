@@ -15,6 +15,12 @@ pub struct VMSnapshot {
 /// Resolves mirror sessions to per-VM mirror rules.
 pub struct MirrorCompiler;
 
+impl Default for MirrorCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MirrorCompiler {
     pub fn new() -> Self {
         Self

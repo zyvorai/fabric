@@ -17,6 +17,12 @@ const TABLE_FAMILY: &str = "ip";
 const TABLE_NAME_V6: &str = "zyvor-fabricd6";
 const TABLE_FAMILY_V6: &str = "ip6";
 
+impl Default for NftManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NftManager {
     pub fn new() -> Self {
         Self
@@ -532,14 +538,18 @@ fn parse_dnat_exprs(
     })
 }
 
+/// Key: (name, host_port, guest_ip, guest_port). Value: the merged rule plus
+/// whether a TCP and/or UDP variant of it was discovered.
+type DnatMergeKey = (String, u16, String, u16);
+type DnatMergeEntry = (ParsedDnatRule, bool, bool);
+
 fn merge_discovered_dnat_rules(
     rules: Vec<ParsedDnatRule>,
     meta: DnatDiscoverMeta,
 ) -> Vec<PortForwardConfig> {
     use std::collections::HashMap;
 
-    let mut by_key: HashMap<(String, u16, String, u16), (ParsedDnatRule, bool, bool)> =
-        HashMap::new();
+    let mut by_key: HashMap<DnatMergeKey, DnatMergeEntry> = HashMap::new();
 
     for r in rules {
         let key = (

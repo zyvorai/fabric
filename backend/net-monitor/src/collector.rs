@@ -16,12 +16,21 @@ pub struct VMSnapshot {
     pub tap_interface: Option<String>,
 }
 
+/// Previous counter readings keyed by interface name.
+type PreviousCounters = Arc<RwLock<HashMap<String, (InterfaceCounters, chrono::DateTime<Utc>)>>>;
+
 /// Collects network interface counters and computes rates.
 pub struct MetricsCollector {
     /// Previous counter readings keyed by interface name.
-    previous: Arc<RwLock<HashMap<String, (InterfaceCounters, chrono::DateTime<Utc>)>>>,
+    previous: PreviousCounters,
     /// Current computed metrics keyed by VM name.
     metrics: Arc<RwLock<HashMap<String, NetworkMetrics>>>,
+}
+
+impl Default for MetricsCollector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MetricsCollector {

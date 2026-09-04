@@ -1121,7 +1121,7 @@ pub async fn clone_vm(
     // Build target path using proper Path API
     let src = std::path::Path::new(&src_path);
     let target_path = src
-        .with_file_name(format!("{}.qcow2", &req.target_name))
+        .with_file_name(format!("{}.qcow2", req.target_name))
         .to_string_lossy()
         .to_string();
 

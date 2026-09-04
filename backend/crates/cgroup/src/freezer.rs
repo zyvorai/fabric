@@ -48,7 +48,7 @@ mod tests {
         let frozen = content.lines().any(|l| {
             l.trim()
                 .strip_prefix("frozen ")
-                .map_or(false, |v| v.trim() == "1")
+                .is_some_and(|v| v.trim() == "1")
         });
         assert!(frozen);
 
@@ -56,7 +56,7 @@ mod tests {
         let frozen2 = content2.lines().any(|l| {
             l.trim()
                 .strip_prefix("frozen ")
-                .map_or(false, |v| v.trim() == "1")
+                .is_some_and(|v| v.trim() == "1")
         });
         assert!(!frozen2);
     }

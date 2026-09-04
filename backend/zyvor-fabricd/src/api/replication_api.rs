@@ -439,9 +439,8 @@ pub async fn check_rpo_violations(
         .into_iter()
         .filter(|r| {
             r.status == ReplicationStatus::Active
-                && r.last_sync.map_or(true, |last| {
-                    (now - last).num_minutes() as u32 > r.rpo_minutes
-                })
+                && r.last_sync
+                    .is_none_or(|last| (now - last).num_minutes() as u32 > r.rpo_minutes)
         })
         .collect();
     Json(violations)
@@ -476,9 +475,9 @@ pub async fn get_replication_health(
             ReplicationStatus::Active => {
                 summary.active += 1;
                 active_rpo_sum += r.rpo_minutes as u64;
-                if r.last_sync.map_or(true, |last| {
-                    (now - last).num_minutes() as u32 > r.rpo_minutes
-                }) {
+                if r.last_sync
+                    .is_none_or(|last| (now - last).num_minutes() as u32 > r.rpo_minutes)
+                {
                     summary.rpo_violations += 1;
                 }
             }
@@ -512,9 +511,8 @@ pub async fn get_replication_health(
                 "critical"
             } else if site_replications.iter().any(|r| {
                 r.status == ReplicationStatus::Active
-                    && r.last_sync.map_or(true, |last| {
-                        (now - last).num_minutes() as u32 > r.rpo_minutes
-                    })
+                    && r.last_sync
+                        .is_none_or(|last| (now - last).num_minutes() as u32 > r.rpo_minutes)
             }) {
                 "degraded"
             } else {

@@ -844,9 +844,7 @@ impl FluxVmClient {
             bail!("FluxVM request failed: {status} — {body}");
         }
 
-        let byte_stream = resp
-            .bytes_stream()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+        let byte_stream = resp.bytes_stream().map_err(std::io::Error::other);
         let reader = tokio_util::io::StreamReader::new(byte_stream);
         let mut lines_reader = reader.lines();
 
@@ -1098,7 +1096,7 @@ impl tokio::io::AsyncRead for ConsoleWs {
             }
             match std::task::ready!(self.stream.poll_next_unpin(cx)) {
                 Some(Ok(tokio_tungstenite::tungstenite::Message::Binary(data))) => {
-                    self.read_buf = data.into();
+                    self.read_buf = data;
                 }
                 Some(Ok(tokio_tungstenite::tungstenite::Message::Text(t))) => {
                     self.read_buf = t.as_bytes().to_vec();
@@ -1126,7 +1124,7 @@ impl tokio::io::AsyncWrite for ConsoleWs {
         if let Err(e) =
             self.stream
                 .start_send_unpin(tokio_tungstenite::tungstenite::Message::Binary(
-                    buf.to_vec().into(),
+                    buf.to_vec(),
                 ))
         {
             return std::task::Poll::Ready(Err(std::io::Error::other(e)));

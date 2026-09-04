@@ -14,6 +14,12 @@ pub struct VMSnapshot {
 /// Compiles VM firewall assignments and profiles into per-VM nftables chains.
 pub struct FirewallCompiler;
 
+impl Default for FirewallCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FirewallCompiler {
     pub fn new() -> Self {
         Self

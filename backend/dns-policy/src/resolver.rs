@@ -15,6 +15,12 @@ pub struct VMSnapshot {
 /// Resolves DNS policies against VM state to produce DNS records.
 pub struct DnsResolver;
 
+impl Default for DnsResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DnsResolver {
     pub fn new() -> Self {
         Self

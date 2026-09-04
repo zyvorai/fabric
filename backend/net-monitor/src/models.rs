@@ -7,64 +7,44 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Direction of traffic for monitoring.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TrafficDirection {
     Rx,
     Tx,
+    #[default]
     Both,
 }
 
-impl Default for TrafficDirection {
-    fn default() -> Self {
-        Self::Both
-    }
-}
-
 /// Unit for bandwidth thresholds.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ThresholdUnit {
     Bps,
     Kbps,
+    #[default]
     Mbps,
     Gbps,
 }
 
-impl Default for ThresholdUnit {
-    fn default() -> Self {
-        Self::Mbps
-    }
-}
-
 /// Severity level for bandwidth alerts.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AlertSeverity {
     Info,
+    #[default]
     Warning,
     Critical,
 }
 
-impl Default for AlertSeverity {
-    fn default() -> Self {
-        Self::Warning
-    }
-}
-
 /// Action to take when threshold is breached.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AlertAction {
+    #[default]
     Log,
     Event,
     Webhook,
-}
-
-impl Default for AlertAction {
-    fn default() -> Self {
-        Self::Log
-    }
 }
 
 /// Selects endpoints by matching labels (AND semantics).

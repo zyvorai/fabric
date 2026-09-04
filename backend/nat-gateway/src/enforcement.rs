@@ -66,6 +66,12 @@ const TABLE_NAME: &str = "zyvor-fabricd_nat";
 /// ```
 pub struct NatEnforcer;
 
+impl Default for NatEnforcer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NatEnforcer {
     pub fn new() -> Self {
         Self
@@ -211,6 +217,7 @@ mod tests {
         NatEnforcer::new()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn make_rule(
         rule_type: NatRuleType,
         chain: NatChain,

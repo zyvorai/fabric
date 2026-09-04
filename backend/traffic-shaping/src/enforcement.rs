@@ -17,6 +17,12 @@ use crate::models::CompiledQoSRule;
 /// ```
 pub struct QoSEnforcer;
 
+impl Default for QoSEnforcer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QoSEnforcer {
     pub fn new() -> Self {
         Self

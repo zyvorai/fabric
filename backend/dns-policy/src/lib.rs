@@ -13,6 +13,12 @@ pub struct DnsManager {
     pub enforcer: DnsEnforcer,
 }
 
+impl Default for DnsManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DnsManager {
     pub fn new() -> Self {
         let resolver = DnsResolver::new();

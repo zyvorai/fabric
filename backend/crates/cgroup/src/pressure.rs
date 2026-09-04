@@ -165,6 +165,7 @@ full avg10=0.00 avg60=0.00 avg300=0.00 total=0
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_parse_pressure_with_values() {
         let p = PathBuf::from("/test/io.pressure");
         let content = "\

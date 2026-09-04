@@ -686,7 +686,7 @@ impl FaultToleranceManager {
         let primary = configs.get(vm_name).map(|c| c.primary_host_id.as_str());
 
         for host in available_hosts {
-            if primary.map_or(true, |p| p != host) {
+            if primary.is_none_or(|p| p != host) {
                 return Ok(host.clone());
             }
         }
@@ -850,6 +850,9 @@ mod tests {
         }
         async fn get_disk_path(&self, _name: &str) -> Result<std::path::PathBuf> {
             unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn get_cgroup_path(&self, _name: &str) -> Result<Option<std::path::PathBuf>> {
+            Ok(None)
         }
     }
 

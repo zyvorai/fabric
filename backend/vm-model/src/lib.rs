@@ -1502,8 +1502,10 @@ mod tests {
 
     #[test]
     fn test_validate_uuid_format() {
-        let mut opts = VMStartOptions::default();
-        opts.uuid = Some("550e8400-e29b-41d4-a716-446655440000".into());
+        let mut opts = VMStartOptions {
+            uuid: Some("550e8400-e29b-41d4-a716-446655440000".into()),
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.uuid = Some("not-a-uuid".into());
@@ -1512,11 +1514,13 @@ mod tests {
 
     #[test]
     fn test_validate_credential_id_no_colon() {
-        let mut opts = VMStartOptions::default();
-        opts.credentials = vec![VMCredential {
-            id: "valid.credential-id".into(),
-            value: "test".into(),
-        }];
+        let mut opts = VMStartOptions {
+            credentials: vec![VMCredential {
+                id: "valid.credential-id".into(),
+                value: "test".into(),
+            }],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.credentials = vec![VMCredential {
@@ -1528,8 +1532,10 @@ mod tests {
 
     #[test]
     fn test_validate_extra_args_no_flags() {
-        let mut opts = VMStartOptions::default();
-        opts.extra_args = vec!["enforcing=0".into()];
+        let mut opts = VMStartOptions {
+            extra_args: vec!["enforcing=0".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.extra_args = vec!["--image=/etc/shadow".into()];
@@ -1538,8 +1544,10 @@ mod tests {
 
     #[test]
     fn test_validate_properties_allowlist() {
-        let mut opts = VMStartOptions::default();
-        opts.properties = vec!["MemoryMax=4G".into(), "CPUQuota=200%".into()];
+        let mut opts = VMStartOptions {
+            properties: vec!["MemoryMax=4G".into(), "CPUQuota=200%".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.properties = vec!["ExecStartPost=/bin/bash".into()];
@@ -1548,8 +1556,10 @@ mod tests {
 
     #[test]
     fn test_validate_smbios11_no_credential_override() {
-        let mut opts = VMStartOptions::default();
-        opts.smbios11 = vec!["custom.string=hello".into()];
+        let mut opts = VMStartOptions {
+            smbios11: vec!["custom.string=hello".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.smbios11 = vec!["io.systemd.credential:secret=pwned".into()];
@@ -1562,8 +1572,10 @@ mod tests {
 
     #[test]
     fn test_validate_bind_users_no_root() {
-        let mut opts = VMStartOptions::default();
-        opts.bind_users = vec!["testuser".into()];
+        let mut opts = VMStartOptions {
+            bind_users: vec!["testuser".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.bind_users = vec!["root".into()];
@@ -1572,8 +1584,10 @@ mod tests {
 
     #[test]
     fn test_validate_slice_format() {
-        let mut opts = VMStartOptions::default();
-        opts.slice = Some("vm.slice".into());
+        let mut opts = VMStartOptions {
+            slice: Some("vm.slice".into()),
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.slice = Some("bad slice name".into());
@@ -1585,8 +1599,10 @@ mod tests {
 
     #[test]
     fn test_validate_grow_image_format() {
-        let mut opts = VMStartOptions::default();
-        opts.grow_image = Some("50G".into());
+        let mut opts = VMStartOptions {
+            grow_image: Some("50G".into()),
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.grow_image = Some("".into());
@@ -1598,8 +1614,10 @@ mod tests {
 
     #[test]
     fn test_validate_path_traversal() {
-        let mut opts = VMStartOptions::default();
-        opts.directory = Some("/safe/path".into());
+        let mut opts = VMStartOptions {
+            directory: Some("/safe/path".into()),
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.directory = Some("/unsafe/../etc/shadow".into());
@@ -1608,12 +1626,14 @@ mod tests {
 
     #[test]
     fn test_validate_bind_mount_traversal() {
-        let mut opts = VMStartOptions::default();
-        opts.bind_mounts = vec![BindMount {
-            source: "/safe/path".into(),
-            destination: Some("/vm/path".into()),
-            read_only: false,
-        }];
+        let mut opts = VMStartOptions {
+            bind_mounts: vec![BindMount {
+                source: "/safe/path".into(),
+                destination: Some("/vm/path".into()),
+                read_only: false,
+            }],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.bind_mounts = vec![BindMount {
@@ -1626,11 +1646,13 @@ mod tests {
 
     #[test]
     fn test_validate_load_credential_path_traversal() {
-        let mut opts = VMStartOptions::default();
-        opts.load_credentials = vec![LoadCredential {
-            id: "test".into(),
-            path: "/safe/path".into(),
-        }];
+        let mut opts = VMStartOptions {
+            load_credentials: vec![LoadCredential {
+                id: "test".into(),
+                path: "/safe/path".into(),
+            }],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.load_credentials = vec![LoadCredential {
@@ -1642,8 +1664,10 @@ mod tests {
 
     #[test]
     fn test_validate_bind_user_shell() {
-        let mut opts = VMStartOptions::default();
-        opts.bind_user_shell = Some("/bin/bash".into());
+        let mut opts = VMStartOptions {
+            bind_user_shell: Some("/bin/bash".into()),
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.bind_user_shell = Some("true".into());
@@ -1658,8 +1682,10 @@ mod tests {
 
     #[test]
     fn test_validate_background_ansi_sgr() {
-        let mut opts = VMStartOptions::default();
-        opts.background = Some("44".into());
+        let mut opts = VMStartOptions {
+            background: Some("44".into()),
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.background = Some("38;5;200".into());
@@ -1671,8 +1697,10 @@ mod tests {
 
     #[test]
     fn test_validate_private_users_format() {
-        let mut opts = VMStartOptions::default();
-        opts.private_users = Some("1000:65536".into());
+        let mut opts = VMStartOptions {
+            private_users: Some("1000:65536".into()),
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.private_users = Some("yes".into());
@@ -1687,8 +1715,10 @@ mod tests {
 
     #[test]
     fn test_validate_bind_users_system_accounts() {
-        let mut opts = VMStartOptions::default();
-        opts.bind_users = vec!["daemon".into()];
+        let mut opts = VMStartOptions {
+            bind_users: vec!["daemon".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_err());
 
         opts.bind_users = vec!["0".into()];
@@ -1703,8 +1733,10 @@ mod tests {
 
     #[test]
     fn test_validate_bind_user_groups() {
-        let mut opts = VMStartOptions::default();
-        opts.bind_user_groups = vec!["wheel".into()];
+        let mut opts = VMStartOptions {
+            bind_user_groups: vec!["wheel".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.bind_user_groups = vec!["".into()];
@@ -1716,11 +1748,13 @@ mod tests {
 
     #[test]
     fn test_validate_credential_value_length() {
-        let mut opts = VMStartOptions::default();
-        opts.credentials = vec![VMCredential {
-            id: "test".into(),
-            value: "a".repeat(65537),
-        }];
+        let opts = VMStartOptions {
+            credentials: vec![VMCredential {
+                id: "test".into(),
+                value: "a".repeat(65537),
+            }],
+            ..Default::default()
+        };
         assert!(opts.validate().is_err());
     }
 
@@ -1740,9 +1774,11 @@ mod tests {
 
     #[test]
     fn test_validate_properties_no_dangerous() {
-        let mut opts = VMStartOptions::default();
         // DeviceAllow and Delegate should now be rejected
-        opts.properties = vec!["DeviceAllow=block-* rwm".into()];
+        let mut opts = VMStartOptions {
+            properties: vec!["DeviceAllow=block-* rwm".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_err());
 
         opts.properties = vec!["Delegate=yes".into()];
@@ -1751,8 +1787,10 @@ mod tests {
 
     #[test]
     fn test_validate_extra_args_control_chars() {
-        let mut opts = VMStartOptions::default();
-        opts.extra_args = vec!["enforcing=0".into()];
+        let mut opts = VMStartOptions {
+            extra_args: vec!["enforcing=0".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.extra_args = vec!["bad\x00value".into()];
@@ -1764,11 +1802,13 @@ mod tests {
 
     #[test]
     fn test_validate_load_credential_invalid_id() {
-        let mut opts = VMStartOptions::default();
-        opts.load_credentials = vec![LoadCredential {
-            id: "valid.id".into(),
-            path: "/some/path".into(),
-        }];
+        let mut opts = VMStartOptions {
+            load_credentials: vec![LoadCredential {
+                id: "valid.id".into(),
+                path: "/some/path".into(),
+            }],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.load_credentials = vec![LoadCredential {
@@ -1786,8 +1826,10 @@ mod tests {
 
     #[test]
     fn test_validate_smbios11_control_chars() {
-        let mut opts = VMStartOptions::default();
-        opts.smbios11 = vec!["valid.string=hello".into()];
+        let mut opts = VMStartOptions {
+            smbios11: vec!["valid.string=hello".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.smbios11 = vec!["bad\x00string".into()];
@@ -1796,8 +1838,10 @@ mod tests {
 
     #[test]
     fn test_validate_bind_users_charset() {
-        let mut opts = VMStartOptions::default();
-        opts.bind_users = vec!["valid-user".into()];
+        let mut opts = VMStartOptions {
+            bind_users: vec!["valid-user".into()],
+            ..Default::default()
+        };
         assert!(opts.validate().is_ok());
 
         opts.bind_users = vec!["bad user".into()];

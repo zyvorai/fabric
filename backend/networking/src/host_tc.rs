@@ -157,7 +157,7 @@ fn parse_tc_text_qdiscs(text: &str) -> Vec<DiscoveredTcQdisc> {
 fn parse_rate_token(line: &str, token: &str) -> Option<u64> {
     let idx = line.find(token)?;
     let rest = &line[idx + token.len()..];
-    let word = rest.trim().split_whitespace().next()?;
+    let word = rest.split_whitespace().next()?;
     parse_bitrate(word)
 }
 

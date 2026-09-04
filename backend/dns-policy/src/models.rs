@@ -7,18 +7,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// DNS record type.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum DnsRecordType {
+    #[default]
     A,
     Cname,
     Srv,
-}
-
-impl Default for DnsRecordType {
-    fn default() -> Self {
-        Self::A
-    }
 }
 
 fn default_ttl() -> u32 {

@@ -764,7 +764,7 @@ impl EncryptionManager {
         inner
             .keys
             .values()
-            .filter(|k| k.status == KeyStatus::Active && k.expires.map_or(false, |exp| exp <= now))
+            .filter(|k| k.status == KeyStatus::Active && k.expires.is_some_and(|exp| exp <= now))
             .cloned()
             .collect()
     }

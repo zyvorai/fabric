@@ -730,13 +730,7 @@ pub async fn discover_host(
             .send()
             .await
             .ok()
-            .and_then(|r| {
-                if r.status().is_success() {
-                    Some(r)
-                } else {
-                    None
-                }
-            });
+            .filter(|r| r.status().is_success());
 
         let cpus = if let Some(resp) = cpu_info {
             resp.json::<serde_json::Value>()
@@ -754,13 +748,7 @@ pub async fn discover_host(
             .send()
             .await
             .ok()
-            .and_then(|r| {
-                if r.status().is_success() {
-                    Some(r)
-                } else {
-                    None
-                }
-            });
+            .filter(|r| r.status().is_success());
 
         let memory_mb = if let Some(resp) = mem_info {
             resp.json::<serde_json::Value>()

@@ -13,6 +13,12 @@ pub struct NatGateway {
     pub enforcer: NatEnforcer,
 }
 
+impl Default for NatGateway {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NatGateway {
     pub fn new() -> Self {
         let compiler = NatCompiler::new();

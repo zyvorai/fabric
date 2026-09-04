@@ -13,6 +13,12 @@ pub struct TrafficShaper {
     pub enforcer: QoSEnforcer,
 }
 
+impl Default for TrafficShaper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TrafficShaper {
     pub fn new() -> Self {
         let classifier = TrafficClassifier::new();

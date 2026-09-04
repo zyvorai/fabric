@@ -346,8 +346,7 @@ mod tests {
     #[test]
     fn test_system_memory() {
         let result = HugepageManager::get_system_memory();
-        if result.is_ok() {
-            let mem = result.unwrap();
+        if let Ok(mem) = result {
             assert!(mem.total_kb > 0);
             println!("Total memory: {} MB", mem.total_kb / 1024);
         }
@@ -357,8 +356,7 @@ mod tests {
     #[test]
     fn test_hugepage_stats() {
         let result = HugepageManager::get_stats(HugepageSize::Size2MB);
-        if result.is_ok() {
-            let stats = result.unwrap();
+        if let Ok(stats) = result {
             println!("2MB hugepages: total={}, free={}", stats.total, stats.free);
         }
     }

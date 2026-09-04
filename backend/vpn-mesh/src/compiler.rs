@@ -15,6 +15,12 @@ pub struct VMSnapshot {
 /// Compiles VPN tunnels and networks into WireGuard interface configs.
 pub struct TunnelCompiler;
 
+impl Default for TunnelCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TunnelCompiler {
     pub fn new() -> Self {
         Self

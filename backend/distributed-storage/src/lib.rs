@@ -1003,7 +1003,7 @@ impl DistributedStorageManager {
         }
 
         // Pick the pool with the most free capacity (storage DRS: balance by space).
-        candidates.sort_by(|a, b| b.free_capacity_gb.cmp(&a.free_capacity_gb));
+        candidates.sort_by_key(|a| std::cmp::Reverse(a.free_capacity_gb));
 
         let recommended = candidates[0];
         tracing::info!(

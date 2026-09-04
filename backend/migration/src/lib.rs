@@ -75,18 +75,18 @@ impl MigrationManager {
 
         // Step 1: Prepare target node
         status.status = MigrationState::Preparing;
-        self.prepare_target(&config).await?;
+        self.prepare_target(config).await?;
 
         // Step 2: Copy VM state and disk
         status.status = MigrationState::Copying;
         status.progress_percent = 20;
-        self.copy_vm_data(&config).await?;
+        self.copy_vm_data(config).await?;
 
         // Step 3: Live migration (if enabled)
         if config.live {
             status.status = MigrationState::Syncing;
             status.progress_percent = 60;
-            self.live_sync(&config).await?;
+            self.live_sync(config).await?;
         }
 
         // Step 4: Complete migration

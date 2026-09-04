@@ -7,32 +7,22 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Direction of traffic to mirror.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum MirrorDirection {
     Ingress,
     Egress,
+    #[default]
     Both,
 }
 
-impl Default for MirrorDirection {
-    fn default() -> Self {
-        Self::Both
-    }
-}
-
 /// Type of mirror collector.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum CollectorType {
+    #[default]
     Interface,
     RemoteIp,
-}
-
-impl Default for CollectorType {
-    fn default() -> Self {
-        Self::Interface
-    }
 }
 
 /// Optional filter for mirrored traffic.

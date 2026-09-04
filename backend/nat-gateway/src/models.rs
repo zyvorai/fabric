@@ -17,18 +17,13 @@ pub enum NatRuleType {
 }
 
 /// Protocol for NAT matching.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum NatProtocol {
     Tcp,
     Udp,
+    #[default]
     Any,
-}
-
-impl Default for NatProtocol {
-    fn default() -> Self {
-        Self::Any
-    }
 }
 
 /// nftables chain type.

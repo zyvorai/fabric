@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -92,7 +92,7 @@ impl NumaTopology {
         Ok(Self { nodes, distances })
     }
 
-    fn read_node_info(id: u32, base_path: &PathBuf) -> Result<NumaNode, NumaError> {
+    fn read_node_info(id: u32, base_path: &Path) -> Result<NumaNode, NumaError> {
         let node_path = base_path.join(format!("node{}", id));
 
         // Read CPU list
@@ -151,7 +151,7 @@ impl NumaTopology {
         cpus
     }
 
-    fn read_meminfo(node_path: &PathBuf) -> Result<(u64, u64), NumaError> {
+    fn read_meminfo(node_path: &Path) -> Result<(u64, u64), NumaError> {
         let meminfo_path = node_path.join("meminfo");
 
         if !meminfo_path.exists() {
@@ -183,7 +183,7 @@ impl NumaTopology {
             .unwrap_or(0)
     }
 
-    fn read_hugepage_info(node_path: &PathBuf, size: &str) -> Result<(u32, u32), NumaError> {
+    fn read_hugepage_info(node_path: &Path, size: &str) -> Result<(u32, u32), NumaError> {
         let hugepage_path = node_path.join("hugepages").join(size);
 
         if !hugepage_path.exists() {
@@ -208,7 +208,7 @@ impl NumaTopology {
             .map_err(|e| NumaError::ParseError(format!("{}: {}", path.display(), e)))
     }
 
-    fn read_distances(node_ids: &[u32], base_path: &PathBuf) -> Result<Vec<Vec<u32>>, NumaError> {
+    fn read_distances(node_ids: &[u32], base_path: &Path) -> Result<Vec<Vec<u32>>, NumaError> {
         let num_nodes = node_ids.len();
         let mut distances = vec![vec![0u32; num_nodes]; num_nodes];
 
@@ -219,8 +219,8 @@ impl NumaTopology {
 
             if !distance_path.exists() {
                 // If distance file doesn't exist, assume uniform distance
-                for j in 0..num_nodes {
-                    distances[i][j] = if i == j { 10 } else { 20 };
+                for (j, slot) in distances[i].iter_mut().enumerate() {
+                    *slot = if i == j { 10 } else { 20 };
                 }
                 continue;
             }

@@ -611,7 +611,7 @@ pub async fn create_macvtap(
     let now = Utc::now().to_rfc3339();
     let mac = req
         .mac_address
-        .unwrap_or_else(|| NetworkdManager::generate_mac_address());
+        .unwrap_or_else(NetworkdManager::generate_mac_address);
     let cfg = MacvtapConfig {
         id: Uuid::new_v4().to_string(),
         name: req.name,

@@ -16,6 +16,12 @@ pub struct AlertEvaluator {
     alerts: Arc<RwLock<Vec<BandwidthAlert>>>,
 }
 
+impl Default for AlertEvaluator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AlertEvaluator {
     pub fn new() -> Self {
         Self {

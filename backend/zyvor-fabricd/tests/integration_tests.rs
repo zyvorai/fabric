@@ -279,7 +279,7 @@ async fn test_networkd_bridge_lifecycle() {
     // Delete bridge
     let delete_request = Request::builder()
         .method("DELETE")
-        .uri(&format!("/api/networkd/bridges/{}", bridge_id))
+        .uri(format!("/api/networkd/bridges/{}", bridge_id))
         .body(Body::empty())
         .unwrap();
 
@@ -388,7 +388,7 @@ async fn test_template_lifecycle() {
     // Get template by ID
     let get_request = Request::builder()
         .method("GET")
-        .uri(&format!("/api/templates/{}", template_id))
+        .uri(format!("/api/templates/{}", template_id))
         .body(Body::empty())
         .unwrap();
 
@@ -398,7 +398,7 @@ async fn test_template_lifecycle() {
     // Update template
     let update_request = Request::builder()
         .method("PUT")
-        .uri(&format!("/api/templates/{}", template_id))
+        .uri(format!("/api/templates/{}", template_id))
         .header("content-type", "application/json")
         .body(Body::from(
             json!({
@@ -422,7 +422,7 @@ async fn test_template_lifecycle() {
     // Delete template
     let delete_request = Request::builder()
         .method("DELETE")
-        .uri(&format!("/api/templates/{}", template_id))
+        .uri(format!("/api/templates/{}", template_id))
         .body(Body::empty())
         .unwrap();
 
@@ -432,7 +432,7 @@ async fn test_template_lifecycle() {
     // Verify deleted
     let get_request = Request::builder()
         .method("GET")
-        .uri(&format!("/api/templates/{}", template_id))
+        .uri(format!("/api/templates/{}", template_id))
         .body(Body::empty())
         .unwrap();
 
@@ -488,7 +488,7 @@ async fn test_deploy_template() {
     // Deploy VM from template
     let deploy_request = Request::builder()
         .method("POST")
-        .uri(&format!("/api/templates/{}/deploy", template_id))
+        .uri(format!("/api/templates/{}/deploy", template_id))
         .header("content-type", "application/json")
         .body(Body::from(json!({ "vm_name": "deployed-vm" }).to_string()))
         .unwrap();
@@ -897,7 +897,7 @@ async fn test_cluster_health_with_cluster() {
     // Get cluster health
     let health_request = Request::builder()
         .method("GET")
-        .uri(&format!("/api/clusters/{}/health", cluster_id))
+        .uri(format!("/api/clusters/{}/health", cluster_id))
         .body(Body::empty())
         .unwrap();
 
@@ -991,7 +991,7 @@ async fn test_datacenter_host_lifecycle() {
     // Send heartbeat
     let hb_request = Request::builder()
         .method("POST")
-        .uri(&format!("/api/hosts/{}/heartbeat", host_id))
+        .uri(format!("/api/hosts/{}/heartbeat", host_id))
         .header("content-type", "application/json")
         .body(Body::from(
             json!({
@@ -1026,7 +1026,7 @@ async fn test_datacenter_host_lifecycle() {
     // Delete host
     let delete_request = Request::builder()
         .method("DELETE")
-        .uri(&format!("/api/hosts/{}", host_id))
+        .uri(format!("/api/hosts/{}", host_id))
         .body(Body::empty())
         .unwrap();
 
@@ -1381,7 +1381,7 @@ async fn test_schedule_lifecycle() {
     // Get by ID
     let req = Request::builder()
         .method("GET")
-        .uri(&format!("/api/schedules/{}", id))
+        .uri(format!("/api/schedules/{}", id))
         .body(Body::empty())
         .unwrap();
     let response = app.clone().oneshot(req).await.unwrap();
@@ -1390,7 +1390,7 @@ async fn test_schedule_lifecycle() {
     // Delete
     let req = Request::builder()
         .method("DELETE")
-        .uri(&format!("/api/schedules/{}", id))
+        .uri(format!("/api/schedules/{}", id))
         .body(Body::empty())
         .unwrap();
     let response = app.clone().oneshot(req).await.unwrap();
@@ -1399,7 +1399,7 @@ async fn test_schedule_lifecycle() {
     // Verify gone
     let req = Request::builder()
         .method("GET")
-        .uri(&format!("/api/schedules/{}", id))
+        .uri(format!("/api/schedules/{}", id))
         .body(Body::empty())
         .unwrap();
     let response = app.oneshot(req).await.unwrap();
@@ -1513,7 +1513,7 @@ async fn test_secrets_lifecycle() {
     // Delete
     let req = Request::builder()
         .method("DELETE")
-        .uri(&format!("/api/secrets/{}", id))
+        .uri(format!("/api/secrets/{}", id))
         .body(Body::empty())
         .unwrap();
     let response = app.oneshot(req).await.unwrap();

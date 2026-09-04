@@ -115,7 +115,7 @@ fn extract_iptables_to(line: &str) -> (Option<String>, Option<u16>) {
     let Some(rest) = line.split(marker).nth(1) else {
         return (None, None);
     };
-    let Some(value) = rest.trim().split_whitespace().next() else {
+    let Some(value) = rest.split_whitespace().next() else {
         return (None, None);
     };
     if let Some((ip, port)) = value.split_once(':') {
@@ -207,7 +207,7 @@ fn parse_nat_exprs(
     // for `expr.comment` and could never find one, so every discovered NAT
     // rule fell back to its generic "{table}-{chain}-{rule_type}" name
     // instead of the name it was actually created with.
-    let mut name = rule_comment
+    let name = rule_comment
         .filter(|c| !c.starts_with("vm-nat-"))
         .map(str::to_string);
     let mut rule_type = None;

@@ -581,7 +581,7 @@ impl DrsManager {
                 let source = vms.iter().find(|vm| vm.vm_name == vm_name);
                 let target_host = hosts
                     .iter()
-                    .find(|h| source.map_or(true, |s| h.host_id != s.host_id));
+                    .find(|h| source.is_none_or(|s| h.host_id != s.host_id));
 
                 if let (Some(src_vm), Some(tgt)) = (source, target_host) {
                     let rec = MigrationRecommendation {
@@ -793,7 +793,7 @@ impl DrsManager {
                                 .push(name.clone());
                         }
                     }
-                    for (_host_id, colocated) in &host_to_vms {
+                    for colocated in host_to_vms.values() {
                         if colocated.len() > 1 {
                             violations.push(AffinityViolation {
                                 rule_id: rule.id.clone(),

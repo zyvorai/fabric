@@ -27,6 +27,12 @@ struct Inner {
     next_id: u32,
 }
 
+impl Default for IdentityAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IdentityAllocator {
     pub fn new() -> Self {
         Self {
