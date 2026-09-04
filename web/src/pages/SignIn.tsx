@@ -3,8 +3,24 @@
 
 import { FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
+import { AlertCircle, Loader2, Lock, User } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { formatUserError } from '../utils/apiError'
+
+function ZMark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        d="M2 2h14L6.6 16H16"
+        fill="none"
+        stroke="#ff5a15"
+        strokeWidth="2.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
 
 export default function SignIn() {
   const { login, isAuthenticated, loading } = useAuth()
@@ -34,50 +50,82 @@ export default function SignIn() {
 
   return (
     <div className="signin-page">
-      <div className="signin-card animate-fade-in">
-        <Link to="/" className="block text-center text-[13px] font-semibold tracking-[-0.02em] text-[var(--zf-ink)] mb-8">
-          Zyvor Fabric
-        </Link>
+      <div className="signin-glow" aria-hidden="true" />
+
+      <Link to="/" className="signin-logo animate-fade-in">
+        <span className="signin-logo-mark">
+          <ZMark />
+        </span>
+        <span className="signin-logo-word">Zyvor Fabric</span>
+      </Link>
+
+      <div className="signin-card animate-fade-in" style={{ animationDelay: '0.08s' }}>
         <h1>Sign in</h1>
         <p className="sub">Use your Fabric account to open the console.</p>
-        <form onSubmit={onSubmit} className="space-y-4">
+
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div>
-            <label className="block text-xs font-medium text-[var(--zf-muted)] mb-1.5" htmlFor="username">
+            <label className="signin-label" htmlFor="username">
               Username
             </label>
-            <input
-              id="username"
-              className="input-field"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
+            <div className="signin-input-wrap">
+              <span className="signin-field-icon">
+                <User size={17} strokeWidth={1.75} />
+              </span>
+              <input
+                id="username"
+                className="signin-input"
+                autoComplete="username"
+                placeholder="admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
           </div>
+
           <div>
-            <label className="block text-xs font-medium text-[var(--zf-muted)] mb-1.5" htmlFor="password">
+            <label className="signin-label" htmlFor="password">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              className="input-field"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="signin-input-wrap">
+              <span className="signin-field-icon">
+                <Lock size={16} strokeWidth={1.75} />
+              </span>
+              <input
+                id="password"
+                type="password"
+                className="signin-input"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
           </div>
+
           {error && (
-            <p className="text-sm text-[var(--zf-danger)]" role="alert">
-              {error}
-            </p>
+            <div className="signin-error animate-fade-in" role="alert">
+              <AlertCircle size={15} strokeWidth={2} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
           )}
-          <button type="submit" className="zf-btn zf-btn-primary w-full" disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Sign in'}
+
+          <button type="submit" className="signin-submit" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 size={17} strokeWidth={2.25} className="animate-spin" />
+                Signing in…
+              </>
+            ) : (
+              'Sign in'
+            )}
           </button>
         </form>
       </div>
+
+      <p className="signin-footer">© 2026 Zyvor. All rights reserved.</p>
     </div>
   )
 }
