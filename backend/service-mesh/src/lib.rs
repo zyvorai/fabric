@@ -15,6 +15,12 @@ pub struct ServiceMesh {
     pub enforcer: ServiceEnforcer,
 }
 
+impl Default for ServiceMesh {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServiceMesh {
     pub fn new() -> Self {
         let health_checker = HealthChecker::new();

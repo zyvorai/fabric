@@ -6,35 +6,25 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Firewall action for a rule.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum FirewallAction {
+    #[default]
     Accept,
     Drop,
     Reject,
     Log,
 }
 
-impl Default for FirewallAction {
-    fn default() -> Self {
-        Self::Accept
-    }
-}
-
 /// Protocol for firewall rules.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum FirewallProtocol {
     Tcp,
     Udp,
     Icmp,
+    #[default]
     Any,
-}
-
-impl Default for FirewallProtocol {
-    fn default() -> Self {
-        Self::Any
-    }
 }
 
 /// Time unit for rate limiting.
@@ -191,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_rule_priority_ordering() {
-        let mut rules = vec![
+        let mut rules = [
             FirewallRule {
                 priority: 100,
                 action: FirewallAction::Accept,

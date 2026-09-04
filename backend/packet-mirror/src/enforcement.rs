@@ -16,6 +16,12 @@ use crate::models::{CompiledMirrorRule, MirrorDirection, MirrorFilter};
 /// ```
 pub struct MirrorEnforcer;
 
+impl Default for MirrorEnforcer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MirrorEnforcer {
     pub fn new() -> Self {
         Self

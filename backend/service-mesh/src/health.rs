@@ -12,6 +12,12 @@ pub struct HealthChecker {
     backends: Arc<RwLock<HashMap<String, Vec<Backend>>>>,
 }
 
+impl Default for HealthChecker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HealthChecker {
     pub fn new() -> Self {
         Self {
@@ -24,10 +30,10 @@ impl HealthChecker {
         let addr = format!("{}:{}", ip, port);
         let timeout = std::time::Duration::from_secs(timeout_secs);
 
-        match tokio::time::timeout(timeout, tokio::net::TcpStream::connect(&addr)).await {
-            Ok(Ok(_)) => true,
-            _ => false,
-        }
+        matches!(
+            tokio::time::timeout(timeout, tokio::net::TcpStream::connect(&addr)).await,
+            Ok(Ok(_))
+        )
     }
 
     /// Perform an HTTP health check via raw TCP.

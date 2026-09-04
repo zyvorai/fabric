@@ -7,18 +7,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Unit for bandwidth rate specification.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum BandwidthUnit {
     Kbit,
+    #[default]
     Mbit,
     Gbit,
-}
-
-impl Default for BandwidthUnit {
-    fn default() -> Self {
-        Self::Mbit
-    }
 }
 
 /// A bandwidth rate with value and unit.

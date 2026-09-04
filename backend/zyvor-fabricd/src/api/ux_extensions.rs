@@ -415,7 +415,7 @@ fn load_vm(state: &AppState, name: &str) -> Result<VM, (StatusCode, Json<serde_j
         .store
         .get_vm(name)
         .map_err(store_err)?
-        .ok_or_else(|| not_found(&format!("VM '{}' not found", name)))
+        .ok_or_else(|| not_found(format!("VM '{}' not found", name)))
 }
 
 // ============================================================================

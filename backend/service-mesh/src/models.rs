@@ -7,32 +7,22 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Load balancing algorithm for distributing traffic across backends.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum LoadBalancerAlgorithm {
+    #[default]
     RoundRobin,
     Random,
     IpHash,
 }
 
-impl Default for LoadBalancerAlgorithm {
-    fn default() -> Self {
-        Self::RoundRobin
-    }
-}
-
 /// Type of health check to perform against backends.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum HealthCheckType {
+    #[default]
     Tcp,
     Http,
-}
-
-impl Default for HealthCheckType {
-    fn default() -> Self {
-        Self::Tcp
-    }
 }
 
 /// Health check configuration for a service's backends.
@@ -98,17 +88,12 @@ impl LabelSelector {
 }
 
 /// Protocol for service ports.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ServiceProtocol {
+    #[default]
     Tcp,
     Udp,
-}
-
-impl Default for ServiceProtocol {
-    fn default() -> Self {
-        Self::Tcp
-    }
 }
 
 /// A port mapping for a service.
@@ -172,18 +157,13 @@ pub struct CreateServiceRequest {
 }
 
 /// Health state of a backend VM.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendHealth {
     Healthy,
     Unhealthy,
+    #[default]
     Unknown,
-}
-
-impl Default for BackendHealth {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 /// A backend VM serving traffic for a service.

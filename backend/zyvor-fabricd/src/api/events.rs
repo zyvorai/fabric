@@ -101,7 +101,7 @@ pub async fn list_events(
     let mut events: Vec<VMEvent> = state.store.list_entities("vm_events").unwrap_or_default();
 
     // Sort by timestamp descending and limit to retention
-    events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    events.sort_by_key(|a| std::cmp::Reverse(a.timestamp));
     events.truncate(keep.min(100));
 
     Json(events)
@@ -183,7 +183,10 @@ pub fn record_event(
 
     // Periodic pruning: every 100 events, remove old entries beyond retention limit.
     // Run in a background task to avoid blocking the request path.
-    if EVENT_COUNTER.fetch_add(1, Ordering::Relaxed) % 100 == 0 {
+    if EVENT_COUNTER
+        .fetch_add(1, Ordering::Relaxed)
+        .is_multiple_of(100)
+    {
         let state_clone = state.clone();
         tokio::spawn(async move {
             prune_old_events(&state_clone, retention_limit(&state_clone));
@@ -195,7 +198,7 @@ pub fn record_event(
 fn prune_old_events(state: &Arc<AppState>, keep: usize) {
     if let Ok(mut events) = state.store.list_entities::<VMEvent>("vm_events") {
         if events.len() > keep {
-            events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            events.sort_by_key(|a| std::cmp::Reverse(a.timestamp));
             for event in events.drain(keep..) {
                 let _ = state.store.delete_entity("vm_events", &event.id);
             }

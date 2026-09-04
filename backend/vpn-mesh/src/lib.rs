@@ -13,6 +13,12 @@ pub struct VpnMesh {
     pub enforcer: WireguardEnforcer,
 }
 
+impl Default for VpnMesh {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VpnMesh {
     pub fn new() -> Self {
         let compiler = TunnelCompiler::new();

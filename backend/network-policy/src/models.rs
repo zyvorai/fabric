@@ -132,18 +132,13 @@ pub struct PortRule {
     pub end_port: Option<u16>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PolicyProtocol {
+    #[default]
     Tcp,
     Udp,
     Any,
-}
-
-impl Default for PolicyProtocol {
-    fn default() -> Self {
-        Self::Tcp
-    }
 }
 
 /// API request to create a network policy.

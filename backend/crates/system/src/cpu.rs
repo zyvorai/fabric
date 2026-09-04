@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -89,7 +89,7 @@ impl CpuTopology {
 
             cores_per_socket_map
                 .entry(cpu_info.socket_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(cpu_info.core_id);
 
             cpus.push(cpu_info);
@@ -126,7 +126,7 @@ impl CpuTopology {
         })
     }
 
-    fn read_cpu_info(cpu_id: u32, base_path: &PathBuf) -> Result<CpuCore, CpuError> {
+    fn read_cpu_info(cpu_id: u32, base_path: &Path) -> Result<CpuCore, CpuError> {
         let cpu_path = base_path.join(format!("cpu{}", cpu_id));
 
         // Read topology info
@@ -291,8 +291,7 @@ mod tests {
         let result = CpuTopology::detect();
 
         // This test might fail in CI without proper /sys
-        if result.is_ok() {
-            let topology = result.unwrap();
+        if let Ok(topology) = result {
             assert!(topology.total_cpus > 0);
             assert!(topology.sockets > 0);
         }

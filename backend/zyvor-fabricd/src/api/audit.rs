@@ -365,6 +365,7 @@ pub async fn get_audit_stats(
 // ============================================================================
 
 /// Helper function to log an audit event
+#[allow(clippy::too_many_arguments)]
 pub async fn log_audit_event(
     state: &AppState,
     user: &str,

@@ -56,10 +56,11 @@ impl MacvtapMode {
 }
 
 /// DHCP configuration mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DhcpMode {
     Yes,
+    #[default]
     No,
     Ipv4,
     Ipv6,
@@ -76,16 +77,11 @@ impl DhcpMode {
     }
 }
 
-impl Default for DhcpMode {
-    fn default() -> Self {
-        DhcpMode::No
-    }
-}
-
 /// Bond mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BondMode {
+    #[default]
     BalanceRr,
     ActiveBackup,
     BalanceXor,
@@ -107,12 +103,6 @@ impl BondMode {
             BondMode::BalanceTlb => "balance-tlb",
             BondMode::BalanceAlb => "balance-alb",
         }
-    }
-}
-
-impl Default for BondMode {
-    fn default() -> Self {
-        BondMode::BalanceRr
     }
 }
 
@@ -624,9 +614,10 @@ pub enum NetworkDevice {
 // ─── Port forwarding (nftables DNAT) ─────────────────────────────────────────
 
 /// Protocol for port forwarding rules
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
+    #[default]
     Tcp,
     Udp,
     Both,
@@ -639,12 +630,6 @@ impl Protocol {
             Protocol::Udp => "udp",
             Protocol::Both => "both",
         }
-    }
-}
-
-impl Default for Protocol {
-    fn default() -> Self {
-        Protocol::Tcp
     }
 }
 

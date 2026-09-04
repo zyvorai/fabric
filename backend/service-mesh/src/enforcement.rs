@@ -21,6 +21,12 @@ const TABLE_NAME: &str = "zyvor-fabricd_services";
 /// ```
 pub struct ServiceEnforcer;
 
+impl Default for ServiceEnforcer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServiceEnforcer {
     pub fn new() -> Self {
         Self

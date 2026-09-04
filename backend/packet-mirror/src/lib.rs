@@ -13,6 +13,12 @@ pub struct PacketMirror {
     pub enforcer: MirrorEnforcer,
 }
 
+impl Default for PacketMirror {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PacketMirror {
     pub fn new() -> Self {
         let compiler = MirrorCompiler::new();

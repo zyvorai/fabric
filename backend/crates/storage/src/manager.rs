@@ -482,7 +482,7 @@ impl StorageManager {
 
     fn update_pool_stats(&self, pool: &mut StoragePool) -> Result<(), StorageError> {
         let output = std::process::Command::new("df")
-            .args(&["-k", pool.path.to_str().unwrap()])
+            .args(["-k", pool.path.to_str().unwrap()])
             .output()?;
 
         let df_output = String::from_utf8_lossy(&output.stdout);

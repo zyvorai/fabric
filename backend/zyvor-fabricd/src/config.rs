@@ -134,20 +134,15 @@ fn default_image_path() -> String {
     "/var/lib/zyvor-fabricd/images".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ControllerMode {
+    #[default]
     Standalone,
     Controller,
 }
 
-impl Default for ControllerMode {
-    fn default() -> Self {
-        Self::Standalone
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ControllerConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -157,17 +152,6 @@ pub struct ControllerConfig {
     pub cluster_name: Option<String>,
     #[serde(default)]
     pub datacenter_name: Option<String>,
-}
-
-impl Default for ControllerConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            mode: ControllerMode::default(),
-            cluster_name: None,
-            datacenter_name: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -7,18 +7,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// VPN network topology type.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum VpnTopology {
     PointToPoint,
     HubSpoke,
+    #[default]
     FullMesh,
-}
-
-impl Default for VpnTopology {
-    fn default() -> Self {
-        Self::FullMesh
-    }
 }
 
 /// Selects endpoints by matching labels (AND semantics).

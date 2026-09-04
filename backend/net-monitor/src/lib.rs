@@ -13,6 +13,12 @@ pub struct NetMonitor {
     pub evaluator: AlertEvaluator,
 }
 
+impl Default for NetMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NetMonitor {
     pub fn new() -> Self {
         let collector = MetricsCollector::new();

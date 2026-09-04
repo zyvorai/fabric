@@ -196,14 +196,13 @@ impl OvmfConfig {
 
     /// Generate systemd-vmspawn arguments
     pub fn to_vmspawn_args(&self) -> Vec<String> {
-        let mut args = Vec::new();
-
         // systemd-vmspawn firmware options
-        args.push("--firmware".to_string());
-        args.push(self.code_path.display().to_string());
-
-        args.push("--firmware-vars".to_string());
-        args.push(self.vars_path.display().to_string());
+        let mut args = vec![
+            "--firmware".to_string(),
+            self.code_path.display().to_string(),
+            "--firmware-vars".to_string(),
+            self.vars_path.display().to_string(),
+        ];
 
         if self.secure_boot {
             args.push("--secure-boot".to_string());

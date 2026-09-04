@@ -18,6 +18,12 @@ pub const DNS_DIR: &str = "/etc/zyvor-fabricd/dns";
 /// - Each file contains hosts-format entries: `<IP> <FQDN>`
 pub struct DnsEnforcer;
 
+impl Default for DnsEnforcer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DnsEnforcer {
     pub fn new() -> Self {
         Self
@@ -175,7 +181,7 @@ mod tests {
     #[test]
     fn test_multiple_records_same_zone() {
         let enforcer = make_enforcer();
-        let records = vec![
+        let records = [
             DnsRecord {
                 name: "web-1.web.zyvor-fabricd.local".to_string(),
                 record_type: DnsRecordType::A,

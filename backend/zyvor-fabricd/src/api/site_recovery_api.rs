@@ -443,7 +443,7 @@ pub async fn get_dr_dashboard(
             tracing::error!("Storage error: {}", e);
             Vec::new()
         });
-    recent_executions.sort_by(|a, b| b.started.cmp(&a.started));
+    recent_executions.sort_by_key(|a| std::cmp::Reverse(a.started));
     recent_executions.truncate(5);
 
     let dashboard = DrDashboard {

@@ -16,6 +16,12 @@ pub struct PolicyEngine {
     pub enforcer: PolicyEnforcer,
 }
 
+impl Default for PolicyEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PolicyEngine {
     pub fn new() -> Self {
         let allocator = IdentityAllocator::new();

@@ -439,7 +439,7 @@ pub async fn list_iso_images(RequireRead(_claims): RequireRead) -> Json<Vec<IsoI
             let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
             let modified = metadata
                 .and_then(|m| m.modified())
-                .map(|t| DateTime::<Utc>::from(t))
+                .map(DateTime::<Utc>::from)
                 .unwrap_or_else(|_| Utc::now());
 
             let path_str = path.display().to_string();

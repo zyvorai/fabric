@@ -131,7 +131,7 @@ impl NfsPool {
     /// Check if NFS server is reachable
     pub fn check_server(&self) -> Result<bool, NfsError> {
         let output = Command::new("ping")
-            .args(&["-c", "1", "-W", "2", &self.config.server])
+            .args(["-c", "1", "-W", "2", &self.config.server])
             .output()
             .map_err(|e| NfsError::ServerUnreachable(e.to_string()))?;
 
@@ -141,7 +141,7 @@ impl NfsPool {
     /// Check if NFS export exists
     pub fn check_export(&self) -> Result<bool, NfsError> {
         let output = Command::new("showmount")
-            .args(&["-e", &self.config.server])
+            .args(["-e", &self.config.server])
             .output()
             .map_err(|e| NfsError::ServerUnreachable(e.to_string()))?;
 
@@ -176,7 +176,7 @@ impl NfsPool {
         let options = mount_opts.join(",");
 
         let output = Command::new("mount")
-            .args(&[
+            .args([
                 "-t",
                 "nfs",
                 "-o",
@@ -219,7 +219,7 @@ impl NfsPool {
     /// Force unmount (lazy unmount)
     pub fn force_unmount(&mut self) -> Result<(), NfsError> {
         let output = Command::new("umount")
-            .args(&["-l", self.config.mount_path.to_str().unwrap()])
+            .args(["-l", self.config.mount_path.to_str().unwrap()])
             .output()
             .map_err(|e| NfsError::UnmountFailed(e.to_string()))?;
 
@@ -235,14 +235,14 @@ impl NfsPool {
     /// Check if mount point is currently mounted
     pub fn is_mounted(&self) -> Result<bool, NfsError> {
         let output = Command::new("findmnt")
-            .args(&[
+            .args([
                 "-n",
                 "-o",
                 "SOURCE",
                 self.config.mount_path.to_str().unwrap(),
             ])
             .output()
-            .map_err(|e| NfsError::Io(e))?;
+            .map_err(NfsError::Io)?;
 
         Ok(output.status.success())
     }
@@ -255,7 +255,7 @@ impl NfsPool {
 
         // Get filesystem stats
         let output = Command::new("df")
-            .args(&["-k", self.config.mount_path.to_str().unwrap()])
+            .args(["-k", self.config.mount_path.to_str().unwrap()])
             .output()?;
 
         let df_output = String::from_utf8_lossy(&output.stdout);
@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn test_nfs_config_default() {
         let config = NfsConfig::default();
-        assert_eq!(config.auto_start, true);
+        assert!(config.auto_start);
         assert!(config.mount_options.contains(&"rw".to_string()));
     }
 

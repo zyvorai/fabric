@@ -242,17 +242,14 @@ impl VmConfig {
             pinning.validate(&topology)?;
 
             // Check if we have enough CPUs for pinning
-            match pinning {
-                CpuPinning::Explicit(pins) => {
-                    if pins.len() < self.cpu.count as usize {
-                        return Err(format!(
-                            "Not enough CPU pins ({}) for {} vCPUs",
-                            pins.len(),
-                            self.cpu.count
-                        ));
-                    }
+            if let CpuPinning::Explicit(pins) = pinning {
+                if pins.len() < self.cpu.count as usize {
+                    return Err(format!(
+                        "Not enough CPU pins ({}) for {} vCPUs",
+                        pins.len(),
+                        self.cpu.count
+                    ));
                 }
-                _ => {}
             }
         }
 

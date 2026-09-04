@@ -266,7 +266,7 @@ pub async fn list_scale_events(
                 tracing::error!("Storage error: {}", e);
                 Vec::new()
             });
-    events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    events.sort_by_key(|a| std::cmp::Reverse(a.timestamp));
     events.truncate(100);
     Json(events)
 }

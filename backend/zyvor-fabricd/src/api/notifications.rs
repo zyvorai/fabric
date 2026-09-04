@@ -909,7 +909,7 @@ pub async fn get_history(
         })?;
 
     // Sort by sent_at (most recent first)
-    history.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
+    history.sort_by_key(|a| std::cmp::Reverse(a.sent_at));
 
     // Prune old history entries beyond retention limit (keep 500 most recent)
     const HISTORY_RETENTION_LIMIT: usize = 500;

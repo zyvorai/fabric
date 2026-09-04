@@ -800,7 +800,7 @@ pub async fn check_vm_security_compliance(
     }
     let result = VmSecurityCompliance {
         vm_name: req.vm_name,
-        baseline_id: baseline_id,
+        baseline_id,
         baseline_name: baseline.name,
         compliant: violations.is_empty(),
         violations,

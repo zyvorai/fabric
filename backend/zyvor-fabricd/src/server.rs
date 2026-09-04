@@ -81,6 +81,12 @@ pub struct QuotaCache {
     pub last_updated: std::time::Instant,
 }
 
+impl Default for QuotaCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QuotaCache {
     pub fn new() -> Self {
         Self {
@@ -2496,7 +2502,7 @@ async fn run_snapshot_retention(state: Arc<AppState>) {
             }
 
             // Sort oldest first
-            snapshots.sort_by(|a, b| a.created.cmp(&b.created));
+            snapshots.sort_by_key(|a| a.created);
 
             let to_remove = snapshots.len() - retention as usize;
             for snap in snapshots.iter().take(to_remove) {
@@ -2998,7 +3004,7 @@ async fn run_ha_monitor(state: Arc<AppState>) {
 
                 // Level 1: Send FenceVm command to host-agent
                 if let Some(host) = primary_host {
-                    let fence_url = format!("http://{}:8081/api/commands", &host.address);
+                    let fence_url = format!("http://{}:8081/api/commands", host.address);
                     let fence_payload = serde_json::json!({
                         "type": "fence_vm",
                         "vm_name": ft.vm_name
@@ -3051,20 +3057,14 @@ async fn run_ha_monitor(state: Arc<AppState>) {
                                     .output()?;
 
                                 if !leader_output.status.success() {
-                                    return Err(std::io::Error::new(
-                                        std::io::ErrorKind::Other,
-                                        "Failed to get leader PID",
-                                    ));
+                                    return Err(std::io::Error::other("Failed to get leader PID"));
                                 }
 
                                 let pid_str = String::from_utf8_lossy(&leader_output.stdout)
                                     .trim()
                                     .to_string();
                                 if pid_str.is_empty() {
-                                    return Err(std::io::Error::new(
-                                        std::io::ErrorKind::Other,
-                                        "Empty leader PID",
-                                    ));
+                                    return Err(std::io::Error::other("Empty leader PID"));
                                 }
 
                                 // Kill the leader PID via SSH
@@ -3139,7 +3139,7 @@ async fn run_ha_monitor(state: Arc<AppState>) {
                     .find(|h| h.id == new_primary || h.hostname == new_primary);
 
                 if let Some(host) = secondary_host {
-                    let promote_url = format!("http://{}:8081/api/commands", &host.address);
+                    let promote_url = format!("http://{}:8081/api/commands", host.address);
                     let promote_payload = serde_json::json!({
                         "type": "promote_storage",
                         "vm_name": ft.vm_name,
@@ -3188,7 +3188,7 @@ async fn run_ha_monitor(state: Arc<AppState>) {
                 .find(|h| h.id == new_primary || h.hostname == new_primary);
 
             if let Some(host) = secondary_host {
-                let start_url = format!("http://{}:8081/api/commands", &host.address);
+                let start_url = format!("http://{}:8081/api/commands", host.address);
                 let start_payload = serde_json::json!({
                     "type": "start_vm",
                     "vm_name": ft.vm_name

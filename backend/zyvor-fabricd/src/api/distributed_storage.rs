@@ -969,13 +969,12 @@ pub async fn recommend_datastore(
             .store
             .get_entity::<DistributedStoragePool>("dist_storage_pools", pool_id)
         {
-            if pool.free_capacity_gb >= req.size_gb {
-                if best
+            if pool.free_capacity_gb >= req.size_gb
+                && best
                     .as_ref()
-                    .map_or(true, |b| pool.free_capacity_gb > b.free_capacity_gb)
-                {
-                    best = Some(pool);
-                }
+                    .is_none_or(|b| pool.free_capacity_gb > b.free_capacity_gb)
+            {
+                best = Some(pool);
             }
         }
     }

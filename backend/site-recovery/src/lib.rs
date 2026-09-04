@@ -576,10 +576,8 @@ impl SiteRecoveryManager {
         let duration = now - exec.started;
         exec.rto_actual_minutes = Some(duration.num_minutes().max(0) as u32);
 
-        if !success {
-            if exec.error.is_none() {
-                exec.error = Some("execution completed with failures".to_string());
-            }
+        if !success && exec.error.is_none() {
+            exec.error = Some("execution completed with failures".to_string());
         }
 
         let plan_id = exec.plan_id.clone();

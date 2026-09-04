@@ -695,7 +695,7 @@ impl ReplicationManager {
             .filter(|(_, i)| i.replication_id == replication_id)
             .map(|(id, i)| (id.clone(), i.snapshot_time))
             .collect();
-        matching.sort_by(|a, b| b.1.cmp(&a.1));
+        matching.sort_by_key(|a| std::cmp::Reverse(a.1));
 
         let mut expired_count: u32 = 0;
         for (idx, (id, _)) in matching.iter().enumerate() {

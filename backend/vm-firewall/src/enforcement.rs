@@ -28,6 +28,12 @@ const TABLE_NAME: &str = "zyvor-fabricd_firewall";
 /// ```
 pub struct FirewallEnforcer;
 
+impl Default for FirewallEnforcer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FirewallEnforcer {
     pub fn new() -> Self {
         Self

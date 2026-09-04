@@ -127,21 +127,22 @@ pub struct StartOptionsSpec {
 
 impl From<StartOptionsSpec> for vm_model::VMStartOptions {
     fn from(spec: StartOptionsSpec) -> Self {
-        let mut opts = vm_model::VMStartOptions::default();
-        opts.kvm = spec.kvm;
-        opts.secure_boot = spec.secure_boot;
-        opts.vsock = spec.vsock;
-        opts.tpm = spec.tpm;
-        opts.console = spec.console;
-        opts.network_tap = spec.network_tap;
-        opts.network_user_mode = spec.network_user_mode;
-        opts.scope = spec.scope;
-        opts.directory = spec.directory;
-        opts.bind_mounts = spec.bind_mounts;
-        opts.credentials = spec.set_credentials;
-        opts.forward_journal = spec.forward_journal;
-        opts.pass_ssh_key = spec.pass_ssh_key;
-        opts
+        vm_model::VMStartOptions {
+            kvm: spec.kvm,
+            secure_boot: spec.secure_boot,
+            vsock: spec.vsock,
+            tpm: spec.tpm,
+            console: spec.console,
+            network_tap: spec.network_tap,
+            network_user_mode: spec.network_user_mode,
+            scope: spec.scope,
+            directory: spec.directory,
+            bind_mounts: spec.bind_mounts,
+            credentials: spec.set_credentials,
+            forward_journal: spec.forward_journal,
+            pass_ssh_key: spec.pass_ssh_key,
+            ..Default::default()
+        }
     }
 }
 

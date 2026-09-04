@@ -91,6 +91,12 @@ pub struct PluginRegistry {
     event_hooks: HashMap<String, Arc<dyn EventHookPlugin>>,
 }
 
+impl Default for PluginRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PluginRegistry {
     pub fn new() -> Self {
         Self {
@@ -197,7 +203,7 @@ impl PluginRegistry {
 
     /// Fire an event to all subscribed hooks
     pub fn fire_event(&self, event_type: &str, payload: &serde_json::Value) {
-        for (_, hook) in &self.event_hooks {
+        for hook in self.event_hooks.values() {
             if hook
                 .subscribed_events()
                 .iter()

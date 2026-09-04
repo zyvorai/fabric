@@ -599,7 +599,7 @@ impl NetworkdManager {
             });
         }
 
-        links.sort_by(|a, b| a.index.cmp(&b.index));
+        links.sort_by_key(|a| a.index);
         Ok(links)
     }
 

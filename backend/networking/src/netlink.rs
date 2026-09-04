@@ -321,8 +321,8 @@ pub async fn create_macvtap(parent: &str, name: &str, mode: &str) -> Result<()> 
 
 /// Create a persistent TAP device. rtnetlink's generic link-add doesn't cover
 /// tun/tap (the kernel creates those via the `/dev/net/tun` character device
-/// + `TUNSETIFF` ioctl, not `RTM_NEWLINK`), so this is the one device type
-/// still created via `ip tuntap` rather than a raw netlink call — a
+/// plus a `TUNSETIFF` ioctl, not `RTM_NEWLINK`), so this is the one device
+/// type still created via `ip tuntap` rather than a raw netlink call — a
 /// pragmatic exception, not a step back toward systemd-networkd (which this
 /// replaces `networkctl reload`, not `iproute2`, for).
 pub async fn create_tap(name: &str) -> Result<()> {
