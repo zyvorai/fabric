@@ -46,7 +46,7 @@ jobs:
         run: |
           cd backend
           cargo llvm-cov --workspace --lcov --output-path lcov.info || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: rust-lcov
@@ -94,7 +94,7 @@ jobs:
         continue-on-error: true
         run: cd web && npm run test:coverage
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: web-coverage
