@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { formatUserError } from '../utils/apiError'
+import ZyvorMark from '../components/ZyvorMark'
 import {
   PremiumLoginShell,
   LoginError,
@@ -131,6 +132,7 @@ export default function SignIn() {
 
   const pills = useMemo(() => {
     const base = [
+      { label: 'Zyvor', tone: 'orange' as const },
       { label: 'KVM', tone: 'emerald' as const },
       { label: 'FluxVM', tone: 'violet' as const },
       { label: 'CLI + Web', tone: 'sky' as const },
@@ -259,11 +261,23 @@ export default function SignIn() {
 
   return (
     <PremiumLoginShell
+      logo={
+        <a
+          href="https://zyvor.dev"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="login-zyvor-mark"
+          aria-label="Zyvor home"
+          title="zyvor.dev"
+        >
+          <ZyvorMark className="w-10 h-10" />
+        </a>
+      }
       productName="Zyvor Fabric"
       productWordmark="Zyvor Fabric"
       heroTitle="Private cloud. One daemon."
       heroSubheadline="VMs, networking, storage, and security — driven by FluxVM on Linux KVM."
-      accent="sky"
+      accent="orange"
       pills={pills}
       instanceMeta={instanceMeta}
       heroCta={storeCta}
@@ -295,9 +309,14 @@ export default function SignIn() {
       footer={
         <p className="login-hint" style={{ marginTop: 0, marginBottom: '1.25rem' }}>
           © 2026 Zyvor ·{' '}
-          <Link to="/" className="text-[#0071e3] hover:underline">
+          <a
+            href="https://zyvor.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="login-zyvor-link"
+          >
             zyvor.dev
-          </Link>
+          </a>
         </p>
       }
       showSignInChapter

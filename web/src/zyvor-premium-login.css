@@ -17,12 +17,17 @@
   --tone-amber: #bf7a00;
   --tone-amber-tint: rgba(191, 122, 0, 0.12);
   --tone-amber-glow: rgba(191, 122, 0, 0.24);
+  /* zyvor.dev accent — #ff5a15 / --hs-accent-fill */
+  --tone-orange: #ff5a15;
+  --tone-orange-tint: rgba(255, 90, 21, 0.1);
+  --tone-orange-glow: rgba(255, 90, 21, 0.2);
 }
 
 [data-tone='sky']     { --tone-color: var(--tone-sky);     --tone-wash: var(--tone-sky-tint);     --tone-glow: var(--tone-sky-glow); }
 [data-tone='violet']  { --tone-color: var(--tone-violet);  --tone-wash: var(--tone-violet-tint);  --tone-glow: var(--tone-violet-glow); }
 [data-tone='emerald'] { --tone-color: var(--tone-emerald); --tone-wash: var(--tone-emerald-tint); --tone-glow: var(--tone-emerald-glow); }
 [data-tone='amber']   { --tone-color: var(--tone-amber);   --tone-wash: var(--tone-amber-tint);   --tone-glow: var(--tone-amber-glow); }
+[data-tone='orange']  { --tone-color: var(--tone-orange);  --tone-wash: var(--tone-orange-tint);  --tone-glow: var(--tone-orange-glow); }
 
 @keyframes login-fade-in-up {
   from { opacity: 0; transform: translateY(10px); }
@@ -138,6 +143,37 @@ html[data-ui-shell='default'] .login-page,
   display: block;
   border-radius: 14px;
   filter: none;
+}
+
+.login-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-zyvor-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  text-decoration: none;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.login-zyvor-mark:hover {
+  opacity: 0.88;
+  transform: scale(1.04);
+}
+
+.login-zyvor-link {
+  color: var(--tone-orange, #ff5a15);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-zyvor-link:hover {
+  color: #ff7340;
+  text-decoration: underline;
 }
 
 /* Brand first — small-caps eyebrow, Vision Pro chapter-divider style */
@@ -466,7 +502,6 @@ a.login-cta-secondary:active {
 
 .login-page .login-btn-primary,
 .login-accent-zeus .login-btn-primary,
-.login-accent-orange .login-btn-primary,
 .login-accent-amber .login-btn-primary,
 .login-accent-violet .login-btn-primary,
 .login-accent-rose .login-btn-primary,
@@ -481,6 +516,58 @@ a.login-cta-secondary:active {
 .login-page .login-btn-primary:hover:not(:disabled) {
   background: hsl(211 100% 40%);
   filter: none;
+}
+
+/* Minimal zyvor.dev orange — logo already orange; CTAs + focus only */
+.login-accent-orange .login-cta-primary,
+.login-accent-orange a.login-cta-primary {
+  background: var(--tone-orange, #ff5a15);
+  color: hsl(0 0% 100%);
+}
+
+.login-accent-orange .login-cta-primary:hover,
+.login-accent-orange a.login-cta-primary:hover {
+  background: #e64f12;
+  color: hsl(0 0% 100%);
+}
+
+.login-accent-orange .login-cta-secondary,
+.login-accent-orange a.login-cta-secondary {
+  border-color: var(--tone-orange, #ff5a15);
+  color: var(--tone-orange, #ff5a15);
+}
+
+.login-accent-orange .login-cta-secondary:hover,
+.login-accent-orange a.login-cta-secondary:hover {
+  background: var(--tone-orange-tint, rgba(255, 90, 21, 0.08));
+  color: #e64f12;
+  border-color: #e64f12;
+}
+
+.login-accent-orange .login-btn-primary,
+.login-page.login-accent-orange .login-btn-primary {
+  background: var(--tone-orange, #ff5a15);
+  color: hsl(0 0% 100%);
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.16) inset;
+}
+
+.login-accent-orange .login-btn-primary:hover:not(:disabled),
+.login-page.login-accent-orange .login-btn-primary:hover:not(:disabled) {
+  background: #e64f12;
+  filter: none;
+}
+
+.login-accent-orange .login-input:focus {
+  border-color: var(--tone-orange, #ff5a15);
+  box-shadow: 0 0 0 3px rgba(255, 90, 21, 0.16);
+}
+
+.login-accent-orange .login-input:focus-visible {
+  outline-color: var(--tone-orange, #ff5a15);
+}
+
+.login-accent-orange .login-chapter-hero::before {
+  opacity: 0.42;
 }
 
 .login-aurora,

@@ -9,7 +9,7 @@ import type { ReactNode } from 'react'
 import { AlertCircle } from 'lucide-react'
 import '../zyvor-premium-login.css'
 
-export type PremiumLoginTone = 'sky' | 'violet' | 'emerald' | 'amber'
+export type PremiumLoginTone = 'sky' | 'violet' | 'emerald' | 'amber' | 'orange'
 
 export type PremiumLoginPill = {
   icon?: ReactNode
@@ -35,6 +35,7 @@ export type PremiumLoginShellProps = {
   panelHint?: ReactNode
   footer?: ReactNode
   formClassName?: string
+  className?: string
   showSignInChapter?: boolean
   children?: ReactNode
 }
@@ -56,6 +57,7 @@ export function PremiumLoginShell({
   panelHint,
   footer,
   formClassName = '',
+  className = '',
   showSignInChapter = true,
   children,
 }: PremiumLoginShellProps) {
@@ -66,9 +68,20 @@ export function PremiumLoginShell({
   const formHeading =
     panelSubtitle ?? (panelTitle && panelTitle !== 'Sign in' ? panelTitle : 'Sign in')
   const wordmark = (productWordmark ?? productName).trim() || 'Zyvor Fabric'
+  const pageClass = [
+    'login-page',
+    'login-store-page',
+    'min-h-screen',
+    'flex',
+    'flex-col',
+    accent === 'orange' ? 'login-accent-orange' : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <div className="login-page login-store-page min-h-screen flex flex-col">
+    <div className={pageClass} data-tone={accent}>
       <main className="login-store-scroll" aria-label="Sign in">
         <section className="login-chapter login-chapter-hero" data-tone={accent} aria-label={productName}>
           <div className="login-chapter-inner">
@@ -186,7 +199,7 @@ export function LoginRemember({
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="w-4 h-4 rounded border-zinc-300 accent-[#0071e3]"
+          className="w-4 h-4 rounded border-zinc-300 accent-[var(--tone-orange,#ff5a15)]"
         />
         <span className="text-sm text-zinc-500">{label}</span>
       </label>
