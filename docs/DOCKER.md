@@ -21,6 +21,14 @@ These are genuine host-level requirements, not something either container's tool
 - **cgroup v2** -- FluxVM's cgroup crate writes directly to `/sys/fs/cgroup`; the `fluxvm`
   service's `cgroup: host` setting depends on this.
 
+### Network Fabric (optional eBPF edge)
+
+Compose mounts [`configs/fluxvm-dataplane.toml`](../configs/fluxvm-dataplane.toml) as
+`/etc/fluxvm.toml`, mounts host `/sys/fs/bpf`, and raises memlock so
+`sandbox.dataplane.mode = "ebpf"` can attach. After first green attach
+(`schema_version=3`), set `required = true` for fail-closed. Operator guide:
+[guides/vm-drivers/fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md).
+
 ## Build
 
 Fabric's own image is a plain single-context build; FluxVM's needs the sibling `guestkit` repo

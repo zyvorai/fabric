@@ -4,6 +4,12 @@ Configure virtual networking for your VMs. This tutorial covers bridges,
 VLANs, bond interfaces, port forwarding, network policies, and DNS
 configuration.
 
+> **Two policy planes:** Fabric **Net Security** network policies are host SDN
+> (label → nftables). Per-VM TC/eBPF edge policy is the **Dataplane** tab /
+> `/api/vms/{name}/dataplane/*` — see
+> [VM edge dataplane](../guides/vm-drivers/fluxvm-dataplane.md). This tutorial
+> focuses on bridges, VLANs, forwards, and Fabric SDN.
+
 **Level:** Intermediate
 **Time:** 45 minutes
 **Prerequisites:** Completed [Tutorial 01](01-first-vm.md), Zyvor Fabric running

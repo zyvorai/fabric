@@ -1,12 +1,17 @@
-# FluxVM companion config fragment for Zyvor Fabric.
+# FluxVM companion config — Network Fabric v3 GA (for Zyvor Fabric).
 # Mounted as /etc/fluxvm.toml when Fabric runs FluxVM via compose/k8s.
 #
-# Network Fabric v3: native TC/eBPF VM-edge dataplane. Keep required=false
-# until the first green attach on a node; then harden with required=true.
-# Fabric's own [network] bridge /network-policies SDN stays independent.
+# required=true fail-closes when a host-visible VM edge exists but attach
+# fails. user NAT / mode=none soft-skip (no edge). Fabric SDN stays independent.
 
 [sandbox.dataplane]
 mode = "ebpf"
 bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"
 pin_root = "/sys/fs/bpf/fluxvm"
-required = false
+required = true
+default_allow = false
+allow_cidrs = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+allow_ports = ["tcp/443", "tcp/80", "udp/53"]
+max_egress_mbps = 250
+max_egress_pps = 100000
+sample_rate = 100

@@ -60,6 +60,10 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | `GET /api/vms/{name}/dataplane/flows?limit=` | `…/network/flows` |
 
 ```bash
+# HTTPS labs — URL + JWT (self-signed accepted when URL is https://)
+export ZYVOR_FABRIC_URL=https://127.0.0.1:9095
+export ZYVOR_FABRIC_TOKEN=…   # from POST /api/auth/login
+
 zyvorctl dataplane status <name>
 zyvorctl dataplane policy get <name>
 zyvorctl dataplane policy set <name> --file policy.json
@@ -67,8 +71,9 @@ zyvorctl dataplane stats <name>
 zyvorctl dataplane flows <name> --limit 100
 ```
 
-**Do not confuse** this with Fabric's `/api/network-policies` (label→nftables SDN on the host). The VM-detail Network tab labels the panel **“VM edge dataplane (FluxVM)”**.
+**Do not confuse** this with Fabric's `/api/network-policies` (label→nftables SDN on the host). The VM-detail tab is labeled **Dataplane**; the Network tab links to it as **“VM edge dataplane (FluxVM)”**.
 
+Operator UX detail: [fluxvm-dataplane.md](fluxvm-dataplane.md).
 Log streaming's one fidelity reduction: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority. Image catalog's `pull-tar`/`import-tar`/`export-tar` are permanently unsupported, not just for now — a tar rootfs isn't a bootable disk image for a real hardware VM, so building that would mean writing a full tar-to-bootable-image converter, a different project from wiring up an existing capability.
 
 ## Known gaps (as of FluxVM v0.1.0)

@@ -20,7 +20,7 @@
 - VM templates
 - VM state persistence
 - VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor)
-- **VM edge dataplane (FluxVM Network Fabric v3)** — proxied at `/api/vms/{name}/dataplane/*`; VM **Dataplane** tab; `zyvorctl dataplane` (status, policy, stats, flows). Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md).
+- **VM edge dataplane (FluxVM Network Fabric v3 GA)** — proxied at `/api/vms/{name}/dataplane/*`; VM **Dataplane** tab (Status / Policy / Stats / Flows + identity); Dashboard **VM dataplane** capability; `zyvorctl dataplane` with `ZYVOR_FABRIC_URL` / `ZYVOR_FABRIC_TOKEN` for HTTPS. Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) and [customer dataplane](docs/customer/pages/infrastructure/dataplane.md).
 - CPU and memory configuration (`--cpus`, `--ram`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)
@@ -196,7 +196,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 ### Network Security (Cilium-style)
 
 - **Network Policies** -- Label-based ingress/egress rules with direction badges, priority, and enforcement status
-- **VM edge dataplane (FluxVM)** -- Separate from SDN: per-VM TC/eBPF allowlists, Mbps/PPS, stats/flows via Dataplane tab / `/api/vms/{name}/dataplane/*` when FluxVM runs `mode=ebpf`
+- **VM edge dataplane (FluxVM)** -- Separate from SDN: per-VM TC/eBPF allowlists, Mbps/PPS, stats/flows via Dataplane tab / `/api/vms/{name}/dataplane/*` when FluxVM runs `mode=ebpf`. Ports are `tcp|udp/PORT`. Dashboard capability `vm_dataplane`.
 - **VM Firewall** -- Per-VM profiles with rule builder (protocol/port/CIDR/action), zones, and VM assignments
 - **Service Mesh** -- Virtual IP services with load balancing (round-robin, least-conn, random, IP-hash), backend management
 - **QoS / Traffic Shaping** -- Guaranteed/max rate with burst, priority-based bandwidth management, label selectors

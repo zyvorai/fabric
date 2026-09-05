@@ -17,6 +17,7 @@ import {
   FlowRecord,
   VmNetworkPolicy,
   getDataplaneFlows,
+  getDataplanePolicy,
   getDataplaneStats,
   getDataplaneStatus,
   setDataplanePolicy,
@@ -26,6 +27,7 @@ import { toastFailure } from '../../utils/toastError'
 import { formatUserError } from '../../utils/apiError'
 import { usePermissions } from '../../hooks/usePermissions'
 import { StatusBadge } from '../../components/ui'
+import SubsystemBanner from '../../components/SubsystemBanner'
 
 type PanelTab = 'status' | 'policy' | 'stats' | 'flows'
 
@@ -92,8 +94,9 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [st, stStats, fl] = await Promise.all([
+      const [st, pol, stStats, fl] = await Promise.all([
         getDataplaneStatus(vmName),
+        getDataplanePolicy(vmName).catch(() => null),
         getDataplaneStats(vmName).catch(() => null),
         getDataplaneFlows(vmName, flowLimit).catch(() => ({ items: [] as FlowRecord[] })),
       ])
@@ -101,7 +104,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
       setStats(stStats)
       setFlows(fl.items)
       if (!dirty) {
-        const p = st.policy ?? emptyPolicy()
+        const p = pol ?? st.policy ?? emptyPolicy()
         setPolicy(p)
         setJsonText(JSON.stringify(p, null, 2))
       }
@@ -157,6 +160,10 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
   const addPort = () => {
     const v = portDraft.trim()
     if (!v) return
+    if (!/^(tcp|udp)\/\d{1,5}(-\d{1,5})?$/i.test(v)) {
+      toast.error('Ports must look like tcp/443 or udp/53')
+      return
+    }
     if (policy.allow_ports.includes(v)) {
       toast.error('Port already listed')
       return
@@ -192,7 +199,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
       updatePolicy({
         default_allow: false,
         allow_cidrs: ['0.0.0.0/0', '::/0'],
-        allow_ports: ['80', '443'],
+        allow_ports: ['tcp/80', 'tcp/443', 'udp/53'],
         max_egress_mbps: 100,
         max_egress_pps: 10000,
         sample_rate: Math.max(policy.sample_rate, 1),
@@ -257,7 +264,9 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
 
   if (error) {
     return (
-      <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-6 space-y-3">
+      <div className="space-y-3">
+        <SubsystemBanner subsystem="vm_dataplane" title="VM edge dataplane" />
+        <div className="bg-[#f5f5f7] rounded-xl border border-[#d2d2d7] p-6 space-y-3">
         <div className="flex items-center gap-2 text-red-600">
           <AlertCircle className="w-4 h-4" />
           <span className="text-sm font-medium">VM edge dataplane (FluxVM)</span>
@@ -270,12 +279,14 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
         <button type="button" onClick={() => { setLoading(true); void load() }} className="zf-btn zf-btn-ghost zf-btn-sm">
           <RefreshCw className="w-3.5 h-3.5" /> Retry
         </button>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
+      <SubsystemBanner subsystem="vm_dataplane" title="VM edge dataplane" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Shield className="w-4 h-4 text-[#0071e3]" />
@@ -372,6 +383,50 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
               path / memlock / bpffs mounts.
             </p>
           )}
+          <div className="bg-white rounded-xl border border-[#d2d2d7] p-4 space-y-2">
+            <p className="text-xs font-medium text-[#6e6e73] uppercase tracking-wide">
+              Active policy snapshot
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <Stat
+                label="Default allow"
+                value={(status.policy ?? policy).default_allow ? 'yes' : 'no'}
+              />
+              <Stat
+                label="Allow CIDRs"
+                value={String((status.policy ?? policy).allow_cidrs.length)}
+              />
+              <Stat
+                label="Allow ports"
+                value={String((status.policy ?? policy).allow_ports.length)}
+              />
+              <Stat
+                label="Sample rate"
+                value={String((status.policy ?? policy).sample_rate)}
+              />
+              <Stat
+                label="Max Mbps"
+                value={(status.policy ?? policy).max_egress_mbps?.toString() ?? 'unlimited'}
+              />
+              <Stat
+                label="Max PPS"
+                value={(status.policy ?? policy).max_egress_pps?.toString() ?? 'unlimited'}
+              />
+            </div>
+            {((status.policy ?? policy).allow_ports.length > 0 ||
+              (status.policy ?? policy).allow_cidrs.length > 0) && (
+              <p className="text-xs text-[#6e6e73] font-mono break-all">
+                {[...(status.policy ?? policy).allow_cidrs, ...(status.policy ?? policy).allow_ports]
+                  .slice(0, 12)
+                  .join(' · ')}
+                {(status.policy ?? policy).allow_cidrs.length +
+                  (status.policy ?? policy).allow_ports.length >
+                12
+                  ? ' · …'
+                  : ''}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -434,7 +489,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
 
               <TagList
                 label="Allow ports"
-                hint="Port or range — e.g. 443 or 8000-8999"
+                hint="Must be tcp/PORT or udp/PORT — e.g. tcp/443 or udp/53"
                 items={policy.allow_ports}
                 draft={portDraft}
                 setDraft={setPortDraft}
@@ -442,7 +497,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                 onRemove={removePort}
                 onClear={() => updatePolicy({ allow_ports: [] })}
                 disabled={!canWrite}
-                placeholder="Add port"
+                placeholder="tcp/443"
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -586,6 +641,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs font-medium text-[#6e6e73] uppercase tracking-wider border-b border-[#d2d2d7]">
+                      <th className="py-2.5 px-3">Identity</th>
                       <th className="py-2.5 px-3">Family</th>
                       <th className="py-2.5 px-3">Source</th>
                       <th className="py-2.5 px-3">Destination</th>
@@ -602,6 +658,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                         key={`${f.identity}-${f.source}-${f.destination}-${f.source_port}-${i}`}
                         className="border-t border-[#d2d2d7]/60 hover:bg-[#f5f5f7]"
                       >
+                        <td className="py-2 px-3 font-mono text-xs text-[#6e6e73]">{f.identity}</td>
                         <td className="py-2 px-3 text-[#6e6e73]">IPv{f.family}</td>
                         <td className="py-2 px-3 font-mono text-xs">
                           {f.source}:{f.source_port}

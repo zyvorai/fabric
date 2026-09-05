@@ -18,7 +18,7 @@ Dashboard — the fabric at a glance: how many VMs exist and in what state, live
 
 ## Operate from the console (UX)
 
-1. Check subsystem status (VM driver, storage, network security, authentication, events) — each shows Live, Unreachable, or Off.
+1. Check subsystem status (VM driver, storage, network security, **VM dataplane**, authentication, events) — each shows Live, Unreachable, or Off. **VM dataplane** reports FluxVM Network Fabric (`mode=ebpf · attached · schema=3` when healthy).
 2. Read the stat cards: total VMs, running, stopped, and total allocated memory/vCPUs.
 3. Watch live CPU and memory usage charts when VMs are running.
 4. Scan the VM table, or open [Virtual Machines](vms.md).
@@ -27,6 +27,7 @@ Dashboard — the fabric at a glance: how many VMs exist and in what state, live
 ## Related pages
 
 - [Virtual Machines](vms.md)
+- [VM Dataplane](../infrastructure/dataplane.md)
 - [Create VM](create.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

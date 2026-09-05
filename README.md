@@ -11,7 +11,7 @@
 [![Built on FluxVM](https://img.shields.io/badge/VM%20engine-FluxVM-8a2be2)](https://github.com/zyvorai/fluxvm)
 [![Built on GuestKit](https://img.shields.io/badge/guest%20tooling-GuestKit-2ea44f)](https://github.com/zyvorai/guestkit)
 
-[Quick start](#quick-start) · [Deploy](#deploy) · [Kubernetes](#run-on-kubernetes) · [Why Fabric](#why-zyvor-fabric) · [Architecture](#built-on-fluxvm--guestkit) · [Network Fabric](#network-fabric-architecture-how-it-works) · [Docs](#documentation)
+[Quick start](#quick-start) · [Deploy](#deploy) · [Kubernetes](#run-on-kubernetes) · [Why Fabric](#why-zyvor-fabric) · [Architecture](#built-on-fluxvm--guestkit) · [Network Fabric](#network-fabric-architecture-how-it-works) · [Ahead of other VMMs](#why-fabric--network-fabric-is-ahead-of-other-vmms) · [Docs](#documentation)
 
 </div>
 
@@ -327,30 +327,30 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant Op as Operator / Web / zyvorctl
+  participant Op as Operator Web or CLI
   participant Fab as zyvor-fabricd
   participant Fv as FluxVM scheduler
-  participant Dp as dataplane/ebpf
-  participant Kern as Kernel TC+maps
+  participant Dp as dataplane eBPF
+  participant Kern as Kernel TC maps
 
-  Op->>Fab: create/start bridged VM
-  Fab->>Fv: POST /v1/vms Tap.netns=true
-  Fv->>Dp: apply_sandbox_policy iface policy
-  Dp->>Kern: load+pin prog/maps
-  Dp->>Kern: write fluxvm_id + CIDR/L4/rate maps
+  Op->>Fab: create or start bridged VM
+  Fab->>Fv: POST v1 vms Tap netns true
+  Fv->>Dp: apply_sandbox_policy
+  Dp->>Kern: load and pin prog maps
+  Dp->>Kern: write fluxvm_id CIDR L4 rate maps
   Dp->>Kern: tc filter add after maps ready
-  Dp->>Dp: write /run meta + fingerprint
+  Dp->>Dp: write run meta and fingerprint
 
-  Op->>Fab: POST /api/vms/name/dataplane/policy
-  Fab->>Fv: POST /v1/vms/id/network/policy
+  Op->>Fab: POST dataplane policy
+  Fab->>Fv: POST network policy
   Fv->>Dp: reconfigure_sandbox_policy
   Dp->>Kern: deny-all on iface
-  Dp->>Kern: replace CIDR/L4/rate maps
+  Dp->>Kern: replace CIDR L4 rate maps
   Dp->>Kern: publish final iface config
-  Note over Dp,Kern: May over-deny briefly never allow-all gap
+  Note over Dp,Kern: Brief over-deny window only never allow-all
 
-  Op->>Fab: GET dataplane/status stats flows
-  Fab->>Fv: GET /network/status stats flows
+  Op->>Fab: GET dataplane status stats flows
+  Fab->>Fv: GET network status stats flows
   Fv-->>Fab: JSON
   Fab-->>Op: same shape
 
@@ -403,9 +403,74 @@ zyvorctl dataplane stats <name>
 zyvorctl dataplane flows <name> [--limit 100]
 ```
 
+HTTPS labs: `export ZYVOR_FABRIC_URL=https://127.0.0.1:9095` and `export ZYVOR_FABRIC_TOKEN=<jwt>` (from `/api/auth/login`).
+
 ### Enable packaging
 
 Ship [`configs/fluxvm-dataplane.toml`](configs/fluxvm-dataplane.toml) (`mode = "ebpf"`). Compose/k8s mount it as `/etc/fluxvm.toml`, mount host `/sys/fs/bpf`, and raise memlock (`SYS_RESOURCE` / `ulimit memlock=-1`). Image must include `/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o`. After first green attach (`schema_version=3`, `attached=true`), set `required = true` for fail-closed production.
+
+### Why Fabric + Network Fabric is ahead of other VMMs
+
+Most hypervisor stacks still treat VM egress as **host netfilter theater**: libvirt/iptables chains, a shared bridge + firewall, or QEMU user-mode NAT. Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-edge dataplane**, so policy, rate limits, and telemetry are first-class — not afterthought scripts.
+
+```mermaid
+flowchart LR
+  subgraph traditional [Traditional VMM path]
+    TGuest[Guest] --> TTap[TAP / bridge]
+    TTap --> TNft[iptables / nft / virbr0]
+    TNft --> TOut[Host / WAN]
+  end
+
+  subgraph fabricPath [Fabric + FluxVM Network Fabric v3]
+    FGuest[Guest] --> FTap[TAP / netns veth]
+    FTap --> FEbpf["TC eBPF on VM edge\nLPM · L4 · Mbps/PPS · flows"]
+    FEbpf --> FOut[Host / Cilium / Fabric SDN]
+    UX[Web Dataplane tab · zyvorctl · REST] -.->|live map rewrite| FEbpf
+  end
+```
+
+```mermaid
+quadrantChart
+    title Control-plane maturity vs packet-path speed
+    x-axis Slow / rebuild-heavy --> Fast / in-kernel maps
+    y-axis Scripted / host-only --> API + UI + telemetry
+    quadrant-1 Ahead today
+    quadrant-2 UX without speed
+    quadrant-3 Legacy baseline
+    quadrant-4 Fast but opaque
+    Libvirt nft: [0.25, 0.30]
+    Shared bridge FW: [0.35, 0.35]
+    QEMU usernet: [0.15, 0.20]
+    Cloud hypervisor raw: [0.55, 0.25]
+    Firecracker CNI: [0.60, 0.40]
+    Fabric plus Network Fabric v3: [0.88, 0.90]
+```
+
+| Capability | libvirt / virsh + nft | Shared bridge + host FW | QEMU user NAT | Typical microVM + CNI | **Fabric + Network Fabric v3** |
+|---|---|---|---|---|---|
+| Per-VM L3/L4 egress allowlists | Manual chains | Host-wide rules | Soft / limited | Pod-oriented | **First-class** `allow_cidrs` + `tcp\|udp/PORT` |
+| Live policy without detach | Flush/reload gaps | Blast radius | Restart usernet | CNI reconcile | **In-place BPF map update** (~100–120 ms p50 in lab) |
+| Mbps / PPS egress caps | Separate tc/htb | Rare | Soft | Depends on CNI | **Maps on the same classifier** |
+| Dual-stack L3+L4 | Easy to drift | Often IPv4-only | Limited | Varies | **One TC program** |
+| Per-VM stats + LRU flows via API | tcpdump / conntrack | Host-centric | Almost none | Sidecar / Hubble-ish | **`/dataplane/stats` + `/flows`** |
+| Operator UX | virsh + shell | Same | Same | kubectl-heavy | **VM → Dataplane tab · `zyvorctl dataplane` · 4 REST verbs** |
+| Host SDN still available | You build it | You build it | N/A | NetworkPolicy | **Fabric `/network-policies` orthogonal** |
+| Cilium coexistence | iptables fights | Same | N/A | Native | **`mode=cilium` — FluxVM owns VM edge only** |
+
+**Shipped in Fabric UX (all wired; lab UX verified):**
+
+| Surface | Status · Policy · Stats · Flows |
+|---------|----------------------------------|
+| Web | VM details → **Dataplane** (presets, JSON, identity column, auto-refresh) |
+| REST | `/api/vms/{name}/dataplane/{status,policy,stats,flows}` |
+| CLI | `zyvorctl dataplane …` (`ZYVOR_FABRIC_URL` + `ZYVOR_FABRIC_TOKEN` for HTTPS labs) |
+| Dashboard | **VM dataplane** capability card (`mode` / attached / schema) |
+
+Operator guide (enablement, create-bridged recipe, troubleshooting, UX checklist):
+[docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md).
+Customer console: [docs/customer/pages/infrastructure/dataplane.md](docs/customer/pages/infrastructure/dataplane.md).
+
+Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com/zyvorai/fluxvm#why-network-fabric-is-faster-than-traditional-vm-networking).
 
 ---
 

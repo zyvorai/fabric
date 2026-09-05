@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Net Security — the advanced SDN and security control plane: network policies scoped to security identities, host firewall profiles/zones/VM assignments, exposed services, QoS traffic shaping, DNS zones/policies, WireGuard VPN tunnels and networks, traffic mirroring, NAT rules/pools/gateways, and bandwidth monitoring with alerts. For everyday per-VM networking mode and port forwards, see [Network](network.md) instead.
+Net Security — the advanced SDN and security control plane: network policies scoped to security identities, host firewall profiles/zones/VM assignments, exposed services, QoS traffic shaping, DNS zones/policies, WireGuard VPN tunnels and networks, traffic mirroring, NAT rules/pools/gateways, and bandwidth monitoring with alerts.
+
+For everyday per-VM networking mode and port forwards, see [Network](network.md). For **per-VM TC/eBPF edge** allowlists, Mbps/PPS, and flows (FluxVM Network Fabric), see [VM Dataplane](dataplane.md) — that plane is orthogonal and does not replace these host policies.
 
 ## When to use it
 
@@ -37,5 +39,7 @@ If the page stays empty, check service health, auth configuration, and that depe
 
 ## Related pages
 
+- [VM Dataplane](dataplane.md) — FluxVM eBPF edge (orthogonal)
+- [Network](network.md) — NAT / bridge / port forwards
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

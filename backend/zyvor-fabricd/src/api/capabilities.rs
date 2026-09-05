@@ -30,6 +30,8 @@ pub struct CapabilitiesResponse {
     pub vm_driver: SubsystemStatus,
     pub storage: SubsystemStatus,
     pub network_security: SubsystemStatus,
+    /// FluxVM Network Fabric v3 (TC/eBPF VM-edge) — orthogonal to Fabric SDN.
+    pub vm_dataplane: SubsystemStatus,
     pub auth: SubsystemStatus,
     pub events: SubsystemStatus,
 }
@@ -42,6 +44,7 @@ pub async fn get_capabilities(
     let vm_driver = probe_vm_driver(&state).await;
     let storage = probe_storage(&state).await;
     let network_security = probe_network_security(&state);
+    let vm_dataplane = probe_vm_dataplane(&state).await;
     let auth = probe_auth(&state);
     let events = probe_events(&state);
 
@@ -49,6 +52,7 @@ pub async fn get_capabilities(
         vm_driver,
         storage,
         network_security,
+        vm_dataplane,
         auth,
         events,
     })
@@ -116,5 +120,76 @@ fn probe_network_security(state: &AppState) -> SubsystemStatus {
         detail: Some(format!(
             "Policy engine active · {policy_count} network polic(ies)"
         )),
+    }
+}
+
+/// Probe FluxVM Network Fabric via the first registered VM (or API readiness).
+async fn probe_vm_dataplane(state: &AppState) -> SubsystemStatus {
+    let machines = match state.driver.list_machines().await {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::debug!("capabilities: vm dataplane unreachable: {}", e);
+            return SubsystemStatus {
+                phase: SubsystemPhase::Unreachable,
+                detail: Some("Could not reach the FluxVM driver for dataplane status".to_string()),
+            };
+        }
+    };
+
+    let Some(sample) = machines.first() else {
+        return SubsystemStatus {
+            phase: SubsystemPhase::Live,
+            detail: Some(
+                "Dataplane API ready · no VMs yet (create a bridged/netns VM to attach eBPF)"
+                    .to_string(),
+            ),
+        };
+    };
+
+    match state.driver.dataplane_status(&sample.name).await {
+        Ok(st) => {
+            let mode = st.mode.to_ascii_lowercase();
+            if mode == "legacy" {
+                SubsystemStatus {
+                    phase: SubsystemPhase::Off,
+                    detail: Some(
+                        "sandbox.dataplane.mode=legacy — set mode=ebpf (or cilium) for Network Fabric v3"
+                            .to_string(),
+                    ),
+                }
+            } else if st.attached {
+                SubsystemStatus {
+                    phase: SubsystemPhase::Live,
+                    detail: Some(format!(
+                        "mode={mode} · attached · schema={}",
+                        st.schema_version
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| "?".into())
+                    )),
+                }
+            } else {
+                SubsystemStatus {
+                    phase: SubsystemPhase::Live,
+                    detail: Some(format!(
+                        "mode={mode} · API live · not attached on sample VM '{}' (need TAP/netns + BPF object)",
+                        sample.name
+                    )),
+                }
+            }
+        }
+        Err(e) => {
+            tracing::debug!(
+                "capabilities: dataplane status for '{}': {}",
+                sample.name,
+                e
+            );
+            SubsystemStatus {
+                phase: SubsystemPhase::Unreachable,
+                detail: Some(format!(
+                    "Dataplane probe failed on '{}': {e}",
+                    sample.name
+                )),
+            }
+        }
     }
 }

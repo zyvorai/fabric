@@ -20,6 +20,9 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 - Interactive terminal console (xterm.js) and graphical VNC console (noVNC)
 - Live metrics graphs
 - Cilium-style network security management with 9 tabs
+- **VM edge dataplane (Network Fabric v3)** — VM detail → **Dataplane** tab
+  (Status / Policy / Stats / Flows), plus Dashboard **VM dataplane** capability
+  card; see [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md)
 - Command palette (`Ctrl+K` / `Cmd+K`) and `g` sequence shortcuts
 - Toast notifications and structured API error banners
 - Light Apple visual system (SF Pro / system UI font; no dark/steel/aurora themes)
@@ -27,6 +30,17 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 - Responsive console with collapsible mobile nav
 
 Human UI is **web only**. CLI (`zyvorctl`), Kubernetes operator, and Terraform remain. Terminal UI (`zyvorctl-tui`) removed.
+
+### Dataplane console (detail)
+
+| Location | What |
+|----------|------|
+| `/app` | Capability card **VM dataplane** — Live when FluxVM eBPF is attached |
+| `/app/vms/:name` → **Dataplane** | Status snapshot, policy editor (presets + JSON), stats, flows with identity |
+| `/app/vms/:name` → **Network** | Teaser button **Open Dataplane** |
+
+Policy ports must be entered as `tcp/443` / `udp/53`. Bridged (`network_tap`)
+VMs are required for attach; user-mode NAT VMs will not show `attached=true`.
 
 ---
 
