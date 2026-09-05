@@ -81,7 +81,7 @@ zbus = { version = "4", default-features = false, features = ["tokio"] }
 async-stream = "0.3"
 async-trait = "0.1"
 rcgen = { version = "0.13", features = ["pem", "x509-parser"] }
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 time = "0.3"
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
