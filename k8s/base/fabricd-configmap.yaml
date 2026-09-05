@@ -9,7 +9,8 @@ metadata:
 data:
   zyvor-fabricd.toml: |
     # Lab / in-cluster profile — TLS off (terminate at Ingress if needed).
-    # Auth stays on; admin password comes from ZYVOR_FABRICD_ADMIN_PASSWORD.
+    # Auth stays on; admin password comes from Secret zyvor-fabric-secrets
+    # via ZYVOR_FABRICD_ADMIN_PASSWORD (default lab: admin / Admin@321).
     [daemon]
     listen = "0.0.0.0:9095"
     cors_origins = ["*"]

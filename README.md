@@ -121,7 +121,7 @@ Fabric on Kubernetes uses the same **lab packaging pattern as Ragnarok** (manife
 | UI + API (hostNetwork) | **9095** |
 | FluxVM | **7788** (node-local) |
 
-Open `http://HOST:30095/` after deploy. Set `FABRIC_ADMIN_PASSWORD` to pin the admin login (otherwise a random password is printed).
+Open `http://HOST:30095/` after deploy. **Login:** `admin` / `Admin@321` (Kubernetes Secret `zyvor-fabric-secrets`).
 
 ### Local kubectl / Helm
 

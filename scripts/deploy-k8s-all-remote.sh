@@ -17,6 +17,7 @@
 # Env:
 #   DEPLOY_HOST, DEPLOY_USER, DEPLOY_PASS / SSHPASS, DEPLOY_DIR
 #   IMAGE_TAG=local  FABRIC_ADMIN_PASSWORD  FABRIC_SKIP_FLUXVM=1
+#   Default credentials (Kubernetes Secret): admin / Admin@321
 #   FLUXVM_DIR / GUESTKIT_DIR — local paths to rsync for fluxvm image build
 # ============================================================================
 set -euo pipefail
@@ -150,13 +151,11 @@ _rsync() {
 }
 
 gen_password() {
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -base64 18
-  else
-    python3 -c "import secrets; print(secrets.token_urlsafe(18))"
-  fi
+  # Unused for K8s defaults — credentials live in the Secret (admin / Admin@321).
+  printf '%s' 'Admin@321'
 }
-ADMIN_PASS="${FABRIC_ADMIN_PASSWORD:-$(gen_password)}"
+ADMIN_PASS="${FABRIC_ADMIN_PASSWORD:-Admin@321}"
+ADMIN_USER="${FABRIC_ADMIN_USERNAME:-admin}"
 
 vmspawn_build_metadata "$REPO_DIR"
 
@@ -287,12 +286,20 @@ _ssh "
   ${SUDO} kubectl apply -f k8s/base/namespace.yaml
   ${SUDO} kubectl apply -f k8s/base/fabricd-configmap.yaml
 
-  ${SUDO} kubectl delete secret zyvor-fabric-secrets -n ${NAMESPACE} 2>/dev/null || true
-  JWT_SECRET=\$(openssl rand -base64 32 2>/dev/null || head -c 32 /dev/urandom | base64)
-  ${SUDO} kubectl create secret generic zyvor-fabric-secrets \\
-    --from-literal=admin-password='${ADMIN_PASS}' \\
-    --from-literal=jwt-secret=\"\$JWT_SECRET\" \\
-    -n ${NAMESPACE}
+  # Credentials: Kubernetes Secret only (never systemd .admin_password).
+  # Default new deploy: admin / Admin@321. Preserve existing Secret unless FORCE_SECRET=1.
+  if [ \"${FORCE_SECRET:-}\" = \"1\" ] || ! ${SUDO} kubectl get secret zyvor-fabric-secrets -n ${NAMESPACE} >/dev/null 2>&1; then
+    JWT_SECRET=\$(openssl rand -base64 32 2>/dev/null || head -c 32 /dev/urandom | base64)
+    ${SUDO} kubectl create secret generic zyvor-fabric-secrets \\
+      --from-literal=admin-username='${ADMIN_USER}' \\
+      --from-literal=admin-password='${ADMIN_PASS}' \\
+      --from-literal=jwt-secret=\"\$JWT_SECRET\" \\
+      -n ${NAMESPACE} \\
+      --dry-run=client -o yaml | ${SUDO} kubectl apply -f -
+    echo '[k8s] Applied Secret zyvor-fabric-secrets (admin / Admin@321 unless overridden)'
+  else
+    echo '[k8s] Keeping existing Secret zyvor-fabric-secrets (FORCE_SECRET=1 to replace)'
+  fi
 
   if [ \"${FABRIC_SKIP_FLUXVM:-}\" = \"1\" ]; then
     echo '[k8s] FABRIC_SKIP_FLUXVM=1 — skipping fluxvm DaemonSet'
@@ -311,8 +318,8 @@ _ssh "
   ${SUDO} kubectl rollout restart daemonset/fluxvm -n ${NAMESPACE} 2>/dev/null || true
 
   ${SUDO} kubectl rollout status daemonset/zyvor-fabricd -n ${NAMESPACE} --timeout=300s || true
-  ${SUDO} kubectl get pods,svc -n ${NAMESPACE} || true
-  echo \"Admin password: ${ADMIN_PASS}\"
+  ${SUDO} kubectl get pods,svc,secret -n ${NAMESPACE} || true
+  echo \"Login: ${ADMIN_USER} / (Secret zyvor-fabric-secrets key admin-password)\"
 " 2>&1 | sed -e 's/^/  [k8s] /'
 end_phase
 
@@ -328,7 +335,7 @@ end_phase
 elapsed=$(( $(now_epoch) - RUN_STARTED_AT ))
 echo ""
 deploy_ui_kv "💚" "UI / API" "http://${HOST}:${NODE_PORT}/  (also :9095)"
-deploy_ui_kv "🔑" "Admin password" "${ADMIN_PASS}"
+deploy_ui_kv "🔑" "Login" "${ADMIN_USER} / Admin@321 (Secret zyvor-fabric-secrets)"
 deploy_ui_kv "⏱" "Total" "$(format_duration "${elapsed}")"
 if [[ "${code_np}" == "200" || "${code_hn}" == "200" ]]; then
   deploy_ui_info "Deploy OK"

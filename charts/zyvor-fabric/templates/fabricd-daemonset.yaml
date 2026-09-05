@@ -51,8 +51,24 @@ spec:
             secretKeyRef:
               name: {{ $secretName }}
               key: jwt-secret
+        - name: ZYVOR_FABRICD_ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ $secretName }}
+              key: admin-username
+              optional: true
         - name: ZYVOR_FABRICD_LOG_LEVEL
           value: {{ .Values.fabricd.logLevel | quote }}
+        - name: ZYVOR_FABRICD_DEPLOY_MODE
+          value: kubernetes
+        - name: ZYVOR_FABRICD_K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         securityContext:
           privileged: true
           capabilities:

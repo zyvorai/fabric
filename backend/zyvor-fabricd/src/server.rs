@@ -334,6 +334,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     // Public auth routes (no JWT required)
     let public_auth_routes = Router::new()
         .route("/auth/login", post(api::auth::login))
+        .route("/instance", get(api::instance::get_instance))
         .with_state(state.clone());
 
     // Protected API routes

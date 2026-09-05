@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Local / CI deploy: kubectl apply k8s/base for zyvor-fabric.
+# Credentials come from Kubernetes Secret zyvor-fabric-secrets (admin / Admin@321).
 # Env:
-#   BUILD_IMAGES=true  — build zyvor-fabricd (+ fluxvm if siblings present) first
-#   IMAGE_TAG=local    — image tag (default local)
-#   ADMIN_PASSWORD     — used when creating secret (default: random)
+#   BUILD_IMAGES=true  — build images first
+#   IMAGE_TAG=local
+#   FABRIC_ADMIN_PASSWORD / FABRIC_ADMIN_USERNAME — override secret on --force-secret
+#   FORCE_SECRET=1 — recreate secret from defaults/env
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,17 +21,12 @@ echo "Deploying Zyvor Fabric to Kubernetes (namespace=${NAMESPACE})..."
 kubectl apply -f k8s/base/namespace.yaml
 kubectl apply -f k8s/base/fabricd-configmap.yaml
 
-if ! kubectl get secret zyvor-fabric-secrets -n "${NAMESPACE}" &>/dev/null; then
-  ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -base64 18 2>/dev/null || python3 -c 'import secrets; print(secrets.token_urlsafe(18))')}"
-  JWT_SECRET="$(openssl rand -base64 32 2>/dev/null || python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-  kubectl create secret generic zyvor-fabric-secrets \
-    --from-literal=admin-password="${ADMIN_PASSWORD}" \
-    --from-literal=jwt-secret="${JWT_SECRET}" \
-    -n "${NAMESPACE}"
-  echo "Created secret zyvor-fabric-secrets (admin password printed once below)."
-  echo "  admin-password: ${ADMIN_PASSWORD}"
+if [ "${FORCE_SECRET:-}" = "1" ] || ! kubectl get secret zyvor-fabric-secrets -n "${NAMESPACE}" &>/dev/null; then
+  FABRIC_ADMIN_USERNAME="${FABRIC_ADMIN_USERNAME:-admin}" \
+  FABRIC_ADMIN_PASSWORD="${FABRIC_ADMIN_PASSWORD:-Admin@321}" \
+    ./scripts/k8s-set-admin-secret.sh --apply
 else
-  echo "Secret zyvor-fabric-secrets already exists"
+  echo "Secret zyvor-fabric-secrets already exists (set FORCE_SECRET=1 to replace)"
 fi
 
 if [ "${BUILD_IMAGES:-}" = "true" ]; then
@@ -55,9 +52,9 @@ kubectl rollout status daemonset/zyvor-fabricd -n "${NAMESPACE}" --timeout=180s
 
 echo ""
 echo "Status:"
-kubectl get pods,svc -n "${NAMESPACE}"
+kubectl get pods,svc,secret -n "${NAMESPACE}"
 echo ""
+echo "Login: admin / Admin@321  (from Secret zyvor-fabric-secrets)"
 echo "Access:"
 echo "  NodePort: http://<node-ip>:${NODE_PORT}/health"
 echo "  hostNetwork: http://<node-ip>:9095/health"
-echo "  kubectl -n ${NAMESPACE} port-forward ds/zyvor-fabricd 9095:9095"

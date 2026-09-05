@@ -28,7 +28,7 @@ This guide covers **running fabricd + FluxVM on Kubernetes**. The separate [oper
 | `zyvor-fabricd` | DaemonSet, `hostNetwork` | nftables/rtnetlink on the real host; reach FluxVM on loopback |
 | `fluxvm` | DaemonSet, `hostNetwork`, privileged | KVM + cgroup/netns like compose |
 | Service | NodePort **30095** → 9095 | Lab UI/API (avoids Ragnarok 30061/30062) |
-| Secret | `zyvor-fabric-secrets` | `admin-password`, `jwt-secret` |
+| Secret | `zyvor-fabric-secrets` | `admin-username`, `admin-password`, `jwt-secret` (K8s Secret — not systemd files) |
 
 Web UI is **baked into** the `zyvor-fabricd` image (no separate frontend pod).
 
@@ -76,10 +76,17 @@ After success:
 | `http://HOST:9095/` | hostNetwork bind |
 | `http://HOST:30095/health` | Liveness smoke |
 
-Admin password: printed at end of deploy, or set ahead of time:
+Admin login for **new** Kubernetes deployments (from Secret):
+
+| Field | Default |
+|-------|---------|
+| Username | `admin` |
+| Password | `Admin@321` |
+
+Override with `FABRIC_ADMIN_PASSWORD` / `FABRIC_ADMIN_USERNAME`, or:
 
 ```bash
-FABRIC_ADMIN_PASSWORD='your-secret' ./scripts/deploy k8s sus@HOST
+./scripts/k8s-set-admin-secret.sh --apply --restart
 ```
 
 ### B. Local kubectl
@@ -106,7 +113,8 @@ make helm-template
 
 helm upgrade --install zyvor-fabric ./charts/zyvor-fabric \
   --namespace zyvor-fabric --create-namespace \
-  --set security.adminPassword='...' \
+  --set security.adminUsername=admin \
+  --set security.adminPassword='Admin@321' \
   --set security.jwtSecret="$(openssl rand -base64 32)" \
   --set fabricd.image.tag=local \
   --set fluxvm.image.tag=local
@@ -120,7 +128,41 @@ Useful values (see [charts/zyvor-fabric/values.yaml](../charts/zyvor-fabric/valu
 | `fluxvm.image.repository` / `tag` | `zyvor-fabric-fluxvm` / `local` | FluxVM image |
 | `fabricd.service.nodePort` | `30095` | Lab NodePort |
 | `fabricd.hostPath` | `/var/lib/zyvor-fabricd` | Persistent data on node |
-| `security.existingSecret` | `""` | Use a pre-created secret instead of chart-managed |
+| `security.adminUsername` | `admin` | Seeded admin username |
+| `security.adminPassword` | `Admin@321` | Seeded admin password (Secret) |
+| `security.existingSecret` | `""` | Use a pre-created Secret instead |
+
+---
+
+## Credentials (Kubernetes Secret)
+
+Fabric on Kubernetes **does not** use systemd’s `/var/lib/zyvor-fabricd/.admin_password` file.
+The DaemonSet reads credentials from Secret `zyvor-fabric-secrets`:
+
+| Key | Default (new deploy) |
+|-----|----------------------|
+| `admin-username` | `admin` |
+| `admin-password` | `Admin@321` |
+| `jwt-secret` | lab placeholder / random on first create |
+
+```bash
+# Apply / replace secret
+./scripts/k8s-set-admin-secret.sh --apply --restart
+
+# Or from manifests
+kubectl apply -f k8s/base/secret.yaml
+
+# Inspect (base64)
+kubectl -n zyvor-fabric get secret zyvor-fabric-secrets -o jsonpath='{.data.admin-username}' | base64 -d; echo
+```
+
+Password is seeded into `auth.db` only when the DB has **no users**. After changing the
+Secret password in lab, wipe the hostPath DB then restart:
+
+```bash
+sudo rm -f /var/lib/zyvor-fabricd/auth.db
+kubectl -n zyvor-fabric rollout restart daemonset/zyvor-fabricd
+```
 
 ---
 
@@ -128,7 +170,9 @@ Useful values (see [charts/zyvor-fabric/values.yaml](../charts/zyvor-fabric/valu
 
 | Variable | Purpose |
 |----------|---------|
-| `FABRIC_ADMIN_PASSWORD` | Admin login (random if unset) |
+| `FABRIC_ADMIN_PASSWORD` | Admin password for Secret (default **Admin@321**) |
+| `FABRIC_ADMIN_USERNAME` | Admin username for Secret (default **admin**) |
+| `FORCE_SECRET=1` | Recreate `zyvor-fabric-secrets` on deploy |
 | `FABRIC_SKIP_FLUXVM=1` | Skip FluxVM image sync/DaemonSet |
 | `FLUXVM_DIR` / `GUESTKIT_DIR` | Paths to siblings for image build |
 | `IMAGE_TAG` | Image tag (default `local`) |
