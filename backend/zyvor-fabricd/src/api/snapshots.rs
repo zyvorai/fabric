@@ -302,22 +302,19 @@ pub async fn create_snapshot(
         let socket_path = {
             let mut path: Option<String> = None;
             for attempt in 0..15u32 {
-                match state.driver.get_control_socket(&vm_name).await {
-                    Ok(Some(p)) => {
-                        let s = p.to_string_lossy().into_owned();
-                        let s_clone = s.clone();
-                        let ready = tokio::task::spawn_blocking(move || {
-                            wait_for_qmp_connectable(&s_clone, 1, 0)
-                        })
-                        .await
-                        .unwrap_or(Err("join".into()));
-                        if ready.is_ok() {
-                            path = Some(s);
-                            break;
-                        }
-                        path = Some(s); // keep last path for error message
+                if let Ok(Some(p)) = state.driver.get_control_socket(&vm_name).await {
+                    let s = p.to_string_lossy().into_owned();
+                    let s_clone = s.clone();
+                    let ready = tokio::task::spawn_blocking(move || {
+                        wait_for_qmp_connectable(&s_clone, 1, 0)
+                    })
+                    .await
+                    .unwrap_or(Err("join".into()));
+                    if ready.is_ok() {
+                        path = Some(s);
+                        break;
                     }
-                    Ok(None) | Err(_) => {}
+                    path = Some(s); // keep last path for error message
                 }
                 if attempt + 1 < 15 {
                     tokio::time::sleep(std::time::Duration::from_millis(400)).await;
