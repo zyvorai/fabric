@@ -70,6 +70,10 @@ enum Commands {
     /// Get VM metrics
     Metrics { name: String },
 
+    /// VM edge dataplane (FluxVM Network Fabric) — not Fabric SDN network-policies
+    #[command(subcommand)]
+    Dataplane(DataplaneCmd),
+
     // ─── Config import (JSON/YAML) ───────────────────────────────────────
     /// Apply configuration from a JSON or YAML file
     Apply {
@@ -140,6 +144,35 @@ enum Commands {
 }
 
 // ─── Sub-command enums ───────────────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum DataplaneCmd {
+    /// Show dataplane attach/schema status
+    Status { name: String },
+    /// Get or set per-VM edge policy
+    #[command(subcommand)]
+    Policy(DataplanePolicyCmd),
+    /// Show allow/drop counters
+    Stats { name: String },
+    /// List recent sampled flows
+    Flows {
+        name: String,
+        #[arg(long, default_value = "100")]
+        limit: usize,
+    },
+}
+
+#[derive(Subcommand)]
+enum DataplanePolicyCmd {
+    /// Get current policy
+    Get { name: String },
+    /// Set policy from a JSON file
+    Set {
+        name: String,
+        #[arg(short, long)]
+        file: String,
+    },
+}
 
 #[derive(Subcommand)]
 enum PolicyCmd {
@@ -854,6 +887,47 @@ impl Cli {
                 let val = api_get(&client, &format!("/vms/{}/metrics", name)).await?;
                 print_value(&val, fmt);
             }
+
+            Commands::Dataplane(cmd) => match cmd {
+                DataplaneCmd::Status { name } => {
+                    let val =
+                        api_get(&client, &format!("/vms/{}/dataplane/status", name)).await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Policy(pol) => match pol {
+                    DataplanePolicyCmd::Get { name } => {
+                        let val =
+                            api_get(&client, &format!("/vms/{}/dataplane/policy", name)).await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplanePolicyCmd::Set { name, file } => {
+                        let policy = load_config_file(&file)?;
+                        let val = api_post(
+                            &client,
+                            &format!("/vms/{}/dataplane/policy", name),
+                            &policy,
+                        )
+                        .await?;
+                        println!("Updated dataplane policy for '{}'", name);
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                },
+                DataplaneCmd::Stats { name } => {
+                    let val =
+                        api_get(&client, &format!("/vms/{}/dataplane/stats", name)).await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Flows { name, limit } => {
+                    let val = api_get(
+                        &client,
+                        &format!("/vms/{}/dataplane/flows?limit={}", name, limit),
+                    )
+                    .await?;
+                    print_value(&val, fmt);
+                }
+            },
 
             // ── Apply / Export ────────────────────────────────────────────
             Commands::Apply { file } => {

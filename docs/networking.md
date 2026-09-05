@@ -2,6 +2,8 @@
 
 Zyvor Fabric provides comprehensive virtual networking with bridge management, VLANs, port forwarding, and an enterprise-grade network security stack including firewalls, VPN mesh, NAT gateways, traffic shaping, and packet mirroring.
 
+**Two policy planes:** Fabric `/api/network-policies` is host SDN (label→nftables). Per-VM TC/eBPF edge policy lives on FluxVM and is exposed as `/api/vms/{name}/dataplane/*` — see [VM edge dataplane](guides/vm-drivers/fluxvm-dataplane.md). Do not conflate the two.
+
 ---
 
 ## Network Modes

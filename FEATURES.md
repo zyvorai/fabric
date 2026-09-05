@@ -20,6 +20,7 @@
 - VM templates
 - VM state persistence
 - VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor)
+- **VM edge dataplane (FluxVM Network Fabric v3)** — proxied at `/api/vms/{name}/dataplane/*`; VM **Dataplane** tab; `zyvorctl dataplane` (status, policy, stats, flows). Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md).
 - CPU and memory configuration (`--cpus`, `--ram`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)
@@ -36,7 +37,8 @@
 
 ### CLI (zyvorctl)
 
-- 15+ subcommand groups (vm, policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net)
+- 15+ subcommand groups (vm, policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net, dataplane)
+- `zyvorctl dataplane status|policy|stats|flows` — FluxVM Network Fabric edge (not SDN network-policies)
 - Output formats: table, JSON, YAML (`-o json|yaml|table`)
 - Declarative config import: `zyvorctl apply -f config.yaml`
 - Config export: `zyvorctl export <resource> -o yaml`
@@ -194,6 +196,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 ### Network Security (Cilium-style)
 
 - **Network Policies** -- Label-based ingress/egress rules with direction badges, priority, and enforcement status
+- **VM edge dataplane (FluxVM)** -- Separate from SDN: per-VM TC/eBPF allowlists, Mbps/PPS, stats/flows via Dataplane tab / `/api/vms/{name}/dataplane/*` when FluxVM runs `mode=ebpf`
 - **VM Firewall** -- Per-VM profiles with rule builder (protocol/port/CIDR/action), zones, and VM assignments
 - **Service Mesh** -- Virtual IP services with load balancing (round-robin, least-conn, random, IP-hash), backend management
 - **QoS / Traffic Shaping** -- Guaranteed/max rate with burst, priority-based bandwidth management, label selectors

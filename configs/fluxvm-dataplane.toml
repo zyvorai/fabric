@@ -1,0 +1,12 @@
+# FluxVM companion config fragment for Zyvor Fabric.
+# Mounted as /etc/fluxvm.toml when Fabric runs FluxVM via compose/k8s.
+#
+# Network Fabric v3: native TC/eBPF VM-edge dataplane. Keep required=false
+# until the first green attach on a node; then harden with required=true.
+# Fabric's own [network] bridge /network-policies SDN stays independent.
+
+[sandbox.dataplane]
+mode = "ebpf"
+bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"
+pin_root = "/sys/fs/bpf/fluxvm"
+required = false

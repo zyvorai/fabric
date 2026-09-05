@@ -24,11 +24,12 @@ bridge = "br0"
 
 [driver]
 # VM lifecycle is handled entirely by FluxVM (https://github.com/zyvorai/fluxvm),
-# a disposable-VM engine with no systemd dependency of its own. FluxVM's
-# newer per-VM storage backends (LVM thin/NBD/Ceph RBD) and network
-# namespaces aren't yet reachable through this driver — every VM still gets
-# FluxVM's default qcow2/raw storage and shared-bridge networking (see
-# fluxvm-client's crate doc comment for the full gap list).
+# a disposable-VM engine with no systemd dependency of its own. Bridged VMs use
+# per-VM netns taps. Network Fabric v3 (TC/eBPF edge dataplane) is proxied at
+# /api/vms/{name}/dataplane/* when FluxVM runs with
+# [sandbox.dataplane] mode = "ebpf" (see configs/fluxvm-dataplane.toml).
+# Pluggable storage backends (LVM/NBD/Ceph) and agent-sandbox APIs are not yet
+# surfaced through this driver (see docs/guides/vm-drivers/fluxvm.md).
 # FluxVM's REST API base URL.
 # fluxvm_url = "http://127.0.0.1:7788"
 # Bearer token for FluxVM's auth layer, if it has auth.tokens configured.

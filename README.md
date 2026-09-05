@@ -197,9 +197,70 @@ flowchart TB
   Daemon -- REST :7788 --> Flux[FluxVM<br/>VM lifecycle · QEMU / CH / Firecracker]
   Flux -- library call --> GK[GuestKit<br/>offline mount · chroot · agent bake-in]
   Flux -- vsock --> Agent[fluxvm-guest-agent<br/>inside the running guest]
+  Daemon -- "/api/vms/name/dataplane/*" --> Flux
+  Flux -- TC eBPF --> Edge[VM edge dataplane<br/>Network Fabric v3]
 ```
 
 **Fabric decides what should exist; FluxVM makes it exist; GuestKit prepares the disk.** Each layer is independently useful and Apache-2.0 licensed.
+
+### Two network policy planes
+
+Fabric SDN and FluxVM’s VM-edge dataplane are **orthogonal** — do not conflate them:
+
+| Plane | Owns | API / UX |
+|-------|------|----------|
+| **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · Security → Network Policies |
+| **VM edge (FluxVM Network Fabric v3)** | Per-VM allowlists, Mbps/PPS, stats/flows on the TAP/netns edge | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** tab · `zyvorctl dataplane …` |
+
+```mermaid
+flowchart LR
+  UI[Web / zyvorctl / Terraform]
+  Fabricd[zyvor-fabricd]
+  Client[fluxvm-client]
+  FluxVM["fluxvm serve"]
+  TC[TC eBPF VM edge]
+  SDN[Fabric network-policies nftables]
+
+  UI --> Fabricd
+  Fabricd -->|"/api/vms/name/dataplane/*"| Client
+  Client -->|"/v1/vms/id/network/*"| FluxVM
+  FluxVM --> TC
+  Fabricd --> SDN
+```
+
+```mermaid
+flowchart TB
+  subgraph fabricUX [Fabric control plane]
+    Tab[VM Dataplane tab]
+    CLI[zyvorctl dataplane]
+    API["GET/POST /api/vms/name/dataplane"]
+    Tab --> API
+    CLI --> API
+  end
+
+  subgraph flux [FluxVM]
+    NetAPI["/v1/vms/id/network"]
+    DP[fluxvm-network]
+    Pins["bpffs pins + maps"]
+    Meta["/run/fluxvm/ebpf"]
+    NetAPI --> DP
+    DP --> Pins
+    DP --> Meta
+  end
+
+  subgraph path [Packet path]
+    Guest[Guest]
+    Tap[TAP / netns veth]
+    Hook[TC ingress classifier]
+    Host[Host routing / Cilium]
+    Guest --> Tap --> Hook --> Host
+  end
+
+  API --> NetAPI
+  DP -->|attach + reconfigure| Hook
+```
+
+Enable with [`configs/fluxvm-dataplane.toml`](configs/fluxvm-dataplane.toml) (`mode = "ebpf"`); compose/k8s mount it, bpffs, and raise memlock. Operator detail: [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). Kernel-level packet decision diagrams live in [FluxVM’s Network Fabric architecture](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works).
 
 ---
 
@@ -232,6 +293,8 @@ flowchart TB
 | Security policy | [SECURITY.md](SECURITY.md) |
 | **Fabric Doctor (preflight)** | [docs/FABRIC_DOCTOR.md](docs/FABRIC_DOCTOR.md) · [tools/fabric-doctor](tools/fabric-doctor/) |
 | FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) |
+| **VM edge dataplane (Network Fabric v3)** | [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) |
+| Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
 | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | SCIM identity | [docs/scim-identity.md](docs/scim-identity.md) |

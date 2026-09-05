@@ -371,6 +371,24 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/vms/{name}/resume", post(routes::resume_vm))
         .route("/vms/{name}/clone", post(routes::clone_vm))
         .route("/vms/{name}/cloud-init", post(routes::configure_cloud_init))
+        // FluxVM Network Fabric v3 — VM edge dataplane (not Fabric SDN)
+        .route(
+            "/vms/{name}/dataplane/status",
+            get(api::vm_dataplane::dataplane_status),
+        )
+        .route(
+            "/vms/{name}/dataplane/policy",
+            get(api::vm_dataplane::get_dataplane_policy)
+                .post(api::vm_dataplane::set_dataplane_policy),
+        )
+        .route(
+            "/vms/{name}/dataplane/stats",
+            get(api::vm_dataplane::dataplane_stats),
+        )
+        .route(
+            "/vms/{name}/dataplane/flows",
+            get(api::vm_dataplane::dataplane_flows),
+        )
         // Snapshot routes
         .route(
             "/vms/{name}/snapshots",

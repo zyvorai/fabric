@@ -33,6 +33,7 @@ pub mod templates;
 pub mod vm_advanced;
 pub mod volumes;
 pub mod zones;
+pub mod vm_dataplane;
 
 // Phase 2 API modules for enterprise features
 pub mod certificates;

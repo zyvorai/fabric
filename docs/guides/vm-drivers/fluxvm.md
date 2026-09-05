@@ -14,9 +14,23 @@ fluxvm_url = "http://127.0.0.1:7788"   # FluxVM's REST API base URL
 
 See [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` itself.
 
+For Network Fabric v3 (TC/eBPF VM-edge dataplane), Fabric ships [`configs/fluxvm-dataplane.toml`](../../configs/fluxvm-dataplane.toml) and mounts it as `/etc/fluxvm.toml` in compose/k8s:
+
+```toml
+[sandbox.dataplane]
+mode = "ebpf"
+bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"
+pin_root = "/sys/fs/bpf/fluxvm"
+required = false   # set true after first green attach on a node
+```
+
+The FluxVM image must include the BPF `.o` files; the DaemonSet/compose also mounts host `/sys/fs/bpf` and raises memlock (`SYS_RESOURCE` / `ulimit memlock=-1`).
+
 ## What's wired today
 
 The `fluxvm-driver`/`fluxvm-client` crates (`backend/crates/`) implement `driver-core`'s trait family against FluxVM's REST API. Every VM this driver creates requests FluxVM's vsock guest agent (`CreateVmRequest.agent.enabled: true`) by default, so shell exec, console, and file copy below work without any extra opt-in — FluxVM bakes in the agent and its auth token at create time, transparent to the caller.
+
+Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network namespace + dnsmasq), not a shared host-bridge tap.
 
 | Capability | `driver-core` trait | FluxVM endpoint(s) |
 | --- | --- | --- |
@@ -34,6 +48,26 @@ The `fluxvm-driver`/`fluxvm-client` crates (`backend/crates/`) implement `driver
 | SSH info | — | Resolves the VM's MAC (pinned at create time) to an IP via zyvor-fabricd's own DHCP lease file — no vsock/FluxVM call at all. `key_path` is always `null`; key management is the operator's own responsibility (e.g. cloud-init) |
 | Bind-mount replacement (virtiofs) | `VMStartOptions.bind_mounts` (create-time only) | `CreateVmRequest.shared_folders` — one `virtiofsd` per share, auto-mounted in-guest via a generated cloud-init `/etc/fstab` entry |
 | Image catalog CRUD, incl. read-only flag + orphaned-download cleanup | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export/read-only/clean |
+| **Network Fabric v3 (VM edge dataplane)** | `VmDataplaneDriver` | `GET/POST /v1/vms/{id}/network/{policy,status,stats,flows}` — proxied as Fabric `/api/vms/{name}/dataplane/*` |
+
+### Fabric API and CLI for the dataplane
+
+| Fabric | FluxVM |
+| --- | --- |
+| `GET /api/vms/{name}/dataplane/status` | `…/network/status` |
+| `GET/POST /api/vms/{name}/dataplane/policy` | `…/network/policy` |
+| `GET /api/vms/{name}/dataplane/stats` | `…/network/stats` |
+| `GET /api/vms/{name}/dataplane/flows?limit=` | `…/network/flows` |
+
+```bash
+zyvorctl dataplane status <name>
+zyvorctl dataplane policy get <name>
+zyvorctl dataplane policy set <name> --file policy.json
+zyvorctl dataplane stats <name>
+zyvorctl dataplane flows <name> --limit 100
+```
+
+**Do not confuse** this with Fabric's `/api/network-policies` (label→nftables SDN on the host). The VM-detail Network tab labels the panel **“VM edge dataplane (FluxVM)”**.
 
 Log streaming's one fidelity reduction: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority. Image catalog's `pull-tar`/`import-tar`/`export-tar` are permanently unsupported, not just for now — a tar rootfs isn't a bootable disk image for a real hardware VM, so building that would mean writing a full tar-to-bootable-image converter, a different project from wiring up an existing capability.
 
@@ -42,15 +76,15 @@ Log streaming's one fidelity reduction: raw serial console output has no journal
 `fluxvm-client`'s wire types are a **hand-synced mirror** of `fluxvm-core::model` — integration is out-of-process (REST, not a Cargo dependency on FluxVM's own crates), a deliberate trade for not coupling this repo's build to FluxVM's crate versions. That means new FluxVM capabilities don't automatically show up here. As of FluxVM v0.1.0, this driver does **not** yet expose:
 
 - **Pluggable storage backends** — `CreateVmRequest.storage` (LVM thin snapshots, NBD-exported disks, Ceph RBD). Every VM created through this driver gets FluxVM's default qcow2 CoW overlay / raw reflink.
-- **Per-VM network namespaces** — `NetworkSpec::Tap.netns`. VMs created through this driver share FluxVM's default bridge-based networking.
 - **Firecracker jailer / vsock-proxy bookkeeping** — `VmRecord.jail_path`, `vsock_socket`, plus `lvm_lv`/`nbd_pid` (the storage-backend cleanup fields above).
 - **Agent-sandbox surface** — FluxVM's `/v1/sandboxes`, memory snapshots, AutoPause, L7 egress, and `/console` ops UI. Those stay on FluxVM's own API for now; Fabric continues to use the classic `/v1/vms` lifecycle.
 
-None of this is broken — it's simply not surfaced through `driver-core` yet. Closing this gap is a matter of extending `fluxvm-client`'s DTOs and `fluxvm-driver`'s trait mappings, not a FluxVM-side limitation.
+**Already wired (no longer gaps):** per-VM netns taps, and Network Fabric v3 dataplane proxy (status/policy/stats/flows) when FluxVM runs with `mode = "ebpf"`.
 
 **Not applicable to this driver at all** (separate ways to run FluxVM, not something a REST-client driver consumes): FluxVM's `fluxvm-kube` Kubernetes `DisposableVm` CRD/operator, and its `fluxvm-agent` distributed fleet registry for multi-host placement. Those are alternatives to embedding FluxVM behind Zyvor Fabric, not features this driver would wrap.
 
 ## See also
 
 - [FluxVM README](https://github.com/zyvorai/fluxvm#readme) — the full feature set, storage backends, agent-sandbox track, Kubernetes operator, and distributed node-agent.
+- [VM edge dataplane](fluxvm-dataplane.md) — SDN vs VM-edge, lab verify steps.
 - [Operations guide](../operations/README.md) — the driver in the broader operational context.
