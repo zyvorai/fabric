@@ -539,6 +539,28 @@ if [ ! -f /etc/zyvor-fabricd/zyvor-fabricd.toml ] && [ -f configs/zyvor-fabricd.
     echo '  ✅ Created /etc/zyvor-fabricd/zyvor-fabricd.toml'
 fi
 
+# Lab default credentials (suite-wide): admin / Admin@321
+# Override with FABRIC_ADMIN_PASSWORD. FORCE_ADMIN_RESET=1 wipes auth.db and reseeds.
+ADMIN_PASS='${FABRIC_ADMIN_PASSWORD:-Admin@321}'
+ENV_FILE=/etc/zyvor-fabricd/zyvor-fabricd.env
+if [ ! -f \"\$ENV_FILE\" ] && [ -f configs/zyvor-fabricd.env ]; then
+    \$SUDO install -m 0644 configs/zyvor-fabricd.env \"\$ENV_FILE\"
+fi
+\$SUDO touch \"\$ENV_FILE\"
+if \$SUDO grep -q '^ZYVOR_FABRICD_ADMIN_PASSWORD=' \"\$ENV_FILE\" 2>/dev/null; then
+    \$SUDO sed -i \"s|^ZYVOR_FABRICD_ADMIN_PASSWORD=.*|ZYVOR_FABRICD_ADMIN_PASSWORD=\${ADMIN_PASS}|\" \"\$ENV_FILE\"
+else
+    echo \"ZYVOR_FABRICD_ADMIN_PASSWORD=\${ADMIN_PASS}\" | \$SUDO tee -a \"\$ENV_FILE\" >/dev/null
+fi
+printf '%s' \"\$ADMIN_PASS\" | \$SUDO tee /var/lib/zyvor-fabricd/.admin_password >/dev/null
+\$SUDO chmod 600 /var/lib/zyvor-fabricd/.admin_password
+if [ '${FORCE_ADMIN_RESET:-0}' = 1 ]; then
+    \$SUDO systemctl stop zyvor-fabricd 2>/dev/null || true
+    \$SUDO rm -f /var/lib/zyvor-fabricd/auth.db /var/lib/zyvor-fabricd/auth.db-wal /var/lib/zyvor-fabricd/auth.db-shm
+    echo '  ✅ Reset auth.db — admin will be reseeded on start'
+fi
+echo \"  ✅ Lab admin password set (admin / from FABRIC_ADMIN_PASSWORD or Admin@321)\"
+
 if [ -n \"\$BIND\" ] && [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
     \$SUDO sed -i \"s/listen = \\\"127.0.0.1:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
     \$SUDO sed -i \"s/listen = \\\"0.0.0.0:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
@@ -645,7 +667,7 @@ deploy_ui_checklist "health" "$(curl -skf --connect-timeout 5 "https://${HOST}:$
 deploy_ui_celebrate "Ship it!"
 vmspawn_print_success "$HOST" "$ELAPSED" "$USER"
 deploy_ui_kv "🔗" "SSH" "ssh ${USER}@${HOST}"
-deploy_ui_kv "🔑" "Password" "sudo cat /var/lib/zyvor-fabricd/.admin_password"
+deploy_ui_kv "🔑" "Login" "admin / Admin@321  (override: FABRIC_ADMIN_PASSWORD · reset: FORCE_ADMIN_RESET=1)"
 deploy_ui_kv "🚀" "Manage" "zyvor-fabricd-ctl status · zyvor-fabricd-ctl verify"
 tip "HOST USER also works: ./scripts/deploy-remote.sh ${HOST} ${USER} --quick"
 
@@ -661,6 +683,7 @@ fi
 if $VERIFY_APIS; then
     deploy_ui_highlight "🔍 UX API audit"
     ADMIN_PW="$(ssh_r_bash "$REMOTE" "sudo cat /var/lib/zyvor-fabricd/.admin_password 2>/dev/null | tr -d '\r'" || true)"
+    ADMIN_PW="${ADMIN_PW:-${FABRIC_ADMIN_PASSWORD:-Admin@321}}"
     if [[ -n "$ADMIN_PW" ]] && VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "http://${HOST}:${API_PORT}"; then
         deploy_ui_celebrate "API audit passed"
     else

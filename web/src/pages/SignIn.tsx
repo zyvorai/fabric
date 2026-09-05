@@ -301,7 +301,15 @@ export default function SignIn() {
           ) : (
             <>
               Signing into <span className="font-mono">{instance?.product ?? 'Zyvor Fabric'}</span> on
-              this host. Use the admin account for this instance.
+              this host. Lab default: <span className="font-mono">admin</span> /{' '}
+              <span className="font-mono">Admin@321</span>
+              {instance?.deploy_mode === 'host' ? (
+                <>
+                  {' '}
+                  (or <span className="font-mono">sudo cat /var/lib/zyvor-fabricd/.admin_password</span> on
+                  older installs).
+                </>
+              ) : null}
             </>
           )
         ) : null

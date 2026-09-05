@@ -82,7 +82,7 @@ Four first-class ways to run Fabric. Pick one:
 ./scripts/deploy check sus@HOST
 ```
 
-Installs `zyvor-fabricd` + web UI, opens `0.0.0.0:9095` (HTTPS, self-signed by default). Admin password is written to `/var/lib/zyvor-fabricd/.admin_password` on first start.
+Installs `zyvor-fabricd` + web UI, opens `0.0.0.0:9095` (HTTPS, self-signed by default). **Lab login:** `admin` / `Admin@321` (set via `ZYVOR_FABRICD_ADMIN_PASSWORD` on deploy). Reseed an existing host with `FORCE_ADMIN_RESET=1 ./scripts/deploy remote USER@HOST --quick`.
 
 ### Docker / Podman
 

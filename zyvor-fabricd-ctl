@@ -791,15 +791,44 @@ cmd_logs() {
     journalctl -u zyvor-fabricd -f --no-hostname "${@}"
 }
 
-# ── password: Show admin password ───────────────────────────────────────
+# ── password: Show or reset admin password ──────────────────────────────
 cmd_password() {
     local pw_file="/var/lib/zyvor-fabricd/.admin_password"
-    if [[ -f "$pw_file" ]]; then
-        echo -e "${BOLD}Admin password:${NC} $(sudo cat "$pw_file" 2>/dev/null || cat "$pw_file")"
-    else
-        warn "Password file not found at $pw_file"
-        info "zyvor-fabricd generates the password on first startup"
-    fi
+    local action="${1:-show}"
+    case "$action" in
+        show|"")
+            if [[ -f "$pw_file" ]]; then
+                echo -e "${BOLD}Admin password:${NC} $(sudo cat "$pw_file" 2>/dev/null || cat "$pw_file")"
+            else
+                warn "Password file not found at $pw_file"
+                info "zyvor-fabricd generates the password on first startup"
+            fi
+            ;;
+        --lab-reset|lab-reset)
+            local new_pw="${2:-Admin@321}"
+            info "Resetting admin to lab password and reseeding auth.db…"
+            sudo systemctl stop zyvor-fabricd 2>/dev/null || true
+            local env_file=/etc/zyvor-fabricd/zyvor-fabricd.env
+            sudo mkdir -p /etc/zyvor-fabricd
+            sudo touch "$env_file"
+            if sudo grep -q '^ZYVOR_FABRICD_ADMIN_PASSWORD=' "$env_file" 2>/dev/null; then
+                sudo sed -i "s|^ZYVOR_FABRICD_ADMIN_PASSWORD=.*|ZYVOR_FABRICD_ADMIN_PASSWORD=${new_pw}|" "$env_file"
+            else
+                echo "ZYVOR_FABRICD_ADMIN_PASSWORD=${new_pw}" | sudo tee -a "$env_file" >/dev/null
+            fi
+            printf '%s' "$new_pw" | sudo tee "$pw_file" >/dev/null
+            sudo chmod 600 "$pw_file"
+            sudo rm -f /var/lib/zyvor-fabricd/auth.db \
+                /var/lib/zyvor-fabricd/auth.db-wal \
+                /var/lib/zyvor-fabricd/auth.db-shm
+            sudo systemctl start zyvor-fabricd
+            ok "Admin reseeded — login: admin / ${new_pw}"
+            ;;
+        *)
+            err "Usage: zyvor-fabricd-ctl password [show | --lab-reset [PASSWORD]]"
+            exit 1
+            ;;
+    esac
 }
 
 # ── doctor: Check system readiness ──────────────────────────────────────
@@ -1102,6 +1131,7 @@ cmd_help() {
     echo "  doctor            Check system readiness (deps, tools, services)"
     echo "  tls               Generate self-signed TLS certificate (auto-sudo)"
     echo "  password          Show the admin password"
+    echo "  password --lab-reset [PW]  Reseed admin (default Admin@321)"
     echo "  demo              Run interactive API demo"
     echo "  help              Show this help"
     echo ""
