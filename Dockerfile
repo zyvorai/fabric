@@ -4,7 +4,7 @@
 # capability list in docker-compose.yml (this Dockerfile only builds the
 # image; it doesn't grant any of that).
 
-FROM node:20-slim AS web-builder
+FROM node:26-slim AS web-builder
 
 WORKDIR /build/web
 COPY web/package.json web/package-lock.json ./
