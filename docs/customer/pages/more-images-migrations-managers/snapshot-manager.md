@@ -18,7 +18,7 @@ Snapshot Manager — create, revert to, and delete disk-state snapshots for a se
 ## Operate from the console (UX)
 
 1. **Select VM** — pick a VM from the dropdown to load its snapshots; the list auto-refreshes every 15 seconds while a VM is selected, or use **Refresh** to reload on demand.
-2. **Create Snapshot** — enter a name and click **Create** to snapshot the selected VM's current **disk** state (same as API `snapshot_type: Disk`). Prefer the VM detail **Snapshots** tab when you need **Full** (disk + memory). A success banner confirms create.
+2. **Create Snapshot** — enter a name, choose **Disk Only** (default) or **Full (disk + memory)**, and click **Create**. Full can take several minutes under load; the UI shows progress text and retries if the VM monitor is still starting. A success banner confirms create.
 3. The snapshots table lists Name, Created timestamp, State, and Parent, with two actions per row:
    - **Revert** (circular arrow) — reverts the VM to that snapshot, behind a confirmation dialog
    - **Delete** (trash) — deletes the snapshot, behind a confirmation dialog

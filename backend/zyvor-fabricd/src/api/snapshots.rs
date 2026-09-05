@@ -53,6 +53,46 @@ fn default_snapshot_type() -> SnapshotType {
     SnapshotType::Disk
 }
 
+/// Whether a live-snapshot QMP error is a connect race (retryable).
+pub(crate) fn is_qmp_connect_retryable(err: &str) -> bool {
+    err.contains("Failed to connect to QMP socket")
+        || err.contains("No such file")
+        || err.contains("Connection refused")
+        || err.contains("No such file or directory")
+}
+
+/// Poll until `path` is a connectable unix socket.
+pub(crate) fn wait_for_qmp_connectable(path: &str, attempts: u32, delay_ms: u64) -> Result<(), String> {
+    for i in 0..attempts {
+        let qmp = crate::qmp::QmpClient::for_socket(path.to_string());
+        if qmp.is_available() {
+            match std::os::unix::net::UnixStream::connect(path) {
+                Ok(_) => return Ok(()),
+                Err(e) if i + 1 < attempts => {
+                    tracing::debug!(
+                        "QMP connect attempt {}/{} for {}: {}",
+                        i + 1,
+                        attempts,
+                        path,
+                        e
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                }
+                Err(e) => {
+                    return Err(format!("Failed to connect to QMP socket: {path}: {e}"));
+                }
+            }
+        } else if i + 1 < attempts {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        } else {
+            return Err(format!(
+                "Failed to connect to QMP socket: {path}: not available"
+            ));
+        }
+    }
+    Err(format!("Failed to connect to QMP socket: {path}"))
+}
+
 /// Resolve the primary attached block node name from `query-block`.
 fn primary_block_node(session: &mut crate::qmp::QmpSession) -> Result<String, String> {
     let blocks = session
@@ -253,17 +293,64 @@ pub async fn create_snapshot(
     );
 
     if vm_running {
-        let qmp = match state.driver.get_control_socket(&vm_name).await {
-            Ok(Some(p)) => crate::qmp::QmpClient::for_socket(p.to_string_lossy().into_owned()),
-            _ => {
-                return crate::api_error::json_error(
-                    StatusCode::CONFLICT,
-                    "VM is running but its QMP control socket isn't available yet -- \
-                     wait for it to finish starting, or stop it first, then retry",
-                )
-                .into_response();
+        // Resolve socket path, waiting briefly if FluxVM has marked the VM
+        // running before the monitor socket appears (common right after start).
+        let socket_path = {
+            let mut path: Option<String> = None;
+            for attempt in 0..15u32 {
+                match state.driver.get_control_socket(&vm_name).await {
+                    Ok(Some(p)) => {
+                        let s = p.to_string_lossy().into_owned();
+                        let s_clone = s.clone();
+                        let ready = tokio::task::spawn_blocking(move || {
+                            wait_for_qmp_connectable(&s_clone, 1, 0)
+                        })
+                        .await
+                        .unwrap_or(Err("join".into()));
+                        if ready.is_ok() {
+                            path = Some(s);
+                            break;
+                        }
+                        path = Some(s); // keep last path for error message
+                    }
+                    Ok(None) | Err(_) => {}
+                }
+                if attempt + 1 < 15 {
+                    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                }
+            }
+            match path {
+                Some(p) => p,
+                None => {
+                    return crate::api_error::json_error(
+                        StatusCode::CONFLICT,
+                        "VM is running but its QMP control socket isn't available yet -- \
+                         wait for it to finish starting, or stop it first, then retry",
+                    )
+                    .into_response();
+                }
             }
         };
+
+        // Final connectability wait (up to ~6s) before the real snapshot call.
+        let wait_path = socket_path.clone();
+        if let Err(e) = tokio::task::spawn_blocking(move || {
+            wait_for_qmp_connectable(&wait_path, 15, 400)
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()))
+        {
+            return crate::api_error::json_error(
+                StatusCode::CONFLICT,
+                format!(
+                    "Live snapshot could not reach the VM monitor yet ({e}). \
+                     Wait a few seconds for the VM to finish starting, then retry."
+                ),
+            )
+            .into_response();
+        }
+
+        let qmp = crate::qmp::QmpClient::for_socket(socket_path);
         let tag = req.name.clone();
         let snap_type = req.snapshot_type.clone();
         let qmp_result = tokio::task::spawn_blocking(move || match snap_type {
@@ -274,12 +361,7 @@ pub async fn create_snapshot(
         match qmp_result {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
-                // Connect races (QEMU still bringing the monitor up) and
-                // "socket not available yet" are retryable — surface as 409
-                // so the UI can say "wait and retry" instead of a hard 500.
-                let retryable = e.contains("Failed to connect to QMP socket")
-                    || e.contains("No such file")
-                    || e.contains("Connection refused");
+                let retryable = is_qmp_connect_retryable(&e);
                 let status = if retryable {
                     StatusCode::CONFLICT
                 } else {
@@ -676,5 +758,41 @@ mod tests {
             depth += 1;
         }
         assert!(depth <= 100, "Tree should stop at depth 100, got {}", depth);
+    }
+
+    #[test]
+    fn test_default_snapshot_type_is_disk() {
+        let json = r#"{"name":"s1"}"#;
+        let req: CreateSnapshotRequest = serde_json::from_str(json).unwrap();
+        assert!(matches!(req.snapshot_type, SnapshotType::Disk));
+    }
+
+    #[test]
+    fn test_qmp_connect_retryable_detection() {
+        assert!(is_qmp_connect_retryable(
+            "Failed to connect to QMP socket: /tmp/qmp.sock"
+        ));
+        assert!(is_qmp_connect_retryable("No such file or directory"));
+        assert!(is_qmp_connect_retryable("Connection refused"));
+        assert!(!is_qmp_connect_retryable("QMP error: DeviceNotFound"));
+        assert!(!is_qmp_connect_retryable(
+            "timed out waiting for snapshot-save job"
+        ));
+    }
+
+    #[test]
+    fn test_snapshot_type_serde_roundtrip() {
+        let disk = serde_json::to_string(&SnapshotType::Disk).unwrap();
+        let full = serde_json::to_string(&SnapshotType::Full).unwrap();
+        assert_eq!(disk, "\"Disk\"");
+        assert_eq!(full, "\"Full\"");
+        assert!(matches!(
+            serde_json::from_str::<SnapshotType>("\"Disk\"").unwrap(),
+            SnapshotType::Disk
+        ));
+        assert!(matches!(
+            serde_json::from_str::<SnapshotType>("\"Full\"").unwrap(),
+            SnapshotType::Full
+        ));
     }
 }

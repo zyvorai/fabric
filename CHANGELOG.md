@@ -9,6 +9,7 @@
 
 ### Fixed
 - Running-VM snapshots ignored `snapshot_type`: both Disk and Full used QMP `snapshot-save` (memory dump), so UI "Disk Only" still timed out under load / the 60s HTTP layer. Disk now uses `blockdev-snapshot-internal-sync`; Full keeps `snapshot-save` with a 300s poll budget; HTTP timeout raised to 330s; Snapshots tab defaults to Disk.
+- Live snapshot create now waits/retries for QMP readiness (409 when still starting); UI retries on 409; Snapshot Manager gained Disk/Full picker; FluxVM HTTP client timeout raised to 180s; auto-healer skips VMs updated within 90s to avoid restart storms after start.
 - Workspace-wide clippy lint drift across ~24 crates that had accumulated under current stable Rust (mostly `new_without_default`, `derivable_impls`, and small iterator/idiom lints) — `cargo clippy -- -D warnings` is green again.
 - `fault-tolerance`'s test-only `MockDriver` was missing `get_cgroup_path`, a method `driver-core::VMDriver` gained since the mock was last updated — a real compile error in test code, not just a lint.
 

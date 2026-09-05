@@ -25,8 +25,17 @@ Stopped VMs use `qemu-img snapshot` for both types (no live monitor required).
 **Tips**
 
 - Prefer **Disk** for routine checkpoints. Use **Full** only when you need to restore running process state.
-- If create returns **409** (“could not reach the VM monitor yet”), wait a few seconds after start/restart and retry — the QMP socket is not ready until QEMU has fully come up.
+- If create returns **409** (“could not reach the VM monitor yet”), wait a few seconds after start/restart and retry — the QMP socket is not ready until QEMU has fully come up. The console retries automatically a few times.
 - Revert still requires the VM to be **stopped**.
+
+## Troubleshooting
+
+| Symptom | Likely cause | What to do |
+|---------|--------------|------------|
+| Snapshot create **409** | QMP monitor not ready yet after start/restart | Wait a few seconds and retry (UI auto-retries). Confirm FluxVM shows the VM `running` and `qmp.sock` exists under `/var/lib/fluxvm/instances/`. |
+| **Full** snapshot hangs / times out | Memory dump under host disk load | Prefer **Disk**; allow up to ~5 minutes for Full; reduce host load (other large guests). |
+| Auto-healer restarting right after start | Guest/QEMU flapping during boot | Fabric skips healing for 90s after start; if it continues, check FluxVM console logs and the guest image. |
+| Start stuck / Failed with FluxVM timeout | Disk clone exceeded the old 30s client timeout | Fixed at 180s — redeploy fabricd if the host is still on an older build. |
 
 ## How to get there
 

@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import { getVM, getMetrics, deleteVM, addPortForward, removePortForward, getVMLogs, VM, VMMetrics, VMLogEntry } from '../api/vm'
-import { listSnapshots, createSnapshot, deleteSnapshot, revertSnapshot, VMSnapshot } from '../api/snapshots'
+import { listSnapshots, createSnapshotWithRetry, deleteSnapshot, revertSnapshot, VMSnapshot } from '../api/snapshots'
 import { listAuditLogs, AuditLog } from '../api/audit'
 import { getMachineProperties } from '../api/machines'
 import {
@@ -936,12 +936,19 @@ function SnapshotsTab({ vm }: { vm: VM }) {
     if (!newName.trim()) return
     setCreating(true)
     try {
-      await createSnapshot(vm.name, {
-        name: newName.trim(),
-        description: newDescription.trim() || undefined,
-        snapshot_type: newType,
-      })
-      toast.success(`Snapshot '${newName}' created`)
+      await createSnapshotWithRetry(
+        vm.name,
+        {
+          name: newName.trim(),
+          description: newDescription.trim() || undefined,
+          snapshot_type: newType,
+        },
+      )
+      toast.success(
+        newType === 'Full'
+          ? `Full snapshot '${newName}' created`
+          : `Snapshot '${newName}' created`,
+      )
       setShowCreateForm(false)
       setNewName('')
       setNewDescription('')
@@ -1054,6 +1061,19 @@ function SnapshotsTab({ vm }: { vm: VM }) {
                 <option value="Disk">Disk Only</option>
                 <option value="Full">Full (disk + memory — slower)</option>
               </select>
+              {newType === 'Full' && (
+                <p className="text-xs text-[var(--zf-muted)] mt-1">
+                  Full snapshots pause the guest briefly and can take several minutes under host load.
+                  Prefer Disk Only for routine checkpoints.
+                </p>
+              )}
+              {creating && (
+                <p className="text-xs text-[var(--zf-muted)] mt-1">
+                  {newType === 'Full'
+                    ? 'Creating full snapshot — this may take a few minutes…'
+                    : 'Creating snapshot…'}
+                </p>
+              )}
             </div>
           </div>
           <div>

@@ -1970,6 +1970,58 @@ describe('snapshots', () => {
     expect(mockApiPost).toHaveBeenCalledWith('/api/vms/vm1/snapshots', req)
   })
 
+  it('createSnapshotWithRetry succeeds on first try', async () => {
+    const { createSnapshotWithRetry } = await import('../snapshots')
+    const body = JSON.stringify({
+      id: '1',
+      vm_name: 'vm1',
+      name: 'snap1',
+      description: null,
+      snapshot_type: 'Disk',
+      parent_id: null,
+      size_bytes: 0,
+      created: '2026-01-01T00:00:00Z',
+    })
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: { get: () => 'application/json' },
+      text: async () => body,
+    } as unknown as Response)
+    const result = await createSnapshotWithRetry('vm1', { name: 'snap1' })
+    expect(result.name).toBe('snap1')
+  })
+
+  it('createSnapshotWithRetry retries once on 409 then succeeds', async () => {
+    const { createSnapshotWithRetry } = await import('../snapshots')
+    const body = JSON.stringify({
+      id: '1',
+      vm_name: 'vm1',
+      name: 'snap1',
+      description: null,
+      snapshot_type: 'Disk',
+      parent_id: null,
+      size_bytes: 0,
+      created: '2026-01-01T00:00:00Z',
+    })
+    mockApiFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        text: async () => JSON.stringify({ error: 'could not reach the VM monitor yet' }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        headers: { get: () => 'application/json' },
+        text: async () => body,
+      } as unknown as Response)
+    const result = await createSnapshotWithRetry('vm1', { name: 'snap1' }, { delayMs: 1 })
+    expect(result.name).toBe('snap1')
+    expect(mockApiFetch).toHaveBeenCalledTimes(2)
+  })
+
   it('getSnapshot calls apiGet', async () => {
     const { getSnapshot } = await import('../snapshots')
     await getSnapshot('vm1', 's1')

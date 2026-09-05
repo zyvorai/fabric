@@ -776,14 +776,28 @@ pub async fn start_vm(
 
         match result {
             Ok(_) => {
+                // Wait for QMP so "Running" means the monitor is usable
+                // (snapshots / hotplug) — FluxVM can report running before
+                // qmp.sock exists.
+                if let Ok(Some(p)) = state_clone.driver.get_control_socket(&vm_name).await {
+                    let path = p.to_string_lossy().into_owned();
+                    let _ = tokio::task::spawn_blocking(move || {
+                        crate::api::snapshots::wait_for_qmp_connectable(&path, 30, 500)
+                    })
+                    .await;
+                }
                 tracing::info!("VM '{}' started successfully", vm_name);
                 if let Ok(Some(mut vm)) = state_clone.store.get_vm(&vm_name) {
                     vm.state = vm_model::VMState::Running;
                     vm.last_error = None; // Clear any previous error
+                    vm.updated = Some(chrono::Utc::now());
                     if let Err(e) = state_clone.store.save_vm(&vm) {
                         tracing::error!("Failed to save VM state: {}", e);
                     }
                 }
+                // Clear autoheal counter on a clean start so a prior crash
+                // streak doesn't immediately burn remaining attempts.
+                let _ = state_clone.store.delete_entity("autoheal", &vm_name);
                 crate::api::events::record_event(
                     &state_clone,
                     crate::api::events::VMEventType::Started,

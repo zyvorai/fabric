@@ -112,7 +112,9 @@ impl Server {
             .map_err(|e| anyhow::anyhow!("Failed to initialize storage manager: {}", e))?;
 
         let http_client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            // 180s — FluxVM create clones guest disks; 30s timed out under
+            // lab load and left VMs Failed / Starting with no QEMU.
+            .timeout(std::time::Duration::from_secs(180))
             .pool_max_idle_per_host(10)
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create HTTP client: {}", e))?;
@@ -3374,6 +3376,17 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                 continue;
             }
 
+            // Grace period after start/restart: FluxVM/QEMU often flap for
+            // a short window (disk clone finishing, QMP coming up). Treating
+            // that as a crash caused restart storms on lab under load.
+            const HEAL_GRACE_SECS: i64 = 90;
+            if let Some(updated) = vm.updated {
+                let age = (Utc::now() - updated).num_seconds();
+                if age >= 0 && age < HEAL_GRACE_SECS {
+                    continue;
+                }
+            }
+
             // Check if the VM is actually still running via the driver.
             // Only a *confirmed* non-running status justifies a restart --
             // found live: `Ok(_) | Err(_)` here used to treat ANY error
@@ -3438,6 +3451,13 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                                 state.store.save_entity("autoheal", &vm.name, &heal_record)
                             {
                                 tracing::error!("Failed to save: {}", e);
+                            }
+
+                            if let Ok(Some(mut healed)) = state.store.get_vm(&vm.name) {
+                                healed.state = vm_model::VMState::Running;
+                                healed.updated = Some(Utc::now());
+                                healed.last_error = None;
+                                let _ = state.store.save_vm(&healed);
                             }
 
                             // Record event

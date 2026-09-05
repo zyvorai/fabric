@@ -469,7 +469,8 @@ impl FluxVmClient {
         let base_url = reqwest::Url::parse(base_url.as_ref())
             .with_context(|| format!("invalid FluxVM base URL: {}", base_url.as_ref()))?;
         let http = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            // Match fabricd: FluxVM create/start can clone large disks.
+            .timeout(std::time::Duration::from_secs(180))
             .build()
             .context("failed to build FluxVM HTTP client")?;
         Ok(Self {

@@ -3,40 +3,35 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Camera, Plus, RotateCcw, Trash2, Loader2, RefreshCw } from 'lucide-react'
-import { apiFetch } from '../api/client'
 import { listVMs } from '../api/vm'
+import {
+  listSnapshots,
+  createSnapshotWithRetry,
+  deleteSnapshot,
+  revertSnapshot,
+  type VMSnapshot,
+} from '../api/snapshots'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader, EmptyState } from '../components/ui'
-import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
-
-interface Snapshot {
-  name: string
-  created_at: string
-  state: string
-  parent?: string
-  description?: string
-}
-
-async function parseApiError(res: Response): Promise<never> {
-  const body = await res.text()
-  throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
-}
+import RelativeTime from '../components/RelativeTime'
 
 export default function SnapshotManager() {
   const toast = useToastContext()
   const { confirmState, confirm, cancel } = useConfirm()
   const [vms, setVMs] = useState<string[]>([])
   const [selectedVM, setSelectedVM] = useState('')
-  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
+  const [snapshots, setSnapshots] = useState<VMSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [snapshotsLoading, setSnapshotsLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState<'Disk' | 'Full'>('Disk')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -60,10 +55,7 @@ export default function SnapshotManager() {
     setSnapshotsLoading(true)
     setActionError(null)
     try {
-      const res = await apiFetch(`/api/vms/${selectedVM}/snapshots`)
-      if (!res.ok) await parseApiError(res)
-      const data = await res.json()
-      setSnapshots(Array.isArray(data) ? data : data.snapshots || [])
+      setSnapshots(await listSnapshots(selectedVM))
     } catch (err) {
       const msg = formatUserError(err)
       setActionError(msg)
@@ -91,15 +83,15 @@ export default function SnapshotManager() {
     setActionError(null)
     setSuccess(null)
     try {
-      const res = await apiFetch(`/api/vms/${selectedVM}/snapshots`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
+      await createSnapshotWithRetry(selectedVM, {
+        name: newName.trim(),
+        snapshot_type: newType,
       })
-      if (!res.ok) await parseApiError(res)
-      setSuccess(`Snapshot "${newName}" created`)
+      const label = newType === 'Full' ? 'Full snapshot' : 'Snapshot'
+      setSuccess(`${label} "${newName}" created`)
       setNewName('')
-      toast.success(`Snapshot "${newName.trim()}" created`)
+      setNewType('Disk')
+      toast.success(`${label} "${newName.trim()}" created`)
       fetchSnapshots()
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
@@ -111,14 +103,21 @@ export default function SnapshotManager() {
     }
   }
 
-  const handleRevert = async (snapName: string) => {
-    if (!await confirm('Revert Snapshot', `Revert VM "${selectedVM}" to snapshot "${snapName}"?`, { variant: 'warning', confirmLabel: 'Revert' })) return
+  const handleRevert = async (snap: VMSnapshot) => {
+    if (
+      !(await confirm(
+        'Revert Snapshot',
+        `Revert VM "${selectedVM}" to snapshot "${snap.name}"? The VM must be stopped.`,
+        { variant: 'warning', confirmLabel: 'Revert' },
+      ))
+    ) {
+      return
+    }
     setActionError(null)
     try {
-      const res = await apiFetch(`/api/vms/${selectedVM}/snapshots/${snapName}/revert`, { method: 'POST' })
-      if (!res.ok) await parseApiError(res)
-      setSuccess(`Reverted to "${snapName}"`)
-      toast.success(`Reverted to "${snapName}"`)
+      await revertSnapshot(selectedVM, snap.id)
+      setSuccess(`Reverted to "${snap.name}"`)
+      toast.success(`Reverted to "${snap.name}"`)
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       const msg = formatUserError(err)
@@ -127,13 +126,19 @@ export default function SnapshotManager() {
     }
   }
 
-  const handleDelete = async (snapName: string) => {
-    if (!await confirm('Delete Snapshot', `Delete snapshot "${snapName}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
+  const handleDelete = async (snap: VMSnapshot) => {
+    if (
+      !(await confirm('Delete Snapshot', `Delete snapshot "${snap.name}"?`, {
+        variant: 'danger',
+        confirmLabel: 'Delete',
+      }))
+    ) {
+      return
+    }
     setActionError(null)
     try {
-      const res = await apiFetch(`/api/vms/${selectedVM}/snapshots/${snapName}`, { method: 'DELETE' })
-      if (!res.ok) await parseApiError(res)
-      toast.success(`Snapshot "${snapName}" deleted`)
+      await deleteSnapshot(selectedVM, snap.id)
+      toast.success(`Snapshot "${snap.name}" deleted`)
       fetchSnapshots()
     } catch (err) {
       const msg = formatUserError(err)
@@ -208,7 +213,7 @@ export default function SnapshotManager() {
       {selectedVM && (
         <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] p-5">
           <h3 className="text-sm font-semibold text-[var(--zf-ink)] mb-3">Create Snapshot</h3>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               value={newName}
@@ -216,7 +221,18 @@ export default function SnapshotManager() {
               placeholder="snapshot-name"
               aria-label="Snapshot name"
               className="input-field flex-1"
+              disabled={creating}
             />
+            <select
+              value={newType}
+              onChange={(e) => setNewType(e.target.value as 'Disk' | 'Full')}
+              aria-label="Snapshot type"
+              className="input-field sm:w-56"
+              disabled={creating}
+            >
+              <option value="Disk">Disk Only</option>
+              <option value="Full">Full (disk + memory)</option>
+            </select>
             <button
               type="button"
               onClick={handleCreate}
@@ -224,9 +240,22 @@ export default function SnapshotManager() {
               title="Create snapshot"
               className="zf-btn zf-btn-primary"
             >
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}{' '}
+              Create
             </button>
           </div>
+          {newType === 'Full' && (
+            <p className="text-xs text-[var(--zf-muted)] mt-2">
+              Full snapshots can take several minutes under host load. Prefer Disk Only for routine checkpoints.
+            </p>
+          )}
+          {creating && (
+            <p className="text-xs text-[var(--zf-muted)] mt-2">
+              {newType === 'Full'
+                ? 'Creating full snapshot — this may take a few minutes…'
+                : 'Creating snapshot (retries if the VM monitor is still starting)…'}
+            </p>
+          )}
         </div>
       )}
 
@@ -253,42 +282,36 @@ export default function SnapshotManager() {
               <thead>
                 <tr className="border-b border-[var(--zf-hairline)]">
                   <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase">Name</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase">Type</th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase">Created</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase">State</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase">Parent</th>
                   <th className="text-right px-5 py-3 text-xs font-medium text-[var(--zf-muted)] uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--zf-hairline)]/30">
                 {snapshots.map((snap) => (
-                  <tr key={snap.name} className="hover:bg-black/[0.04] transition-colors">
+                  <tr key={snap.id} className="hover:bg-black/[0.04] transition-colors">
                     <td className="px-5 py-3 text-[var(--zf-ink)] font-medium">{snap.name}</td>
+                    <td className="px-5 py-3 text-[var(--zf-muted)]">{snap.snapshot_type}</td>
                     <td className="px-5 py-3 text-[var(--zf-muted)] text-xs">
-                      {snap.created_at ? new Date(snap.created_at).toLocaleString() : '-'}
+                      <RelativeTime date={snap.created} />
                     </td>
-                    <td className="px-5 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium border text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]">
-                        {snap.state || '-'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-[var(--zf-muted)] text-xs">{snap.parent || '-'}</td>
                     <td className="px-5 py-3 text-right">
-                      <div className="flex items-center gap-1 justify-end">
+                      <div className="inline-flex gap-1">
                         <button
                           type="button"
-                          onClick={() => handleRevert(snap.name)}
-                          title="Revert to this snapshot"
-                          className="p-1.5 text-[var(--zf-muted)] hover:text-[var(--zf-link)] hover:bg-[var(--zf-link-hover)]/10 rounded-lg transition-colors"
+                          onClick={() => handleRevert(snap)}
+                          title="Revert"
+                          className="zf-btn zf-btn-ghost zf-btn-sm"
                         >
-                          <RotateCcw className="w-4 h-4" />
+                          <RotateCcw className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(snap.name)}
-                          title="Delete snapshot"
-                          className="p-1.5 text-[var(--zf-muted)] hover:text-[var(--zf-danger)] hover:bg-red-50 rounded-lg transition-colors"
+                          onClick={() => handleDelete(snap)}
+                          title="Delete"
+                          className="zf-btn zf-btn-ghost zf-btn-sm text-[var(--zf-danger)]"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -300,21 +323,11 @@ export default function SnapshotManager() {
         </div>
       )}
 
-      {!selectedVM && !loading && !loadError && (
-        <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)]">
-          <EmptyState
-            icon={<Camera className="w-10 h-10" />}
-            title="Select a VM"
-            description="Choose a virtual machine to manage snapshots"
-          />
-        </div>
-      )}
-
       {confirmState && (
         <ConfirmDialog
           title={confirmState.title}
           message={confirmState.message}
-          confirmLabel={confirmState.confirmLabel ?? 'Delete'}
+          confirmLabel={confirmState.confirmLabel ?? 'Confirm'}
           variant={confirmState.variant ?? 'danger'}
           onConfirm={confirmState.onConfirm}
           onCancel={cancel}

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { Camera, Plus, Trash2, RotateCcw } from 'lucide-react'
 import {
   listSnapshots,
-  createSnapshot,
+  createSnapshotWithRetry,
   deleteSnapshot,
   revertSnapshot,
   type VMSnapshot,
@@ -211,19 +211,28 @@ function CreateSnapshotDialog({
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [snapshotType, setSnapshotType] = useState<'Disk' | 'Full'>('Disk')
+  const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitting(true)
     try {
-      await createSnapshot(vmName, {
+      await createSnapshotWithRetry(vmName, {
         name,
         description: description || undefined,
         snapshot_type: snapshotType,
       })
+      toast.success(
+        snapshotType === 'Full'
+          ? `Full snapshot '${name}' created`
+          : `Snapshot '${name}' created`,
+      )
       onCreated()
       onClose()
     } catch (error) {
       toastFailure(toast, 'Failed to create snapshot', error)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -241,6 +250,7 @@ function CreateSnapshotDialog({
               className="w-full bg-white border border-[var(--zf-hairline)] rounded px-4 py-2"
               placeholder="my-snapshot"
               required
+              disabled={submitting}
             />
           </div>
           <div className="mb-4">
@@ -251,6 +261,7 @@ function CreateSnapshotDialog({
               onChange={(e) => setDescription(e.target.value)}
               className="w-full bg-white border border-[var(--zf-hairline)] rounded px-4 py-2"
               placeholder="Optional description"
+              disabled={submitting}
             />
           </div>
           <div className="mb-6">
@@ -259,24 +270,39 @@ function CreateSnapshotDialog({
               value={snapshotType}
               onChange={(e) => setSnapshotType(e.target.value as 'Disk' | 'Full')}
               className="w-full bg-white border border-[var(--zf-hairline)] rounded px-4 py-2"
+              disabled={submitting}
             >
               <option value="Disk">Disk Only</option>
-              <option value="Full">Full (Disk + State)</option>
+              <option value="Full">Full (disk + memory — slower)</option>
             </select>
+            {snapshotType === 'Full' && (
+              <p className="text-xs text-[var(--zf-muted)] mt-2">
+                Full snapshots can take several minutes under host load. Prefer Disk Only for routine checkpoints.
+              </p>
+            )}
+            {submitting && (
+              <p className="text-xs text-[var(--zf-muted)] mt-2">
+                {snapshotType === 'Full'
+                  ? 'Creating full snapshot — this may take a few minutes…'
+                  : 'Creating snapshot…'}
+              </p>
+            )}
           </div>
           <div className="flex gap-4">
             <button
               type="button"
               onClick={onClose}
+              disabled={submitting}
               className="zf-btn zf-btn-ghost flex-1"
             >
               Cancel
             </button>
             <button
               type="submit"
+              disabled={submitting || !name.trim()}
               className="zf-btn zf-btn-primary flex-1"
             >
-              Create
+              {submitting ? 'Creating…' : 'Create'}
             </button>
           </div>
         </form>
