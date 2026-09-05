@@ -62,7 +62,12 @@ pub struct UpdateUserRequest {
 fn hash_password(password: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(password.as_bytes());
-    format!("{:x}", hasher.finalize())
+    // sha2 0.11 / digest hybrid-array: GenericArray no longer implements LowerHex.
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn user_response(u: &DashboardUserRecord) -> serde_json::Value {
