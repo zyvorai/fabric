@@ -63,6 +63,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 64px;
 }
 
 body {
@@ -102,6 +103,8 @@ a:hover {
   backdrop-filter: saturate(180%) blur(20px);
   background: var(--zf-nav-surface);
   border-bottom: 1px solid var(--zf-nav-border);
+  /* Avoid Safari compositing a huge system focus glow under the sticky bar */
+  -webkit-tap-highlight-color: transparent;
 }
 .mkt-nav-inner {
   max-width: 980px;
@@ -117,10 +120,21 @@ a:hover {
   color: var(--zf-ink);
   opacity: 0.8;
   font-weight: 500;
+  border-radius: 6px;
 }
 .mkt-nav a:hover {
   opacity: 1;
   color: var(--zf-ink);
+}
+.mkt-nav a:focus,
+.mkt-nav button:focus {
+  outline: none;
+}
+.mkt-nav a:focus-visible,
+.mkt-nav button:focus-visible {
+  outline: 2px solid var(--zf-link);
+  outline-offset: 3px;
+  opacity: 1;
 }
 .mkt-brand {
   display: inline-flex;
@@ -170,6 +184,8 @@ a:hover {
   padding: 96px 24px;
   max-width: 980px;
   margin: 0 auto;
+  /* Keep sticky .mkt-nav from covering section headings while scrolling */
+  scroll-margin-top: 64px;
 }
 .mkt-section h2 {
   font-size: clamp(2rem, 4.5vw, 3rem);
@@ -177,6 +193,7 @@ a:hover {
   letter-spacing: -0.035em;
   margin: 0 0 16px;
   line-height: 1.1;
+  color: var(--zf-ink);
 }
 .mkt-section p {
   font-size: 1.25rem;
@@ -185,23 +202,47 @@ a:hover {
   letter-spacing: -0.015em;
   max-width: 40rem;
 }
+/* Inverse band: dark on light theme, light on dark theme — never reuse --zf-ink
+   as the band fill (in dark mode ink is already light, which washed out the CTA). */
 .mkt-band {
-  background: var(--zf-ink);
-  color: #f5f5f7;
+  --mkt-band-bg: #1d1d1f;
+  --mkt-band-fg: #f5f5f7;
+  --mkt-band-muted: #a1a1a6;
+  --mkt-band-cta-bg: #ffffff;
+  --mkt-band-cta-fg: #1d1d1f;
+  background: var(--mkt-band-bg);
+  color: var(--mkt-band-fg);
   padding: 120px 24px;
   text-align: center;
 }
+:root[data-theme='dark'] .mkt-band {
+  --mkt-band-bg: #f5f5f7;
+  --mkt-band-fg: #1d1d1f;
+  --mkt-band-muted: #6e6e73;
+  --mkt-band-cta-bg: #1d1d1f;
+  --mkt-band-cta-fg: #f5f5f7;
+}
 .mkt-band h2 {
-  color: #f5f5f7;
+  color: var(--mkt-band-fg);
   font-size: clamp(2rem, 5vw, 3.5rem);
   letter-spacing: -0.04em;
   margin: 0 0 16px;
 }
 .mkt-band p {
-  color: #a1a1a6;
+  color: var(--mkt-band-muted);
   font-size: 1.25rem;
   max-width: 32rem;
   margin: 0 auto 32px;
+}
+.mkt-band-cta,
+.mkt-band .mkt-band-cta {
+  background: var(--mkt-band-cta-bg) !important;
+  color: var(--mkt-band-cta-fg) !important;
+}
+.mkt-band-cta:hover:not(:disabled),
+.mkt-band .mkt-band-cta:hover:not(:disabled) {
+  opacity: 0.92;
+  color: var(--mkt-band-cta-fg) !important;
 }
 .mkt-footer {
   border-top: 1px solid var(--zf-hairline);
