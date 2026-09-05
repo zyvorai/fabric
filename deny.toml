@@ -1,5 +1,5 @@
-# Advisory/license/ban policy for cargo-deny.
-# Exceptions go here with a short comment and issue link when needed.
+# Advisory/license/ban policy for cargo-deny (v2 schema).
+# cargo-deny 0.20+: advisory severity keys removed; use ignore + yanked.
 
 [graph]
 all-features = false
@@ -8,20 +8,17 @@ no-default-features = false
 [advisories]
 version = 2
 yanked = "warn"
-# First proven-infra land: warn so Dependabot/PRs can clear the baseline without
-# blocking required CI. Tighten vulnerability back to "deny" once ignored set is empty.
-unmaintained = "warn"
-vulnerability = "warn"
+# Baseline exceptions for first proven-infra land (issue #6 / Dependabot).
+# Remove IDs as crates are upgraded.
 ignore = [
-    # Baseline tracked under #6 / Dependabot; ignore keeps room to re-deny later.
-    { id = "RUSTSEC-2024-0436", reason = "transitive unmaintained; Dependabot follow-up" },
-    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained transitive" },
-    { id = "RUSTSEC-2024-0437", reason = "transitive; tracked for upgrade" },
-    { id = "RUSTSEC-2026-0194", reason = "transitive; tracked for upgrade" },
-    { id = "RUSTSEC-2026-0195", reason = "transitive; tracked for upgrade" },
-    { id = "RUSTSEC-2025-0134", reason = "transitive unmaintained" },
-    { id = "RUSTSEC-2023-0040", reason = "transitive unmaintained" },
-    { id = "RUSTSEC-2025-0040", reason = "transitive; tracked for upgrade" },
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2024-0370",
+    "RUSTSEC-2024-0437",
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    "RUSTSEC-2025-0134",
+    "RUSTSEC-2023-0040",
+    "RUSTSEC-2025-0040",
 ]
 
 [licenses]
