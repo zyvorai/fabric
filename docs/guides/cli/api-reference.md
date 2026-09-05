@@ -662,7 +662,12 @@ Create a snapshot of a VM.
 }
 ```
 
-Snapshot types: `Disk` (disk-only, default), `Full` (disk + memory state).
+Snapshot types:
+
+| Type | Default | Running / paused VM | Stopped VM |
+|------|---------|---------------------|------------|
+| `Disk` | yes | QMP `blockdev-snapshot-internal-sync` (fast, disk only) | `qemu-img snapshot -c` |
+| `Full` | no | QMP `snapshot-save` (disk + memory; may take minutes) | `qemu-img snapshot -c` |
 
 **Response (201):**
 
@@ -679,13 +684,18 @@ Snapshot types: `Disk` (disk-only, default), `Full` (disk + memory state).
 }
 ```
 
+**Errors:**
+
+- **409** — live snapshot could not reach the QMP monitor yet (VM still starting). Wait and retry.
+- **500** — QEMU/job failure on `Full`, or `qemu-img` failure on a stopped VM.
+
 **curl example:**
 
 ```bash
 curl -s -X POST http://localhost:3000/api/vms/my-vm/snapshots \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"before-upgrade","description":"Pre-upgrade snapshot"}' | jq
+  -d '{"name":"before-upgrade","description":"Pre-upgrade snapshot","snapshot_type":"Disk"}' | jq
 ```
 
 ---

@@ -51,8 +51,14 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms" \
 
 ## Part 1: Snapshots
 
-Snapshots capture the state of a VM's disk at a specific moment. They are stored
-inside the QCOW2 image file using `qemu-img snapshot`.
+Snapshots capture point-in-time state inside the guest's qcow2 image.
+
+| `snapshot_type` | Meaning | How it is taken |
+|-----------------|---------|-----------------|
+| `Disk` (default) | Disk only | **Running/paused:** QMP `blockdev-snapshot-internal-sync`. **Stopped:** `qemu-img snapshot -c`. |
+| `Full` | Disk + guest memory | **Running/paused:** QMP `snapshot-save` (can take minutes under load). **Stopped:** `qemu-img snapshot -c` (no memory to capture). |
+
+Prefer `Disk` for routine checkpoints. Use `Full` only when you need process/memory state. If create returns **409**, the QMP monitor is not ready yet — wait a few seconds after start and retry.
 
 ### Step 1: Create a Snapshot
 
@@ -90,7 +96,7 @@ Expected response:
 |----------------|--------|------------------------------------------|
 | `name`         | string | Human-readable snapshot name (unique per VM) |
 | `description`  | string | Optional description of the snapshot     |
-| `snapshot_type`| enum   | `Disk` (disk only) or `Full` (disk + memory) |
+| `snapshot_type`| enum   | `Disk` (disk only, **default**) or `Full` (disk + memory; slower on a live VM) |
 
 ### Step 2: Create Additional Snapshots
 

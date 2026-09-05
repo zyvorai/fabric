@@ -56,8 +56,8 @@ This is the customer-facing onboarding guide — how to access the product, your
   1. Forwarded ports bind `0.0.0.0`, so they're reachable from any machine on the network — not just the host.
   1. Add or remove forwards later without recreating the VM: `POST`/`DELETE /api/vms/:name/port-forwards` · Web VM detail Network tab.
 - **Protect a VM with snapshots and backups**
-  1. Before a risky change, take a snapshot: `POST /api/vms/web-01/snapshots` (use `snapshot_type: Full` to include memory state).
-  1. Roll back if needed: `POST /api/vms/web-01/snapshots//revert`.
+  1. Before a risky change, take a snapshot: `POST /api/vms/web-01/snapshots` with `snapshot_type: Disk` (default, fast on a live VM) or `Full` (disk + memory — slower). Web: VM detail → Snapshots (defaults to Disk).
+  1. Roll back if needed (VM must be stopped): `POST /api/vms/web-01/snapshots/:id/revert`.
   1. Create a durable backup: `POST /api/backups` (`{vm_name, backup_type: full|incremental, retention_days}`).
   1. Automate it with a policy: `POST /api/backups/policies` (daily/weekly, matched by VM tag) — scheduled via systemd timers.
   1. Restore any time with `POST /api/backups/restore`, or drive all of this from the Web Backups page.
@@ -78,7 +78,7 @@ _Create, run, and reshape virtual machines with declarative or interactive workf
 - **Cloning & Templates** — Full and linked copy-on-write clones plus reusable templates for rapid deployment. — _Stand up fleets from a golden image in seconds, not minutes._
   - **How:** REST `POST /api/vms/:name/clone` (`linked_clone: true|false`) · templates via `POST /api/templates` and `POST /api/templates/:id/deploy` · Web Templates / VM Cloning pages (REST/Web only — no `zyvorctl` clone command).
 - **Hibernate & Checkpoint** — Suspend-to-disk hibernate, resume from snapshot, and VM checkpoint/restore and forking. — _Pause idle workloads and restore exact machine state on demand._
-  - **How:** Capture machine state with a full snapshot: REST `POST /api/vms/:name/snapshots` (`snapshot_type: Full`) then `POST .../snapshots/:id/revert` · Web VM detail Snapshots tab (REST/Web only — no `zyvorctl` snapshot command).
+  - **How:** REST `POST /api/vms/:name/snapshots` — `Disk` (default; live via QMP internal sync) or `Full` (live via `snapshot-save`, disk + memory) · revert with `POST .../snapshots/:id/revert` (VM stopped) · Web VM detail Snapshots tab (REST/Web only — no `zyvorctl` snapshot command).
 - **Live Hotplug** — Hotplug CPU, memory, disk, and NIC into running VMs without a reboot. — _Scale a VM to demand while it keeps serving traffic._
   - **How:** Web VM detail Hotplug tab (live CPU/memory/disk/NIC) · REST resource endpoints under `/api/system/vms/:name/...` · emits `cpu_hotplug`/`memory_hotplug`/`disk_attached` events on the SSE stream.
 - **Disk Import & Conversion** — Import VMs from VMDK, VDI, and VHD with auto-conversion to qcow2, and online disk resize via QMP. — _Bring machines off VMware or VirtualBox without downtime._
