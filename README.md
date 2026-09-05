@@ -11,7 +11,7 @@
 [![Built on FluxVM](https://img.shields.io/badge/VM%20engine-FluxVM-8a2be2)](https://github.com/zyvorai/fluxvm)
 [![Built on GuestKit](https://img.shields.io/badge/guest%20tooling-GuestKit-2ea44f)](https://github.com/zyvorai/guestkit)
 
-[Quick start](#quick-start) · [Deploy](#deploy) · [Kubernetes](#run-on-kubernetes) · [Why Fabric](#why-zyvor-fabric) · [Architecture](#built-on-fluxvm--guestkit) · [Docs](#documentation)
+[Quick start](#quick-start) · [Deploy](#deploy) · [Kubernetes](#run-on-kubernetes) · [Why Fabric](#why-zyvor-fabric) · [Architecture](#built-on-fluxvm--guestkit) · [Network Fabric](#network-fabric-architecture-how-it-works) · [Docs](#documentation)
 
 </div>
 
@@ -203,14 +203,18 @@ flowchart TB
 
 **Fabric decides what should exist; FluxVM makes it exist; GuestKit prepares the disk.** Each layer is independently useful and Apache-2.0 licensed.
 
-### Two network policy planes
+---
 
-Fabric SDN and FluxVM’s VM-edge dataplane are **orthogonal** — do not conflate them:
+## Network Fabric architecture (how it works)
+
+Fabric exposes FluxVM **Network Fabric v3** (TC/eBPF VM-edge dataplane) as first-class API, CLI, and UI — while keeping Fabric's own host SDN separate. Operator guide: [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). Kernel program source of truth: [FluxVM Network Fabric](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works).
+
+### Two policy planes (do not conflate)
 
 | Plane | Owns | API / UX |
 |-------|------|----------|
 | **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · Security → Network Policies |
-| **VM edge (FluxVM Network Fabric v3)** | Per-VM allowlists, Mbps/PPS, stats/flows on the TAP/netns edge | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** tab · `zyvorctl dataplane …` |
+| **VM edge (Network Fabric v3)** | Per-VM allowlists, Mbps/PPS, stats/flows on the TAP/netns edge | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** tab · `zyvorctl dataplane …` |
 
 ```mermaid
 flowchart LR
@@ -228,39 +232,180 @@ flowchart LR
   Fabricd --> SDN
 ```
 
+### Big picture (Fabric + FluxVM + kernel)
+
 ```mermaid
 flowchart TB
-  subgraph fabricUX [Fabric control plane]
-    Tab[VM Dataplane tab]
-    CLI[zyvorctl dataplane]
-    API["GET/POST /api/vms/name/dataplane"]
-    Tab --> API
-    CLI --> API
+  subgraph fabricCtrl [Fabric control plane]
+    WebTab[VM Dataplane tab]
+    Zctl[zyvorctl dataplane]
+    FabAPI["/api/vms/name/dataplane\nstatus policy stats flows"]
+    Driver[VmDataplaneDriver]
+    FClient[fluxvm-client]
+    WebTab --> FabAPI
+    Zctl --> FabAPI
+    FabAPI --> Driver --> FClient
   end
 
-  subgraph flux [FluxVM]
+  subgraph fluxCtrl [FluxVM control plane]
     NetAPI["/v1/vms/id/network"]
-    DP[fluxvm-network]
-    Pins["bpffs pins + maps"]
-    Meta["/run/fluxvm/ebpf"]
-    NetAPI --> DP
-    DP --> Pins
-    DP --> Meta
+    Sched[fluxvm-scheduler]
+    DP[fluxvm-network dataplane]
+    NetAPI --> Sched --> DP
   end
 
-  subgraph path [Packet path]
-    Guest[Guest]
-    Tap[TAP / netns veth]
-    Hook[TC ingress classifier]
-    Host[Host routing / Cilium]
-    Guest --> Tap --> Hook --> Host
+  subgraph durable [Durable + runtime state]
+    PolJSON["/var/lib/fluxvm/network-policy/uuid.json"]
+    Pins["/sys/fs/bpf/fluxvm/vms/uuid/\nprogs + maps"]
+    Meta["/run/fluxvm/ebpf/vms/uuid/\niface prog_id schema fingerprint"]
   end
 
-  API --> NetAPI
-  DP -->|attach + reconfigure| Hook
+  subgraph guestPath [Guest packet path]
+    Guest[Guest OS]
+    TAP[TAP / macvtap / netns]
+    HostEdge["Host-visible iface\nvh-star or tap"]
+    TC["TC ingress\nfluxvm_egress"]
+    HostRt[Host routing / Cilium / Fabric SDN]
+    Guest --> TAP --> HostEdge --> TC --> HostRt
+  end
+
+  FClient --> NetAPI
+  DP -->|configure maps before attach| Pins
+  DP -->|fsync policy + fingerprint| PolJSON
+  DP -->|ownership sidecars| Meta
+  DP -->|tc filter add / reconfigure| TC
+  Sched -->|reconcile heal + orphan GC| DP
 ```
 
-Enable with [`configs/fluxvm-dataplane.toml`](configs/fluxvm-dataplane.toml) (`mode = "ebpf"`); compose/k8s mount it, bpffs, and raise memlock. Operator detail: [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). Kernel-level packet decision diagrams live in [FluxVM’s Network Fabric architecture](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works).
+### Namespaced TAP path (what Fabric bridged VMs use)
+
+Fabric creates bridged VMs with `NetworkSpec::Tap { netns: true }`. The classifier attaches on the **host** veth (`vh-…`), not inside the guest:
+
+```mermaid
+flowchart LR
+  VM[Guest]
+  TapNs[TAP in netns]
+  Br[netns bridge]
+  VethNs[veth in netns]
+  VethHost["host veth vh-id"]
+  TcHook["TC ingress FluxVM eBPF"]
+  Out[Host stack / Cilium / SDN]
+
+  VM --> TapNs --> Br --> VethNs --> VethHost --> TcHook --> Out
+```
+
+Direct TAP/macvtap (non-netns) attaches on the host-visible TAP/macvtap itself.
+
+### Packet decision inside the TC program
+
+```mermaid
+flowchart TD
+  In[Packet on ingress] --> Look{fluxvm_id<br/>ifindex lookup}
+  Look -->|miss| Pass[TC_ACT_OK / pass]
+  Look -->|hit| Boot{ARP/DHCP/NDP/DHCPv6?}
+  Boot -->|yes| Allow[allow + stats/flows]
+  Boot -->|no| Fam{IPv4 or IPv6?}
+  Fam -->|other| Def{default_allow?}
+  Def -->|true| Allow
+  Def -->|false| Drop[drop + stats/events]
+  Fam -->|v4/v6| Cidr{enforce_cidr?}
+  Cidr -->|yes| Lpm["LPM fluxvm_v4 / fluxvm_v6"]
+  Lpm -->|miss| Drop
+  Lpm -->|hit| L4
+  Cidr -->|no| L4{enforce_l4?}
+  L4 -->|yes| Port["fluxvm_l4 proto+port"]
+  Port -->|miss| Drop
+  Port -->|hit| Rate
+  L4 -->|no| Rate{Mbps/PPS set?}
+  Rate -->|yes| Win["fluxvm_rate fixed 1s window"]
+  Win -->|over| Drop
+  Win -->|ok| Allow
+  Rate -->|no| Allow
+```
+
+### Control-plane lifecycle (through Fabric)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator / Web / zyvorctl
+  participant Fab as zyvor-fabricd
+  participant Fv as FluxVM scheduler
+  participant Dp as dataplane/ebpf
+  participant Kern as Kernel TC+maps
+
+  Op->>Fab: create/start bridged VM
+  Fab->>Fv: POST /v1/vms Tap.netns=true
+  Fv->>Dp: apply_sandbox_policy iface policy
+  Dp->>Kern: load+pin prog/maps
+  Dp->>Kern: write fluxvm_id + CIDR/L4/rate maps
+  Dp->>Kern: tc filter add after maps ready
+  Dp->>Dp: write /run meta + fingerprint
+
+  Op->>Fab: POST /api/vms/name/dataplane/policy
+  Fab->>Fv: POST /v1/vms/id/network/policy
+  Fv->>Dp: reconfigure_sandbox_policy
+  Dp->>Kern: deny-all on iface
+  Dp->>Kern: replace CIDR/L4/rate maps
+  Dp->>Kern: publish final iface config
+  Note over Dp,Kern: May over-deny briefly never allow-all gap
+
+  Op->>Fab: GET dataplane/status stats flows
+  Fab->>Fv: GET /network/status stats flows
+  Fv-->>Fab: JSON
+  Fab-->>Op: same shape
+
+  Fv->>Dp: reconcile tick
+  alt needsRepair
+    Dp->>Kern: ensure_sandbox_policy reload
+  end
+  Dp->>Dp: reconcile_orphan_pins for dead UUIDs
+```
+
+### Where state lives
+
+| Location | Contents |
+|----------|----------|
+| Fabric API | Name-keyed proxy; resolves VM name → FluxVM UUID via `fluxvm-client` |
+| `/sys/fs/bpf/fluxvm/vms/<uuid>/` | Pinned TC program + maps (`fluxvm_id`, `v4`, `v6`, `l4`, `rate`, `stats`, `flows`, `events`) |
+| `/run/fluxvm/ebpf/vms/<uuid>/` | `iface`, `prog_id`, `schema_version`, `policy_fingerprint` (not on bpffs) |
+| `/run/fluxvm/xdp/` | Optional XDP `iface` + `prog_id` |
+| `/var/lib/fluxvm/network-policy/<uuid>.json` | Durable per-VM policy (fsync + rename) |
+
+### Modes vs ownership
+
+```mermaid
+flowchart TB
+  Mode{sandbox.dataplane.mode}
+  Mode -->|legacy| Nft[nftables only]
+  Mode -->|ebpf| Edge[FluxVM TC on VM edge]
+  Mode -->|cilium| Check[Require cilium.sock + bpffs]
+  Check --> Edge
+  Edge --> Own["Pins only under /sys/fs/bpf/fluxvm\nnever Cilium private maps"]
+  Xdp[Optional XDP on uplink]
+  Edge -.->|refused when cilium| Xdp
+  FabSDN[Fabric /network-policies]
+  FabSDN -.->|independent host SDN| HostNft[host nftables]
+```
+
+### REST surface (Fabric ↔ FluxVM)
+
+| Fabric | FluxVM | Role |
+|--------|--------|------|
+| `GET …/dataplane/status` | `GET …/network/status` | mode, attached, schema_version, policy_synced, iface |
+| `GET/POST …/dataplane/policy` | `GET/POST …/network/policy` | Read / replace durable policy (+ live map update) |
+| `GET …/dataplane/stats` | `GET …/network/stats` | allow/drop packet + byte counters |
+| `GET …/dataplane/flows?limit=` | `GET …/network/flows?limit=` | LRU flows with `family` 4/6 |
+
+```bash
+zyvorctl dataplane status <name>
+zyvorctl dataplane policy get|set <name> [--file policy.json]
+zyvorctl dataplane stats <name>
+zyvorctl dataplane flows <name> [--limit 100]
+```
+
+### Enable packaging
+
+Ship [`configs/fluxvm-dataplane.toml`](configs/fluxvm-dataplane.toml) (`mode = "ebpf"`). Compose/k8s mount it as `/etc/fluxvm.toml`, mount host `/sys/fs/bpf`, and raise memlock (`SYS_RESOURCE` / `ulimit memlock=-1`). Image must include `/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o`. After first green attach (`schema_version=3`, `attached=true`), set `required = true` for fail-closed production.
 
 ---
 
