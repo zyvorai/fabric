@@ -419,7 +419,8 @@ async fn discover_oidc_endpoints(http_client: &reqwest::Client, issuer_url: &str
             if let (Some(auth), Some(token)) = (auth_endpoint, token_endpoint) {
                 // Validate discovered endpoints against SSRF to prevent
                 // a malicious provider from redirecting to internal services
-                let auth_ok = crate::api::notifications::validate_external_url_public(&auth).is_ok();
+                let auth_ok =
+                    crate::api::notifications::validate_external_url_public(&auth).is_ok();
                 let token_ok =
                     crate::api::notifications::validate_external_url_public(&token).is_ok();
                 let jwks_ok = jwks_uri
@@ -474,8 +475,7 @@ fn percent_encode(s: &str) -> String {
 /// Generate a PKCE code_verifier (43–128 unreserved chars). Uses 64 chars.
 fn generate_code_verifier() -> String {
     use rand::Rng;
-    const CHARSET: &[u8] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
     let mut rng = rand::rng();
     (0..64)
         .map(|_| CHARSET[rng.random_range(0..CHARSET.len())] as char)
@@ -494,7 +494,10 @@ fn generate_nonce() -> String {
 }
 
 /// Returns Ok when the id_token `nonce` claim matches the expected value.
-fn verify_nonce_claim(claims: &serde_json::Map<String, serde_json::Value>, expected: &str) -> Result<(), String> {
+fn verify_nonce_claim(
+    claims: &serde_json::Map<String, serde_json::Value>,
+    expected: &str,
+) -> Result<(), String> {
     let actual = claims
         .get("nonce")
         .and_then(|v| v.as_str())
@@ -550,10 +553,7 @@ fn select_jwk<'a>(keys: &'a [Jwk], kid: Option<&str>, alg: Algorithm) -> Result<
     }
 }
 
-async fn fetch_jwks(
-    http_client: &reqwest::Client,
-    jwks_uri: &str,
-) -> Result<Vec<Jwk>, String> {
+async fn fetch_jwks(http_client: &reqwest::Client, jwks_uri: &str) -> Result<Vec<Jwk>, String> {
     crate::api::notifications::validate_external_url_public(jwks_uri)
         .map_err(|e| format!("Invalid jwks_uri: {e}"))?;
 

@@ -23,7 +23,7 @@ function VxlansTabContent({ vxlans, onDelete, onAdopt, onCreate }: VxlansTabProp
   const [showAll, setShowAll] = useState(false)
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...vxlans].sort((a, b) => a.name.localeCompare(b.name))
+    const list = [...vxlans].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return list
     return list.filter(v => [v.name, String(v.vni), v.remote ?? '', v.parent_interface ?? '', v.addresses.join(' ')].join(' ').toLowerCase().includes(q))
   }, [vxlans, search])

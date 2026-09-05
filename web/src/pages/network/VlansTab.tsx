@@ -25,7 +25,7 @@ function VlansTabContent({ vlans, onDelete, onAdopt, onCreate, onEdit }: VlansTa
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...vlans].sort((a, b) => a.name.localeCompare(b.name))
+    const list = [...vlans].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return list
     return list.filter(v => {
       const hay = [v.name, String(v.vlan_id), v.parent_interface, v.addresses.join(' ')].join(' ').toLowerCase()

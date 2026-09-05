@@ -62,7 +62,11 @@ pub(crate) fn is_qmp_connect_retryable(err: &str) -> bool {
 }
 
 /// Poll until `path` is a connectable unix socket.
-pub(crate) fn wait_for_qmp_connectable(path: &str, attempts: u32, delay_ms: u64) -> Result<(), String> {
+pub(crate) fn wait_for_qmp_connectable(
+    path: &str,
+    attempts: u32,
+    delay_ms: u64,
+) -> Result<(), String> {
     for i in 0..attempts {
         let qmp = crate::qmp::QmpClient::for_socket(path.to_string());
         if qmp.is_available() {
@@ -334,11 +338,10 @@ pub async fn create_snapshot(
 
         // Final connectability wait (up to ~6s) before the real snapshot call.
         let wait_path = socket_path.clone();
-        if let Err(e) = tokio::task::spawn_blocking(move || {
-            wait_for_qmp_connectable(&wait_path, 15, 400)
-        })
-        .await
-        .unwrap_or_else(|e| Err(e.to_string()))
+        if let Err(e) =
+            tokio::task::spawn_blocking(move || wait_for_qmp_connectable(&wait_path, 15, 400))
+                .await
+                .unwrap_or_else(|e| Err(e.to_string()))
         {
             return crate::api_error::json_error(
                 StatusCode::CONFLICT,
@@ -513,11 +516,7 @@ pub async fn delete_snapshot(
                     .await
                     .unwrap_or_else(|e| Err(e.to_string()))
                     {
-                        tracing::warn!(
-                            "QMP snapshot delete failed for '{}': {}",
-                            snapshot.name,
-                            e
-                        );
+                        tracing::warn!("QMP snapshot delete failed for '{}': {}", snapshot.name, e);
                     }
                 }
             } else if let Ok(disk) = state.driver.get_disk_path(&vm_name).await {

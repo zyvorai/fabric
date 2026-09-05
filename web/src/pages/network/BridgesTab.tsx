@@ -29,7 +29,7 @@ function BridgesTabContent({ bridges, dhcpServers, onDelete, onAdopt, onCreate, 
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...bridges].sort((a, b) => a.name.localeCompare(b.name))
+    const list = [...bridges].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return list
     return list.filter(b => [b.name, b.addresses.join(' '), b.dhcp].join(' ').toLowerCase().includes(q))
   }, [bridges, search])

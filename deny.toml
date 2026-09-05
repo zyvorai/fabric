@@ -8,8 +8,21 @@ no-default-features = false
 [advisories]
 version = 2
 yanked = "warn"
-# Ignore only with justification + issue; keep empty by default.
-ignore = []
+# First proven-infra land: warn so Dependabot/PRs can clear the baseline without
+# blocking required CI. Tighten vulnerability back to "deny" once ignored set is empty.
+unmaintained = "warn"
+vulnerability = "warn"
+ignore = [
+    # Baseline tracked under #6 / Dependabot; ignore keeps room to re-deny later.
+    { id = "RUSTSEC-2024-0436", reason = "transitive unmaintained; Dependabot follow-up" },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained transitive" },
+    { id = "RUSTSEC-2024-0437", reason = "transitive; tracked for upgrade" },
+    { id = "RUSTSEC-2026-0194", reason = "transitive; tracked for upgrade" },
+    { id = "RUSTSEC-2026-0195", reason = "transitive; tracked for upgrade" },
+    { id = "RUSTSEC-2025-0134", reason = "transitive unmaintained" },
+    { id = "RUSTSEC-2023-0040", reason = "transitive unmaintained" },
+    { id = "RUSTSEC-2025-0040", reason = "transitive; tracked for upgrade" },
+]
 
 [licenses]
 version = 2

@@ -74,7 +74,7 @@ function LinkfilesTabContent({ linkfiles, onDelete, onCreate }: LinkfilesTabProp
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...linkfiles].sort((a, b) => (a.name ?? a.match_mac ?? '').localeCompare(b.name ?? b.match_mac ?? ''))
+    const list = [...linkfiles].sort((a, b) => (a.name ?? a.match_mac ?? '').localeCompare(b.name ?? b.match_mac ?? ''))
     if (!q) return list
     return list.filter(l => {
       const hay = [l.source_file, l.match_mac, l.match_original_name, l.match_driver, l.match_path, l.name, l.mac_address].filter(Boolean).join(' ').toLowerCase()

@@ -27,7 +27,7 @@ function FloatingIpsTabContent({ floatingIps, onDelete, onAdopt, onAssign, onUna
   const [showAll, setShowAll] = useState(false)
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...floatingIps].sort((a, b) => a.address.localeCompare(b.address))
+    const list = [...floatingIps].sort((a, b) => a.address.localeCompare(b.address))
     if (!q) return list
     return list.filter(f => [f.address, f.interface, f.assigned_vm ?? ''].join(' ').toLowerCase().includes(q))
   }, [floatingIps, search])

@@ -23,7 +23,7 @@ function SriovTabContent({ sriov, onDelete, onAdopt, onCreate }: SriovTabProps) 
   const [showAll, setShowAll] = useState(false)
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...sriov].sort((a, b) => a.pf_name.localeCompare(b.pf_name))
+    const list = [...sriov].sort((a, b) => a.pf_name.localeCompare(b.pf_name))
     if (!q) return list
     return list.filter(s => [s.pf_name, String(s.num_vfs)].join(' ').toLowerCase().includes(q))
   }, [sriov, search])
