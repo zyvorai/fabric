@@ -3,12 +3,50 @@
 
 use axum::{extract::State, http::StatusCode, Json};
 use chrono::{DateTime, Utc};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock};
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 use crate::server::AppState;
 use security::{RequireAdmin, RequireRead};
+
+/// How long a cached JWKS document is considered fresh before re-fetch.
+const JWKS_CACHE_TTL: Duration = Duration::from_secs(3600);
+
+/// In-memory JWKS cache keyed by `jwks_uri`.
+static JWKS_CACHE: LazyLock<RwLock<HashMap<String, CachedJwks>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+#[derive(Clone)]
+struct CachedJwks {
+    keys: Vec<Jwk>,
+    fetched_at: Instant,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct JwksDocument {
+    keys: Vec<Jwk>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct Jwk {
+    kty: String,
+    kid: Option<String>,
+    alg: Option<String>,
+    n: Option<String>,
+    e: Option<String>,
+}
+
+struct OidcDiscovery {
+    authorization_endpoint: String,
+    token_endpoint: String,
+    jwks_uri: Option<String>,
+}
 
 // ============================================================================
 // OIDC State Tracking
@@ -20,6 +58,10 @@ pub struct OidcPendingState {
     /// The state parameter value (used as the store key).
     pub state_id: String,
     pub provider_id: String,
+    /// PKCE code_verifier (S256); sent on token exchange.
+    pub code_verifier: String,
+    /// OIDC nonce; must match the `nonce` claim in the id_token.
+    pub nonce: String,
     pub created: DateTime<Utc>,
 }
 
@@ -303,11 +345,16 @@ pub async fn oidc_login_url(
     };
 
     let state_param = uuid::Uuid::new_v4().to_string();
+    let code_verifier = generate_code_verifier();
+    let code_challenge = pkce_challenge_s256(&code_verifier);
+    let nonce = generate_nonce();
 
     // Persist the state -> provider mapping so the callback can look it up
     let pending = OidcPendingState {
         state_id: state_param.clone(),
         provider_id: provider_id.clone(),
+        code_verifier,
+        nonce: nonce.clone(),
         created: Utc::now(),
     };
     state
@@ -321,8 +368,7 @@ pub async fn oidc_login_url(
         })?;
 
     // Fetch OIDC discovery to get the real authorization endpoint
-    let (auth_endpoint, _token_endpoint) =
-        discover_oidc_endpoints(&state.http_client, &oidc_config.issuer_url).await;
+    let discovery = discover_oidc_endpoints(&state.http_client, &oidc_config.issuer_url).await;
 
     let scopes = oidc_config.scopes.join(" ");
 
@@ -331,12 +377,14 @@ pub async fn oidc_login_url(
     let encoded_scopes = percent_encode(&scopes);
 
     let url = format!(
-        "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}",
-        auth_endpoint,
+        "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=S256&nonce={}",
+        discovery.authorization_endpoint,
         percent_encode(&oidc_config.client_id),
         encoded_redirect,
         encoded_scopes,
         state_param,
+        percent_encode(&code_challenge),
+        percent_encode(&nonce),
     );
 
     Ok(Json(OidcLoginUrl {
@@ -345,12 +393,9 @@ pub async fn oidc_login_url(
     }))
 }
 
-/// Fetch the OIDC discovery document and extract the authorization and token endpoints.
+/// Fetch the OIDC discovery document and extract endpoints.
 /// Falls back to conventional `{issuer}/authorize` and `{issuer}/token` if discovery fails.
-async fn discover_oidc_endpoints(
-    http_client: &reqwest::Client,
-    issuer_url: &str,
-) -> (String, String) {
+async fn discover_oidc_endpoints(http_client: &reqwest::Client, issuer_url: &str) -> OidcDiscovery {
     let discovery_url = format!(
         "{}/.well-known/openid-configuration",
         issuer_url.trim_end_matches('/')
@@ -366,15 +411,34 @@ async fn discover_oidc_endpoints(
                 .get("token_endpoint")
                 .and_then(|v| v.as_str())
                 .map(String::from);
+            let jwks_uri = doc
+                .get("jwks_uri")
+                .and_then(|v| v.as_str())
+                .map(String::from);
 
             if let (Some(auth), Some(token)) = (auth_endpoint, token_endpoint) {
                 // Validate discovered endpoints against SSRF to prevent
                 // a malicious provider from redirecting to internal services
-                if crate::api::notifications::validate_external_url_public(&auth).is_ok()
-                    && crate::api::notifications::validate_external_url_public(&token).is_ok()
-                {
-                    tracing::debug!("OIDC discovery: auth={}, token={}", auth, token);
-                    return (auth, token);
+                let auth_ok = crate::api::notifications::validate_external_url_public(&auth).is_ok();
+                let token_ok =
+                    crate::api::notifications::validate_external_url_public(&token).is_ok();
+                let jwks_ok = jwks_uri
+                    .as_ref()
+                    .map(|u| crate::api::notifications::validate_external_url_public(u).is_ok())
+                    .unwrap_or(true);
+
+                if auth_ok && token_ok && jwks_ok {
+                    tracing::debug!(
+                        "OIDC discovery: auth={}, token={}, jwks={:?}",
+                        auth,
+                        token,
+                        jwks_uri
+                    );
+                    return OidcDiscovery {
+                        authorization_endpoint: auth,
+                        token_endpoint: token,
+                        jwks_uri,
+                    };
                 }
                 tracing::warn!("OIDC discovery endpoints failed SSRF validation, using fallback");
             }
@@ -383,7 +447,11 @@ async fn discover_oidc_endpoints(
 
     tracing::debug!("OIDC discovery failed, using conventional endpoints");
     let base = issuer_url.trim_end_matches('/');
-    (format!("{}/authorize", base), format!("{}/token", base))
+    OidcDiscovery {
+        authorization_endpoint: format!("{}/authorize", base),
+        token_endpoint: format!("{}/token", base),
+        jwks_uri: None,
+    }
 }
 
 /// RFC 3986 percent-encoding for URL components.
@@ -403,12 +471,208 @@ fn percent_encode(s: &str) -> String {
     encoded
 }
 
+/// Generate a PKCE code_verifier (43–128 unreserved chars). Uses 64 chars.
+fn generate_code_verifier() -> String {
+    use rand::Rng;
+    const CHARSET: &[u8] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+    let mut rng = rand::rng();
+    (0..64)
+        .map(|_| CHARSET[rng.random_range(0..CHARSET.len())] as char)
+        .collect()
+}
+
+/// S256 code_challenge = BASE64URL-ENCODE(SHA256(ASCII(code_verifier))) without padding.
+fn pkce_challenge_s256(code_verifier: &str) -> String {
+    use base64::Engine;
+    let digest = Sha256::digest(code_verifier.as_bytes());
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest)
+}
+
+fn generate_nonce() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+
+/// Returns Ok when the id_token `nonce` claim matches the expected value.
+fn verify_nonce_claim(claims: &serde_json::Map<String, serde_json::Value>, expected: &str) -> Result<(), String> {
+    let actual = claims
+        .get("nonce")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "ID token missing nonce claim".to_string())?;
+    if actual != expected {
+        return Err("ID token nonce mismatch".to_string());
+    }
+    Ok(())
+}
+
+fn decoding_key_from_jwk(jwk: &Jwk) -> Result<DecodingKey, String> {
+    if jwk.kty != "RSA" {
+        return Err(format!("Unsupported JWK kty '{}'", jwk.kty));
+    }
+    let n = jwk
+        .n
+        .as_deref()
+        .ok_or_else(|| "RSA JWK missing 'n'".to_string())?;
+    let e = jwk
+        .e
+        .as_deref()
+        .ok_or_else(|| "RSA JWK missing 'e'".to_string())?;
+    DecodingKey::from_rsa_components(n, e).map_err(|err| format!("Invalid RSA JWK: {err}"))
+}
+
+fn select_jwk<'a>(keys: &'a [Jwk], kid: Option<&str>, alg: Algorithm) -> Result<&'a Jwk, String> {
+    let alg_name = match alg {
+        Algorithm::RS256 => "RS256",
+        Algorithm::RS384 => "RS384",
+        Algorithm::RS512 => "RS512",
+        _ => return Err(format!("Unsupported JWT algorithm: {alg:?}")),
+    };
+
+    if let Some(kid) = kid {
+        if let Some(jwk) = keys.iter().find(|k| k.kid.as_deref() == Some(kid)) {
+            if jwk.alg.as_deref().map(|a| a == alg_name).unwrap_or(true) {
+                return Ok(jwk);
+            }
+            return Err(format!("JWK kid '{kid}' alg mismatch"));
+        }
+    }
+
+    // Fall back to a single RSA key when kid is absent (common in small deployments).
+    let rsa_keys: Vec<_> = keys
+        .iter()
+        .filter(|k| k.kty == "RSA")
+        .filter(|k| k.alg.as_deref().map(|a| a == alg_name).unwrap_or(true))
+        .collect();
+    match rsa_keys.as_slice() {
+        [only] => Ok(*only),
+        [] => Err("No matching RSA key in JWKS".into()),
+        _ => Err("Multiple JWKS keys; JWT header must include kid".into()),
+    }
+}
+
+async fn fetch_jwks(
+    http_client: &reqwest::Client,
+    jwks_uri: &str,
+) -> Result<Vec<Jwk>, String> {
+    crate::api::notifications::validate_external_url_public(jwks_uri)
+        .map_err(|e| format!("Invalid jwks_uri: {e}"))?;
+
+    let resp = http_client
+        .get(jwks_uri)
+        .send()
+        .await
+        .map_err(|e| format!("JWKS fetch failed: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("JWKS endpoint returned {}", resp.status()));
+    }
+    let doc: JwksDocument = resp
+        .json()
+        .await
+        .map_err(|e| format!("Invalid JWKS document: {e}"))?;
+    if doc.keys.is_empty() {
+        return Err("JWKS document contained no keys".into());
+    }
+    Ok(doc.keys)
+}
+
+/// Return cached JWKS keys, refreshing when stale or on forced refresh.
+async fn get_jwks(
+    http_client: &reqwest::Client,
+    jwks_uri: &str,
+    force_refresh: bool,
+) -> Result<Vec<Jwk>, String> {
+    if !force_refresh {
+        let cache = JWKS_CACHE.read().await;
+        if let Some(entry) = cache.get(jwks_uri) {
+            if entry.fetched_at.elapsed() < JWKS_CACHE_TTL {
+                return Ok(entry.keys.clone());
+            }
+        }
+    }
+
+    let keys = fetch_jwks(http_client, jwks_uri).await?;
+    let mut cache = JWKS_CACHE.write().await;
+    cache.insert(
+        jwks_uri.to_string(),
+        CachedJwks {
+            keys: keys.clone(),
+            fetched_at: Instant::now(),
+        },
+    );
+    Ok(keys)
+}
+
+/// Verify an id_token signature and standard claims using a provided decoding key.
+/// Used by the production JWKS path and by unit tests.
+fn verify_id_token_with_key(
+    id_token: &str,
+    issuer: &str,
+    client_id: &str,
+    expected_nonce: &str,
+    alg: Algorithm,
+    key: &DecodingKey,
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let mut validation = Validation::new(alg);
+    // Some IdPs include a trailing slash on iss; accept both forms.
+    let issuer_trimmed = issuer.trim_end_matches('/');
+    let issuer_slash = format!("{}/", issuer_trimmed);
+    validation.set_issuer(&[issuer_trimmed, issuer_slash.as_str()]);
+    validation.set_audience(&[client_id]);
+    validation.validate_exp = true;
+
+    let data = decode::<serde_json::Value>(id_token, key, &validation)
+        .map_err(|e| format!("ID token verification failed: {e}"))?;
+
+    let claims = data
+        .claims
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "ID token payload is not a JSON object".to_string())?;
+
+    verify_nonce_claim(&claims, expected_nonce)?;
+    Ok(claims)
+}
+
+/// Fetch JWKS (cached), select the signing key, and verify the id_token.
+async fn verify_id_token_jwks(
+    http_client: &reqwest::Client,
+    id_token: &str,
+    issuer: &str,
+    client_id: &str,
+    expected_nonce: &str,
+    jwks_uri: &str,
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let header = decode_header(id_token).map_err(|e| format!("Invalid ID token header: {e}"))?;
+    let alg = match header.alg {
+        Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => header.alg,
+        other => {
+            return Err(format!(
+                "Unsupported ID token algorithm {:?}; only RS256/384/512 are supported",
+                other
+            ))
+        }
+    };
+
+    let mut keys = get_jwks(http_client, jwks_uri, false).await?;
+    let jwk = match select_jwk(&keys, header.kid.as_deref(), alg) {
+        Ok(jwk) => jwk.clone(),
+        Err(_) => {
+            // Key rotation: refresh JWKS once and retry selection.
+            keys = get_jwks(http_client, jwks_uri, true).await?;
+            select_jwk(&keys, header.kid.as_deref(), alg)?.clone()
+        }
+    };
+
+    let key = decoding_key_from_jwk(&jwk)?;
+    verify_id_token_with_key(id_token, issuer, client_id, expected_nonce, alg, &key)
+}
+
 /// POST /api/auth/oidc/callback - Handle OIDC callback
 ///
 /// Completes the OIDC authorization code flow:
 /// 1. Validates the state parameter against stored pending states
-/// 2. Exchanges the authorization code for tokens at the provider's token endpoint
-/// 3. Parses the ID token to extract user claims
+/// 2. Exchanges the authorization code for tokens (with PKCE code_verifier)
+/// 3. Verifies the ID token via JWKS (signature, iss, aud, exp, nonce)
 /// 4. Maps the OIDC user to a local role and issues a local JWT
 pub async fn oidc_callback(
     State(state): State<Arc<AppState>>,
@@ -478,18 +742,26 @@ pub async fn oidc_callback(
     }
 
     // 3. Exchange the authorization code for tokens at the provider's token endpoint
-    let (_auth_endpoint, token_url) =
-        discover_oidc_endpoints(&state.http_client, &oidc_config.issuer_url).await;
+    let discovery = discover_oidc_endpoints(&state.http_client, &oidc_config.issuer_url).await;
+    let jwks_uri = discovery.jwks_uri.ok_or_else(|| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({
+                "error": "OIDC discovery did not return jwks_uri; cannot verify id_token"
+            })),
+        )
+    })?;
 
     let token_response = state
         .http_client
-        .post(&token_url)
+        .post(&discovery.token_endpoint)
         .form(&[
             ("grant_type", "authorization_code"),
-            ("code", &req.code),
-            ("redirect_uri", &oidc_config.redirect_uri),
-            ("client_id", &oidc_config.client_id),
-            ("client_secret", &oidc_config.client_secret),
+            ("code", req.code.as_str()),
+            ("redirect_uri", oidc_config.redirect_uri.as_str()),
+            ("client_id", oidc_config.client_id.as_str()),
+            ("client_secret", oidc_config.client_secret.as_str()),
+            ("code_verifier", pending.code_verifier.as_str()),
         ])
         .send()
         .await
@@ -529,9 +801,17 @@ pub async fn oidc_callback(
             )
         })?;
 
-    // 4. Decode the ID token payload (the provider's signature was validated by the TLS
-    //    connection to the token endpoint — the token came directly from the provider)
-    let claims = decode_id_token_claims(id_token).map_err(|e| {
+    // 4. Cryptographically verify the ID token via JWKS
+    let claims = verify_id_token_jwks(
+        &state.http_client,
+        id_token,
+        &oidc_config.issuer_url,
+        &oidc_config.client_id,
+        &pending.nonce,
+        &jwks_uri,
+    )
+    .await
+    .map_err(|e| {
         (
             StatusCode::BAD_GATEWAY,
             Json(json!({"error": format!("Invalid ID token: {}", e)})),
@@ -617,11 +897,10 @@ pub async fn oidc_callback(
 
 /// Decode the payload of a JWT ID token without cryptographic verification.
 ///
-/// This is safe when the token was obtained directly from the provider's token
-/// endpoint over TLS (authorization code flow), as the transport layer guarantees
-/// authenticity. We must NOT skip verification for tokens received from untrusted
-/// sources (e.g. implicit flow).
-fn decode_id_token_claims(
+/// Private helper for unit tests of claim/payload parsing only. Production
+/// code must use [`verify_id_token_jwks`] / [`verify_id_token_with_key`].
+#[cfg(test)]
+fn decode_id_token_claims_unverified(
     id_token: &str,
 ) -> Result<serde_json::Map<String, serde_json::Value>, String> {
     let parts: Vec<&str> = id_token.split('.').collect();
@@ -663,6 +942,44 @@ fn parse_role(role_str: &str) -> security::Role {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+
+    #[test]
+    fn test_pkce_challenge_s256_rfc7636() {
+        // RFC 7636 Appendix B test vector
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        let challenge = pkce_challenge_s256(verifier);
+        assert_eq!(challenge, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+
+    #[test]
+    fn test_generate_code_verifier_length_and_charset() {
+        let v = generate_code_verifier();
+        assert_eq!(v.len(), 64);
+        assert!(v
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_' | '~')));
+    }
+
+    #[test]
+    fn test_verify_nonce_claim_ok() {
+        let mut claims = serde_json::Map::new();
+        claims.insert("nonce".into(), json!("abc-123"));
+        assert!(verify_nonce_claim(&claims, "abc-123").is_ok());
+    }
+
+    #[test]
+    fn test_verify_nonce_claim_mismatch() {
+        let mut claims = serde_json::Map::new();
+        claims.insert("nonce".into(), json!("abc-123"));
+        assert!(verify_nonce_claim(&claims, "other").is_err());
+    }
+
+    #[test]
+    fn test_verify_nonce_claim_missing() {
+        let claims = serde_json::Map::new();
+        assert!(verify_nonce_claim(&claims, "abc-123").is_err());
+    }
 
     #[test]
     fn test_decode_id_token_valid() {
@@ -672,20 +989,20 @@ mod tests {
         let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .encode(r#"{"sub":"user1","email":"u@test.com","name":"Test"}"#);
         let token = format!("{}.{}.fake-signature", header, payload);
-        let claims = decode_id_token_claims(&token).unwrap();
+        let claims = decode_id_token_claims_unverified(&token).unwrap();
         assert_eq!(claims.get("sub").unwrap().as_str().unwrap(), "user1");
         assert_eq!(claims.get("email").unwrap().as_str().unwrap(), "u@test.com");
     }
 
     #[test]
     fn test_decode_id_token_invalid_parts() {
-        assert!(decode_id_token_claims("only-two.parts").is_err());
-        assert!(decode_id_token_claims("").is_err());
+        assert!(decode_id_token_claims_unverified("only-two.parts").is_err());
+        assert!(decode_id_token_claims_unverified("").is_err());
     }
 
     #[test]
     fn test_decode_id_token_invalid_base64() {
-        assert!(decode_id_token_claims("header.!!!invalid!!!.sig").is_err());
+        assert!(decode_id_token_claims_unverified("header.!!!invalid!!!.sig").is_err());
     }
 
     #[test]
@@ -715,5 +1032,79 @@ mod tests {
         assert_eq!(parse_role("ADMIN"), security::Role::Admin);
         assert_eq!(parse_role("User"), security::Role::User);
         assert_eq!(parse_role("AdMiN"), security::Role::Admin);
+    }
+
+    #[test]
+    fn test_select_jwk_by_kid() {
+        let keys = vec![
+            Jwk {
+                kty: "RSA".into(),
+                kid: Some("a".into()),
+                alg: Some("RS256".into()),
+                n: Some("n1".into()),
+                e: Some("AQAB".into()),
+            },
+            Jwk {
+                kty: "RSA".into(),
+                kid: Some("b".into()),
+                alg: Some("RS256".into()),
+                n: Some("n2".into()),
+                e: Some("AQAB".into()),
+            },
+        ];
+        let selected = select_jwk(&keys, Some("b"), Algorithm::RS256).unwrap();
+        assert_eq!(selected.kid.as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn test_verify_id_token_rejects_nonce_mismatch_with_hmac() {
+        // Use HS256 only for isolated unit-test of claim validation plumbing;
+        // production path is RS* via JWKS.
+        #[derive(Serialize)]
+        struct Claims {
+            iss: String,
+            aud: String,
+            exp: i64,
+            nonce: String,
+            sub: String,
+        }
+
+        let secret = b"unit-test-secret-key-32bytes!!!!";
+        let claims = Claims {
+            iss: "https://issuer.example".into(),
+            aud: "client-1".into(),
+            exp: chrono::Utc::now().timestamp() + 3600,
+            nonce: "expected-nonce".into(),
+            sub: "user1".into(),
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(secret),
+        )
+        .unwrap();
+
+        let key = DecodingKey::from_secret(secret);
+        let ok = verify_id_token_with_key(
+            &token,
+            "https://issuer.example",
+            "client-1",
+            "expected-nonce",
+            Algorithm::HS256,
+            &key,
+        );
+        assert!(ok.is_ok());
+        assert_eq!(ok.unwrap().get("sub").unwrap().as_str().unwrap(), "user1");
+
+        let bad = verify_id_token_with_key(
+            &token,
+            "https://issuer.example",
+            "client-1",
+            "wrong-nonce",
+            Algorithm::HS256,
+            &key,
+        );
+        assert!(bad.is_err());
+        assert!(bad.unwrap_err().contains("nonce"));
     }
 }

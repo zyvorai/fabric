@@ -137,7 +137,7 @@ Detailed documentation for each major feature area.
 | Authentication | PAM + JWT authentication flow |
 | RBAC | Admin, User, Viewer roles and endpoint permissions |
 | API Keys | Service-to-service authentication tokens |
-| External Auth | LDAP and OIDC/OAuth2 integration |
+| [OIDC / External Auth](oidc.md) | LDAP and OIDC/OAuth2 SSO (PKCE, JWKS-verified id_token) |
 | [SCIM Provisioning](scim-identity.md) | SCIM 2.0 lifecycle provisioning and group-to-role sync for Entra ID / Okta |
 | Audit Logging | Structured audit logs with JSON/CSV export |
 | Encryption | VM disk encryption with key management providers |

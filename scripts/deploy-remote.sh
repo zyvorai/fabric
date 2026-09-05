@@ -514,6 +514,24 @@ ok "Rust binaries built"
 install_step=$((install_step + 1))
 
 phase "$install_step" "$TOTAL_STEPS" "Install binaries and systemd units" "config · directories · zyvorctl · restart service"
+# Password: explicit env > FABRIC_LAB_DEFAULTS=1 (Admin@321) > random (never silent Admin@321)
+GENERATED_ADMIN_PASS=false
+if [[ -n "${FABRIC_ADMIN_PASSWORD:-}" ]]; then
+    ADMIN_PASS="${FABRIC_ADMIN_PASSWORD}"
+elif [[ -n "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
+    ADMIN_PASS="${ZYVOR_FABRICD_ADMIN_PASSWORD}"
+elif [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]]; then
+    ADMIN_PASS='Admin@321'
+else
+    if command -v openssl >/dev/null 2>&1; then
+        ADMIN_PASS="$(openssl rand -base64 18 2>/dev/null | tr -d '/+=' | head -c 24)"
+    elif command -v python3 >/dev/null 2>&1; then
+        ADMIN_PASS="$(python3 -c 'import secrets; print(secrets.token_urlsafe(18)[:24])')"
+    else
+        die "need openssl or python3 to generate admin password (or set FABRIC_ADMIN_PASSWORD / FABRIC_LAB_DEFAULTS=1)"
+    fi
+    GENERATED_ADMIN_PASS=true
+fi
 ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
@@ -539,9 +557,10 @@ if [ ! -f /etc/zyvor-fabricd/zyvor-fabricd.toml ] && [ -f configs/zyvor-fabricd.
     echo '  ✅ Created /etc/zyvor-fabricd/zyvor-fabricd.toml'
 fi
 
-# Lab default credentials (suite-wide): admin / Admin@321
-# Override with FABRIC_ADMIN_PASSWORD. FORCE_ADMIN_RESET=1 wipes auth.db and reseeds.
-ADMIN_PASS='${FABRIC_ADMIN_PASSWORD:-Admin@321}'
+# Admin password (resolved on deploy host; never silent Admin@321).
+# FABRIC_ADMIN_PASSWORD / ZYVOR_FABRICD_ADMIN_PASSWORD, or FABRIC_LAB_DEFAULTS=1 → Admin@321.
+# FORCE_ADMIN_RESET=1 wipes auth.db and reseeds.
+ADMIN_PASS='${ADMIN_PASS}'
 ENV_FILE=/etc/zyvor-fabricd/zyvor-fabricd.env
 if [ ! -f \"\$ENV_FILE\" ] && [ -f configs/zyvor-fabricd.env ]; then
     \$SUDO install -m 0644 configs/zyvor-fabricd.env \"\$ENV_FILE\"
@@ -559,7 +578,7 @@ if [ '${FORCE_ADMIN_RESET:-0}' = 1 ]; then
     \$SUDO rm -f /var/lib/zyvor-fabricd/auth.db /var/lib/zyvor-fabricd/auth.db-wal /var/lib/zyvor-fabricd/auth.db-shm
     echo '  ✅ Reset auth.db — admin will be reseeded on start'
 fi
-echo \"  ✅ Lab admin password set (admin / from FABRIC_ADMIN_PASSWORD or Admin@321)\"
+echo '  ✅ Admin password set (admin · see /var/lib/zyvor-fabricd/.admin_password)'
 
 if [ -n \"\$BIND\" ] && [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
     \$SUDO sed -i \"s/listen = \\\"127.0.0.1:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
@@ -667,7 +686,13 @@ deploy_ui_checklist "health" "$(curl -skf --connect-timeout 5 "https://${HOST}:$
 deploy_ui_celebrate "Ship it!"
 vmspawn_print_success "$HOST" "$ELAPSED" "$USER"
 deploy_ui_kv "🔗" "SSH" "ssh ${USER}@${HOST}"
-deploy_ui_kv "🔑" "Login" "admin / Admin@321  (override: FABRIC_ADMIN_PASSWORD · reset: FORCE_ADMIN_RESET=1)"
+if [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]] && [[ -z "${FABRIC_ADMIN_PASSWORD:-}" ]] && [[ -z "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
+    deploy_ui_kv "🔑" "Login" "admin / Admin@321  (FABRIC_LAB_DEFAULTS=1 · reset: FORCE_ADMIN_RESET=1)"
+elif $GENERATED_ADMIN_PASS; then
+    deploy_ui_kv "🔑" "Login" "admin / (generated · sudo cat /var/lib/zyvor-fabricd/.admin_password)"
+else
+    deploy_ui_kv "🔑" "Login" "admin / (from env · see .admin_password · reset: FORCE_ADMIN_RESET=1)"
+fi
 deploy_ui_kv "🚀" "Manage" "zyvor-fabricd-ctl status · zyvor-fabricd-ctl verify"
 tip "HOST USER also works: ./scripts/deploy-remote.sh ${HOST} ${USER} --quick"
 
@@ -683,7 +708,15 @@ fi
 if $VERIFY_APIS; then
     deploy_ui_highlight "🔍 UX API audit"
     ADMIN_PW="$(ssh_r_bash "$REMOTE" "sudo cat /var/lib/zyvor-fabricd/.admin_password 2>/dev/null | tr -d '\r'" || true)"
-    ADMIN_PW="${ADMIN_PW:-${FABRIC_ADMIN_PASSWORD:-Admin@321}}"
+    if [[ -z "$ADMIN_PW" ]]; then
+        if [[ -n "${FABRIC_ADMIN_PASSWORD:-}" ]]; then
+            ADMIN_PW="${FABRIC_ADMIN_PASSWORD}"
+        elif [[ -n "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
+            ADMIN_PW="${ZYVOR_FABRICD_ADMIN_PASSWORD}"
+        elif [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]]; then
+            ADMIN_PW='Admin@321'
+        fi
+    fi
     if [[ -n "$ADMIN_PW" ]] && VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "http://${HOST}:${API_PORT}"; then
         deploy_ui_celebrate "API audit passed"
     else

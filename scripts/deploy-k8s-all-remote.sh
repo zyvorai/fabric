@@ -17,7 +17,8 @@
 # Env:
 #   DEPLOY_HOST, DEPLOY_USER, DEPLOY_PASS / SSHPASS, DEPLOY_DIR
 #   IMAGE_TAG=local  FABRIC_ADMIN_PASSWORD  FABRIC_SKIP_FLUXVM=1
-#   Default credentials (Kubernetes Secret): admin / Admin@321
+#   FABRIC_LAB_DEFAULTS=1 — use Admin@321 for convenient lab deploys
+#   (otherwise generate random password; never silent Admin@321)
 #   FLUXVM_DIR / GUESTKIT_DIR — local paths to rsync for fluxvm image build
 # ============================================================================
 set -euo pipefail
@@ -150,11 +151,30 @@ _rsync() {
     "$@"
 }
 
-gen_password() {
-  # Unused for K8s defaults — credentials live in the Secret (admin / Admin@321).
-  printf '%s' 'Admin@321'
+gen_random_password() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -base64 18 2>/dev/null | tr -d '/+=' | head -c 24
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import secrets; print(secrets.token_urlsafe(18)[:24])'
+    return 0
+  fi
+  echo "error: need openssl or python3 to generate admin password (or set FABRIC_ADMIN_PASSWORD / FABRIC_LAB_DEFAULTS=1)" >&2
+  exit 1
 }
-ADMIN_PASS="${FABRIC_ADMIN_PASSWORD:-Admin@321}"
+
+GENERATED_ADMIN_PASS=false
+if [[ -n "${FABRIC_ADMIN_PASSWORD:-}" ]]; then
+  ADMIN_PASS="${FABRIC_ADMIN_PASSWORD}"
+elif [[ -n "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
+  ADMIN_PASS="${ZYVOR_FABRICD_ADMIN_PASSWORD}"
+elif [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]]; then
+  ADMIN_PASS='Admin@321'
+else
+  ADMIN_PASS="$(gen_random_password)"
+  GENERATED_ADMIN_PASS=true
+fi
 ADMIN_USER="${FABRIC_ADMIN_USERNAME:-admin}"
 
 vmspawn_build_metadata "$REPO_DIR"
@@ -287,7 +307,7 @@ _ssh "
   ${SUDO} kubectl apply -f k8s/base/fabricd-configmap.yaml
 
   # Credentials: Kubernetes Secret only (never systemd .admin_password).
-  # Default new deploy: admin / Admin@321. Preserve existing Secret unless FORCE_SECRET=1.
+  # Preserve existing Secret unless FORCE_SECRET=1.
   if [ \"${FORCE_SECRET:-}\" = \"1\" ] || ! ${SUDO} kubectl get secret zyvor-fabric-secrets -n ${NAMESPACE} >/dev/null 2>&1; then
     JWT_SECRET=\$(openssl rand -base64 32 2>/dev/null || head -c 32 /dev/urandom | base64)
     ${SUDO} kubectl create secret generic zyvor-fabric-secrets \\
@@ -296,7 +316,7 @@ _ssh "
       --from-literal=jwt-secret=\"\$JWT_SECRET\" \\
       -n ${NAMESPACE} \\
       --dry-run=client -o yaml | ${SUDO} kubectl apply -f -
-    echo '[k8s] Applied Secret zyvor-fabric-secrets (admin / Admin@321 unless overridden)'
+    echo '[k8s] Applied Secret zyvor-fabric-secrets'
   else
     echo '[k8s] Keeping existing Secret zyvor-fabric-secrets (FORCE_SECRET=1 to replace)'
   fi
@@ -335,7 +355,14 @@ end_phase
 elapsed=$(( $(now_epoch) - RUN_STARTED_AT ))
 echo ""
 deploy_ui_kv "💚" "UI / API" "http://${HOST}:${NODE_PORT}/  (also :9095)"
-deploy_ui_kv "🔑" "Login" "${ADMIN_USER} / Admin@321 (Secret zyvor-fabric-secrets)"
+if [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]] && [[ -z "${FABRIC_ADMIN_PASSWORD:-}" ]] && [[ -z "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
+  deploy_ui_kv "🔑" "Login" "${ADMIN_USER} / Admin@321 (FABRIC_LAB_DEFAULTS=1 · Secret zyvor-fabric-secrets)"
+elif $GENERATED_ADMIN_PASS; then
+  deploy_ui_kv "🔑" "Login" "${ADMIN_USER} / (generated · Secret zyvor-fabric-secrets)"
+  echo "  Retrieve: kubectl -n ${NAMESPACE} get secret zyvor-fabric-secrets -o jsonpath='{.data.admin-password}' | base64 -d; echo"
+else
+  deploy_ui_kv "🔑" "Login" "${ADMIN_USER} / (from env · Secret zyvor-fabric-secrets)"
+fi
 deploy_ui_kv "⏱" "Total" "$(format_duration "${elapsed}")"
 if [[ "${code_np}" == "200" || "${code_hn}" == "200" ]]; then
   deploy_ui_info "Deploy OK"

@@ -12,13 +12,14 @@ podSecurity:
   enforce: privileged
 
 ## Secrets — Kubernetes Secret only (not systemd .admin_password files).
-## Lab defaults: admin / Admin@321. Override via --set or existingSecret.
+## adminPassword empty → chart generates a random password (randAlphaNum).
+## Do not set Admin@321 (install fails). Lab convenience: FABRIC_LAB_DEFAULTS=1
+## on deploy scripts, or --set a unique password / existingSecret.
 security:
   existingSecret: ""
   adminUsername: "admin"
-  adminPassword: "Admin@321"
-  # Empty → chart generates a random jwt when templating if not set; prefer
-  # setting explicitly or using existingSecret in production.
+  adminPassword: ""
+  # Prefer setting explicitly or using existingSecret in production.
   jwtSecret: "zyvor-fabric-lab-jwt-change-me"
 
 fabricd:

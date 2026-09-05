@@ -68,7 +68,7 @@ For VS Code with rust-analyzer:
 ```bash
 cd backend
 
-# Full debug build (all 46 crates)
+# Full debug build (all 48 crates)
 cargo build
 
 # Release build (optimized)

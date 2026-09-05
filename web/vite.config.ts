@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
@@ -20,6 +21,13 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+  },
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      reportsDirectory: './coverage',
+    },
   },
   server: {
     port: 3000,

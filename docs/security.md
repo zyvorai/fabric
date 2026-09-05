@@ -86,6 +86,13 @@ curl -H "Authorization: Bearer <token>" \
   http://localhost:9095/api/vms
 ```
 
+### OIDC SSO
+
+Enterprise SSO uses the OIDC Authorization Code flow with PKCE (S256), state
+TTL, nonce binding, and JWKS-based `id_token` verification (`iss` / `aud` /
+`exp` / `nonce`). Setup notes for Keycloak, Entra ID, and Okta:
+[oidc.md](oidc.md).
+
 ### API Keys
 
 For service-to-service and CI/CD authentication:

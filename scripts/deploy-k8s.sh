@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Local / CI deploy: kubectl apply k8s/base for zyvor-fabric.
-# Credentials come from Kubernetes Secret zyvor-fabric-secrets (admin / Admin@321).
+# Credentials come from Kubernetes Secret zyvor-fabric-secrets.
 # Env:
 #   BUILD_IMAGES=true  — build images first
 #   IMAGE_TAG=local
-#   FABRIC_ADMIN_PASSWORD / FABRIC_ADMIN_USERNAME — override secret on --force-secret
+#   FABRIC_ADMIN_PASSWORD / ZYVOR_FABRICD_ADMIN_PASSWORD — explicit password
+#   FABRIC_LAB_DEFAULTS=1 — use Admin@321 for convenient lab deploys
+#   (otherwise a random password is generated; never silent Admin@321)
 #   FORCE_SECRET=1 — recreate secret from defaults/env
 set -euo pipefail
 
@@ -23,7 +25,6 @@ kubectl apply -f k8s/base/fabricd-configmap.yaml
 
 if [ "${FORCE_SECRET:-}" = "1" ] || ! kubectl get secret zyvor-fabric-secrets -n "${NAMESPACE}" &>/dev/null; then
   FABRIC_ADMIN_USERNAME="${FABRIC_ADMIN_USERNAME:-admin}" \
-  FABRIC_ADMIN_PASSWORD="${FABRIC_ADMIN_PASSWORD:-Admin@321}" \
     ./scripts/k8s-set-admin-secret.sh --apply
 else
   echo "Secret zyvor-fabric-secrets already exists (set FORCE_SECRET=1 to replace)"
@@ -54,7 +55,13 @@ echo ""
 echo "Status:"
 kubectl get pods,svc,secret -n "${NAMESPACE}"
 echo ""
-echo "Login: admin / Admin@321  (from Secret zyvor-fabric-secrets)"
+if [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]] && [[ -z "${FABRIC_ADMIN_PASSWORD:-}" ]] && [[ -z "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
+  echo "Login: admin / Admin@321  (FABRIC_LAB_DEFAULTS=1 · Secret zyvor-fabric-secrets)"
+else
+  echo "Login: admin / (from Secret zyvor-fabric-secrets)"
+  echo "Retrieve password:"
+  echo "  kubectl -n ${NAMESPACE} get secret zyvor-fabric-secrets -o jsonpath='{.data.admin-password}' | base64 -d; echo"
+fi
 echo "Access:"
 echo "  NodePort: http://<node-ip>:${NODE_PORT}/health"
 echo "  hostNetwork: http://<node-ip>:9095/health"
