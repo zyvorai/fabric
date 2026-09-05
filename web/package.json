@@ -16,7 +16,7 @@
     "@xterm/xterm": "^5.5.0",
     "lucide-react": "^0.475.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "react-dom": "^19.2.8",
     "react-router": "^7.5.0",
     "recharts": "^2.15.0"
   },
@@ -24,7 +24,7 @@
     "@eslint/js": "^9.22.0",
     "@tailwindcss/vite": "^4.1.0",
     "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
+    "@types/react-dom": "^19.2.5",
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
     "@vitejs/plugin-react": "^4.5.0",
