@@ -37,6 +37,18 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev clang pkg-config libssl-dev
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache-dependency-path: tools/fabric-doctor/go.mod
+
+      - name: Build fabric-doctor
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then TAG="${{ inputs.tag }}"; fi
+          make -C tools/fabric-doctor build VERSION="$TAG"
+          cp tools/fabric-doctor/bin/fabric-doctor "$GITHUB_WORKSPACE/fabric-doctor"
+
       - name: Build binaries
         run: |
           cd backend
@@ -48,7 +60,7 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then TAG="${{ inputs.tag }}"; fi
           mkdir -p dist
-          tar -czf "dist/zyvor-fabricd-${TAG}-linux-${{ matrix.arch }}.tar.gz" zyvor-fabricd zyvorctl
+          tar -czf "dist/zyvor-fabricd-${TAG}-linux-${{ matrix.arch }}.tar.gz" zyvor-fabricd zyvorctl fabric-doctor
           (cd dist && sha256sum *.tar.gz > "SHA256SUMS-${{ matrix.arch }}.txt")
 
       - uses: actions/upload-artifact@v4

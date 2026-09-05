@@ -56,3 +56,4 @@ integrations/machina/desktop/node_modules/
 integrations/machina/desktop/dist/
 integrations/machina/desktop/src-tauri/target/
 integrations/machina/desktop/src-tauri/gen/
+tools/fabric-doctor/bin/

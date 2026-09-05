@@ -210,7 +210,7 @@ flowchart TB
 | Rust crates | 48 |
 | REST endpoints | 480+ |
 | LOC | ~87K (60K Rust + 27K TS) |
-| Interfaces | 4 (CLI, Web, Operator, Terraform) |
+| Interfaces | 4 (CLI, Web, Operator, Terraform) + Fabric Doctor |
 | Web pages | 80+ console routes + marketing |
 | Deploy modes | Bare metal · Docker · Kubernetes · Operator |
 
@@ -230,6 +230,7 @@ flowchart TB
 | Governance / branch protection | [docs/GOVERNANCE.md](docs/GOVERNANCE.md) |
 | OIDC / SSO | [docs/oidc.md](docs/oidc.md) |
 | Security policy | [SECURITY.md](SECURITY.md) |
+| **Fabric Doctor (preflight)** | [docs/FABRIC_DOCTOR.md](docs/FABRIC_DOCTOR.md) · [tools/fabric-doctor](tools/fabric-doctor/) |
 | FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) |
 | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |

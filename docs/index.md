@@ -156,6 +156,7 @@ Detailed documentation for each major feature area.
 | DRS | Distributed Resource Scheduling and placement |
 | Affinity Rules | VM-to-VM and VM-to-host affinity/anti-affinity |
 | [Host Maintenance Evacuation](host-lifecycle.md) | Preflight-checked workload evacuation before a host enters maintenance |
+| [Fabric Doctor](FABRIC_DOCTOR.md) | Production host preflight checks and safe support bundles (`tools/fabric-doctor`) |
 | Fault Tolerance | Automatic failover, fencing, and recovery |
 | Live Migration | Iterative rsync pre-copy migration with cutover |
 | Site Recovery | Failover/reprotect workflows for disaster recovery |
