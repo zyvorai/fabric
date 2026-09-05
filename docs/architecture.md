@@ -97,7 +97,7 @@ The backend is a Cargo workspace with 40 crates organized into functional areas.
 | CLI | clap 4.5 |
 | Web | React 19 + Vite |
 | D-Bus | zbus 4 |
-| Frontend | React 18 + TypeScript + Vite + TailwindCSS |
+| Frontend | React 19 + TypeScript + Vite + TailwindCSS |
 | Terminal emulator | xterm.js |
 | VNC client | noVNC |
 | Monitoring | Prometheus |

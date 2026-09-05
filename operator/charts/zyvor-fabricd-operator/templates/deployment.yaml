@@ -21,13 +21,14 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         env:
         - name: ZYVOR_FABRICD_URL
-          value: {{ .Values.zyvor-fabricd.url | quote }}
-        {{- if .Values.zyvor-fabricd.tokenSecret }}
+          value: {{ (index .Values "zyvor-fabricd").url | quote }}
+        {{- $fab := index .Values "zyvor-fabricd" }}
+        {{- if $fab.tokenSecret }}
         - name: ZYVOR_FABRICD_TOKEN
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.zyvor-fabricd.tokenSecret | quote }}
-              key: {{ .Values.zyvor-fabricd.tokenSecretKey | quote }}
+              name: {{ $fab.tokenSecret | quote }}
+              key: {{ $fab.tokenSecretKey | quote }}
         {{- end }}
         - name: NODE_NAME
           valueFrom:

@@ -58,16 +58,7 @@ fn deploy_mode() -> (String, String, bool, Option<String>) {
             "systemd" | "bare-metal" | "host" => "Bare metal · systemd".into(),
             other => other.to_string(),
         };
-        return (
-            if k8s {
-                "kubernetes".into()
-            } else {
-                mode
-            },
-            label,
-            k8s,
-            ns,
-        );
+        return (if k8s { "kubernetes".into() } else { mode }, label, k8s, ns);
     }
 
     if in_kubernetes() {
@@ -75,11 +66,9 @@ fn deploy_mode() -> (String, String, bool, Option<String>) {
             .ok()
             .or_else(|| std::env::var("POD_NAMESPACE").ok())
             .or_else(|| {
-                std::fs::read_to_string(
-                    "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
-                )
-                .ok()
-                .map(|s| s.trim().to_string())
+                std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+                    .ok()
+                    .map(|s| s.trim().to_string())
             })
             .filter(|s| !s.is_empty());
         let label = match &ns {
@@ -90,26 +79,18 @@ fn deploy_mode() -> (String, String, bool, Option<String>) {
     }
 
     if Path::new("/.dockerenv").exists() {
-        return (
-            "docker".into(),
-            "Docker / Podman".into(),
-            false,
-            None,
-        );
+        return ("docker".into(), "Docker / Podman".into(), false, None);
     }
 
-    (
-        "host".into(),
-        "Bare metal · host".into(),
-        false,
-        None,
-    )
+    ("host".into(), "Bare metal · host".into(), false, None)
 }
 
 /// GET /api/instance — public product / host / deploy identity for the login UI.
 pub async fn get_instance() -> Json<InstanceInfo> {
     let (deploy_mode, deploy_label, kubernetes, kubernetes_namespace) = deploy_mode();
-    let listen = std::env::var("ZYVOR_FABRICD_LISTEN").ok().filter(|s| !s.is_empty());
+    let listen = std::env::var("ZYVOR_FABRICD_LISTEN")
+        .ok()
+        .filter(|s| !s.is_empty());
     Json(InstanceInfo {
         product: "Zyvor Fabric".into(),
         product_id: "zyvor-fabric".into(),

@@ -47,7 +47,7 @@ function StatusTabContent({ links, onRefresh }: StatusTabProps) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...links].sort((a, b) => a.name.localeCompare(b.name))
+    const list = [...links].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return list
     return list.filter(l => {
       const hay = [l.name, l.kind, l.operational_state, l.setup_state].join(' ').toLowerCase()

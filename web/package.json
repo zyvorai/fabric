@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@novnc/novnc": "^1.7.0",
@@ -27,6 +28,7 @@
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
     "@vitejs/plugin-react": "^4.5.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "tailwindcss": "^4.1.0",

@@ -152,7 +152,7 @@ cargo build 2>&1 | grep -c "warning"
 
 ## Building Individual Crates
 
-Each of the 46 crates can be built and tested independently:
+Each of the 48 crates can be built and tested independently:
 
 ```bash
 cd backend

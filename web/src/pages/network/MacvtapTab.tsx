@@ -42,7 +42,7 @@ function MacvtapTabContent({ macvtaps, onDelete, onAdopt, onCreate }: MacvtapTab
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...macvtaps].sort((a, b) => a.name.localeCompare(b.name))
+    const list = [...macvtaps].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return list
     return list.filter(m => [m.name, m.parent_interface, m.mode, m.mac_address ?? ''].join(' ').toLowerCase().includes(q))
   }, [macvtaps, search])

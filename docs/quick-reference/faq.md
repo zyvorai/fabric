@@ -90,7 +90,7 @@ that used to build `systemd-vmspawn` command lines) now only builds VM
 `machinectl-driver`/`machined-dbus` crates that implemented D-Bus/`machinectl`
 based VM lifecycle are deleted entirely.
 
-### Why are there 46 crates?
+### Why are there 48 crates?
 
 The workspace is organized into fine-grained crates to enforce clear module
 boundaries, enable independent compilation and testing, and prevent circular

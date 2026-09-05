@@ -42,7 +42,7 @@ function TapsTabContent({ taps, onDelete, onAdopt, onCreate }: TapsTabProps) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...taps].sort((a, b) => a.name.localeCompare(b.name))
+    const list = [...taps].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return list
     return list.filter(t => [t.name, t.bridge ?? '', t.user ?? ''].join(' ').toLowerCase().includes(q))
   }, [taps, search])

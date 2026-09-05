@@ -407,8 +407,8 @@ impl From<&ScimTokenRecord> for ScimTokenView {
             id: value.id.clone(),
             profile_id: value.profile_id.clone(),
             name: value.name.clone(),
-            created: value.created.clone(),
-            last_used: value.last_used.clone(),
+            created: value.created,
+            last_used: value.last_used,
             revoked: value.revoked,
         }
     }
@@ -839,8 +839,8 @@ pub fn to_scim_user(
         groups: group_refs,
         meta: ScimMeta {
             resource_type: "User".into(),
-            created: user.created.clone(),
-            last_modified: user.updated.clone(),
+            created: user.created,
+            last_modified: user.updated,
             location: Some(format!(
                 "{}/Users/{}",
                 base_url.trim_end_matches('/'),
@@ -877,8 +877,8 @@ pub fn to_scim_group(
         members,
         meta: ScimMeta {
             resource_type: "Group".into(),
-            created: group.created.clone(),
-            last_modified: group.updated.clone(),
+            created: group.created,
+            last_modified: group.updated,
             location: Some(format!(
                 "{}/Groups/{}",
                 base_url.trim_end_matches('/'),

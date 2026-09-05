@@ -143,7 +143,7 @@ helm-template:
 	helm template zyvor-fabric ./charts/zyvor-fabric \
 		--namespace zyvor-fabric \
 		--set security.adminUsername=admin \
-		--set security.adminPassword=Admin@321 \
+		--set security.adminPassword=eval-admin-only \
 		--set security.jwtSecret=eval-jwt-secret-at-least-32-chars
 
 help:

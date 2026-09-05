@@ -25,7 +25,7 @@ function BondsTabContent({ bonds, onDelete, onAdopt, onCreate, onEdit }: BondsTa
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = [...bonds].sort((a, b) => a.name.localeCompare(b.name))
+    const list = [...bonds].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return list
     return list.filter(b => {
       const hay = [b.name, b.mode, b.slave_interfaces.join(' '), b.addresses.join(' ')].join(' ').toLowerCase()

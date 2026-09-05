@@ -81,12 +81,21 @@ Admin login for **new** Kubernetes deployments (from Secret):
 | Field | Default |
 |-------|---------|
 | Username | `admin` |
-| Password | `Admin@321` |
+| Password | **generated** (unless `FABRIC_ADMIN_PASSWORD` / `ZYVOR_FABRICD_ADMIN_PASSWORD` set, or `FABRIC_LAB_DEFAULTS=1` → `Admin@321`) |
 
-Override with `FABRIC_ADMIN_PASSWORD` / `FABRIC_ADMIN_USERNAME`, or:
+Retrieve:
 
 ```bash
-./scripts/k8s-set-admin-secret.sh --apply --restart
+kubectl -n zyvor-fabric get secret zyvor-fabric-secrets \
+  -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+Override / rotate:
+
+```bash
+FABRIC_LAB_DEFAULTS=1 ./scripts/k8s-set-admin-secret.sh --apply --restart
+# or:
+FABRIC_ADMIN_PASSWORD='Secret!' ./scripts/k8s-set-admin-secret.sh --apply --restart
 ```
 
 ### B. Local kubectl
@@ -114,10 +123,13 @@ make helm-template
 helm upgrade --install zyvor-fabric ./charts/zyvor-fabric \
   --namespace zyvor-fabric --create-namespace \
   --set security.adminUsername=admin \
-  --set security.adminPassword='Admin@321' \
   --set security.jwtSecret="$(openssl rand -base64 32)" \
   --set fabricd.image.tag=local \
   --set fluxvm.image.tag=local
+# Leave security.adminPassword empty → chart generates a random password.
+# Do not --set security.adminPassword=Admin@321 (install fails).
+# Retrieve: kubectl -n zyvor-fabric get secret zyvor-fabric-secrets \
+#   -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
 
 Useful values (see [charts/zyvor-fabric/values.yaml](../charts/zyvor-fabric/values.yaml)):
@@ -129,31 +141,33 @@ Useful values (see [charts/zyvor-fabric/values.yaml](../charts/zyvor-fabric/valu
 | `fabricd.service.nodePort` | `30095` | Lab NodePort |
 | `fabricd.hostPath` | `/var/lib/zyvor-fabricd` | Persistent data on node |
 | `security.adminUsername` | `admin` | Seeded admin username |
-| `security.adminPassword` | `Admin@321` | Seeded admin password (Secret) |
+| `security.adminPassword` | `""` (random) | Empty → `randAlphaNum`; `Admin@321` is rejected |
 | `security.existingSecret` | `""` | Use a pre-created Secret instead |
 
 ---
 
 ## Credentials (Kubernetes Secret)
 
-Fabric on Kubernetes **does not** use systemd’s `/var/lib/zyvor-fabricd/.admin_password` file.
+Fabric on Kubernetes **does not** use systemd’s `/var/lib/zyvor-fabricd/.admin_password` file
+by default (bare-metal systemd deploys still write that file).
 The DaemonSet reads credentials from Secret `zyvor-fabric-secrets`:
 
 | Key | Default (new deploy) |
 |-----|----------------------|
 | `admin-username` | `admin` |
-| `admin-password` | `Admin@321` |
+| `admin-password` | random (or env / `FABRIC_LAB_DEFAULTS=1` → `Admin@321`) |
 | `jwt-secret` | lab placeholder / random on first create |
 
 ```bash
-# Apply / replace secret
+# Apply / replace secret (generates password unless env / FABRIC_LAB_DEFAULTS=1)
 ./scripts/k8s-set-admin-secret.sh --apply --restart
 
-# Or from manifests
+# Or from manifests (replace REPLACE_ME first — do not ship a known default)
 kubectl apply -f k8s/base/secret.yaml
 
-# Inspect (base64)
-kubectl -n zyvor-fabric get secret zyvor-fabric-secrets -o jsonpath='{.data.admin-username}' | base64 -d; echo
+# Retrieve password
+kubectl -n zyvor-fabric get secret zyvor-fabric-secrets \
+  -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
 
 Password is seeded into `auth.db` only when the DB has **no users**. After changing the
@@ -170,7 +184,9 @@ kubectl -n zyvor-fabric rollout restart daemonset/zyvor-fabricd
 
 | Variable | Purpose |
 |----------|---------|
-| `FABRIC_ADMIN_PASSWORD` | Admin password for Secret (default **Admin@321**) |
+| `FABRIC_ADMIN_PASSWORD` | Admin password for Secret (explicit; preferred for prod) |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Same as above (alternate env name) |
+| `FABRIC_LAB_DEFAULTS=1` | Use convenient lab password `Admin@321` (never silent without this) |
 | `FABRIC_ADMIN_USERNAME` | Admin username for Secret (default **admin**) |
 | `FORCE_SECRET=1` | Recreate `zyvor-fabric-secrets` on deploy |
 | `FABRIC_SKIP_FLUXVM=1` | Skip FluxVM image sync/DaemonSet |

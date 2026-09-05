@@ -239,7 +239,7 @@ Authentication and authorization are handled by the `security` crate:
 
 ## Crate Dependency Graph
 
-The workspace contains 46 crates organized into the following domains.
+The workspace contains 48 crates organized into the following domains.
 See [crate-map.md](crate-map.md) for the complete listing.
 
 ```

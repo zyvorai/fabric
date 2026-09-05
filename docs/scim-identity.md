@@ -98,16 +98,14 @@ and its secret token as the returned `fscim_...` value.
 - `requireProvisionedUser=true` turns provisioning into an explicit allow-list
   for the linked auth provider; an unprovisioned user is denied login rather
   than falling back to the provider's default role.
-- The OIDC ID token this feature reads was fetched directly by Fabric's
-  backend from the provider's token endpoint during the authorization-code
-  exchange (not supplied by the browser), so the `username` claim it relies
-  on for provisioning lookups is not attacker-controlled.
+- The OIDC ID token this feature reads is JWKS-verified by Fabric (signature,
+  `iss`, `aud`, `exp`, `nonce`) after the authorization-code + PKCE token
+  exchange, so the `username` claim used for provisioning lookups is not
+  attacker-controlled. See [oidc.md](oidc.md).
 
 ## Follow-up hardening
 
-The existing OIDC implementation exchanges the authorization code for tokens
-server-to-server and does not yet perform full JWKS signature verification,
-issuer/audience/nonce validation, or PKCE. A future identity PR should add
-that hardening and replace the current LDAP connectivity stub with real TLS
-bind/search — both are pre-existing gaps in Fabric's external-auth stack, not
-introduced by SCIM provisioning.
+OIDC Authorization Code flow now includes PKCE (S256), nonce binding, and
+JWKS-based `id_token` verification. Remaining external-auth gap: the LDAP
+connectivity stub still needs a real TLS bind/search — that is unrelated to
+SCIM provisioning. See [oidc.md](oidc.md).

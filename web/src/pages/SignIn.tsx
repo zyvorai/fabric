@@ -294,22 +294,26 @@ export default function SignIn() {
                   (<span className="font-mono">ns/{instance.kubernetes_namespace}</span>)
                 </>
               ) : null}
-              . Default lab credentials: <span className="font-mono">admin</span> /{' '}
-              <span className="font-mono">Admin@321</span> (from Secret{' '}
-              <span className="font-mono">zyvor-fabric-secrets</span>).
+              . Retrieve password from Secret{' '}
+              <span className="font-mono">zyvor-fabric-secrets</span>
+              {' '}
+              (<span className="font-mono">kubectl get secret … -o jsonpath=…</span>). Labs with{' '}
+              <span className="font-mono">FABRIC_LAB_DEFAULTS=1</span> may use{' '}
+              <span className="font-mono">admin</span> / <span className="font-mono">Admin@321</span>.
             </>
           ) : (
             <>
               Signing into <span className="font-mono">{instance?.product ?? 'Zyvor Fabric'}</span> on
-              this host. Lab default: <span className="font-mono">admin</span> /{' '}
-              <span className="font-mono">Admin@321</span>
+              this host. Retrieve password from{' '}
+              <span className="font-mono">/var/lib/zyvor-fabricd/.admin_password</span>
               {instance?.deploy_mode === 'host' ? (
                 <>
                   {' '}
-                  (or <span className="font-mono">sudo cat /var/lib/zyvor-fabricd/.admin_password</span> on
-                  older installs).
+                  (<span className="font-mono">sudo cat /var/lib/zyvor-fabricd/.admin_password</span>).
                 </>
-              ) : null}
+              ) : null}{' '}
+              Labs with <span className="font-mono">FABRIC_LAB_DEFAULTS=1</span> may use{' '}
+              <span className="font-mono">admin</span> / <span className="font-mono">Admin@321</span>.
             </>
           )
         ) : null

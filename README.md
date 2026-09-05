@@ -82,7 +82,7 @@ Four first-class ways to run Fabric. Pick one:
 ./scripts/deploy check sus@HOST
 ```
 
-Installs `zyvor-fabricd` + web UI, opens `0.0.0.0:9095` (HTTPS, self-signed by default). **Lab login:** `admin` / `Admin@321` (set via `ZYVOR_FABRICD_ADMIN_PASSWORD` on deploy). Reseed an existing host with `FORCE_ADMIN_RESET=1 ./scripts/deploy remote USER@HOST --quick`.
+Installs `zyvor-fabricd` + web UI, opens `0.0.0.0:9095` (HTTPS, self-signed by default). Admin password is generated on deploy unless you set `FABRIC_ADMIN_PASSWORD` / `ZYVOR_FABRICD_ADMIN_PASSWORD`, or `FABRIC_LAB_DEFAULTS=1` for convenient lab default `Admin@321`. Retrieve: `sudo cat /var/lib/zyvor-fabricd/.admin_password`. Reseed with `FORCE_ADMIN_RESET=1 ./scripts/deploy remote USER@HOST --quick`.
 
 ### Docker / Podman
 
@@ -121,7 +121,7 @@ Fabric on Kubernetes uses the same **lab packaging pattern as Ragnarok** (manife
 | UI + API (hostNetwork) | **9095** |
 | FluxVM | **7788** (node-local) |
 
-Open `http://HOST:30095/` after deploy. **Login:** `admin` / `Admin@321` (Kubernetes Secret `zyvor-fabric-secrets`).
+Open `http://HOST:30095/` after deploy. **Login:** `admin` + password from Secret `zyvor-fabric-secrets` (generated unless `FABRIC_ADMIN_PASSWORD` or `FABRIC_LAB_DEFAULTS=1`). Retrieve: `kubectl -n zyvor-fabric get secret zyvor-fabric-secrets -o jsonpath='{.data.admin-password}' | base64 -d; echo`.
 
 ### Local kubectl / Helm
 
@@ -226,6 +226,10 @@ flowchart TB
 | Quick start (dev) | [QUICKSTART.md](QUICKSTART.md) |
 | Features | [FEATURES.md](FEATURES.md) |
 | Architecture | [docs/architecture.md](docs/architecture.md) |
+| Project stats (generated) | [docs/generated/project-stats.md](docs/generated/project-stats.md) |
+| Governance / branch protection | [docs/GOVERNANCE.md](docs/GOVERNANCE.md) |
+| OIDC / SSO | [docs/oidc.md](docs/oidc.md) |
+| Security policy | [SECURITY.md](SECURITY.md) |
 | FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) |
 | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |

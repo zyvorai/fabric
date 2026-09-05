@@ -3382,7 +3382,7 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
             const HEAL_GRACE_SECS: i64 = 90;
             if let Some(updated) = vm.updated {
                 let age = (Utc::now() - updated).num_seconds();
-                if age >= 0 && age < HEAL_GRACE_SECS {
+                if (0..HEAL_GRACE_SECS).contains(&age) {
                     continue;
                 }
             }

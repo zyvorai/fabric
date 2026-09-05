@@ -297,7 +297,7 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | Async Runtime | Tokio 1.44 |
 | Web Framework | Axum 0.8 |
 | Web UI | React 19 + Vite |
-| Web UI | React 18 + TypeScript + Vite + TailwindCSS |
+| Web UI | React 19 + TypeScript + Vite + TailwindCSS |
 | VM Backend | FluxVM (no systemd dependency) |
 | Monitoring | Prometheus |
 
