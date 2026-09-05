@@ -28,6 +28,11 @@ const ALLOWED_QMP_COMMANDS: &[&str] = &[
     "balloon",
     "block_resize",
     "blockdev-snapshot-sync",
+    // Internal qcow2 snapshot (disk only, no vmstate) — used for
+    // snapshot_type=Disk on a running VM. Distinct from snapshot-save,
+    // which dumps memory and can take minutes under disk contention.
+    "blockdev-snapshot-internal-sync",
+    "blockdev-snapshot-delete-internal-sync",
     "blockdev-add",
     "blockdev-del",
     "device_add",

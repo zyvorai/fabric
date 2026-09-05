@@ -911,7 +911,9 @@ function SnapshotsTab({ vm }: { vm: VM }) {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDescription, setNewDescription] = useState('')
-  const [newType, setNewType] = useState<'Disk' | 'Full'>('Full')
+  // Default Disk — matches API default and avoids Full (vmstate) dumps that
+  // routinely exceed host load / HTTP budgets on lab hardware.
+  const [newType, setNewType] = useState<'Disk' | 'Full'>('Disk')
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
 
   const loadSnapshots = useCallback(async () => {
@@ -943,7 +945,7 @@ function SnapshotsTab({ vm }: { vm: VM }) {
       setShowCreateForm(false)
       setNewName('')
       setNewDescription('')
-      setNewType('Full')
+      setNewType('Disk')
       await loadSnapshots()
     } catch (err) {
       toastFailure(toast, 'Failed to create snapshot', err)
@@ -1049,8 +1051,8 @@ function SnapshotsTab({ vm }: { vm: VM }) {
                 onChange={(e) => setNewType(e.target.value as 'Disk' | 'Full')}
                 className="input-field py-1.5"
               >
-                <option value="Full">Full</option>
                 <option value="Disk">Disk Only</option>
+                <option value="Full">Full (disk + memory — slower)</option>
               </select>
             </div>
           </div>

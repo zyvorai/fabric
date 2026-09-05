@@ -53,6 +53,63 @@ fn default_snapshot_type() -> SnapshotType {
     SnapshotType::Disk
 }
 
+/// Resolve the primary attached block node name from `query-block`.
+fn primary_block_node(session: &mut crate::qmp::QmpSession) -> Result<String, String> {
+    let blocks = session
+        .execute("query-block", serde_json::Value::Null)
+        .map_err(|e| e.to_string())?;
+    blocks
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find_map(|b| b.get("inserted")?.get("node-name")?.as_str())
+        .ok_or_else(|| "no attached block device to snapshot".to_string())
+        .map(|s| s.to_string())
+}
+
+/// Disk-only internal snapshot of a *running* VM via QMP
+/// `blockdev-snapshot-internal-sync`. Fast (no vmstate dump) and is what
+/// `snapshot_type=Disk` must use — previously every running-VM snapshot
+/// went through `snapshot-save` (full memory), so "Disk Only" in the UI
+/// still timed out under host load / the 60s HTTP TimeoutLayer.
+pub(crate) fn live_disk_snapshot_via_qmp(
+    qmp: &crate::qmp::QmpClient,
+    tag: &str,
+) -> Result<(), String> {
+    let mut session = qmp.open_session().map_err(|e| e.to_string())?;
+    let node_name = primary_block_node(&mut session)?;
+    session
+        .execute(
+            "blockdev-snapshot-internal-sync",
+            serde_json::json!({
+                "device": node_name,
+                "name": tag,
+            }),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Delete an internal qcow2 snapshot tag on a *running* VM (disk held open
+/// by QEMU — external `qemu-img snapshot -d` cannot take the image lock).
+pub(crate) fn live_delete_snapshot_via_qmp(
+    qmp: &crate::qmp::QmpClient,
+    tag: &str,
+) -> Result<(), String> {
+    let mut session = qmp.open_session().map_err(|e| e.to_string())?;
+    let node_name = primary_block_node(&mut session)?;
+    session
+        .execute(
+            "blockdev-snapshot-delete-internal-sync",
+            serde_json::json!({
+                "device": node_name,
+                "name": tag,
+            }),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Internal (disk + memory) snapshot of a *running* VM via QMP's job-based
 /// `snapshot-save`. `savevm` (the old HMP command name) isn't a real
 /// top-level QMP command on current QEMU -- found live: "The command
@@ -72,19 +129,13 @@ fn default_snapshot_type() -> SnapshotType {
 /// concurrent raw probe against the same socket also stalling -- for
 /// ~10s (the read timeout) until it eventually cleared on its own. One
 /// held-open connection for the whole operation never triggers this.
+///
+/// Poll budget matches the QMP read timeout (300s): vmstate dumps under
+/// disk contention routinely exceed the old 50×200ms ≈ 10s window.
 pub(crate) fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> Result<(), String> {
     let mut session = qmp.open_session().map_err(|e| e.to_string())?;
 
-    let blocks = session
-        .execute("query-block", serde_json::Value::Null)
-        .map_err(|e| e.to_string())?;
-    let node_name = blocks
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find_map(|b| b.get("inserted")?.get("node-name")?.as_str())
-        .ok_or_else(|| "no attached block device to snapshot".to_string())?
-        .to_string();
+    let node_name = primary_block_node(&mut session)?;
 
     let job_id = format!("snap-{}", &Uuid::new_v4().simple().to_string()[..8]);
     session
@@ -99,9 +150,11 @@ pub(crate) fn live_snapshot_via_qmp(qmp: &crate::qmp::QmpClient, tag: &str) -> R
         )
         .map_err(|e| e.to_string())?;
 
+    // 300s / 200ms = 1500 polls — aligned with qmp session read timeout.
+    const MAX_POLLS: u32 = 1500;
     let outcome = (|| {
         let mut last_err = String::new();
-        for _ in 0..50 {
+        for _ in 0..MAX_POLLS {
             // A query-jobs poll can itself error while QEMU's monitor is
             // busy mid-dump -- that's a reason to keep polling on this
             // same session, not to give up, since the underlying job
@@ -189,12 +242,11 @@ pub async fn create_snapshot(
     // A running VM already has the disk open exclusively (qcow2's own image
     // locking) -- an external `qemu-img snapshot -c` against the same path
     // collides with that lock and fails with "Is another process using the
-    // image?". Route through QMP's job-based snapshot-save instead when the
-    // VM is running (see live_snapshot_via_qmp): it runs inside the live
-    // QEMU process, so it coordinates with the image lock instead of
-    // fighting it, and captures full VM state (disk + memory) rather than
-    // just disk. Only fall back to the external `qemu-img` path -- which
-    // needs the disk to not be held open -- for a stopped VM.
+    // image?". Route through QMP instead when the VM is running:
+    //   * Disk  → blockdev-snapshot-internal-sync (fast, no vmstate)
+    //   * Full  → snapshot-save job (disk + memory; can take minutes)
+    // Found live: ignoring snapshot_type and always calling snapshot-save
+    // made the UI "Disk Only" option time out under the 60s HTTP layer.
     let vm_running = matches!(
         state.store.get_vm(&vm_name).ok().flatten().map(|v| v.state),
         Some(vm_model::VMState::Running) | Some(vm_model::VMState::Paused)
@@ -212,12 +264,44 @@ pub async fn create_snapshot(
                 .into_response();
             }
         };
-        if let Err(e) = live_snapshot_via_qmp(&qmp, &req.name) {
-            return crate::api_error::json_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Live snapshot failed: {}", e),
-            )
-            .into_response();
+        let tag = req.name.clone();
+        let snap_type = req.snapshot_type.clone();
+        let qmp_result = tokio::task::spawn_blocking(move || match snap_type {
+            SnapshotType::Disk => live_disk_snapshot_via_qmp(&qmp, &tag),
+            SnapshotType::Full => live_snapshot_via_qmp(&qmp, &tag),
+        })
+        .await;
+        match qmp_result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                // Connect races (QEMU still bringing the monitor up) and
+                // "socket not available yet" are retryable — surface as 409
+                // so the UI can say "wait and retry" instead of a hard 500.
+                let retryable = e.contains("Failed to connect to QMP socket")
+                    || e.contains("No such file")
+                    || e.contains("Connection refused");
+                let status = if retryable {
+                    StatusCode::CONFLICT
+                } else {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                };
+                let msg = if retryable {
+                    format!(
+                        "Live snapshot could not reach the VM monitor yet ({e}). \
+                         Wait a few seconds for the VM to finish starting, then retry."
+                    )
+                } else {
+                    format!("Live snapshot failed: {e}")
+                };
+                return crate::api_error::json_error(status, msg).into_response();
+            }
+            Err(e) => {
+                return crate::api_error::json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Live snapshot task failed: {}", e),
+                )
+                .into_response();
+            }
         }
     } else {
         let output = Command::new("qemu-img")
@@ -328,18 +412,41 @@ pub async fn delete_snapshot(
 
     let store_key = format!("snapshots_{}", vm_name);
 
-    // Get snapshot info to delete from qemu-img
+    // Get snapshot info to delete from the live disk
     if let Ok(Some(snapshot)) = state.store.get_entity::<VMSnapshot>(&store_key, &id) {
         if crate::validation::validate_snapshot_name(&snapshot.name).is_err() {
             tracing::error!("Corrupted snapshot name in store, skipping qemu-img delete");
-        } else if let Ok(disk) = state.driver.get_disk_path(&vm_name).await {
-            let path = disk.display().to_string();
-            if let Err(e) = Command::new("qemu-img")
-                .args(["snapshot", "-d", &snapshot.name, &path])
-                .output()
-                .await
-            {
-                tracing::warn!("Command failed: {}", e);
+        } else {
+            let vm_running = matches!(
+                state.store.get_vm(&vm_name).ok().flatten().map(|v| v.state),
+                Some(vm_model::VMState::Running) | Some(vm_model::VMState::Paused)
+            );
+            if vm_running {
+                if let Ok(Some(p)) = state.driver.get_control_socket(&vm_name).await {
+                    let qmp = crate::qmp::QmpClient::for_socket(p.to_string_lossy().into_owned());
+                    let tag = snapshot.name.clone();
+                    if let Err(e) = tokio::task::spawn_blocking(move || {
+                        live_delete_snapshot_via_qmp(&qmp, &tag)
+                    })
+                    .await
+                    .unwrap_or_else(|e| Err(e.to_string()))
+                    {
+                        tracing::warn!(
+                            "QMP snapshot delete failed for '{}': {}",
+                            snapshot.name,
+                            e
+                        );
+                    }
+                }
+            } else if let Ok(disk) = state.driver.get_disk_path(&vm_name).await {
+                let path = disk.display().to_string();
+                if let Err(e) = Command::new("qemu-img")
+                    .args(["snapshot", "-d", &snapshot.name, &path])
+                    .output()
+                    .await
+                {
+                    tracing::warn!("Command failed: {}", e);
+                }
             }
         }
     }

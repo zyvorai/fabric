@@ -2261,9 +2261,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         })
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
         .layer(axum::middleware::from_fn(security_headers))
+        // 330s — Full (disk+memory) live snapshots poll QMP for up to 300s
+        // under disk contention; the previous 60s layer aborted those mid-dump
+        // with 408 while QEMU was still working. Disk-only snaps finish fast.
         .layer(tower_http::timeout::TimeoutLayer::with_status_code(
             axum::http::StatusCode::REQUEST_TIMEOUT,
-            std::time::Duration::from_secs(60),
+            std::time::Duration::from_secs(330),
         ))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
