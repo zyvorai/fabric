@@ -12,7 +12,7 @@ RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM rust:1.88-slim AS rust-builder
+FROM rust:1.98-slim AS rust-builder
 
 WORKDIR /build
 
