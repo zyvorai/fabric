@@ -68,7 +68,7 @@ export default function Home() {
       <section className="mkt-band">
         <h2>From bare metal to fleet.</h2>
         <p>Web console, CLI, Kubernetes operator, and Terraform — one API underneath.</p>
-        <Link to="/platform" className="zf-btn zf-btn-primary !bg-white !text-[var(--zf-ink)]">
+        <Link to="/platform" className="zf-btn mkt-band-cta">
           See the platform
         </Link>
       </section>
