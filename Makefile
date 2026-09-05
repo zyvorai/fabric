@@ -1,7 +1,9 @@
 .PHONY: all build build-backend build-web \
        install install-bin install-conf install-systemd install-web install-modules install-libexec \
        uninstall run dev cli test clean fmt lint \
-       docker-build docker-build-fluxvm docker-up docker-down rpm deb help
+       docker-build docker-build-fluxvm docker-up docker-down \
+       k8s-deploy k8s-undeploy helm-lint helm-template \
+       rpm deb help
 
 PREFIX     ?= /usr
 DESTDIR    ?=
@@ -128,6 +130,21 @@ docker-up:
 docker-down:
 	docker compose down
 
+k8s-deploy:
+	./scripts/deploy-k8s.sh
+
+k8s-undeploy:
+	kubectl delete namespace zyvor-fabric --wait=false || true
+
+helm-lint:
+	helm lint ./charts/zyvor-fabric
+
+helm-template:
+	helm template zyvor-fabric ./charts/zyvor-fabric \
+		--namespace zyvor-fabric \
+		--set security.adminPassword=eval \
+		--set security.jwtSecret=eval-jwt-secret-at-least-32-chars
+
 help:
 	@echo "Available targets:"
 	@echo "  build           - Build backend and web UI"
@@ -152,6 +169,10 @@ help:
 	@echo "  docker-build    - Build zyvor-fabricd and fluxvm images (see docs/DOCKER.md)"
 	@echo "  docker-up       - Start with Docker/Podman Compose"
 	@echo "  docker-down     - Stop Docker/Podman Compose"
+	@echo "  k8s-deploy      - Apply k8s/base manifests (local kubectl)"
+	@echo "  k8s-undeploy    - Delete zyvor-fabric namespace"
+	@echo "  helm-lint       - Lint charts/zyvor-fabric"
+	@echo "  helm-template   - Render Helm chart (eval secrets)"
 	@echo ""
 	@echo "Variables:"
 	@echo "  PREFIX=$(PREFIX)  DESTDIR=$(DESTDIR)"

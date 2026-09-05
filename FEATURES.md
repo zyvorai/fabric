@@ -340,7 +340,9 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 - Build from source
 - Optional systemd service (not required — the daemon runs fine under any supervisor, or in the foreground)
 - Make install script
-- Helm charts (for operator)
+- Remote bare-metal: `./scripts/deploy remote USER@HOST`
+- **Kubernetes platform** (fabricd + FluxVM DaemonSets, Helm): see `docs/KUBERNETES.md` / `./scripts/deploy k8s USER@HOST`
+- Helm chart for the **operator** (CRDs → Fabric API)
 
 ### Configuration
 
@@ -355,5 +357,6 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 - npm/Vite for web UI
 - GitHub Actions CI/CD
 - Automated builds, formatting checks, linting
-- Makefile for common tasks
-- Docker and Podman support -- `zyvor-fabricd` + an FluxVM companion container, see `docs/DOCKER.md`
+- Makefile for common tasks (`k8s-deploy`, `helm-lint`, …)
+- Docker and Podman support -- `zyvor-fabricd` + FluxVM companion, see `docs/DOCKER.md`
+- Kubernetes manifests under `k8s/base/` and chart under `charts/zyvor-fabric/`

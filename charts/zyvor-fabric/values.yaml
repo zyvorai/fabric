@@ -1,0 +1,70 @@
+## Global
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+## Namespace labels (chart does not create the namespace by default —
+## install with --create-namespace). PSS must be privileged.
+podSecurity:
+  enforce: privileged
+
+## Secrets — set via --set or existingSecret; never commit real values.
+security:
+  existingSecret: ""
+  adminPassword: ""
+  jwtSecret: ""
+
+fabricd:
+  enabled: true
+  image:
+    repository: zyvor-fabricd
+    pullPolicy: IfNotPresent
+    tag: "local"
+  listen: "0.0.0.0:9095"
+  logLevel: info
+  hostPath: /var/lib/zyvor-fabricd
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 2Gi
+  service:
+    type: NodePort
+    port: 9095
+    nodePort: 30095
+  config: |
+    [daemon]
+    listen = "0.0.0.0:9095"
+    cors_origins = ["*"]
+
+    [storage]
+    path = "/var/lib/zyvor-fabricd"
+    image_path = "/var/lib/zyvor-fabricd/images"
+
+    [network]
+    bridge = "br0"
+
+    [tls]
+    enabled = false
+
+    [driver]
+    fluxvm_url = "http://127.0.0.1:7788"
+
+fluxvm:
+  enabled: true
+  image:
+    repository: zyvor-fabric-fluxvm
+    pullPolicy: IfNotPresent
+    tag: "local"
+  hostPath: /var/lib/fluxvm
+  runPath: /run/fluxvm
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 2Gi

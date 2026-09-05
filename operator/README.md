@@ -2,6 +2,8 @@
 
 Manage virtual machines as native Kubernetes resources. The operator watches `VirtualMachine` custom resources and reconciles them against the Zyvor Fabric API, handling creation, updates, deletion, and status reporting automatically.
 
+> **Running fabricd itself on Kubernetes?** That is the platform chart / `k8s/base` DaemonSets — see **[docs/KUBERNETES.md](../docs/KUBERNETES.md)**. This operator assumes fabricd is already reachable.
+
 ## Features
 
 - Declarative VM management via `kubectl`
@@ -13,23 +15,26 @@ Manage virtual machines as native Kubernetes resources. The operator watches `Vi
 
 ## Quick Start
 
-### Install the CRD and Operator
+### Prerequisites
+
+Fabric API must be up (bare metal, Docker, or [Kubernetes platform deploy](../docs/KUBERNETES.md)).
+
+### Install the operator
 
 ```bash
-# Install CRD
-kubectl apply -f https://raw.githubusercontent.com/ssahani/zyvor-fabric/main/operator/crd.yaml
-
-# Install operator via Helm
-helm repo add zyvor-fabric https://ssahani.github.io/zyvor-fabric
-helm install zyvor-fabricd-operator zyvor-fabric/zyvor-fabricd-operator
+# From this repo (chart under operator/charts/)
+helm upgrade --install zyvor-fabricd-operator ./operator/charts/zyvor-fabricd-operator \
+  --set zyvor-fabricd.url=http://NODE_IP:30095
+# or same-node hostNetwork fabricd:
+#   --set zyvor-fabricd.url=http://127.0.0.1:9095
 ```
 
 ### Create a VM
 
-Define a `VirtualMachine` resource:
+Define a `VirtualMachine` resource (see [examples/vm-example.yaml](examples/vm-example.yaml)):
 
 ```yaml
-apiVersion: Zyvor Fabric.io/v1alpha1
+apiVersion: zyvor-fabricd.io/v1alpha1
 kind: VirtualMachine
 metadata:
   name: my-vm
@@ -75,10 +80,10 @@ Kubernetes API Server
   (watches VirtualMachine CRs)
         |
         v
-  Zyvor Fabric REST API
+  Zyvor Fabric REST API  (bare metal :9095 or K8s NodePort :30095)
         |
         v
-  Virtual Machines
+  Virtual Machines (via FluxVM)
 ```
 
 The operator runs a reconciliation loop that:
@@ -105,7 +110,8 @@ The operator is configured via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ZYVOR_FABRICD_URL` | `http://zyvor-fabricd:8080` | URL of the zyvor-fabricd API |
+| `ZYVOR_FABRICD_URL` | `http://127.0.0.1:9095` | URL of the zyvor-fabricd API (use `http://NODE_IP:30095` for lab K8s NodePort) |
+| `ZYVOR_FABRICD_TOKEN` | (empty) | Optional JWT for authenticated API calls |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 
 ## Development
@@ -117,10 +123,4 @@ cargo build --release
 
 # Run locally (requires kubeconfig and Zyvor Fabric access)
 cargo run
-
-# Build Docker image
-docker build -t zyvor-fabricd-operator:latest .
-
-# Run tests
-cargo test
 ```

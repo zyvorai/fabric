@@ -10,8 +10,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/ssahani/zyvor-fabric.git
-cd zyvor-fabric
+git clone https://github.com/zyvorai/fabric.git
+cd fabric
 
 # Build backend (Rust)
 cd backend
@@ -95,6 +95,35 @@ sudo systemctl enable --now zyvor-fabricd
 zyvorctl list
 ```
 
+## Remote bare-metal deploy
+
+```bash
+./scripts/deploy remote sus@HOST
+./scripts/deploy remote sus@HOST --quick
+# UI: https://HOST:9095/   password: sudo cat /var/lib/zyvor-fabricd/.admin_password
+```
+
+## Run on Kubernetes
+
+Privileged `hostNetwork` DaemonSets (fabricd + FluxVM). Full guide: [docs/KUBERNETES.md](docs/KUBERNETES.md).
+
+```bash
+# Lab k3s — build + import + apply on the remote node
+./scripts/deploy k8s sus@HOST
+# UI: http://HOST:30095/
+
+# Local cluster (images already loaded)
+make k8s-deploy
+
+# Helm
+helm upgrade --install zyvor-fabric ./charts/zyvor-fabric \
+  --namespace zyvor-fabric --create-namespace \
+  --set security.adminPassword='...' \
+  --set security.jwtSecret="$(openssl rand -base64 32)"
+```
+
+Docker / Podman eval: [docs/DOCKER.md](docs/DOCKER.md) (`make docker-up`).
+
 ## Access Web UI
 
 Once Zyvor Fabric is running, access:
@@ -166,21 +195,17 @@ curl -X POST http://localhost:9095/api/vms/test-vm/start \
 ## Directory Structure
 
 ```
-Zyvor Fabric/
-├── backend/              # Rust backend (crates: daemon, CLI, drivers, enterprise features)
-│   ├── Zyvor Fabric/         # Main daemon with REST API + WebSocket
-│   ├── zyvorctl/            # CLI tool (JSON/YAML output, 15+ subcommand groups)
-│   ├── zyvor-fabric-vm-driver/   # mkosi-based VM image building (unrelated to VM lifecycle)
-│   ├── crates/fluxvm-driver/  # FluxVM VM driver (no systemd dependency)
-│   ├── crates/           # Shared libraries (storage with Ceph/RBD, system, vm)
-│   └── ...               # 34 more feature crates (networking, security, ha, migration, etc.)
-├── web/                  # React web UI
-├── operator/             # Kubernetes operator
+fabric/
+├── backend/              # Rust backend (daemon, CLI, drivers, enterprise)
+├── web/                  # React web UI (baked into fabricd image)
+├── k8s/base/             # Kubernetes manifests (DaemonSets + NodePort)
+├── charts/zyvor-fabric/  # Platform Helm chart (fabricd + FluxVM)
+├── operator/             # Kubernetes operator (CRDs → Fabric API)
 ├── terraform-provider/   # Terraform provider
-├── docs/                 # Documentation
-├── systemd/              # Optional systemd unit files (not required to run)
+├── docs/                 # Documentation (see docs/KUBERNETES.md)
+├── systemd/              # Optional systemd unit files
 ├── configs/              # Configuration files
-├── scripts/              # Installation and utility scripts
+├── scripts/              # deploy, deploy-k8s, install, verify
 ├── monitoring/           # Monitoring configuration
 ├── sdk/                  # SDK
 ├── tests/                # Integration tests
@@ -190,7 +215,8 @@ Zyvor Fabric/
 ## Next Steps
 
 1. Read [Architecture](docs/architecture.md)
-2. Explore [API Documentation](docs/api.md)
+2. Deploy on [Kubernetes](docs/KUBERNETES.md) or [Docker](docs/DOCKER.md)
+3. Explore [API Documentation](docs/api.md)
 4. Check out the [Web UI](docs/web-ui.md)
 5. Review [Security](docs/security.md)
 6. Explore [Advanced Features](docs/advanced-features.md)

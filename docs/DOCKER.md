@@ -94,3 +94,8 @@ mirrors the capability grants the bare-metal systemd deployment already has.
   (served by the daemon for a VM's cloud-init to fetch) is a vendor binary this repo's own build
   doesn't produce -- run `scripts/build-vendor-binaries.sh` separately and mount the result into
   `/var/lib/zyvor-fabricd/vendor/` if you need this.
+
+## Kubernetes
+
+For the same privilege model as DaemonSets on k3s (NodePort **30095**, Helm chart, remote deploy),
+see **[KUBERNETES.md](KUBERNETES.md)** and `./scripts/deploy k8s USER@HOST`.

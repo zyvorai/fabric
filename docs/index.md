@@ -296,9 +296,11 @@ VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`
 
 | Document | Description |
 |----------|-------------|
+| **[Kubernetes](KUBERNETES.md)** | Run fabricd + FluxVM as privileged DaemonSets; Helm; lab `./scripts/deploy k8s` |
+| [Docker / Podman](DOCKER.md) | Local eval with compose (`hostNetwork` + KVM) |
 | Single Server | One-node deployment for development and small teams |
 | Multi-Node Cluster | HA deployment with shared storage and etcd |
-| Kubernetes-Managed | VMs as CRDs with the zyvor-fabricd operator |
+| Kubernetes Operator | VMs as CRDs with the zyvor-fabricd operator ([operator/](../operator/)) |
 | Terraform Provider | Declarative provisioning with plan/apply |
 | Edge Deployment | Lightweight single-node deployment for edge locations |
 | Air-Gapped Install | Offline installation without internet access |
