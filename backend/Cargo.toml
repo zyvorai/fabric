@@ -86,4 +86,4 @@ hex = "0.4"
 time = "0.3"
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
 base32 = "0.5"
-quick-xml = "0.36"
+quick-xml = "0.42"
