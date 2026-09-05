@@ -1,6 +1,7 @@
 .PHONY: all build build-backend build-web \
        install install-bin install-conf install-systemd install-web install-modules install-libexec \
        uninstall run dev cli test clean fmt lint \
+       doctor doctor-check \
        docker-build docker-build-fluxvm docker-up docker-down \
        k8s-deploy k8s-undeploy helm-lint helm-template \
        rpm deb help
@@ -102,6 +103,12 @@ test:
 	cd backend && cargo test
 	cd web && npm test
 
+doctor:
+	$(MAKE) -C tools/fabric-doctor build
+
+doctor-check:
+	$(MAKE) -C tools/fabric-doctor check
+
 clean:
 	cd backend && cargo clean
 	cd web && rm -rf node_modules dist
@@ -162,6 +169,8 @@ help:
 	@echo "  dev             - Run in development mode (debug + web dev server)"
 	@echo "  cli             - Run CLI"
 	@echo "  test            - Run tests"
+	@echo "  doctor          - Build fabric-doctor (Go preflight tool)"
+	@echo "  doctor-check    - Format/vet/test/build fabric-doctor"
 	@echo "  clean           - Clean build artifacts"
 	@echo "  fmt             - Format code"
 	@echo "  lint            - Lint code"
