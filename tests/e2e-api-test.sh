@@ -26,16 +26,19 @@ fail() {
   printf "  \033[31m✗\033[0m %s (expected %s, got %s)\n" "$1" "$2" "$3"
 }
 
-auth_args() {
+# Expand optional auth headers without tripping `set -u` on empty arrays.
+curl_auth() {
   if [ ${#AUTH_HEADER[@]} -gt 0 ]; then
-    printf '%s\0' "${AUTH_HEADER[@]}"
+    curl "$@" "${AUTH_HEADER[@]}"
+  else
+    curl "$@"
   fi
 }
 
 # GET  url expected_status description
 get() {
   local status
-  status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTH_HEADER[@]}" "$BASE_URL$1")
+  status=$(curl_auth -sk -o /dev/null -w "%{http_code}" "$BASE_URL$1")
   if [ "$status" = "$2" ]; then pass "$3"; else fail "$3" "$2" "$status"; fi
 }
 
@@ -43,21 +46,21 @@ get() {
 post() {
   local status
   if [ -z "$2" ]; then
-    status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTH_HEADER[@]}" -X POST "$BASE_URL$1")
+    status=$(curl_auth -sk -o /dev/null -w "%{http_code}" -X POST "$BASE_URL$1")
   else
-    status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTH_HEADER[@]}" -X POST -H "Content-Type: application/json" -d "$2" "$BASE_URL$1")
+    status=$(curl_auth -sk -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$2" "$BASE_URL$1")
   fi
   if [ "$status" = "$2" ] || [ "$status" = "$3" ]; then pass "$4"; else fail "$4" "$3" "$status"; fi
 }
 
 # POST that returns body for further use
 post_body() {
-  curl -s "${AUTH_HEADER[@]}" -X POST -H "Content-Type: application/json" -d "$2" "$BASE_URL$1"
+  curl_auth -sk -X POST -H "Content-Type: application/json" -d "$2" "$BASE_URL$1"
 }
 
 # GET that returns body
 get_body() {
-  curl -s "${AUTH_HEADER[@]}" "$BASE_URL$1"
+  curl_auth -sk "$BASE_URL$1"
 }
 
 # Extract "id" field from JSON string
@@ -70,16 +73,16 @@ api() {
   local method="$1" url="$2" body="$3" expected="$4" desc="$5"
   local status
   if [ -z "$body" ]; then
-    status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTH_HEADER[@]}" -X "$method" "$BASE_URL$url")
+    status=$(curl_auth -sk -o /dev/null -w "%{http_code}" -X "$method" "$BASE_URL$url")
   else
-    status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTH_HEADER[@]}" -X "$method" -H "Content-Type: application/json" -d "$body" "$BASE_URL$url")
+    status=$(curl_auth -sk -o /dev/null -w "%{http_code}" -X "$method" -H "Content-Type: application/json" -d "$body" "$BASE_URL$url")
   fi
   if [ "$status" = "$expected" ]; then pass "$desc"; else fail "$desc" "$expected" "$status"; fi
 }
 
 # Optional login so write endpoints succeed when auth is enabled
 if [ -n "$ADMIN_PASSWORD" ]; then
-  LOGIN_JSON=$(curl -s -X POST -H "Content-Type: application/json" \
+  LOGIN_JSON=$(curl -sk -X POST -H "Content-Type: application/json" \
     -d "{\"username\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
     "$BASE_URL/api/auth/login" || true)
   TOKEN=$(echo "$LOGIN_JSON" | grep -o '"token":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
