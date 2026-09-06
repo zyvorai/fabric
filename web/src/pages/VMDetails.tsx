@@ -1367,7 +1367,7 @@ function LogsTab({ vm }: { vm: VM }) {
           live={autoRefresh}
           bodyRef={termRef}
           onBodyScroll={onTermScroll}
-          bodyClassName="font-mono text-[12px] leading-[1.45] max-h-[36rem] overflow-y-auto px-3 py-2 text-[#f5f5f7] selection:bg-[#0a84ff]/40"
+          bodyClassName="max-h-[36rem] overflow-y-auto px-3 py-2"
         >
           {displayLogs.map((log, i) => {
             let ts = ''
