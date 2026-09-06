@@ -144,7 +144,7 @@ jobs:
             ./cosign sign --yes "ghcr.io/${{ github.repository }}:latest" || true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.assets.outputs.tag }}
           generate_release_notes: true
