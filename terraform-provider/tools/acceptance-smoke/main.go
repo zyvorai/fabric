@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ssahani/terraform-provider-zyvor-fabricd/internal/provider"
+	"github.com/zyvorai/terraform-provider-zyvor-fabricd/internal/provider"
 )
 
 func main() {

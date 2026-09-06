@@ -7,7 +7,7 @@ Zyvor Fabric is the product name for this platform. Technical identifiers are un
 | Before | After |
 |--------|-------|
 | Product name **zyvor-fabricd** / **vmspawn** | **Zyvor Fabric** |
-| GitHub `ssahani/vmspawn` | Canonical: [zyvorai/fabric](https://github.com/zyvorai/fabric) (older `ssahani/zyvor-fabric` mirrors redirect / are obsolete) |
+| GitHub (legacy personal / vmspawn) | Canonical: [zyvorai/fabric](https://github.com/zyvorai/fabric) |
 | Web UI title / docs prose | Zyvor Fabric |
 | Default deploy path `~/vmspawn` | `~/zyvor-fabric` |
 
@@ -20,7 +20,7 @@ Zyvor Fabric is the product name for this platform. Technical identifiers are un
 | Config | `/etc/zyvor-fabricd/zyvor-fabricd.toml` |
 | State | `/var/lib/zyvor-fabricd/` |
 | Env vars | `ZYVOR_FABRICD_*` |
-| Terraform provider type | `zyvor-fabricd` (`ssahani/zyvor-fabricd`) |
+| Terraform provider type | `zyvor-fabricd` (`zyvorai/zyvor-fabricd`) |
 | K8s operator chart | `zyvor-fabricd-operator` |
 | API paths | `/api/*` unchanged |
 
@@ -31,7 +31,7 @@ git clone https://github.com/zyvorai/fabric.git
 cd fabric
 ```
 
-Prefer `zyvorai/fabric`. Older `ssahani/vmspawn` / `ssahani/zyvor-fabric` clone URLs are obsolete.
+Prefer `zyvorai/fabric` as the only supported clone URL.
 
 ## Deploy scripts
 

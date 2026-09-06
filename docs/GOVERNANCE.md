@@ -1,7 +1,6 @@
 # Repository governance
 
 Notes for the canonical repo [`zyvorai/fabric`](https://github.com/zyvorai/fabric).
-(The personal mirror `ssahani/zyvor-fabric`, if still present, is not the source of truth.)
 
 ## Branch protection
 

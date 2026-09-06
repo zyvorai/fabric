@@ -1,4 +1,4 @@
-module github.com/ssahani/terraform-provider-zyvor-fabricd
+module github.com/zyvorai/terraform-provider-zyvor-fabricd
 
 go 1.22.0
 

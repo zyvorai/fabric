@@ -32,11 +32,11 @@ checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
 
 terraformproviders:
-  - name: registry.terraform.io/ssahani/zyvor-fabricd
+  - name: registry.terraform.io/zyvorai/zyvor-fabricd
     version: "{{ .Version }}"
 
 release:
   github:
-    owner: ssahani
-    name: zyvor-fabric
+    owner: zyvorai
+    name: fabric
   name_template: "terraform-provider-zyvor-fabricd {{.Version}}"
