@@ -79,6 +79,7 @@ pub mod scim;
 pub mod secrets;
 pub mod vm_power;
 pub mod webhook_retry;
+pub mod openstack;
 
 // Phase 3 infrastructure modules
 pub mod compliance;

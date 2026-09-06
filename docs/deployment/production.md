@@ -146,6 +146,8 @@ Create the main configuration file at `/etc/zyvor-fabricd/zyvor-fabricd.toml`:
 [daemon]
 # Bind address. Use 0.0.0.0 only behind a reverse proxy with TLS.
 listen = "127.0.0.1:9095"
+# External URL for OpenStack catalog / remote clients (scheme://host:port).
+# public_url = "https://zyvor-fabric.example.com"
 
 # CORS origins allowed for the web UI.
 # In production, restrict to the actual domain(s) serving the UI.

@@ -70,6 +70,12 @@ config sets. The same variable works for a bare-metal install too -- set it in
 `/etc/zyvor-fabricd/zyvor-fabricd.env`, which `systemd/zyvor-fabricd.service`'s `EnvironmentFile=`
 already loads, no unit file change needed.
 
+If you change the published port (or sit behind a hostname/ingress), also set
+`ZYVOR_FABRICD_PUBLIC_URL` (or `daemon.public_url`) so the OpenStack service
+catalog advertises the URL clients actually call — for example
+`http://localhost:19095` when using `ZYVOR_FABRICD_PORT=19095`. See
+[openstack-compat.md](openstack-compat.md).
+
 Auth and TLS are both off in this profile (`configs/zyvor-fabricd-docker.toml`) -- it's for local
 dev only, don't expose it beyond localhost. Open `http://localhost:9095/app` for the console.
 

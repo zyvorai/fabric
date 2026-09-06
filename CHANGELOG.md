@@ -3,11 +3,13 @@
 ## Unreleased
 
 ### Added
+- `openstack-compat` crate and `/identity` `/compute` `/image` `/network` `/volume` routes: experimental OpenStack wire-protocol façade (Keystone/Nova/Glance/Neutron/Cinder) on the same daemon port as Fabric. Catalog URLs come from `daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` (or listen + TLS). See [docs/openstack-compat.md](docs/openstack-compat.md).
 - `host-lifecycle` crate: deterministic host maintenance evacuation planner and async job manager — preflight blockers, capacity-aware target selection, live/cold migration policy, bounded-parallel execution, and failure semantics that leave a partially evacuated host cordoned rather than guessing. Not yet wired into the scheduler or server routes (see [docs/host-lifecycle.md](docs/host-lifecycle.md) for the intended follow-up integration).
 - `enterprise-identity` crate and `/api/identity/scim/*` + `/scim/v2/*` endpoints: SCIM 2.0 lifecycle provisioning and group-to-role sync for Entra ID / Okta on top of Fabric's existing OIDC/SAML/LDAP auth providers. Dedicated, hashed, constant-time-compared provisioning bearer tokens; deprovisioning takes effect on next login. See [docs/scim-identity.md](docs/scim-identity.md).
 - Redesigned the sign-in page (`/login`) with the Zyvor Z mark and Apple-style visual polish (depth, spacing, focus states).
 
 ### Fixed
+- `jsonwebtoken` 11 login panics: enable the `aws_lc_rs` crypto backend so Fabric JWT encode/decode works after the Dependabot bump.
 - Running-VM snapshots ignored `snapshot_type`: both Disk and Full used QMP `snapshot-save` (memory dump), so UI "Disk Only" still timed out under load / the 60s HTTP layer. Disk now uses `blockdev-snapshot-internal-sync`; Full keeps `snapshot-save` with a 300s poll budget; HTTP timeout raised to 330s; Snapshots tab defaults to Disk.
 - Live snapshot create now waits/retries for QMP readiness (409 when still starting); UI retries on 409; Snapshot Manager gained Disk/Full picker; FluxVM HTTP client timeout raised to 180s; auto-healer skips VMs updated within 90s to avoid restart storms after start.
 - Workspace-wide clippy lint drift across ~24 crates that had accumulated under current stable Rust (mostly `new_without_default`, `derivable_impls`, and small iterator/idiom lints) — `cargo clippy -- -D warnings` is green again.

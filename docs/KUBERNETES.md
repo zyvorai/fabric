@@ -194,6 +194,8 @@ kubectl -n zyvor-fabric rollout restart daemonset/zyvor-fabricd
 | `IMAGE_TAG` | Image tag (default `local`) |
 | `DEPLOY_HOST` / `DEPLOY_USER` | Defaults for host/user |
 | `NODE_PORT` | Override NodePort smoke check (default `30095`) |
+| `ZYVOR_FABRICD_PUBLIC_URL` | External base URL for OpenStack catalog (e.g. `http://NODE_IP:30095`) |
+| `ZYVOR_FABRICD_LISTEN` | Override daemon bind (usually set by the chart / DaemonSet) |
 
 ---
 

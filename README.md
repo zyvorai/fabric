@@ -508,6 +508,7 @@ Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com
 | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | SCIM identity | [docs/scim-identity.md](docs/scim-identity.md) |
+| OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) |
 | Host maintenance | [docs/host-lifecycle.md](docs/host-lifecycle.md) |
 | Customer manuals | [docs/customer/README.md](docs/customer/README.md) |
 | Full catalog | [docs/index.md](docs/index.md) |

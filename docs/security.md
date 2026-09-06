@@ -5,6 +5,11 @@ Zyvor Fabric provides authentication, authorization, TLS, audit logging, and API
 For enterprise identity provider (Entra ID / Okta) lifecycle provisioning and
 group-to-role sync via SCIM 2.0, see [scim-identity.md](scim-identity.md).
 
+For the experimental OpenStack Keystone-compat surface (`/identity`, …), see
+[openstack-compat.md](openstack-compat.md). That path is separate from Fabric
+JWT auth and from SCIM; treat it as a dialect adapter until it is wired to
+`enterprise-identity`.
+
 ---
 
 ## Authentication
@@ -260,6 +265,8 @@ curl http://localhost:9095/api/vms
 | `ZYVOR_FABRICD_JWT_SECRET` | Override the JWT signing secret (takes priority over auto-generated) |
 | `ZYVOR_FABRICD_ADMIN_PASSWORD` | Set the initial admin password (used only on first startup) |
 | `ZYVOR_FABRICD_CONFIG` | Override the config file path |
+| `ZYVOR_FABRICD_LISTEN` | Override `daemon.listen` (`host:port`) |
+| `ZYVOR_FABRICD_PUBLIC_URL` | External base URL for OpenStack catalog / clients |
 
 ---
 

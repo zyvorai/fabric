@@ -50,6 +50,7 @@ members = [
     "zyvor-fabric-sdk",
     "billing",
     "compliance",
+    "openstack-compat",
 ]
 
 [workspace.package]

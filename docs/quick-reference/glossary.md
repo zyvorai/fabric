@@ -253,6 +253,11 @@ machines, containing OVF metadata and one or more disk images.
 **Overlay Network**: A virtual network built on top of an existing network,
 typically using tunneling protocols like VXLAN or WireGuard.
 
+**OpenStack Compatibility**: Experimental façade on `zyvor-fabricd` that speaks
+Keystone / Nova / Glance / Neutron / Cinder wire protocols at `/identity`,
+`/compute`, `/image`, `/network`, and `/volume`. Does not replace FluxVM; see
+`docs/openstack-compat.md`.
+
 ## P
 
 **Pagination**: Splitting large result sets into pages. Zyvor Fabric uses
@@ -281,6 +286,10 @@ similar to cloud instance types.
 
 **Prometheus**: An open-source monitoring system. Zyvor Fabric exposes metrics in
 Prometheus format at the `/metrics` endpoint.
+
+**Public URL**: External base URL (`daemon.public_url` /
+`ZYVOR_FABRICD_PUBLIC_URL`) advertised in the OpenStack service catalog and
+similar client-facing links. When unset, derived from `daemon.listen` and TLS.
 
 ## Q
 
@@ -332,6 +341,10 @@ boot loaders before execution, preventing unauthorized code from running.
 
 **Service Mesh**: A network infrastructure layer that provides service discovery,
 load balancing, health checking, and traffic management for VM workloads.
+
+**SCIM (System for Cross-domain Identity Management)**: Protocol used by Entra ID /
+Okta to provision Fabric users and groups at `/scim/v2`. Separate from the
+OpenStack Keystone-compat `/identity` surface. See `docs/scim-identity.md`.
 
 **Site Recovery**: Disaster recovery orchestration including recovery plans,
 planned migration, disaster failover, and reprotection workflows.

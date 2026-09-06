@@ -584,6 +584,14 @@ if [ -n \"\$BIND\" ] && [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
     \$SUDO sed -i \"s/listen = \\\"127.0.0.1:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
     \$SUDO sed -i \"s/listen = \\\"0.0.0.0:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
     echo \"  ✅ listen bound to \${BIND}:\${API_PORT}\"
+    # Advertise a reachable OpenStack catalog URL (not 0.0.0.0 / 127.0.0.1).
+    PUBLIC_URL=\"https://${HOST}:\${API_PORT}\"
+    if \$SUDO grep -qE '^[[:space:]]*public_url[[:space:]]*=' /etc/zyvor-fabricd/zyvor-fabricd.toml; then
+        \$SUDO sed -i \"s|^[[:space:]]*public_url[[:space:]]*=.*|public_url = \\\"\${PUBLIC_URL}\\\"|\" /etc/zyvor-fabricd/zyvor-fabricd.toml
+    else
+        \$SUDO sed -i \"/listen = /a public_url = \\\"\${PUBLIC_URL}\\\"\" /etc/zyvor-fabricd/zyvor-fabricd.toml
+    fi
+    echo \"  ✅ public_url = \${PUBLIC_URL}\"
 fi
 
 for unit in zyvor-fabricd.service; do

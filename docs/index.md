@@ -141,6 +141,7 @@ Detailed documentation for each major feature area.
 | API Keys | Service-to-service authentication tokens |
 | [OIDC / External Auth](oidc.md) | LDAP and OIDC/OAuth2 SSO (PKCE, JWKS-verified id_token) |
 | [SCIM Provisioning](scim-identity.md) | SCIM 2.0 lifecycle provisioning and group-to-role sync for Entra ID / Okta |
+| [OpenStack Compatibility](openstack-compat.md) | Experimental Keystone/Nova/Glance/Neutron/Cinder façade on the same daemon port |
 | Audit Logging | Structured audit logs with JSON/CSV export |
 | Encryption | VM disk encryption with key management providers |
 | TLS/HTTPS | Certificate management and self-signed TLS generation |
@@ -335,6 +336,7 @@ The REST API is organized into the following endpoint groups:
 |----------|--------|-----------|-------------|
 | Authentication | `/api/auth/` | 6 | Login, 2FA/TOTP setup, and session management |
 | SCIM Identity | `/api/identity/scim/`, `/scim/v2/` | 21 | Provisioning profiles/tokens (JWT) plus SCIM Users/Groups (bearer token) |
+| OpenStack Compatibility | `/identity`, `/compute`, `/image`, `/network`, `/volume` | — | Experimental OpenStack wire protocol (catalog from `public_url`) |
 | VM Lifecycle | `/api/vms/` | 12 | CRUD, start, stop, restart, pause, resume, clone |
 | VM Advanced | `/api/vms/{name}/` | 20+ | Hotplug, checkpoints, fork, disk resize, firmware |
 | Snapshots | `/api/vms/{name}/snapshots/` | 5 | Create, list, get, delete, revert |
@@ -441,6 +443,10 @@ The REST API is organized into the following endpoint groups:
 
 | Variable | Description |
 |----------|-------------|
+| `ZYVOR_FABRICD_LISTEN` | Override `daemon.listen` (e.g. `0.0.0.0:9095`) |
+| `ZYVOR_FABRICD_PUBLIC_URL` | External base URL for OpenStack catalog / clients |
+| `ZYVOR_FABRICD_CONFIG` | Override config file path |
+| `ZYVOR_FABRICD_LOG_LEVEL` | Override log level |
 | `ZYVOR_FABRICD_JWT_SECRET` | Override JWT signing secret |
 | `ZYVOR_FABRICD_ADMIN_PASSWORD` | Override default admin password |
 | `ZYVOR_FABRICD_BACKUP_DIR` | Override backup directory |
@@ -451,7 +457,8 @@ The REST API is organized into the following endpoint groups:
 
 ## Integrations
 
-- [integrations/README.md](integrations/README.md) — Machina, Terraform, operator, Ansible
+- [integrations/README.md](integrations/README.md) — Machina, Terraform, operator, Ansible, OpenStack-compat
+- [openstack-compat.md](openstack-compat.md) — drive Fabric with `openstack` / Terraform OpenStack / Ansible `os_*`
 - [MIGRATION-FROM-VMSPAWN.md](MIGRATION-FROM-VMSPAWN.md) — Clone URL and naming migration
 
 ## Product Positioning

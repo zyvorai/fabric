@@ -21,6 +21,10 @@ developers.
 - **Config file**: `/etc/zyvor-fabricd/zyvor-fabricd.toml`
 - **Data directory**: `/var/lib/zyvor-fabricd/`
 - **API base path**: `/api/v1/`
+- **OpenStack façade**: `/identity`, `/compute`, `/image`, `/network`, `/volume` (see [openstack-compat.md](../openstack-compat.md))
+- **SCIM**: `/scim/v2`
+- **Public URL env**: `ZYVOR_FABRICD_PUBLIC_URL`
+- **Listen override**: `ZYVOR_FABRICD_LISTEN`
 - **Metrics endpoint**: `/metrics`
 - **WebSocket console**: `/api/v1/ws/{vm_name}/console`
 - **SSE event stream**: `/api/v1/events/stream`

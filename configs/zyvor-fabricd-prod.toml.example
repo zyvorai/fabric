@@ -8,6 +8,7 @@
 
 [daemon]
 listen = "0.0.0.0:9095"
+# public_url = "https://fabric.example.com:9095"
 # cors_origins = ["https://fabric.example.com"]
 
 [storage]

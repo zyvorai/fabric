@@ -92,6 +92,11 @@ pub struct DaemonConfig {
     pub listen: String,
     #[serde(default = "default_cors_origins")]
     pub cors_origins: Vec<String>,
+    /// External base URL advertised to clients (OpenStack catalog, etc.).
+    /// When unset, derived from `listen` + TLS (`http(s)://host:port`).
+    /// Override with `ZYVOR_FABRICD_PUBLIC_URL`.
+    #[serde(default)]
+    pub public_url: Option<String>,
 }
 
 fn default_cors_origins() -> Vec<String> {
@@ -309,7 +314,40 @@ impl Config {
             );
             config.daemon.listen = listen;
         }
+        if let Ok(public_url) = std::env::var("ZYVOR_FABRICD_PUBLIC_URL") {
+            let public_url = public_url.trim().trim_end_matches('/').to_string();
+            if !public_url.is_empty() {
+                tracing::info!(
+                    "Overriding daemon.public_url from ZYVOR_FABRICD_PUBLIC_URL: {}",
+                    public_url
+                );
+                config.daemon.public_url = Some(public_url);
+            }
+        }
         Ok(config)
+    }
+
+    /// Base URL clients should use to reach this daemon (no trailing slash).
+    ///
+    /// Order: `daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` → derive from
+    /// `daemon.listen` and TLS. Wildcard binds (`0.0.0.0`, `::`) become
+    /// `127.0.0.1` for local catalog URLs — set `public_url` for remote hosts.
+    pub fn public_base_url(&self) -> String {
+        if let Some(ref url) = self.daemon.public_url {
+            return url.trim().trim_end_matches('/').to_string();
+        }
+        let scheme = if self.tls.enabled { "https" } else { "http" };
+        let (host, port) = match self.daemon.listen.rsplit_once(':') {
+            Some((host, port)) => {
+                let host = match host.trim() {
+                    "0.0.0.0" | "*" | "::" | "[::]" => "127.0.0.1",
+                    h => h.trim_start_matches('[').trim_end_matches(']'),
+                };
+                (host.to_string(), port.to_string())
+            }
+            None => (self.daemon.listen.clone(), "9095".to_string()),
+        };
+        format!("{scheme}://{host}:{port}")
     }
 
     fn load_from_file_or_default() -> Result<Self> {
@@ -338,6 +376,7 @@ impl Config {
             daemon: DaemonConfig {
                 listen: "127.0.0.1:9095".to_string(),
                 cors_origins: default_cors_origins(),
+                public_url: None,
             },
             storage: StorageConfig {
                 path: "/var/lib/zyvor-fabricd".to_string(),
@@ -369,5 +408,56 @@ impl Config {
             }
         }
         Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_config(listen: &str, tls: bool, public_url: Option<&str>) -> Config {
+        Config {
+            daemon: DaemonConfig {
+                listen: listen.into(),
+                cors_origins: default_cors_origins(),
+                public_url: public_url.map(str::to_string),
+            },
+            storage: StorageConfig {
+                path: "/tmp".into(),
+                image_path: "/tmp".into(),
+                atlas_base_url: None,
+            },
+            network: NetworkConfig {
+                bridge: "br0".into(),
+                networkd_config_dir: default_networkd_config_dir(),
+                networkd_file_prefix: default_networkd_file_prefix(),
+            },
+            controller: ControllerConfig::default(),
+            auth: AuthConfig::default(),
+            driver: DriverConfig::default(),
+            tls: TlsConfig {
+                enabled: tls,
+                ..TlsConfig::default()
+            },
+        }
+    }
+
+    #[test]
+    fn public_base_url_derives_from_listen_and_tls() {
+        let cfg = base_config("127.0.0.1:9095", true, None);
+        assert_eq!(cfg.public_base_url(), "https://127.0.0.1:9095");
+
+        let cfg = base_config("0.0.0.0:9095", false, None);
+        assert_eq!(cfg.public_base_url(), "http://127.0.0.1:9095");
+    }
+
+    #[test]
+    fn public_base_url_honors_explicit_override() {
+        let cfg = base_config(
+            "0.0.0.0:9095",
+            true,
+            Some("https://fabric.example.com:9443/"),
+        );
+        assert_eq!(cfg.public_base_url(), "https://fabric.example.com:9443");
     }
 }
