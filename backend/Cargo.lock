@@ -538,7 +538,7 @@ name = "cloud-init"
 version = "0.2.1"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2748,7 +2748,7 @@ name = "secrets-manager"
 version = "0.2.1"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "serde",
  "serde_json",
@@ -2762,7 +2762,7 @@ dependencies = [
  "anyhow",
  "axum",
  "base32",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bcrypt",
  "chrono",
  "jsonwebtoken",
@@ -4298,7 +4298,7 @@ version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "futures",
  "rand 0.9.5",
@@ -4386,7 +4386,7 @@ dependencies = [
  "async-stream",
  "axum",
  "axum-server",
- "base64 0.22.1",
+ "base64 0.23.1",
  "billing",
  "certificate-manager",
  "chrono",
