@@ -79,6 +79,7 @@ certificate-manager = { path = "../certificate-manager" }
 billing = { path = "../billing" }
 compliance = { path = "../compliance" }
 enterprise-identity = { path = "../enterprise-identity" }
+openstack-compat = { path = "../openstack-compat" }
 
 [dev-dependencies]
 tempfile = "3"

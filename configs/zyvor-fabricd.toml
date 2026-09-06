@@ -1,6 +1,10 @@
 [daemon]
 # Listen address for REST API
 listen = "127.0.0.1:9095"
+# External base URL for OpenStack catalog / clients (scheme://host:port).
+# When unset, derived from listen + TLS (0.0.0.0 → 127.0.0.1).
+# Override with ZYVOR_FABRICD_PUBLIC_URL.
+# public_url = "https://fabric.example.com:9095"
 # CORS allowed origins (default: ["http://127.0.0.1:9095"])
 # cors_origins = ["http://127.0.0.1:9095", "https://myhost.example.com"]
 

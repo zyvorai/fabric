@@ -2061,6 +2061,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "openstack-compat"
+version = "0.2.1"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "uuid",
+]
+
+[[package]]
 name = "ova-tools"
 version = "0.2.1"
 dependencies = [
@@ -4522,6 +4536,7 @@ dependencies = [
  "net-monitor",
  "network-policy",
  "networking",
+ "openstack-compat",
  "ova-tools",
  "packet-mirror",
  "predictive-drs",

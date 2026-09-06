@@ -2245,11 +2245,21 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     // Serve API under /api/v1 (canonical) and /api (backward compat alias)
     let all_api_routes = public_auth_routes.merge(api_routes);
 
+    // OpenStack catalog endpoints must match the URL clients actually call.
+    // Prefer daemon.public_url / ZYVOR_FABRICD_PUBLIC_URL; else derive from listen + TLS.
+    let os_url = state.config.public_base_url();
+    let os_cloud = openstack_compat::Cloud::new(os_url);
+
     Router::new()
         .nest("/api/v1", all_api_routes.clone())
         .nest("/api", all_api_routes)
         .nest("/scim/v2", scim_routes)
         .nest("/ws", ws_routes)
+        .nest("/identity", openstack_compat::identity_router(os_cloud.clone()))
+        .nest("/compute", openstack_compat::compute_router(os_cloud.clone()))
+        .nest("/image", openstack_compat::image_router(os_cloud.clone()))
+        .nest("/network", openstack_compat::network_router(os_cloud.clone()))
+        .nest("/volume", openstack_compat::volume_router(os_cloud))
         .route("/health", get(|| async { "OK" }))
         .route("/metrics", get(prometheus_exporter::metrics_handler))
         // Unauthenticated on purpose -- cloud-init's first-boot runcmd has
