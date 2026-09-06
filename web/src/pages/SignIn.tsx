@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { formatUserError } from '../utils/apiError'
-import ZyvorMark from '../components/ZyvorMark'
+import { ZyvorLockup } from '../components/ZyvorMark'
 import {
   PremiumLoginShell,
   LoginError,
@@ -267,10 +267,10 @@ export default function SignIn() {
           target="_blank"
           rel="noopener noreferrer"
           className="login-zyvor-mark"
-          aria-label="Zyvor home"
+          aria-label="zyvor.dev"
           title="zyvor.dev"
         >
-          <ZyvorMark className="w-10 h-10" />
+          <ZyvorLockup markClassName="w-9 h-9" wordmarkClassName="text-[1.35rem] text-[#f5f5f7]" />
         </a>
       }
       productName="Zyvor Fabric"

@@ -11,7 +11,7 @@ import CommandPalette from './CommandPalette'
 import Breadcrumb from './Breadcrumb'
 import HelpDialog, { type HelpTab } from './HelpDialog'
 import { useSequenceShortcuts } from '../hooks/useSequenceShortcut'
-import ZyvorMark from './ZyvorMark'
+import { ZyvorLockup } from './ZyvorMark'
 import ThemeToggle from './ThemeToggle'
 import { useKeyboardShortcut, isInputFocused } from '../hooks/useKeyboardShortcut'
 import { useRecordRecentPage } from '../hooks/useRecordRecentPage'
@@ -118,9 +118,9 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
         >
           {mobileNav ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </button>
-        <Link to="/app" className="console-brand">
-          <ZyvorMark className="w-6 h-6 rounded-md" />
-          Fabric
+        <Link to="/app" className="console-brand" aria-label="Zyvor Fabric">
+          <ZyvorLockup markClassName="w-6 h-6" />
+          <span className="text-[var(--zf-muted)] font-medium">Fabric</span>
         </Link>
         <div className="flex-1" />
         <button
