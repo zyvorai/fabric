@@ -21,6 +21,8 @@ Run enterprise-grade virtual machines, software-defined networking, pluggable st
 
 Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API, auth, and UX layer on top of two independent sibling projects — [FluxVM](https://github.com/zyvorai/fluxvm) (VM engine) and [GuestKit](https://github.com/zyvorai/guestkit) (offline disk tooling).
 
+**Naming:** product is **Zyvor Fabric**; daemon/unit/paths stay `zyvor-fabricd`. Canonical repo: [zyvorai/fabric](https://github.com/zyvorai/fabric). See [docs/NAMING.md](docs/NAMING.md) and [docs/POSITIONING.md](docs/POSITIONING.md).
+
 ### Feature guides
 
 - **[Customer Feature Guide](docs/zyvor-fabric-customer-feature-guide.md)** — **55 features** across **9 areas** (also [PDF](docs/zyvor-fabric-customer-feature-guide.pdf))
@@ -492,6 +494,8 @@ Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com
 | Goal | Document |
 |------|----------|
 | **Docs index** | [docs/README.md](docs/README.md) |
+| **Naming / clone URL** | [docs/NAMING.md](docs/NAMING.md) |
+| **Product positioning** | [docs/POSITIONING.md](docs/POSITIONING.md) |
 | **Kubernetes deploy** | [docs/KUBERNETES.md](docs/KUBERNETES.md) |
 | **Docker / Podman** | [docs/DOCKER.md](docs/DOCKER.md) |
 | Quick start (dev) | [QUICKSTART.md](QUICKSTART.md) |
@@ -534,7 +538,7 @@ Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com
 | **Ragnarok** | AI-powered KubeVirt VM management |
 | **Veyron** | KubeVirt VM command center |
 | **IronWolf** | Metal3 bare-metal automation |
-| **Zyvor Fabric** | Private cloud with a pluggable VM engine (**this repo**) |
+| **Zyvor Fabric** | Private cloud control plane on FluxVM (**this repo**) |
 
 → [zyvor.dev](https://zyvor.dev)
 

@@ -7,6 +7,8 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | Goal | Document |
 |------|----------|
 | **Product README** | [README.md](../README.md) |
+| **Naming / clone URL** | [NAMING.md](NAMING.md) |
+| **Product positioning** | [POSITIONING.md](POSITIONING.md) |
 | **Kubernetes** (DaemonSets, Helm, lab deploy) | [KUBERNETES.md](KUBERNETES.md) |
 | **Docker / Podman** | [DOCKER.md](DOCKER.md) |
 | **Quick start** (dev build) | [QUICKSTART.md](../QUICKSTART.md) |
