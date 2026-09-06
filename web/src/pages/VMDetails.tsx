@@ -157,11 +157,11 @@ export default function VMDetails() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       {!canWrite && <ReadOnlyNotice />}
 
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4 min-w-0 flex-wrap">
         <div>
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold text-[var(--zf-ink)]">{vm.name}</h1>
@@ -228,9 +228,13 @@ export default function VMDetails() {
         </div>
       </div>
 
-      {/* Tabs — wrap instead of forcing horizontal scroll */}
-      <div className="border-b border-[var(--zf-hairline)]">
-        <nav className="flex flex-wrap gap-x-0.5 gap-y-0 -mb-px" aria-label="VM sections">
+      {/* Tabs — auto-fill grid wraps into rows; never forces horizontal page scroll */}
+      <div className="border-b border-[var(--zf-hairline)] min-w-0 max-w-full">
+        <nav
+          className="grid w-full min-w-0 gap-x-0.5 gap-y-0 -mb-px"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(5.75rem, max-content))' }}
+          aria-label="VM sections"
+        >
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -239,7 +243,7 @@ export default function VMDetails() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors relative whitespace-nowrap ${
+                className={`flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-t-lg transition-colors relative whitespace-nowrap ${
                   isActive
                     ? 'text-[var(--zf-link)]'
                     : 'text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
