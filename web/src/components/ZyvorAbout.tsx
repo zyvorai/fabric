@@ -26,15 +26,15 @@ export type HelpDocLink = {
 export const VMSPAWN_HELP_LINKS: HelpDocLink[] = [
   {
     label: 'Documentation',
-    href: 'https://github.com/ssahani/zyvor-fabric/tree/main/docs',
+    href: 'https://github.com/zyvorai/fabric/tree/main/docs',
   },
   {
     label: 'Web UI guide',
-    href: 'https://github.com/ssahani/zyvor-fabric/blob/main/docs/web-ui.md',
+    href: 'https://github.com/zyvorai/fabric/blob/main/docs/web-ui.md',
   },
   {
     label: 'Getting started',
-    href: 'https://github.com/ssahani/zyvor-fabric/blob/main/docs/getting-started',
+    href: 'https://github.com/zyvorai/fabric/blob/main/docs/getting-started',
   },
   {
     label: 'Zyvor documentation',

@@ -95,8 +95,11 @@ def restore_technical(text: str, slots: list[str]) -> str:
 
 
 def apply_rebrand(text: str) -> str:
-    text = text.replace("github.com/ssahani/vmspawn", "github.com/ssahani/zyvor-fabric")
-    text = text.replace("ssahani/vmspawn", "ssahani/zyvor-fabric")
+    text = text.replace("github.com/ssahani/vmspawn", "github.com/zyvorai/fabric")
+    text = text.replace("github.com/ssahani/zyvor-fabric", "github.com/zyvorai/fabric")
+    # Repo slug only — do not strip the `d` from Terraform `ssahani/zyvor-fabricd`.
+    text = re.sub(r"\bssahani/vmspawn\b", "zyvorai/fabric", text)
+    text = re.sub(r"\bssahani/zyvor-fabric\b(?!d)", "zyvorai/fabric", text)
 
     text, slots = stash_technical(text)
 

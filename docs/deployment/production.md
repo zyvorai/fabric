@@ -110,7 +110,7 @@ sudo apt install -y build-essential libssl-dev libpam0g-dev libsystemd-dev libsq
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Clone and build
-git clone https://github.com/ssahani/zyvor-fabric.git
+git clone https://github.com/zyvorai/fabric.git
 cd backend
 cargo build --release
 

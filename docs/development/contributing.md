@@ -34,7 +34,7 @@ pull request process.
 
 ```bash
 # Clone the repository
-git clone https://github.com/ssahani/zyvor-fabric.git
+git clone https://github.com/zyvorai/fabric.git
 cd zyvor-fabric
 
 # Install Rust toolchain components

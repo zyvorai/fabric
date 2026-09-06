@@ -7,7 +7,7 @@ Zyvor Fabric is the product name for this platform. Technical identifiers are un
 | Before | After |
 |--------|-------|
 | Product name **zyvor-fabricd** / **vmspawn** | **Zyvor Fabric** |
-| GitHub `ssahani/vmspawn` | [ssahani/zyvor-fabric](https://github.com/ssahani/zyvor-fabric) (redirects) |
+| GitHub `ssahani/vmspawn` | Canonical: [zyvorai/fabric](https://github.com/zyvorai/fabric) (older `ssahani/zyvor-fabric` mirrors redirect / are obsolete) |
 | Web UI title / docs prose | Zyvor Fabric |
 | Default deploy path `~/vmspawn` | `~/zyvor-fabric` |
 
@@ -27,11 +27,11 @@ Zyvor Fabric is the product name for this platform. Technical identifiers are un
 ## Clone URL
 
 ```bash
-git clone https://github.com/ssahani/zyvor-fabric.git
-cd zyvor-fabric
+git clone https://github.com/zyvorai/fabric.git
+cd fabric
 ```
 
-Old URLs continue to work via GitHub redirects.
+Prefer `zyvorai/fabric`. Older `ssahani/vmspawn` / `ssahani/zyvor-fabric` clone URLs are obsolete.
 
 ## Deploy scripts
 

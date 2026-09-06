@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Zyvor Fabric.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/ssahani/zyvor-fabric.git
+git clone https://github.com/zyvorai/fabric.git
 cd zyvor-fabric
 ```
 

@@ -13,6 +13,6 @@ This repository’s system architecture lives in the docs tree:
 | [docs/tutorials/08-openstack-clients.md](docs/tutorials/08-openstack-clients.md) | Tutorial: `openstack` CLI against Fabric |
 | [docs/TIME-MACHINE-API.md](docs/TIME-MACHINE-API.md) | Config snapshot & event retention APIs |
 
-**Runtime:** `zyvor-fabricd` daemon · **Product:** Zyvor Fabric · **Repo:** [github.com/ssahani/zyvor-fabric](https://github.com/ssahani/zyvor-fabric)
+**Runtime:** `zyvor-fabricd` daemon · **Product:** Zyvor Fabric · **Repo:** [github.com/zyvorai/fabric](https://github.com/zyvorai/fabric)
 
-Former clone URL `github.com/ssahani/vmspawn` redirects to this repository.
+Former clone URLs `github.com/ssahani/vmspawn` and `github.com/ssahani/zyvor-fabric` are obsolete; use `zyvorai/fabric`.
