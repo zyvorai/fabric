@@ -228,31 +228,32 @@ export default function VMDetails() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — wrap instead of forcing horizontal scroll */}
       <div className="border-b border-[var(--zf-hairline)]">
-        <div className="flex gap-1">
+        <nav className="flex flex-wrap gap-x-0.5 gap-y-0 -mb-px" aria-label="VM sections">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors relative ${
+                className={`flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors relative whitespace-nowrap ${
                   isActive
                     ? 'text-[var(--zf-link)]'
                     : 'text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5 shrink-0" />
                 {tab.label}
                 {isActive && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--zf-link)] rounded-full" />
+                  <div className="absolute bottom-0 left-1 right-1 h-0.5 bg-[var(--zf-link)] rounded-full" />
                 )}
               </button>
             )
           })}
-        </div>
+        </nav>
       </div>
 
       {/* Tab Content */}
