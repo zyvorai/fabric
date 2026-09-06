@@ -10,7 +10,7 @@ import { getMachineProperties } from '../api/machines'
 import {
   Play, Square, RotateCw, Trash2, Info, Activity, HardDrive,
   Network, Camera, Terminal, Cpu, MemoryStick, Pause, Copy, Wifi,
-  AlertCircle, Loader2, RefreshCw, Plus, Plug, Usb, Cloud, Settings, Wrench,
+  AlertCircle, Loader2, RefreshCw, Plus, Plug, Usb, Cloud, Settings, Wrench, Shield,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useToastContext } from '../contexts/ToastContext'
@@ -32,8 +32,9 @@ import DevicesTab from './vm-details/DevicesTab'
 import CloudInitTab from './vm-details/CloudInitTab'
 import AdvancedTab from './vm-details/AdvancedTab'
 import RescueTab from './vm-details/RescueTab'
+import DataplanePanel from './vm-details/DataplanePanel'
 
-type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'logs' | 'hotplug' | 'devices' | 'cloudinit' | 'advanced' | 'rescue'
+type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'dataplane' | 'snapshots' | 'logs' | 'hotplug' | 'devices' | 'cloudinit' | 'advanced' | 'rescue'
 
 export default function VMDetails() {
   const { name } = useParams<{ name: string }>()
@@ -142,6 +143,7 @@ export default function VMDetails() {
     { id: 'metrics', label: 'Metrics', icon: Activity },
     { id: 'disks', label: 'Disks', icon: HardDrive },
     { id: 'network', label: 'Network', icon: Network },
+    { id: 'dataplane', label: 'Dataplane', icon: Shield },
     { id: 'snapshots', label: 'Snapshots', icon: Camera },
     { id: 'hotplug', label: 'Hotplug', icon: Plug },
     { id: 'devices', label: 'Devices', icon: Usb },
@@ -255,7 +257,8 @@ export default function VMDetails() {
         {activeTab === 'overview' && <OverviewTab vm={vm} onRetryStart={handleStart} />}
         {activeTab === 'metrics' && <MetricsTab vm={vm} />}
         {activeTab === 'disks' && <DisksTab vm={vm} />}
-        {activeTab === 'network' && <NetworkTab vm={vm} onUpdated={loadVM} />}
+        {activeTab === 'network' && <NetworkTab vm={vm} onUpdated={loadVM} onOpenDataplane={() => setActiveTab('dataplane')} />}
+        {activeTab === 'dataplane' && <DataplanePanel vmName={vm.name} />}
         {activeTab === 'snapshots' && <SnapshotsTab vm={vm} />}
         {activeTab === 'hotplug' && <HotplugTab vm={vm} />}
         {activeTab === 'devices' && <DevicesTab vm={vm} />}
@@ -583,7 +586,7 @@ function DisksTab({ vm }: { vm: VM }) {
   )
 }
 
-function NetworkTab({ vm, onUpdated }: { vm: VM; onUpdated: () => void }) {
+function NetworkTab({ vm, onUpdated, onOpenDataplane }: { vm: VM; onUpdated: () => void; onOpenDataplane: () => void }) {
   const [properties, setProperties] = useState<Record<string, string> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -625,21 +628,43 @@ function NetworkTab({ vm, onUpdated }: { vm: VM; onUpdated: () => void }) {
           <p className="text-[var(--zf-danger)] text-sm">{error}</p>
         </div>
         <PortForwardsSection vm={vm} onUpdated={onUpdated} />
+        <DataplaneTeaser onOpen={onOpenDataplane} />
       </div>
     )
   }
 
-  return <NetworkTabContent vm={vm} properties={properties} onUpdated={onUpdated} />
+  return <NetworkTabContent vm={vm} properties={properties} onUpdated={onUpdated} onOpenDataplane={onOpenDataplane} />
+}
+
+function DataplaneTeaser({ onOpen }: { onOpen: () => void }) {
+  return (
+    <div className="zf-panel p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-start gap-2">
+        <Shield className="w-4 h-4 text-[var(--zf-link)] mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-[var(--zf-ink)]">VM edge dataplane (FluxVM)</p>
+          <p className="text-xs text-[var(--zf-muted)] mt-0.5">
+            Status, allowlists, Mbps/PPS limits, counters, and sampled flows.
+          </p>
+        </div>
+      </div>
+      <button type="button" onClick={onOpen} className="zf-btn zf-btn-primary zf-btn-sm">
+        Open Dataplane
+      </button>
+    </div>
+  )
 }
 
 function NetworkTabContent({
   vm,
   properties,
   onUpdated,
+  onOpenDataplane,
 }: {
   vm: VM
   properties: Record<string, string> | null
   onUpdated: () => void
+  onOpenDataplane: () => void
 }) {
   interface NetworkInterface {
     name: string
@@ -705,6 +730,7 @@ function NetworkTabContent({
     <div className="space-y-6">
       {interfacesSection}
       <PortForwardsSection vm={vm} onUpdated={onUpdated} />
+      <DataplaneTeaser onOpen={onOpenDataplane} />
     </div>
   )
 }

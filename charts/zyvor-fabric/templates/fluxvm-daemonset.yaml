@@ -1,4 +1,20 @@
 {{- if .Values.fluxvm.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zyvor-fabric.fullname" . }}-fluxvm-config
+  labels:
+    {{- include "zyvor-fabric.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fluxvm
+data:
+  fluxvm.toml: |
+    # Network Fabric v3 — keep required=false until first green attach.
+    [sandbox.dataplane]
+    mode = "ebpf"
+    bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"
+    pin_root = "/sys/fs/bpf/fluxvm"
+    required = false
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -32,7 +48,7 @@ spec:
       - name: fluxvm
         image: {{ include "zyvor-fabric.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.fluxvm.image.repository "tag" .Values.fluxvm.image.tag) }}
         imagePullPolicy: {{ .Values.fluxvm.image.pullPolicy }}
-        command: ["fluxvm", "serve"]
+        command: ["fluxvm", "--config", "/etc/fluxvm.toml", "serve"]
         ports:
         - name: api
           containerPort: 7788
@@ -43,6 +59,7 @@ spec:
             add:
               - NET_ADMIN
               - SYS_ADMIN
+              - SYS_RESOURCE
               - NET_BIND_SERVICE
               - NET_RAW
               - SYS_CHROOT
@@ -53,6 +70,12 @@ spec:
           mountPath: /run/fluxvm
         - name: netns
           mountPath: /run/netns
+        - name: bpffs
+          mountPath: /sys/fs/bpf
+        - name: fluxvm-config
+          mountPath: /etc/fluxvm.toml
+          subPath: fluxvm.toml
+          readOnly: true
         - name: kvm
           mountPath: /dev/kvm
         readinessProbe:
@@ -82,6 +105,13 @@ spec:
         hostPath:
           path: /run/netns
           type: DirectoryOrCreate
+      - name: bpffs
+        hostPath:
+          path: /sys/fs/bpf
+          type: DirectoryOrCreate
+      - name: fluxvm-config
+        configMap:
+          name: {{ include "zyvor-fabric.fullname" . }}-fluxvm-config
       - name: kvm
         hostPath:
           path: /dev/kvm

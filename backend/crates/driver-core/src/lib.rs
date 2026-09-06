@@ -313,6 +313,88 @@ pub trait PoolDriver: Send + Sync {
     ) -> Result<VM>;
 }
 
+/// Per-VM edge policy for FluxVM Network Fabric (TC/eBPF dataplane).
+/// Distinct from Fabric's label→nftables `/network-policies` SDN.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct VmNetworkPolicy {
+    pub default_allow: bool,
+    pub allow_cidrs: Vec<String>,
+    pub allow_ports: Vec<String>,
+    pub max_egress_mbps: Option<u32>,
+    pub max_egress_pps: Option<u32>,
+    pub sample_rate: u32,
+}
+
+impl Default for VmNetworkPolicy {
+    fn default() -> Self {
+        Self {
+            default_allow: true,
+            allow_cidrs: Vec::new(),
+            allow_ports: Vec::new(),
+            max_egress_mbps: None,
+            max_egress_pps: None,
+            sample_rate: 0,
+        }
+    }
+}
+
+/// Live dataplane attach + schema status for one VM.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DataplaneStatus {
+    pub mode: String,
+    pub required: bool,
+    pub attached: bool,
+    pub interface: Option<String>,
+    pub identity: u32,
+    pub pin_dir: Option<String>,
+    pub schema_version: Option<u32>,
+    pub schema_compatible: bool,
+    pub policy_synced: bool,
+    pub policy: VmNetworkPolicy,
+}
+
+/// Allow/drop counters from the attached eBPF program.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DataplaneStats {
+    pub allowed_packets: u64,
+    pub allowed_bytes: u64,
+    pub dropped_packets: u64,
+    pub dropped_bytes: u64,
+}
+
+/// One sampled flow from the dataplane flow exporter.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowRecord {
+    pub identity: u32,
+    pub family: u8,
+    pub source: String,
+    pub destination: String,
+    pub source_port: u16,
+    pub destination_port: u16,
+    pub protocol: u8,
+    pub verdict: String,
+    pub packets: u64,
+    pub bytes: u64,
+    pub last_seen_ns: u64,
+}
+
+/// FluxVM Network Fabric v3 — per-VM TC/eBPF edge dataplane (policy, status,
+/// stats, flows). Name-keyed like the rest of `driver-core`; backends resolve
+/// to their internal id. Orthogonal to Fabric's `/network-policies` SDN.
+#[async_trait]
+pub trait VmDataplaneDriver: Send + Sync {
+    async fn dataplane_status(&self, name: &str) -> Result<DataplaneStatus>;
+    async fn get_dataplane_policy(&self, name: &str) -> Result<VmNetworkPolicy>;
+    async fn set_dataplane_policy(
+        &self,
+        name: &str,
+        policy: &VmNetworkPolicy,
+    ) -> Result<VmNetworkPolicy>;
+    async fn dataplane_stats(&self, name: &str) -> Result<DataplaneStats>;
+    async fn dataplane_flows(&self, name: &str, limit: Option<usize>) -> Result<Vec<FlowRecord>>;
+}
+
 /// Feature detection for optional capabilities.
 pub trait CapabilityProvider: Send + Sync {
     /// A short, stable identifier for the active backend (`"fluxvm"`)
@@ -321,6 +403,11 @@ pub trait CapabilityProvider: Send + Sync {
 
     /// Whether resource control (cgroup v2 quota/freeze/etc.) is available.
     fn has_resource_control(&self) -> bool;
+
+    /// Whether per-VM Network Fabric dataplane APIs are available.
+    fn has_vm_dataplane(&self) -> bool {
+        false
+    }
 }
 
 /// A live interactive console session (an already-open PTY connection) —
@@ -345,9 +432,9 @@ pub trait ConsoleDriver: Send + Sync {
 }
 
 /// Umbrella trait letting `zyvor-fabricd` hold one `Arc<dyn VmDriver>` covering
-/// every driver capability, instead of eight separate trait objects. Blanket
-/// `impl`'d for anything implementing the eight component traits — backends
-/// only need to implement those, never this trait directly.
+/// every driver capability, instead of nine separate trait objects. Blanket
+/// `impl`'d for anything implementing the component traits — backends only
+/// need to implement those, never this trait directly.
 pub trait VmDriver:
     VMDriver
     + ResourceStatsDriver
@@ -357,6 +444,7 @@ pub trait VmDriver:
     + ShellDriver
     + ConsoleDriver
     + PoolDriver
+    + VmDataplaneDriver
     + CapabilityProvider
 {
 }
@@ -369,6 +457,7 @@ impl<T> VmDriver for T where
         + ShellDriver
         + ConsoleDriver
         + PoolDriver
+        + VmDataplaneDriver
         + CapabilityProvider
 {
 }

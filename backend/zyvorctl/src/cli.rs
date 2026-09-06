@@ -9,7 +9,18 @@ use std::collections::HashMap;
 use tabled::{Table, Tabled};
 use vm_model::{CreateVMRequest, VM};
 
-const API_BASE: &str = "http://localhost:9095/api";
+/// Fabric API root including `/api` (override with `ZYVOR_FABRIC_URL` or `FABRIC_URL`).
+fn api_base() -> String {
+    let root = std::env::var("ZYVOR_FABRIC_URL")
+        .or_else(|_| std::env::var("FABRIC_URL"))
+        .unwrap_or_else(|_| "http://localhost:9095".to_string());
+    let root = root.trim_end_matches('/').to_string();
+    if root.ends_with("/api") {
+        root
+    } else {
+        format!("{root}/api")
+    }
+}
 
 // ─── Output format ───────────────────────────────────────────────────────────
 
@@ -69,6 +80,10 @@ enum Commands {
     Delete { name: String },
     /// Get VM metrics
     Metrics { name: String },
+
+    /// VM edge dataplane (FluxVM Network Fabric) — not Fabric SDN network-policies
+    #[command(subcommand)]
+    Dataplane(DataplaneCmd),
 
     // ─── Config import (JSON/YAML) ───────────────────────────────────────
     /// Apply configuration from a JSON or YAML file
@@ -140,6 +155,35 @@ enum Commands {
 }
 
 // ─── Sub-command enums ───────────────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum DataplaneCmd {
+    /// Show dataplane attach/schema status
+    Status { name: String },
+    /// Get or set per-VM edge policy
+    #[command(subcommand)]
+    Policy(DataplanePolicyCmd),
+    /// Show allow/drop counters
+    Stats { name: String },
+    /// List recent sampled flows
+    Flows {
+        name: String,
+        #[arg(long, default_value = "100")]
+        limit: usize,
+    },
+}
+
+#[derive(Subcommand)]
+enum DataplanePolicyCmd {
+    /// Get current policy
+    Get { name: String },
+    /// Set policy from a JSON file
+    Set {
+        name: String,
+        #[arg(short, long)]
+        file: String,
+    },
+}
 
 #[derive(Subcommand)]
 enum PolicyCmd {
@@ -615,8 +659,8 @@ fn extract_info(v: &serde_json::Value) -> String {
 }
 
 async fn api_get(client: &Client, path: &str) -> Result<serde_json::Value> {
-    tracing::debug!("GET {}{}", API_BASE, path);
-    let res = client.get(format!("{}{}", API_BASE, path)).send().await?;
+    tracing::debug!("GET {}{}", api_base(), path);
+    let res = client.get(format!("{}{}", api_base(), path)).send().await?;
     tracing::debug!("Response: {}", res.status());
     if !res.status().is_success() {
         let status = res.status();
@@ -631,9 +675,9 @@ async fn api_post(
     path: &str,
     body: &serde_json::Value,
 ) -> Result<serde_json::Value> {
-    tracing::debug!("POST {}{}", API_BASE, path);
+    tracing::debug!("POST {}{}", api_base(), path);
     let res = client
-        .post(format!("{}{}", API_BASE, path))
+        .post(format!("{}{}", api_base(), path))
         .json(body)
         .send()
         .await?;
@@ -647,8 +691,8 @@ async fn api_post(
 }
 
 async fn api_post_empty(client: &Client, path: &str) -> Result<serde_json::Value> {
-    tracing::debug!("POST {}{} (empty body)", API_BASE, path);
-    let res = client.post(format!("{}{}", API_BASE, path)).send().await?;
+    tracing::debug!("POST {}{} (empty body)", api_base(), path);
+    let res = client.post(format!("{}{}", api_base(), path)).send().await?;
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
@@ -665,9 +709,9 @@ async fn api_put(
     path: &str,
     body: &serde_json::Value,
 ) -> Result<serde_json::Value> {
-    tracing::debug!("PUT {}{}", API_BASE, path);
+    tracing::debug!("PUT {}{}", api_base(), path);
     let res = client
-        .put(format!("{}{}", API_BASE, path))
+        .put(format!("{}{}", api_base(), path))
         .json(body)
         .send()
         .await?;
@@ -680,9 +724,9 @@ async fn api_put(
 }
 
 async fn api_delete(client: &Client, path: &str) -> Result<()> {
-    tracing::debug!("DELETE {}{}", API_BASE, path);
+    tracing::debug!("DELETE {}{}", api_base(), path);
     let res = client
-        .delete(format!("{}{}", API_BASE, path))
+        .delete(format!("{}{}", api_base(), path))
         .send()
         .await?;
     if !res.status().is_success() {
@@ -694,8 +738,8 @@ async fn api_delete(client: &Client, path: &str) -> Result<()> {
 }
 
 async fn api_post_void(client: &Client, path: &str) -> Result<()> {
-    tracing::debug!("POST {}{} (void)", API_BASE, path);
-    let res = client.post(format!("{}{}", API_BASE, path)).send().await?;
+    tracing::debug!("POST {}{} (void)", api_base(), path);
+    let res = client.post(format!("{}{}", api_base(), path)).send().await?;
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
@@ -708,14 +752,31 @@ async fn api_post_void(client: &Client, path: &str) -> Result<()> {
 
 impl Cli {
     pub async fn run(self) -> Result<()> {
-        let client = Client::new();
+        let base = api_base();
+        let mut headers = reqwest::header::HeaderMap::new();
+        if let Ok(token) = std::env::var("ZYVOR_FABRIC_TOKEN")
+            .or_else(|_| std::env::var("FABRIC_TOKEN"))
+        {
+            let value = format!("Bearer {token}");
+            headers.insert(
+                reqwest::header::AUTHORIZATION,
+                value
+                    .parse()
+                    .context("invalid ZYVOR_FABRIC_TOKEN / FABRIC_TOKEN")?,
+            );
+        }
+        let client = Client::builder()
+            .default_headers(headers)
+            .danger_accept_invalid_certs(base.starts_with("https://"))
+            .build()
+            .context("build HTTP client")?;
         let fmt = self.output;
 
         match self.command {
             // ── VM Management ────────────────────────────────────────────
             Commands::List => {
                 let vms: Vec<VM> = client
-                    .get(format!("{}/vms", API_BASE))
+                    .get(format!("{}/vms", api_base()))
                     .send()
                     .await?
                     .json()
@@ -747,7 +808,7 @@ impl Cli {
 
             Commands::Info { name } => {
                 let vm: VM = client
-                    .get(format!("{}/vms/{}", API_BASE, name))
+                    .get(format!("{}/vms/{}", api_base(), name))
                     .send()
                     .await?
                     .json()
@@ -806,7 +867,7 @@ impl Cli {
                     network_static_ip: false,
                 };
                 let vm: VM = client
-                    .post(format!("{}/vms", API_BASE))
+                    .post(format!("{}/vms", api_base()))
                     .json(&req)
                     .send()
                     .await?
@@ -820,7 +881,7 @@ impl Cli {
 
             Commands::Start { name } => {
                 client
-                    .post(format!("{}/vms/{}/start", API_BASE, name))
+                    .post(format!("{}/vms/{}/start", api_base(), name))
                     .send()
                     .await?;
                 println!("VM '{}' started", name);
@@ -828,7 +889,7 @@ impl Cli {
 
             Commands::Stop { name } => {
                 client
-                    .post(format!("{}/vms/{}/stop", API_BASE, name))
+                    .post(format!("{}/vms/{}/stop", api_base(), name))
                     .send()
                     .await?;
                 println!("VM '{}' stopped", name);
@@ -836,7 +897,7 @@ impl Cli {
 
             Commands::Restart { name } => {
                 client
-                    .post(format!("{}/vms/{}/restart", API_BASE, name))
+                    .post(format!("{}/vms/{}/restart", api_base(), name))
                     .send()
                     .await?;
                 println!("VM '{}' restarted", name);
@@ -844,7 +905,7 @@ impl Cli {
 
             Commands::Delete { name } => {
                 client
-                    .delete(format!("{}/vms/{}", API_BASE, name))
+                    .delete(format!("{}/vms/{}", api_base(), name))
                     .send()
                     .await?;
                 println!("VM '{}' deleted", name);
@@ -854,6 +915,47 @@ impl Cli {
                 let val = api_get(&client, &format!("/vms/{}/metrics", name)).await?;
                 print_value(&val, fmt);
             }
+
+            Commands::Dataplane(cmd) => match cmd {
+                DataplaneCmd::Status { name } => {
+                    let val =
+                        api_get(&client, &format!("/vms/{}/dataplane/status", name)).await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Policy(pol) => match pol {
+                    DataplanePolicyCmd::Get { name } => {
+                        let val =
+                            api_get(&client, &format!("/vms/{}/dataplane/policy", name)).await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplanePolicyCmd::Set { name, file } => {
+                        let policy = load_config_file(&file)?;
+                        let val = api_post(
+                            &client,
+                            &format!("/vms/{}/dataplane/policy", name),
+                            &policy,
+                        )
+                        .await?;
+                        println!("Updated dataplane policy for '{}'", name);
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                },
+                DataplaneCmd::Stats { name } => {
+                    let val =
+                        api_get(&client, &format!("/vms/{}/dataplane/stats", name)).await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Flows { name, limit } => {
+                    let val = api_get(
+                        &client,
+                        &format!("/vms/{}/dataplane/flows?limit={}", name, limit),
+                    )
+                    .await?;
+                    print_value(&val, fmt);
+                }
+            },
 
             // ── Apply / Export ────────────────────────────────────────────
             Commands::Apply { file } => {

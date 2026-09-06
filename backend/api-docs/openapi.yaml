@@ -265,6 +265,106 @@ paths:
               schema:
                 $ref: '#/components/schemas/VMMetrics'
 
+  /api/vms/{name}/dataplane/status:
+    get:
+      summary: FluxVM Network Fabric dataplane status
+      tags: [Tier-1, VMs, Dataplane]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dataplane attach/schema status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/vms/{name}/dataplane/policy:
+    get:
+      summary: Get VM edge dataplane policy
+      tags: [Tier-1, VMs, Dataplane]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VmNetworkPolicy
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      summary: Set VM edge dataplane policy
+      tags: [Tier-1, VMs, Dataplane]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Saved VmNetworkPolicy
+
+  /api/vms/{name}/dataplane/stats:
+    get:
+      summary: VM edge dataplane counters
+      tags: [Tier-1, VMs, Dataplane]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DataplaneStats
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/vms/{name}/dataplane/flows:
+    get:
+      summary: VM edge dataplane sampled flows
+      tags: [Tier-1, VMs, Dataplane]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Flow list
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
   /api/vms/{name}/cloud-init:
     post:
       summary: Configure cloud-init for a VM

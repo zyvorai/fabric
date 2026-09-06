@@ -1,5 +1,6 @@
 # FluxVM companion — mirrors docker-compose.yml fluxvm service.
 # hostNetwork + privileged so KVM, cgroup host, and /run/netns work like compose.
+# Network Fabric v3: bpffs + SYS_RESOURCE (memlock) + fluxvm-dataplane.toml.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -29,7 +30,7 @@ spec:
       - name: fluxvm
         image: zyvor-fabric-fluxvm:local
         imagePullPolicy: IfNotPresent
-        command: ["fluxvm", "serve"]
+        command: ["fluxvm", "--config", "/etc/fluxvm.toml", "serve"]
         ports:
         - name: api
           containerPort: 7788
@@ -40,6 +41,7 @@ spec:
             add:
               - NET_ADMIN
               - SYS_ADMIN
+              - SYS_RESOURCE
               - NET_BIND_SERVICE
               - NET_RAW
               - SYS_CHROOT
@@ -50,6 +52,12 @@ spec:
           mountPath: /run/fluxvm
         - name: netns
           mountPath: /run/netns
+        - name: bpffs
+          mountPath: /sys/fs/bpf
+        - name: fluxvm-config
+          mountPath: /etc/fluxvm.toml
+          subPath: fluxvm.toml
+          readOnly: true
         - name: kvm
           mountPath: /dev/kvm
         readinessProbe:
@@ -83,9 +91,34 @@ spec:
         hostPath:
           path: /run/netns
           type: DirectoryOrCreate
+      - name: bpffs
+        hostPath:
+          path: /sys/fs/bpf
+          type: DirectoryOrCreate
+      - name: fluxvm-config
+        configMap:
+          name: fluxvm-config
       - name: kvm
         hostPath:
           path: /dev/kvm
           type: CharDevice
       tolerations:
       - operator: Exists
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluxvm-config
+  namespace: zyvor-fabric
+  labels:
+    app: fluxvm
+    app.kubernetes.io/name: zyvor-fabric
+    app.kubernetes.io/component: fluxvm
+data:
+  fluxvm.toml: |
+    # Network Fabric v3 — keep required=false until first green attach.
+    [sandbox.dataplane]
+    mode = "ebpf"
+    bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"
+    pin_root = "/sys/fs/bpf/fluxvm"
+    required = false

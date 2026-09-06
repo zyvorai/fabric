@@ -21,16 +21,16 @@
 //! hand-synced mirror of `fluxvm-core::model` (see that crate's own doc
 //! comment for why), and haven't yet picked up several fields/capabilities
 //! FluxVM has since grown — `CreateVmRequest.storage` (LVM thin/NBD/Ceph
-//! RBD backends), `NetworkSpec::Tap.netns` (per-VM network namespaces), and
-//! `VmRecord`'s `jail_path`/`vsock_socket`/`lvm_lv`/`nbd_pid` fields. Every
-//! VM created through this driver still gets FluxVM's default qcow2/raw
-//! storage and shared-bridge networking — those newer per-VM choices simply
-//! aren't reachable through `driver-core` yet. Also orthogonal to this
-//! driver entirely: FluxVM's `fluxvm-kube` Kubernetes CRD/operator and
-//! `fluxvm-agent` distributed fleet registry are separate ways to run
-//! FluxVM, not something this REST-client-based driver consumes.
+//! RBD backends) and `VmRecord`'s `jail_path`/`vsock_socket`/`lvm_lv`/
+//! `nbd_pid` fields. Bridged VMs already use `NetworkSpec::Tap { netns:
+//! true }`, and Network Fabric v3 (`VmDataplaneDriver`) proxies FluxVM's
+//! `/v1/vms/{id}/network/*` when FluxVM runs with
+//! `[sandbox.dataplane] mode = "ebpf"`. Also orthogonal to this driver:
+//! FluxVM's `fluxvm-kube` Kubernetes CRD/operator and `fluxvm-agent`
+//! distributed fleet registry.
 
 mod console;
+mod dataplane;
 mod images;
 mod lifecycle;
 mod pools;
@@ -41,9 +41,10 @@ use anyhow::{Context, Result};
 use zyvor_fabric_fluxvm_client::FluxVmClient;
 
 pub use zyvor_fabric_driver_core::{
-    CapabilityProvider, ConsoleDriver, ImageDriver, ImageInfo, LogDriver, LogEntry, MachineInfo,
-    PoolDriver, PoolInfo, ResourceControlDriver, ResourceStatsDriver, ShellDriver, ShellOutput,
-    VMDriver, VmDriver,
+    CapabilityProvider, ConsoleDriver, DataplaneStats, DataplaneStatus, FlowRecord, ImageDriver,
+    ImageInfo, LogDriver, LogEntry, MachineInfo, PoolDriver, PoolInfo, ResourceControlDriver,
+    ResourceStatsDriver, ShellDriver, ShellOutput, VMDriver, VmDataplaneDriver, VmDriver,
+    VmNetworkPolicy,
 };
 
 /// Driver backed by one `fluxvm serve` instance's REST API.
@@ -84,6 +85,12 @@ impl CapabilityProvider for FluxVmDriver {
 
     fn has_resource_control(&self) -> bool {
         // Backed by FluxVM's cgroup-delegation extension — see `resource_control.rs`.
+        true
+    }
+
+    fn has_vm_dataplane(&self) -> bool {
+        // Proxies FluxVM Network Fabric v3; effective when FluxVM runs with
+        // `[sandbox.dataplane] mode = "ebpf"` (or `cilium`).
         true
     }
 }

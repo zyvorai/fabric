@@ -95,6 +95,7 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 
 ### Networking
 - **Network Policies** — Cilium-style label-based ingress/egress rules
+- **VM edge dataplane (Network Fabric v3)** — FluxVM TC/eBPF per-VM allowlists, Mbps/PPS, stats/flows via Dataplane tab / `/api/vms/{name}/dataplane/*` (orthogonal to host SDN)
 - **VM Firewall** — Per-VM firewall profiles and zones via nftables
 - **Service Mesh** — Virtual IP load balancing (round-robin, least-conn, random, IP-hash)
 - **QoS / Traffic Shaping** — Guaranteed/max rate, burst, priority-based bandwidth

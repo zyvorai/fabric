@@ -203,7 +203,7 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {(
           [
             {
@@ -220,6 +220,11 @@ export default function Dashboard() {
               title: 'Network security',
               subtitle: 'Firewall, DNS, VPN policies',
               status: capabilities?.network_security,
+            },
+            {
+              title: 'VM dataplane',
+              subtitle: 'FluxVM eBPF edge (Network Fabric)',
+              status: capabilities?.vm_dataplane,
             },
             {
               title: 'Authentication',

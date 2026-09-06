@@ -2,6 +2,31 @@
 
 Zyvor Fabric provides comprehensive virtual networking with bridge management, VLANs, port forwarding, and an enterprise-grade network security stack including firewalls, VPN mesh, NAT gateways, traffic shaping, and packet mirroring.
 
+**Two policy planes:** Fabric `/api/network-policies` is host SDN (label→nftables). Per-VM TC/eBPF edge policy lives on FluxVM and is exposed as `/api/vms/{name}/dataplane/*` — see [VM edge dataplane](guides/vm-drivers/fluxvm-dataplane.md). Do not conflate the two.
+
+---
+
+## VM edge dataplane (Network Fabric v3)
+
+When FluxVM runs with `sandbox.dataplane.mode = "ebpf"`, Fabric proxies the
+per-VM TC/eBPF edge as first-class API, Web, and CLI.
+
+| Need | Where |
+|------|--------|
+| Attach path | Bridged VMs (`network_tap: true` → TAP + netns); classifier on host `vh…` |
+| Operator UX | VM → **Dataplane** (Status / Policy / Stats / Flows) |
+| Dashboard | **VM dataplane** capability (`GET /api/capabilities` → `vm_dataplane`) |
+| REST | `/api/vms/{name}/dataplane/{status,policy,stats,flows}` |
+| CLI | `zyvorctl dataplane …` with `ZYVOR_FABRIC_URL` + `ZYVOR_FABRIC_TOKEN` on HTTPS labs |
+| Policy ports | Must be `tcp/PORT` or `udp/PORT` |
+| vs other VMMs | [README comparison](../README.md#why-fabric--network-fabric-is-ahead-of-other-vmms) |
+
+Full enablement, troubleshooting, and lab UX checklist:
+[guides/vm-drivers/fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md).
+
+Customer console walkthrough:
+[customer/pages/infrastructure/dataplane.md](customer/pages/infrastructure/dataplane.md).
+
 ---
 
 ## Network Modes
@@ -393,4 +418,10 @@ sudo tc filter show dev tap-myvm parent ffff:
 # Network counters
 cat /sys/class/net/tap-myvm/statistics/rx_bytes
 cat /sys/class/net/tap-myvm/statistics/tx_bytes
+
+# VM edge dataplane (Network Fabric)
+curl -sk https://127.0.0.1:9095/api/vms/NAME/dataplane/status -H "Authorization: Bearer $TOKEN"
+sudo ls /sys/fs/bpf/fluxvm/vms/
+sudo cat /run/fluxvm/ebpf/vms/*/schema_version
+# Full guide: docs/guides/vm-drivers/fluxvm-dataplane.md
 ```

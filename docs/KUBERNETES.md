@@ -300,3 +300,8 @@ Makefile targets: `k8s-deploy`, `k8s-undeploy`, `helm-lint`, `helm-template`.
 - [DOCKER.md](DOCKER.md) — container eval prerequisites
 - [operator/README.md](../operator/README.md) — VirtualMachine CRDs
 - [guides/vm-drivers/fluxvm.md](guides/vm-drivers/fluxvm.md) — FluxVM driver details
+- [guides/vm-drivers/fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md) — Network Fabric v3 (TC/eBPF VM edge) via Fabric API/Web/CLI
+
+DaemonSets that run FluxVM should mount host `/sys/fs/bpf`, raise memlock, and
+ship `configs/fluxvm-dataplane.toml` as `/etc/fluxvm.toml` when enabling
+`mode = "ebpf"`.

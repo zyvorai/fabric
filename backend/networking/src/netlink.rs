@@ -5,8 +5,8 @@ use anyhow::{bail, Context, Result};
 use futures::TryStreamExt;
 use netlink_packet_route::address::{AddressAttribute, AddressScope};
 use netlink_packet_route::link::{
-    BondMode as NlBondMode, InfoBridge, InfoData, InfoKind, LinkAttribute, LinkFlags, LinkInfo,
-    LinkLayerType, MacVtapMode as NlMacVtapMode,
+    BondMode as NlBondMode, BridgeStpState, InfoBridge, InfoData, InfoKind, LinkAttribute,
+    LinkFlags, LinkInfo, LinkLayerType, MacVtapMode as NlMacVtapMode,
 };
 use netlink_packet_route::AddressFamily;
 use rtnetlink::{
@@ -550,7 +550,13 @@ pub async fn set_bridge_options(iface: &str, opts: &BridgeOptions) -> Result<()>
 
     let mut attrs = Vec::new();
     if let Some(enable) = opts.stp {
-        attrs.push(InfoBridge::StpState(if enable { 1 } else { 0 }));
+        // netlink-packet-route 0.33+: StpState takes BridgeStpState, not u8.
+        // 0=Disabled, 1=KernelStp (matches iproute2 / prior integer encoding).
+        attrs.push(InfoBridge::StpState(if enable {
+            BridgeStpState::KernelStp
+        } else {
+            BridgeStpState::Disabled
+        }));
     }
     if let Some(sec) = opts.forward_delay_sec {
         attrs.push(InfoBridge::ForwardDelay(sec.saturating_mul(100)));

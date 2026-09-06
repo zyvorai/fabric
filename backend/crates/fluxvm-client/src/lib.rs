@@ -23,12 +23,11 @@
 //!
 //! As of FluxVM v0.1.0, `CreateVmRequest`/`VmRecord` here are missing the
 //! fields behind its newer per-VM storage backends (`storage`: LVM thin/NBD/
-//! Ceph RBD), per-VM network namespaces (`NetworkSpec::Tap.netns`), and the
-//! Firecracker-jailer/vsock-proxy bookkeeping (`jail_path`, `vsock_socket`,
-//! `lvm_lv`, `nbd_pid`) — see `fluxvm-driver`'s crate doc comment for the
-//! full gap list. Every VM created through this client still gets FluxVM's
-//! default qcow2/raw storage and shared-bridge networking until those fields
-//! are added here.
+//! Ceph RBD) and the Firecracker-jailer/vsock-proxy bookkeeping (`jail_path`,
+//! `vsock_socket`, `lvm_lv`, `nbd_pid`) — see `fluxvm-driver`'s crate doc
+//! comment for the full gap list. Network Fabric v3 wire types
+//! (`VmNetworkPolicy`, `DataplaneStatus`, …) and
+//! `NetworkSpec::Tap.netns` are mirrored here.
 
 use std::path::PathBuf;
 
@@ -328,6 +327,80 @@ struct PoolSpecRequest {
 #[derive(Debug, Deserialize)]
 struct PoolListResponse {
     items: Vec<PoolRecord>,
+}
+
+// ============================================================================
+// Network Fabric v3 wire types (mirror fluxvm-network::dataplane)
+// ============================================================================
+
+/// Per-VM edge policy for FluxVM's TC/eBPF Network Fabric dataplane.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct VmNetworkPolicy {
+    pub default_allow: bool,
+    pub allow_cidrs: Vec<String>,
+    pub allow_ports: Vec<String>,
+    pub max_egress_mbps: Option<u32>,
+    pub max_egress_pps: Option<u32>,
+    pub sample_rate: u32,
+}
+
+impl Default for VmNetworkPolicy {
+    fn default() -> Self {
+        Self {
+            default_allow: true,
+            allow_cidrs: Vec::new(),
+            allow_ports: Vec::new(),
+            max_egress_mbps: None,
+            max_egress_pps: None,
+            sample_rate: 0,
+        }
+    }
+}
+
+/// Live dataplane attach + schema status for one VM.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DataplaneStatus {
+    pub mode: String,
+    pub required: bool,
+    pub attached: bool,
+    pub interface: Option<String>,
+    pub identity: u32,
+    pub pin_dir: Option<String>,
+    pub schema_version: Option<u32>,
+    pub schema_compatible: bool,
+    pub policy_synced: bool,
+    pub policy: VmNetworkPolicy,
+}
+
+/// Allow/drop counters from the attached eBPF program.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DataplaneStats {
+    pub allowed_packets: u64,
+    pub allowed_bytes: u64,
+    pub dropped_packets: u64,
+    pub dropped_bytes: u64,
+}
+
+/// One sampled flow from the dataplane flow exporter.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowRecord {
+    pub identity: u32,
+    pub family: u8,
+    pub source: String,
+    pub destination: String,
+    pub source_port: u16,
+    pub destination_port: u16,
+    pub protocol: u8,
+    pub verdict: String,
+    pub packets: u64,
+    pub bytes: u64,
+    pub last_seen_ns: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct FlowListResponse {
+    items: Vec<FlowRecord>,
 }
 
 /// Applied to the VM handed back by a pool claim, replacing whatever the
@@ -1043,6 +1116,72 @@ impl FluxVmClient {
         Self::parse(resp).await
     }
 
+    /// `GET /v1/vms/{id}/network/policy`
+    pub async fn get_network_policy(&self, id: Uuid) -> Result<VmNetworkPolicy> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/network/policy"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/network/policy` — requires admin when FluxVM auth is on.
+    pub async fn set_network_policy(
+        &self,
+        id: Uuid,
+        policy: &VmNetworkPolicy,
+    ) -> Result<VmNetworkPolicy> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/network/policy"))?),
+            )
+            .json(policy)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/vms/{id}/network/status`
+    pub async fn network_status(&self, id: Uuid) -> Result<DataplaneStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/network/status"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/vms/{id}/network/stats`
+    pub async fn network_stats(&self, id: Uuid) -> Result<DataplaneStats> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/network/stats"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/vms/{id}/network/flows?limit=` — FluxVM defaults `limit` to 100
+    /// and clamps to `[1, 4096]`.
+    pub async fn network_flows(&self, id: Uuid, limit: Option<usize>) -> Result<Vec<FlowRecord>> {
+        let mut url = self.url(&format!("/v1/vms/{id}/network/flows"))?;
+        if let Some(limit) = limit {
+            url.query_pairs_mut()
+                .append_pair("limit", &limit.to_string());
+        }
+        let resp = self.authed(self.http.get(url)).send().await?;
+        let body: FlowListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
     async fn expect_no_content(resp: reqwest::Response) -> Result<()> {
         let status = resp.status();
         if status.is_success() {
@@ -1097,7 +1236,7 @@ impl tokio::io::AsyncRead for ConsoleWs {
             }
             match std::task::ready!(self.stream.poll_next_unpin(cx)) {
                 Some(Ok(tokio_tungstenite::tungstenite::Message::Binary(data))) => {
-                    self.read_buf = data;
+                    self.read_buf = data.to_vec();
                 }
                 Some(Ok(tokio_tungstenite::tungstenite::Message::Text(t))) => {
                     self.read_buf = t.as_bytes().to_vec();
@@ -1125,7 +1264,7 @@ impl tokio::io::AsyncWrite for ConsoleWs {
         if let Err(e) =
             self.stream
                 .start_send_unpin(tokio_tungstenite::tungstenite::Message::Binary(
-                    buf.to_vec(),
+                    buf.to_vec().into(),
                 ))
         {
             return std::task::Poll::Ready(Err(std::io::Error::other(e)));

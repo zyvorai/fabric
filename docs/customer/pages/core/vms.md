@@ -32,8 +32,9 @@ Virtual Machines — the fleet view of every VM in the fabric, and the starting 
 
 1. Start, stop, pause, resume, restart, or clone the VM from the header actions.
 2. Open a real console — either the browser terminal (xterm.js) or a graphical VNC session — from the Console tab.
-3. Manage disks, network (including port forwards), snapshots, hotplug devices, and cloud-init from their respective tabs.
-4. **Deleting a VM is undoable for a few seconds.** Confirming delete doesn't remove the VM immediately — a bar appears at the bottom of the screen with an **Undo** button and a countdown; the VM is only actually deleted once that countdown finishes unclicked. If you change your mind, click Undo before it runs out.
+3. Manage disks, network (including port forwards), **Dataplane** (FluxVM eBPF edge policy / stats / flows — see [VM Dataplane](../infrastructure/dataplane.md)), snapshots, hotplug devices, and cloud-init from their respective tabs.
+4. From the **Network** tab, use **Open Dataplane** as a shortcut into the edge policy editor.
+5. **Deleting a VM is undoable for a few seconds.** Confirming delete doesn't remove the VM immediately — a bar appears at the bottom of the screen with an **Undo** button and a countdown; the VM is only actually deleted once that countdown finishes unclicked. If you change your mind, click Undo before it runs out.
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
 
@@ -41,5 +42,6 @@ If the page stays empty, check service health, auth configuration, and that depe
 
 - [Create VM](create.md)
 - [VM Console](vms-name-console.md)
+- [VM Dataplane](../infrastructure/dataplane.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

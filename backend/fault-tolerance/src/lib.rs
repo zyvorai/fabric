@@ -1020,6 +1020,42 @@ mod tests {
         }
     }
 
+    #[async_trait::async_trait]
+    impl zyvor_fabric_driver_core::VmDataplaneDriver for MockDriver {
+        async fn dataplane_status(
+            &self,
+            _name: &str,
+        ) -> Result<zyvor_fabric_driver_core::DataplaneStatus> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn get_dataplane_policy(
+            &self,
+            _name: &str,
+        ) -> Result<zyvor_fabric_driver_core::VmNetworkPolicy> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn set_dataplane_policy(
+            &self,
+            _name: &str,
+            _policy: &zyvor_fabric_driver_core::VmNetworkPolicy,
+        ) -> Result<zyvor_fabric_driver_core::VmNetworkPolicy> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn dataplane_stats(
+            &self,
+            _name: &str,
+        ) -> Result<zyvor_fabric_driver_core::DataplaneStats> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+        async fn dataplane_flows(
+            &self,
+            _name: &str,
+            _limit: Option<usize>,
+        ) -> Result<Vec<zyvor_fabric_driver_core::FlowRecord>> {
+            unimplemented!("not exercised by fault-tolerance tests")
+        }
+    }
+
     impl zyvor_fabric_driver_core::CapabilityProvider for MockDriver {
         fn backend_name(&self) -> &'static str {
             "mock"
