@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router'
 import { getVM, getMetrics, deleteVM, addPortForward, removePortForward, getVMLogs, VM, VMMetrics, VMLogEntry } from '../api/vm'
 import { listSnapshots, createSnapshotWithRetry, deleteSnapshot, revertSnapshot, VMSnapshot } from '../api/snapshots'
@@ -33,6 +33,8 @@ import CloudInitTab from './vm-details/CloudInitTab'
 import AdvancedTab from './vm-details/AdvancedTab'
 import RescueTab from './vm-details/RescueTab'
 import DataplanePanel from './vm-details/DataplanePanel'
+import { AnsiText } from '../components/AnsiText'
+import { isSpinnerNoise } from '../utils/ansi'
 
 type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'dataplane' | 'snapshots' | 'logs' | 'hotplug' | 'devices' | 'cloudinit' | 'advanced' | 'rescue'
 
@@ -1193,12 +1195,10 @@ function SnapshotsTab({ vm }: { vm: VM }) {
   )
 }
 
-const LOG_PRIORITY_STYLE: Record<string, string> = {
-  emerg: 'text-[var(--zf-danger)]', alert: 'text-[var(--zf-danger)]', crit: 'text-[var(--zf-danger)]',
-  err: 'text-[var(--zf-danger)]', error: 'text-[var(--zf-danger)]',
-  warning: 'text-amber-700', warn: 'text-amber-700',
-  notice: 'text-[var(--zf-link)]', info: 'text-[var(--zf-ink)]',
-  debug: 'text-[var(--zf-muted)]',
+const LOG_PRIORITY_DOT: Record<string, string> = {
+  emerg: 'bg-red-500', alert: 'bg-red-500', crit: 'bg-red-500', err: 'bg-red-400', error: 'bg-red-400',
+  warning: 'bg-amber-400', warn: 'bg-amber-400', notice: 'bg-sky-400', info: 'bg-zinc-500',
+  debug: 'bg-zinc-600',
 }
 
 function LogsTab({ vm }: { vm: VM }) {
@@ -1209,6 +1209,8 @@ function LogsTab({ vm }: { vm: VM }) {
   const [autoRefresh, setAutoRefresh] = useState(vm.state === 'starting' || vm.state === 'running')
   const [showActivity, setShowActivity] = useState(false)
   const [activity, setActivity] = useState<AuditLog[]>([])
+  const termRef = useRef<HTMLDivElement>(null)
+  const stickBottom = useRef(true)
 
   const loadLogs = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true)
@@ -1237,6 +1239,23 @@ function LogsTab({ vm }: { vm: VM }) {
     if (!showActivity) return
     listAuditLogs({ resource_name: vm.name, resource_type: 'vm' }).then(setActivity).catch(() => {})
   }, [showActivity, vm.name])
+
+  const displayLogs = useMemo(
+    () => logs.filter((log) => !isSpinnerNoise(log.message)),
+    [logs],
+  )
+
+  useEffect(() => {
+    const el = termRef.current
+    if (!el || !stickBottom.current) return
+    el.scrollTop = el.scrollHeight
+  }, [displayLogs])
+
+  const onTermScroll = () => {
+    const el = termRef.current
+    if (!el) return
+    stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+  }
 
   return (
     <div className="space-y-3">
@@ -1292,38 +1311,80 @@ function LogsTab({ vm }: { vm: VM }) {
         </div>
       )}
 
-      {!error && loading && logs.length === 0 && (
-        <div className="zf-panel p-8 text-center">
-          <Loader2 className="w-6 h-6 text-[var(--zf-muted)] mx-auto mb-2 animate-spin" />
-          <p className="text-[var(--zf-muted)] text-sm">Loading console output...</p>
+      {!error && loading && displayLogs.length === 0 && (
+        <div className="rounded-xl overflow-hidden border border-black/40 bg-[#1c1c1e]">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-[#2c2c2e]">
+            <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
+            <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
+            <span className="w-3 h-3 rounded-full bg-[#28c840]" />
+            <span className="ml-3 text-xs text-white/40 font-medium truncate">{vm.name} — console</span>
+          </div>
+          <div className="p-8 text-center">
+            <Loader2 className="w-6 h-6 text-white/40 mx-auto mb-2 animate-spin" />
+            <p className="text-white/40 text-sm">Loading console output...</p>
+          </div>
         </div>
       )}
 
-      {!error && !loading && logs.length === 0 && (
-        <div className="zf-panel p-8 text-center">
-          <Terminal className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
-          <p className="text-[var(--zf-muted)] text-sm">
-            {vm.state === 'stopped'
-              ? "No console output captured yet — it appears here once this VM has booted at least once."
-              : 'No console output yet — this can take a few seconds right after boot.'}
-          </p>
+      {!error && !loading && displayLogs.length === 0 && (
+        <div className="rounded-xl overflow-hidden border border-black/40 bg-[#1c1c1e]">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-[#2c2c2e]">
+            <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
+            <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
+            <span className="w-3 h-3 rounded-full bg-[#28c840]" />
+            <span className="ml-3 text-xs text-white/40 font-medium truncate">{vm.name} — console</span>
+          </div>
+          <div className="p-8 text-center">
+            <Terminal className="w-10 h-10 text-white/25 mx-auto mb-3" />
+            <p className="text-white/40 text-sm">
+              {vm.state === 'stopped'
+                ? "No console output captured yet — it appears here once this VM has booted at least once."
+                : 'No console output yet — this can take a few seconds right after boot.'}
+            </p>
+          </div>
         </div>
       )}
 
-      {logs.length > 0 && (
-        <div className="zf-panel overflow-hidden">
-          <div className="font-mono text-xs max-h-[32rem] overflow-y-auto">
-            {logs.map((log, i) => (
-              <div key={i} className="flex gap-4 px-5 py-1.5 hover:bg-black/[0.04] transition-colors">
-                <span className="text-[var(--zf-muted)] shrink-0 tabular-nums">
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
-                {log.unit && <span className="text-[var(--zf-muted)] shrink-0 max-w-[8rem] truncate">{log.unit}</span>}
-                <span className={`break-all ${LOG_PRIORITY_STYLE[log.priority?.toLowerCase()] || 'text-[var(--zf-ink)]'}`}>
-                  {log.message}
-                </span>
-              </div>
-            ))}
+      {displayLogs.length > 0 && (
+        <div className="rounded-xl overflow-hidden border border-black/40 shadow-lg shadow-black/20 bg-[#1c1c1e]">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-[#2c2c2e]">
+            <span className="w-3 h-3 rounded-full bg-[#ff5f57]" aria-hidden />
+            <span className="w-3 h-3 rounded-full bg-[#febc2e]" aria-hidden />
+            <span className="w-3 h-3 rounded-full bg-[#28c840]" aria-hidden />
+            <span className="ml-3 text-xs text-white/50 font-medium truncate tracking-wide">
+              {vm.name} — console
+            </span>
+            {autoRefresh && (
+              <span className="ml-auto text-[10px] uppercase tracking-wider text-[#28c840]">Live</span>
+            )}
+          </div>
+          <div
+            ref={termRef}
+            onScroll={onTermScroll}
+            className="font-mono text-[12px] leading-[1.45] max-h-[36rem] overflow-y-auto px-3 py-2 text-[#f5f5f7] selection:bg-[#0a84ff]/40"
+            style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
+          >
+            {displayLogs.map((log, i) => {
+              let ts = ''
+              try {
+                ts = new Date(log.timestamp).toLocaleTimeString(undefined, { hour12: false })
+              } catch { /* ignore */ }
+              const pri = log.priority?.toLowerCase() || 'info'
+              return (
+                <div key={i} className="flex gap-2.5 py-[1px] hover:bg-white/[0.04] rounded px-1 -mx-1">
+                  <span className="text-white/25 shrink-0 tabular-nums w-[4.5rem] text-right select-none">
+                    {ts}
+                  </span>
+                  <span
+                    className={`mt-[6px] w-1.5 h-1.5 rounded-full shrink-0 ${LOG_PRIORITY_DOT[pri] || 'bg-zinc-500'}`}
+                    title={pri}
+                  />
+                  <span className="min-w-0 break-words whitespace-pre-wrap">
+                    <AnsiText text={log.message} />
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
