@@ -15,7 +15,7 @@ use zyvor_fabric_fluxvm_client::{
 use crate::FluxVmDriver;
 
 fn generate_mac_address() -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let mut rng = rand::rng();
     format!(
         "52:54:00:{:02x}:{:02x}:{:02x}",
