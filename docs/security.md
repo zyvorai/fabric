@@ -6,7 +6,8 @@ For enterprise identity provider (Entra ID / Okta) lifecycle provisioning and
 group-to-role sync via SCIM 2.0, see [scim-identity.md](scim-identity.md).
 
 For the experimental OpenStack Keystone-compat surface (`/identity`, …), see
-[openstack-compat.md](openstack-compat.md). That path is separate from Fabric
+[openstack-compat.md](openstack-compat.md) and
+[Tutorial 08](tutorials/08-openstack-clients.md). That path is separate from Fabric
 JWT auth and from SCIM; treat it as a dialect adapter until it is wired to
 `enterprise-identity`.
 

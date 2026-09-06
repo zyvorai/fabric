@@ -341,7 +341,8 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 ### OpenStack Compatibility (experimental)
 
 Same daemon port as Fabric (default **9095**). Catalog uses `daemon.public_url` /
-`ZYVOR_FABRICD_PUBLIC_URL`. See `docs/openstack-compat.md`.
+`ZYVOR_FABRICD_PUBLIC_URL`. See `docs/openstack-compat.md` and
+**Tutorial 08** (`docs/tutorials/08-openstack-clients.md`).
 
 - `POST /identity/v3/auth/tokens` -- Keystone token
 - `GET /compute/v2.1/flavors` -- Nova flavors

@@ -24,14 +24,12 @@ Step-by-step walkthroughs for common workflows.
 
 | Document | Description |
 |----------|-------------|
-| First VM | Create, configure, start, and connect to a virtual machine |
-| Cloud Image Deployment | Download and deploy Ubuntu, Fedora, or Debian cloud images |
-| Network Setup | Configure bridges, VLANs, and network policies |
-| Storage Pool Configuration | Set up local, NFS, LVM, ZFS, or Ceph storage |
-| Template-Based Deployment | Create templates and deploy VMs from them |
-| Backup and Restore | Configure automated backups and perform restores |
-| Multi-VM Application Stack | Deploy a multi-tier application with networking |
-| CI/CD Integration | Automate VM provisioning from CI pipelines |
+| [Tutorial index](tutorials/README.md) | Full numbered tutorial list |
+| [01 First VM](tutorials/01-first-vm.md) | Create, configure, start, and connect to a virtual machine |
+| [02 Networking](tutorials/02-networking.md) | Bridges, VLANs, bonds, port forwarding, network policies |
+| [03 Snapshots & Backups](tutorials/03-snapshots-backups.md) | Snapshots, backup policies, restore |
+| [08 OpenStack Clients](tutorials/08-openstack-clients.md) | Drive Fabric with `openstack` CLI / curl (Keystone/Nova/…) |
+| [OpenStack Compatibility reference](openstack-compat.md) | Endpoints, public URL, limitations |
 
 ---
 

@@ -4,7 +4,7 @@ Third-party and companion products that connect to the Zyvor Fabric control plan
 
 | Integration | Status | Document |
 |-------------|--------|----------|
-| **OpenStack compatibility** | Experimental | [../openstack-compat.md](../openstack-compat.md) |
+| **OpenStack compatibility** | Experimental | [../openstack-compat.md](../openstack-compat.md) · [Tutorial](../tutorials/08-openstack-clients.md) |
 | **Machina** (macOS AI infrastructure workbench) | Planned v0.1 | [machina.md](machina.md) |
 | Kubernetes operator | Shipped | [../operator/README.md](../../operator/README.md) |
 | Terraform | Shipped | [../terraform-provider/README.md](../../terraform-provider/README.md) |
