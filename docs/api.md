@@ -95,8 +95,8 @@ SCIM data-plane routes (outside `/api`, under `/scim/v2`, bearer-token auth):
 Experimental OpenStack wire-protocol façade (Keystone v3, Nova v2.1, Glance v2,
 Neutron v2.0, Cinder v3) mounted on the **same listen port** as Fabric, outside
 `/api`. Not the same as SCIM (`/scim/v2`). Catalog endpoint URLs come from
-`daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` (else listen + TLS). See
-[docs/openstack-compat.md](openstack-compat.md).
+`daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` (else listen + TLS). See [docs/openstack-compat.md](openstack-compat.md) and the hands-on
+[Tutorial 08](tutorials/08-openstack-clients.md).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|

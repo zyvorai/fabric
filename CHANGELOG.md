@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Tutorial 08: drive Fabric with OpenStack clients (`docs/tutorials/08-openstack-clients.md`) — Keystone token, Nova/Glance/Neutron/Cinder via `openstack` CLI and curl, public URL setup, Terraform/Ansible outline.
 - `openstack-compat` crate and `/identity` `/compute` `/image` `/network` `/volume` routes: experimental OpenStack wire-protocol façade (Keystone/Nova/Glance/Neutron/Cinder) on the same daemon port as Fabric. Catalog URLs come from `daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` (or listen + TLS). See [docs/openstack-compat.md](docs/openstack-compat.md).
 - `host-lifecycle` crate: deterministic host maintenance evacuation planner and async job manager — preflight blockers, capacity-aware target selection, live/cold migration policy, bounded-parallel execution, and failure semantics that leave a partially evacuated host cordoned rather than guessing. Not yet wired into the scheduler or server routes (see [docs/host-lifecycle.md](docs/host-lifecycle.md) for the intended follow-up integration).
 - `enterprise-identity` crate and `/api/identity/scim/*` + `/scim/v2/*` endpoints: SCIM 2.0 lifecycle provisioning and group-to-role sync for Entra ID / Okta on top of Fabric's existing OIDC/SAML/LDAP auth providers. Dedicated, hashed, constant-time-compared provisioning bearer tokens; deprovisioning takes effect on next login. See [docs/scim-identity.md](docs/scim-identity.md).

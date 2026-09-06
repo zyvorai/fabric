@@ -8,6 +8,8 @@ concepts on the **OpenStack wire protocol** so `openstack`, Terraform
 It does **not** replace FluxVM. It is a façade mounted on the same
 `zyvor-fabricd` process and listen port as the Fabric API and web UI.
 
+**Hands-on walkthrough:** [Tutorial 08 — Drive Fabric with OpenStack Clients](tutorials/08-openstack-clients.md).
+
 ## Included
 
 - `backend/openstack-compat/` — Keystone v3, Nova v2.1, Glance v2, Neutron
@@ -148,6 +150,7 @@ cargo test -p openstack-compat
 
 ## See also
 
+- [Tutorial 08: OpenStack clients](tutorials/08-openstack-clients.md) — step-by-step CLI/curl
 - [api.md](api.md) — OpenStack section in the API reference
 - [getting-started/03-Configuration.md](getting-started/03-Configuration.md) — `listen` / `public_url`
 - [scim-identity.md](scim-identity.md) — enterprise SCIM (separate from Keystone-compat)

@@ -470,12 +470,14 @@ export ZYVOR_FABRICD_LISTEN=0.0.0.0:9095
 For external access, always use TLS (or a reverse proxy with TLS termination).
 When OpenStack clients or remote catalogs need a reachable URL, also set
 `daemon.public_url` or `ZYVOR_FABRICD_PUBLIC_URL` (see
-[openstack-compat.md](../openstack-compat.md)).
+[openstack-compat.md](../openstack-compat.md) and
+[Tutorial 08](../tutorials/08-openstack-clients.md)).
 
 ### How do I point OpenStack / Terraform at Fabric?
 
-Set `OS_AUTH_URL` to `https://HOST:9095/identity` (or your `public_url` +
-`/identity`). Full walkthrough: [openstack-compat.md](../openstack-compat.md).
+Follow [Tutorial 08](../tutorials/08-openstack-clients.md). Short version: set
+`OS_AUTH_URL` to `https://HOST:9095/identity` (or your `public_url` +
+`/identity`).
 
 ### How do I configure CORS for the web UI?
 

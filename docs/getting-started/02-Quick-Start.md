@@ -246,9 +246,10 @@ Returns `204 No Content` on success.
 
 ## Next Steps
 
-- [Configuration Reference](03-Configuration.md) -- customize Zyvor Fabric settings
+- [Configuration Reference](03-Configuration.md) -- customize Zyvor Fabric settings (`listen`, `public_url`)
 - [Web UI Guide](04-Web-UI.md) -- explore the full web dashboard
 - [API Reference](../api.md) -- learn the 520+ API endpoints
-- [OpenStack Compatibility](../openstack-compat.md) -- optional `openstack` CLI façade
+- [Tutorial 08: OpenStack clients](../tutorials/08-openstack-clients.md) -- point `openstack` CLI at Fabric
+- [OpenStack Compatibility](../openstack-compat.md) -- optional façade reference
 - [Networking Guide](../networking.md) -- configure VM networking
 - [Storage Guide](../storage.md) -- set up storage backends

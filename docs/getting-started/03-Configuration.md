@@ -98,7 +98,8 @@ export ZYVOR_FABRICD_PUBLIC_URL=https://fabric.example.com:9095
 export ZYVOR_FABRICD_LISTEN=0.0.0.0:9095
 ```
 
-See [OpenStack Compatibility](../openstack-compat.md).
+See [openstack-compat.md](../openstack-compat.md) and
+[Tutorial 08](../tutorials/08-openstack-clients.md).
 
 #### CORS Configuration
 

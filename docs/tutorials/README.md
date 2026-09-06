@@ -32,14 +32,17 @@ export TOKEN="your-jwt-token-here"
 | 04 | [Advanced VM Configuration](04-advanced-vm-options.md) | Intermediate | 40 min | VMStartOptions, hotplug, disk resize, cloud-init, and credentials. |
 | 05 | [Multi-Node Clustering](05-clustering.md)         | Advanced     | 60 min | Datacenters, clusters, resource pools, migration, HA, and DRS.     |
 | 06 | [Security Hardening](06-security-hardening.md)    | Advanced     | 45 min | PAM auth, RBAC, JWT, firewalls, encryption, certs, and auditing.   |
+| 07 | [Logging & Compliance](07-logging-compliance.md)  | Intermediate | 35 min | Journals, compliance scans, and secrets management.                 |
+| 08 | [OpenStack Clients](08-openstack-clients.md)      | Beginner     | 25 min | Point `openstack` CLI / curl at Fabric’s Keystone/Nova façade.     |
 
 ---
 
 ## Conventions Used
 
-- **`$VMSPAWN_HOST`** -- Base URL of the Zyvor Fabric API (default `http://localhost:3000`)
-- **`$TOKEN`** -- A valid JWT bearer token obtained via `/api/auth/login`
-- All `curl` examples include `-s` (silent) and pipe through `jq` for readability
+- **`$VMSPAWN_HOST`** / **`$FABRIC_HOST`** -- Base URL of the Zyvor Fabric API (default `https://127.0.0.1:9095` in production-style deploys; older examples may use port 3000 for a local UI proxy)
+- **`$TOKEN`** -- A valid Fabric JWT bearer token obtained via `/api/auth/login` (Tutorials 01–07)
+- **`$OS_TOKEN` / `OS_*`** -- OpenStack Keystone token and env vars (Tutorial 08)
+- All `curl` examples include `-s` (silent) and pipe through `jq` for readability; use `-sk` against lab self-signed TLS
 - Response bodies show the **essential fields**; actual responses may include additional metadata
 - UUIDs in examples are illustrative; your IDs will differ
 

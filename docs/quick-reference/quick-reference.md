@@ -20,7 +20,8 @@ curl -s http://127.0.0.1:9095/api/v1/auth/me \
 ## OpenStack Compatibility (experimental)
 
 Same port as Fabric. Set `daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` for remote hosts.
-Full guide: [openstack-compat.md](../openstack-compat.md).
+Full guide: [openstack-compat.md](../openstack-compat.md) ·
+[Tutorial 08](../tutorials/08-openstack-clients.md).
 
 ```bash
 BASE=https://127.0.0.1:9095
