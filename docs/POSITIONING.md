@@ -31,7 +31,7 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 | **Product** | Zyvor Fabric | Marketing, UI, documentation, sales |
 | **Daemon** | `zyvor-fabricd` | systemd unit, config paths, APIs — stable technical identifier |
 | **CLI** | `zyvorctl`, `zyvor-fabricd-ctl` | Operational tools |
-| **Repo** | [zyvor-fabric](https://github.com/ssahani/zyvor-fabric) | GitHub redirects from `vmspawn` |
+| **Repo** | [zyvorai/fabric](https://github.com/zyvorai/fabric) | Canonical GitHub org repo |
 
 Keeping `zyvor-fabricd` as the daemon name avoids breaking installs, Ansible roles, and automation. User-facing surfaces say **Zyvor Fabric**; ops runbooks reference `zyvor-fabricd` where commands and paths matter.
 
@@ -136,7 +136,7 @@ Then use the appropriate name for context (product in prose, `zyvor-fabricd` in 
 ## Links
 
 - Product: [zyvor.dev](https://zyvor.dev)
-- Repository: [github.com/ssahani/zyvor-fabric](https://github.com/ssahani/zyvor-fabric)
+- Repository: [github.com/zyvorai/fabric](https://github.com/zyvorai/fabric)
 - Migration: [MIGRATION-FROM-VMSPAWN.md](MIGRATION-FROM-VMSPAWN.md)
 - Documentation: [docs/index.md](index.md)
 - Client decks: [client-presentations/](client-presentations/)

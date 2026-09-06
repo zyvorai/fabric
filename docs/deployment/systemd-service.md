@@ -32,7 +32,7 @@ below is illustrative and close to it, with commentary added:
 ```ini
 [Unit]
 Description=zyvor-fabricd - Virtual Machine Management Daemon
-Documentation=https://github.com/ssahani/zyvor-fabric
+Documentation=https://github.com/zyvorai/fabric
 # VM lifecycle is entirely FluxVM's job (driver.fluxvm_url) — nothing
 # here depends on systemd-machined or systemd-networkd, so there's nothing
 # service-specific to order After= beyond basic network availability.
