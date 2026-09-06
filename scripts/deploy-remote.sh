@@ -654,8 +654,10 @@ REMOTE_DIR='${REMOTE_DIR}'
 cd \"\$REMOTE_DIR\"
 if [ -f web/package.json ] && command -v npm &>/dev/null; then
     cd web
-    npm install --silent 2>&1 | tail -1
-    npm run build 2>&1 | tail -3
+    # Avoid pipefail+tail SIGPIPE: npm warns on stderr and exits 141 when tail closes early.
+    npm install --silent > /tmp/zyvor-web-npm-install.log 2>&1 || { tail -20 /tmp/zyvor-web-npm-install.log; exit 1; }
+    npm run build > /tmp/zyvor-web-npm-build.log 2>&1 || { tail -40 /tmp/zyvor-web-npm-build.log; exit 1; }
+    tail -3 /tmp/zyvor-web-npm-build.log
     cd \"\$REMOTE_DIR\"
     if [ -d web/dist ]; then
         \$SUDO rm -rf /usr/share/zyvor-fabricd/web
