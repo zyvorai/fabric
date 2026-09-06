@@ -23,6 +23,7 @@ If no config file is found, Zyvor Fabric uses built-in defaults and logs a warni
 ```toml
 [daemon]
 listen = "127.0.0.1:9095"
+# public_url = "https://fabric.example.com:9095"
 cors_origins = ["http://127.0.0.1:9095"]
 
 [storage]
@@ -56,6 +57,7 @@ Controls the HTTP server and API behavior.
 |-----|------|---------|-------------|
 | `listen` | String | `"127.0.0.1:9095"` | Address and port for the HTTP server |
 | `cors_origins` | Array of Strings | `["http://127.0.0.1:9095"]` | Allowed CORS origins for web UI access |
+| `public_url` | String (optional) | unset | External base URL advertised to clients (OpenStack catalog). Override with `ZYVOR_FABRICD_PUBLIC_URL`. When unset, derived from `listen` + TLS (`0.0.0.0` → `127.0.0.1`). |
 
 #### Listen Address
 
@@ -72,11 +74,31 @@ listen = "0.0.0.0:9095"
 # Specific interface
 listen = "192.168.1.100:9095"
 
-# Custom port
-listen = "127.0.0.1:8080"
+# Custom port (also set public_url so OpenStack clients see the same host:port)
+listen = "127.0.0.1:19095"
+public_url = "https://127.0.0.1:19095"
 ```
 
 > **Security note:** Binding to `0.0.0.0` exposes the API to the network. Always enable authentication and consider TLS when using a non-localhost address.
+
+#### Public URL
+
+OpenStack service-catalog endpoints and similar client-facing URLs must match
+what callers use. Prefer an explicit value for remote hosts, reverse proxies,
+and Kubernetes NodePort/ingress:
+
+```toml
+[daemon]
+listen = "0.0.0.0:9095"
+public_url = "https://fabric.example.com:9095"
+```
+
+```bash
+export ZYVOR_FABRICD_PUBLIC_URL=https://fabric.example.com:9095
+export ZYVOR_FABRICD_LISTEN=0.0.0.0:9095
+```
+
+See [OpenStack Compatibility](../openstack-compat.md).
 
 #### CORS Configuration
 
@@ -261,6 +283,10 @@ Environment variables override config file values for sensitive settings.
 
 | Variable | Overrides | Description |
 |----------|-----------|-------------|
+| `ZYVOR_FABRICD_LISTEN` | `daemon.listen` | Bind address (`host:port`, default port **9095**) |
+| `ZYVOR_FABRICD_PUBLIC_URL` | `daemon.public_url` | External base URL for OpenStack catalog / clients |
+| `ZYVOR_FABRICD_CONFIG` | — | Config file path |
+| `ZYVOR_FABRICD_LOG_LEVEL` | — | Log level |
 | `ZYVOR_FABRICD_JWT_SECRET` | `auth.jwt_secret` | JWT signing secret |
 | `ZYVOR_FABRICD_ADMIN_PASSWORD` | `auth.default_admin_password` | Default admin password |
 | `ZYVOR_FABRICD_BACKUP_DIR` | Backup directory | Override backup storage location |

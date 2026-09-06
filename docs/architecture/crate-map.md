@@ -1,6 +1,6 @@
 # Zyvor Fabric Crate Map
 
-This document catalogs all 51 crates in the Zyvor Fabric workspace, organized by domain.
+This document catalogs the crates in the Zyvor Fabric workspace, organized by domain.
 Each entry includes the crate name, workspace path, and a brief description of its
 purpose.
 
@@ -94,6 +94,9 @@ Enterprise management features for large-scale VM deployments.
 | `secrets-manager`    | `backend/secrets-manager`     | Secrets and credential storage. Encrypted at-rest secret store with CRUD API, access policies, and automatic rotation. |
 | `compliance`         | `backend/compliance`          | Compliance profile scanning. Built-in profiles (CIS, STIG, PCI-DSS), per-VM scanning, finding severity, remediation guidance. |
 | `billing`            | `backend/billing`             | Usage tracking, pricing, and invoicing. Per-VM metering, configurable pricing tiers, invoice generation, chargeback reports. |
+| `enterprise-identity`| `backend/enterprise-identity` | SCIM 2.0 models, provisioning tokens, patch/filter engine, and group-to-role resolution for Entra ID / Okta. |
+| `openstack-compat`   | `backend/openstack-compat`    | OpenStack wire-protocol façade (Keystone/Nova/Glance/Neutron/Cinder) mounted on `zyvor-fabricd`. |
+| `host-lifecycle`     | `backend/host-lifecycle`      | Host maintenance evacuation planner and async job manager (preflight, capacity-aware placement). |
 
 ## Infrastructure
 
@@ -204,4 +207,7 @@ Zyvor Fabric (main binary)
   |-- secrets-manager
   |-- compliance --> vm-model, state-store
   |-- billing --> vm-model, state-store
+  |-- enterprise-identity
+  |-- openstack-compat
+  |-- host-lifecycle
 ```

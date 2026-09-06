@@ -112,6 +112,8 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 - Password hashing (bcrypt with DEFAULT_COST)
 - Token generation, validation, and configurable expiration
 - API key support for service-to-service auth
+- SCIM 2.0 provisioning for Entra ID / Okta (`/scim/v2`) — see `docs/scim-identity.md`
+- Experimental OpenStack Keystone/Nova/Glance/Neutron/Cinder façade — see `docs/openstack-compat.md`
 
 ### Authorization (RBAC)
 
@@ -335,6 +337,18 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 - `GET /api/cluster/leader` -- Get current leader
 - `GET /metrics` -- Prometheus metrics
 - `GET /health` -- Health check
+
+### OpenStack Compatibility (experimental)
+
+Same daemon port as Fabric (default **9095**). Catalog uses `daemon.public_url` /
+`ZYVOR_FABRICD_PUBLIC_URL`. See `docs/openstack-compat.md`.
+
+- `POST /identity/v3/auth/tokens` -- Keystone token
+- `GET /compute/v2.1/flavors` -- Nova flavors
+- `POST /compute/v2.1/servers` -- Create server
+- `GET /image/v2/images` -- Glance images
+- `GET /network/v2.0/networks` -- Neutron networks
+- `POST /volume/v3/{project_id}/volumes` -- Cinder volumes
 
 ## Deployment
 

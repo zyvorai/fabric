@@ -17,6 +17,20 @@ curl -s http://127.0.0.1:9095/api/v1/auth/me \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
+## OpenStack Compatibility (experimental)
+
+Same port as Fabric. Set `daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` for remote hosts.
+Full guide: [openstack-compat.md](../openstack-compat.md).
+
+```bash
+BASE=https://127.0.0.1:9095
+curl -sk -D /tmp/os-hdrs -o /tmp/tok.json -X POST "$BASE/identity/v3/auth/tokens" \
+  -H "Content-Type: application/json" \
+  -d '{"auth":{"identity":{"methods":["password"],"password":{"user":{"name":"admin","password":"any"}}},"scope":{"project":{"name":"admin"}}}}'
+TOKEN=$(awk -F': ' 'tolower($1)=="x-subject-token"{print $2}' /tmp/os-hdrs | tr -d '\r')
+curl -sk "$BASE/compute/v2.1/flavors" -H "X-Auth-Token: $TOKEN" | jq .
+```
+
 ## 2FA Setup and Login
 
 ```bash
@@ -447,6 +461,7 @@ curl -s -X DELETE http://127.0.0.1:9095/api/v1/vms/my-vm/usb/DEVICE_ID \
 ```toml
 [daemon]
 listen = "127.0.0.1:9095"       # Bind address
+# public_url = "https://fabric.example.com:9095"  # OpenStack catalog / clients
 cors_origins = ["http://..."]    # Allowed CORS origins
 
 [storage]

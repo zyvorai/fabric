@@ -14,6 +14,7 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | **User journeys & acceptance criteria** | [USER_STORIES.md](USER_STORIES.md) |
 | **FluxVM VM driver** — config, capability matrix, gaps | [guides/vm-drivers/fluxvm.md](guides/vm-drivers/fluxvm.md) |
 | **Enterprise identity** (SCIM 2.0) | [scim-identity.md](scim-identity.md) |
+| **OpenStack compatibility** (Keystone/Nova/…) | [openstack-compat.md](openstack-compat.md) |
 | **Host maintenance evacuation** | [host-lifecycle.md](host-lifecycle.md) |
 | Customer page index | [customer/PAGE_INDEX.md](customer/PAGE_INDEX.md) |
 | Full documentation catalog | [index.md](index.md) |

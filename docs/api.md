@@ -90,6 +90,26 @@ SCIM data-plane routes (outside `/api`, under `/scim/v2`, bearer-token auth):
 | PATCH | `/scim/v2/Groups/:id` | Patch a group (membership changes) |
 | DELETE | `/scim/v2/Groups/:id` | Delete a group |
 
+## OpenStack Compatibility
+
+Experimental OpenStack wire-protocol façade (Keystone v3, Nova v2.1, Glance v2,
+Neutron v2.0, Cinder v3) mounted on the **same listen port** as Fabric, outside
+`/api`. Not the same as SCIM (`/scim/v2`). Catalog endpoint URLs come from
+`daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` (else listen + TLS). See
+[docs/openstack-compat.md](openstack-compat.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/identity/v3/auth/tokens` | Issue Keystone-style token (`X-Subject-Token`) |
+| GET | `/identity/v3/auth/tokens` | Validate token |
+| GET | `/identity/v3/auth/catalog` | Service catalog (requires token) |
+| GET | `/compute/v2.1/flavors` | List Nova flavors (`m1.tiny` … `m1.xlarge`) |
+| GET/POST | `/compute/v2.1/servers` | List / create servers |
+| POST | `/compute/v2.1/servers/:id/action` | start / stop / reboot |
+| GET | `/image/v2/images` | List Glance images |
+| GET | `/network/v2.0/networks` | List Neutron networks |
+| GET/POST | `/volume/v3/:project_id/volumes` | List / create Cinder volumes |
+
 ## VM Management
 
 Core virtual machine lifecycle operations.

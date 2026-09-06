@@ -321,17 +321,22 @@ sudo usermod -aG kvm $USER
 
 ### Port 9095 already in use
 
-Change the listen address in the config file:
+Change the listen address in the config file (any free port — example uses
+`19095`). Also set `public_url` if OpenStack clients should see the same port:
 
 ```bash
 sudo mkdir -p /etc/zyvor-fabricd
 sudo tee /etc/zyvor-fabricd/zyvor-fabricd.toml > /dev/null << 'EOF'
 [daemon]
-listen = "127.0.0.1:8080"
+listen = "127.0.0.1:19095"
+public_url = "https://127.0.0.1:19095"
 EOF
 
 sudo systemctl restart zyvor-fabricd
 ```
+
+Or: `export ZYVOR_FABRICD_LISTEN=127.0.0.1:19095` and
+`export ZYVOR_FABRICD_PUBLIC_URL=https://127.0.0.1:19095`.
 
 ---
 

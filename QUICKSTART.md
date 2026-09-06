@@ -217,9 +217,10 @@ fabric/
 1. Read [Architecture](docs/architecture.md)
 2. Deploy on [Kubernetes](docs/KUBERNETES.md) or [Docker](docs/DOCKER.md)
 3. Explore [API Documentation](docs/api.md)
-4. Check out the [Web UI](docs/web-ui.md)
-5. Review [Security](docs/security.md)
-6. Explore [Advanced Features](docs/advanced-features.md)
+4. Optional: drive Fabric with the [OpenStack CLI](docs/openstack-compat.md)
+5. Check out the [Web UI](docs/web-ui.md)
+6. Review [Security](docs/security.md)
+7. Explore [Advanced Features](docs/advanced-features.md)
 
 ## Troubleshooting
 

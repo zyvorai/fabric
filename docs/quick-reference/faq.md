@@ -456,13 +456,26 @@ network.
 
 ### How do I change the listen address?
 
-Set `daemon.listen` in `zyvor-fabricd.toml`:
+Set `daemon.listen` in `zyvor-fabricd.toml`, or export `ZYVOR_FABRICD_LISTEN`:
+
 ```toml
 [daemon]
 listen = "0.0.0.0:9095"   # Listen on all interfaces
 ```
 
-For external access, always use a reverse proxy with TLS termination.
+```bash
+export ZYVOR_FABRICD_LISTEN=0.0.0.0:9095
+```
+
+For external access, always use TLS (or a reverse proxy with TLS termination).
+When OpenStack clients or remote catalogs need a reachable URL, also set
+`daemon.public_url` or `ZYVOR_FABRICD_PUBLIC_URL` (see
+[openstack-compat.md](../openstack-compat.md)).
+
+### How do I point OpenStack / Terraform at Fabric?
+
+Set `OS_AUTH_URL` to `https://HOST:9095/identity` (or your `public_url` +
+`/identity`). Full walkthrough: [openstack-compat.md](../openstack-compat.md).
 
 ### How do I configure CORS for the web UI?
 
