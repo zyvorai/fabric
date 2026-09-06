@@ -10,8 +10,8 @@ tidy:
 	go mod tidy
 
 install: build
-	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/ssahani/zyvor-fabricd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)
-	cp $(PROVIDER_NAME) ~/.terraform.d/plugins/registry.terraform.io/ssahani/zyvor-fabricd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/$(PROVIDER_NAME)_v$(VERSION)
+	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/zyvorai/zyvor-fabricd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)
+	cp $(PROVIDER_NAME) ~/.terraform.d/plugins/registry.terraform.io/zyvorai/zyvor-fabricd/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/$(PROVIDER_NAME)_v$(VERSION)
 
 test:
 	go test ./...

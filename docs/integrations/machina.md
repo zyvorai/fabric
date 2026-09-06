@@ -4,7 +4,7 @@
 
 Zyvor Fabric runs on Linux hypervisor hosts. Machina runs on the operator’s Mac and connects to one or more Fabric clusters over HTTPS.
 
-> Note: The sibling repo [`machina`](https://github.com/ssahani/machina) (if present in your org) is a separate libvirt-based Linux platform. The macOS Machina workbench described here is the **Zyvor suite desktop product** consuming **Zyvor Fabric** APIs.
+> Note: The sibling repo [`machina`](https://github.com/zyvorai/machina) (if present in your org) is a separate libvirt-based Linux platform. The macOS Machina workbench described here is the **Zyvor suite desktop product** consuming **Zyvor Fabric** APIs.
 
 ---
 

@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/ssahani/terraform-provider-zyvor-fabricd/internal/provider"
+	"github.com/zyvorai/terraform-provider-zyvor-fabricd/internal/provider"
 )
 
 var version = "0.1.0"
@@ -17,7 +17,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/ssahani/zyvor-fabricd",
+		Address: "registry.terraform.io/zyvorai/zyvor-fabricd",
 		Debug:   debug,
 	}
 

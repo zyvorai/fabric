@@ -1,8 +1,8 @@
 # Terraform Provider for Zyvor Fabric
 
-Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. The provider type is **`zyvor-fabricd`** (stable); registry namespace is **`ssahani/zyvor-fabricd`**.
+Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. The provider type is **`zyvor-fabricd`** (stable); registry namespace is **`zyvorai/zyvor-fabricd`**.
 
-> A future registry alias `ssahani/zyvor-fabric` may be published without breaking existing `zyvor-fabricd` provider blocks.
+> A future registry alias `zyvorai/fabric` may be published without breaking existing `zyvor-fabricd` provider blocks.
 
 ## Installation
 
@@ -10,7 +10,7 @@ Provision and manage Zyvor Fabric virtual machines using HashiCorp Terraform. Th
 terraform {
   required_providers {
     zyvor-fabricd = {
-      source  = "ssahani/zyvor-fabricd"
+      source  = "zyvorai/zyvor-fabricd"
       version = "~> 0.1"
     }
   }
@@ -144,8 +144,8 @@ Example configuration: [examples/basic/main.tf](examples/basic/main.tf)
 ### Install Locally
 
 ```bash
-mkdir -p ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64
-cp terraform-provider-zyvor-fabricd ~/.terraform.d/plugins/ssahani/zyvor-fabricd/0.1.0/linux_amd64/
+mkdir -p ~/.terraform.d/plugins/zyvorai/zyvor-fabricd/0.1.0/linux_amd64
+cp terraform-provider-zyvor-fabricd ~/.terraform.d/plugins/zyvorai/zyvor-fabricd/0.1.0/linux_amd64/
 ```
 
 ### Run Tests
@@ -164,13 +164,13 @@ git tag terraform-provider/v0.1.0 && git push origin terraform-provider/v0.1.0
 
 ## Registry migration (planned)
 
-When `ssahani/zyvor-fabric` is published to the Terraform Registry:
+When `zyvorai/fabric` is published to the Terraform Registry:
 
 ```hcl
 terraform {
   required_providers {
     zyvor-fabricd = {
-      source  = "ssahani/zyvor-fabric"
+      source  = "zyvorai/fabric"
       version = "~> 0.1"
     }
   }

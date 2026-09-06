@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- Drop remaining `ssahani/` GitHub and Terraform Registry namespaces in favor of `zyvorai/` (`zyvorai/fabric`, `zyvorai/zyvor-fabricd`).
+
 ### Added
 - Tutorial 08: drive Fabric with OpenStack clients (`docs/tutorials/08-openstack-clients.md`) — Keystone token, Nova/Glance/Neutron/Cinder via `openstack` CLI and curl, public URL setup, Terraform/Ansible outline.
 - `openstack-compat` crate and `/identity` `/compute` `/image` `/network` `/volume` routes: experimental OpenStack wire-protocol façade (Keystone/Nova/Glance/Neutron/Cinder) on the same daemon port as Fabric. Catalog URLs come from `daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` (or listen + TLS). See [docs/openstack-compat.md](docs/openstack-compat.md).

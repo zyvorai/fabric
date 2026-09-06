@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     zyvor-fabricd = {
-      source  = "ssahani/zyvor-fabricd"
+      source  = "zyvorai/zyvor-fabricd"
       version = "~> 0.1"
     }
   }

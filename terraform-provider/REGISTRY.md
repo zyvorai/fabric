@@ -1,13 +1,13 @@
 # Publishing to the Terraform Registry
 
 Provider type: **`zyvor-fabricd`**  
-Registry namespace: **`ssahani/zyvor-fabricd`**  
+Registry namespace: **`zyvorai/zyvor-fabricd`**  
 Product: **Zyvor Fabric** (`zyvor-fabricd` daemon)
 
 ## Prerequisites
 
-1. [HashiCorp Terraform Registry](https://registry.terraform.io/) account linked to GitHub `ssahani`
-2. Public `zyvor-fabric` repository
+1. [HashiCorp Terraform Registry](https://registry.terraform.io/) account linked to GitHub `zyvorai`
+2. Public [`zyvorai/fabric`](https://github.com/zyvorai/fabric) repository
 3. GPG key (optional; recommended for signed checksums in production releases)
 
 ## Release flow
@@ -22,7 +22,7 @@ git push origin terraform-provider/v0.1.0
 GitHub Actions (`.github/workflows/terraform-provider-release.yml`) runs GoReleaser and uploads:
 
 - Multi-platform `terraform-provider-zyvor-fabricd` binaries
-- Terraform Registry provider manifest (`registry.terraform.io/ssahani/zyvor-fabricd`)
+- Terraform Registry provider manifest (`registry.terraform.io/zyvorai/zyvor-fabricd`)
 
 ## Local install (development)
 
@@ -37,7 +37,7 @@ make tidy build install
 terraform {
   required_providers {
     zyvor-fabricd = {
-      source  = "ssahani/zyvor-fabricd"
+      source  = "zyvorai/zyvor-fabricd"
       version = "~> 0.1"
     }
   }
@@ -49,12 +49,12 @@ provider "zyvor-fabricd" {
 }
 ```
 
-## Future alias: `ssahani/zyvor-fabric`
+## Future alias: `zyvorai/fabric`
 
 The provider **type name** stays `zyvor-fabricd` for compatibility. A second registry namespace can mirror the same binaries once published:
 
 ```hcl
-source = "ssahani/zyvor-fabric"  # planned mirror
+source = "zyvorai/fabric"  # planned mirror
 ```
 
 ## Troubleshooting releases

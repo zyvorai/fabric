@@ -15,4 +15,4 @@ This repository’s system architecture lives in the docs tree:
 
 **Runtime:** `zyvor-fabricd` daemon · **Product:** Zyvor Fabric · **Repo:** [github.com/zyvorai/fabric](https://github.com/zyvorai/fabric)
 
-Former clone URLs `github.com/ssahani/vmspawn` and `github.com/ssahani/zyvor-fabric` are obsolete; use `zyvorai/fabric`.
+Canonical clone: `https://github.com/zyvorai/fabric.git`.
