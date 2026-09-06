@@ -39,7 +39,7 @@ export default function UploadDisk() {
           } else { reject(new Error(`HTTP ${xhr.status}`)); }
         };
         xhr.onerror = () => reject(new Error('Upload failed'));
-        const token = sessionStorage.getItem('vmspawnd_token');
+        const token = sessionStorage.getItem('zyvor_fabric_token');
         xhr.open('POST', '/api/images/import');
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.send(formData);

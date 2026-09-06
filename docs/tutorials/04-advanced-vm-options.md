@@ -37,8 +37,8 @@ interprets this same request shape rather than shelling out to systemd-vmspawn.
 ## Setup
 
 ```bash
-export VMSPAWN_HOST="http://localhost:3000"
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+export FABRIC_HOST="http://localhost:3000"
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 ```
@@ -46,7 +46,7 @@ TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
 Create a test VM:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms" \
+curl -s -X POST "$FABRIC_HOST/api/vms" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -68,7 +68,7 @@ options. All fields are optional -- omitted fields use auto-detected defaults.
 ### Full Example
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -230,7 +230,7 @@ Enable hardware security features for VMs that require measured boot or
 disk encryption (e.g., BitLocker, LUKS with TPM binding):
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -253,7 +253,7 @@ VSOCK provides a high-performance socket interface between host and guest,
 useful for agent communication without network configuration:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -276,7 +276,7 @@ Add vCPUs to a running VM without downtime. This uses the QEMU Machine Protocol
 (QMP) to activate pre-configured but unrealized CPU slots.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/hotplug/cpu" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/hotplug/cpu" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -304,7 +304,7 @@ Expected response:
 Add memory to a running VM:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/hotplug/memory" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/hotplug/memory" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -336,7 +336,7 @@ free -h
 Attach additional disks to a running VM:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/hotplug/disk" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/hotplug/disk" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -359,7 +359,7 @@ Expected response:
 Add a network interface to a running VM:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/hotplug/nic" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/hotplug/nic" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -379,11 +379,11 @@ online (VM running with QMP).
 
 ```bash
 # Stop the VM first
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/stop" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/stop" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
 # Resize to 50GB
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/disk/resize" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/disk/resize" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -408,7 +408,7 @@ Grow the disk while the VM is running. The guest must support online resize
 (e.g., via `growpart` and `resize2fs`):
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/disk/resize" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/disk/resize" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -453,7 +453,7 @@ generates a cloud-init ISO that is attached to the VM.
 ### Full Cloud-Init Example
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/cloud-init" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/cloud-init" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -521,7 +521,7 @@ generated cloud-init entry written into `/etc/fstab`, so it also survives a
 later stop/start.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -564,7 +564,7 @@ via SMBIOS or VSOCK without exposing them on the command line.
 ### Inline Credentials
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -596,7 +596,7 @@ systemd-creds cat app.database-url
 Load credentials from files on the host:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -628,7 +628,7 @@ Use systemd properties to limit VM resource consumption. These are set as
 VMStartOptions and applied to the VM's scope unit.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -673,7 +673,7 @@ Boot a VM directly from a kernel image, bypassing the bootloader. Useful for
 testing custom kernels or embedded systems:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -697,7 +697,7 @@ Bind host user accounts into the VM so they can log in with their host
 credentials:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -727,7 +727,7 @@ desktop Linux, or any workload that requires a GUI.
 Set `console` to `"gui"` in VMStartOptions to enable SPICE:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -767,7 +767,7 @@ keys, USB storage, serial adapters, and specialized peripherals.
 ### List Available USB Devices
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/system/usb" \
+curl -s "$FABRIC_HOST/api/system/usb" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -797,7 +797,7 @@ Expected response:
 Use the vendor ID and product ID to pass the device at start time:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -829,11 +829,11 @@ OVA files can be imported into VMware, VirtualBox, and other platforms.
 
 ```bash
 # Stop the VM first
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/stop" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/stop" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
 # Export to OVA
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/export" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/export" \
   -H "Authorization: Bearer $TOKEN" \
   -o advanced-demo.ova
 ```
@@ -861,10 +861,10 @@ The exported OVA file contains:
 ## Cleanup
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/advanced-demo/stop" \
+curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/stop" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
-curl -s -X DELETE "$VMSPAWN_HOST/api/vms/advanced-demo" \
+curl -s -X DELETE "$FABRIC_HOST/api/vms/advanced-demo" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

@@ -82,7 +82,7 @@ if [[ -z "${HOST}" ]]; then
 fi
 
 REMOTE="${USER}@${HOST}"
-REMOTE_DIR="$(vmspawn_remote_dir_for_user "$USER")"
+REMOTE_DIR="$(fabric_remote_dir_for_user "$USER")"
 # Prefer a dedicated K8s checkout under .deployment when DEPLOY_DIR unset
 if [[ -z "${DEPLOY_DIR:-}" && -z "${REMOTE_DIR_OVERRIDE:-}" ]]; then
   if [[ "$USER" == "root" ]]; then
@@ -91,7 +91,7 @@ if [[ -z "${DEPLOY_DIR:-}" && -z "${REMOTE_DIR_OVERRIDE:-}" ]]; then
     REMOTE_DIR="/home/${USER}/.deployment/zyvor-fabric"
   fi
 fi
-SUDO="$(vmspawn_sudo_prefix_for_user "$USER")"
+SUDO="$(fabric_sudo_prefix_for_user "$USER")"
 
 SSH_OPTS=(
   -o StrictHostKeyChecking=accept-new
@@ -177,7 +177,7 @@ else
 fi
 ADMIN_USER="${FABRIC_ADMIN_USERNAME:-admin}"
 
-vmspawn_build_metadata "$REPO_DIR"
+fabric_build_metadata "$REPO_DIR"
 
 if $UNINSTALL; then
   PHASE_TOTAL=1
@@ -192,7 +192,7 @@ if $UNINSTALL; then
 fi
 
 echo ""
-deploy_ui_banner "Fabric K8s → ${REMOTE}" "${VMSPAWN_VERSION:-dev} · ${VMSPAWN_COMMIT:-?}"
+deploy_ui_banner "Fabric K8s → ${REMOTE}" "${FABRIC_VERSION:-dev} · ${FABRIC_COMMIT:-?}"
 deploy_ui_kv "📁" "Remote tree" "${REMOTE_DIR}"
 deploy_ui_kv "🏷️" "Images" "${FABRIC_IMAGE} / ${FLUXVM_IMAGE}"
 deploy_ui_kv "🔌" "NodePort" "${NODE_PORT}"
@@ -370,4 +370,4 @@ else
   deploy_ui_warn "Health not 200 yet — check: kubectl -n ${NAMESPACE} get pods -o wide"
 fi
 
-vmspawn_save_deploy_last "$REPO_DIR" "$HOST" "$USER" "k8s" || true
+fabric_save_deploy_last "$REPO_DIR" "$HOST" "$USER" "k8s" || true

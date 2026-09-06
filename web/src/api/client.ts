@@ -4,18 +4,29 @@
 import { formatHttpErrorBody } from '../utils/apiError'
 import { parseJsonResponse } from '../utils/parseJsonResponse'
 
-const TOKEN_KEY = 'vmspawnd_token'
+const TOKEN_KEY = 'zyvor_fabric_token'
+const LEGACY_TOKEN_KEY = 'vmspawnd_token'
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) return token
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY)
+  if (legacy) {
+    localStorage.setItem(TOKEN_KEY, legacy)
+    localStorage.removeItem(LEGACY_TOKEN_KEY)
+    return legacy
+  }
+  return null
 }
 
 export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token)
+  localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
 
 async function throwApiError(res: Response): Promise<never> {

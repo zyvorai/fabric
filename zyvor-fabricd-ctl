@@ -295,7 +295,7 @@ cmd_deps() {
     step "Summary"
     echo ""
     echo -e "  ${BOLD}Build deps:${NC}     gcc, make, pkg-config, openssl-dev, systemd-dev, dbus-dev"
-    echo -e "  ${BOLD}VM tools:${NC}       systemd-vmspawn, machinectl, qemu-img, OVMF/UEFI"
+    echo -e "  ${BOLD}VM tools:${NC}       qemu-img, OVMF/UEFI (FluxVM backend)"
     echo -e "  ${BOLD}TPM:${NC}            swtpm"
     echo -e "  ${BOLD}Networking:${NC}     nftables, wireguard, socat, iproute2"
     echo -e "  ${BOLD}Rust:${NC}           $(rustc --version 2>/dev/null || echo 'not in PATH — reload shell')"
@@ -847,7 +847,7 @@ cmd_doctor() {
     if [[ "$sd_ver" =~ ^[0-9]+$ ]] && [[ "$sd_ver" -ge 256 ]]; then
         ok "systemd $sd_ver (>= 256 required)"
     else
-        warn "systemd $sd_ver (256+ recommended for systemd-vmspawn)"
+        warn "systemd $sd_ver (256+ recommended)"
         ((issues++)) || true
     fi
 
@@ -860,7 +860,7 @@ cmd_doctor() {
     fi
 
     # Check required commands
-    local cmds=("systemd-vmspawn" "machinectl" "qemu-img" "curl" "jq")
+    local cmds=("qemu-img" "curl" "jq")
     for cmd in "${cmds[@]}"; do
         if command -v "$cmd" &>/dev/null; then
             ok "$cmd found"

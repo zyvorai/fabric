@@ -16,31 +16,31 @@ DEPLOY_UI_HEALTH_PATH="/health"
 # shellcheck source=deploy-ui.sh
 source "$_DEPLOY_LIB_DIR/deploy-ui.sh"
 
-vmspawn_build_metadata() {
+fabric_build_metadata() {
     local repo_dir="$1"
-    VMSPAWN_VERSION=$(git -C "$repo_dir" describe --tags --always --dirty 2>/dev/null || echo 'dev')
-    VMSPAWN_COMMIT=$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || echo 'unknown')
-    export VMSPAWN_VERSION VMSPAWN_COMMIT
+    FABRIC_VERSION=$(git -C "$repo_dir" describe --tags --always --dirty 2>/dev/null || echo 'dev')
+    FABRIC_COMMIT=$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || echo 'unknown')
+    export FABRIC_VERSION FABRIC_COMMIT
 }
 
-vmspawn_deploy_state_file() { deploy_ui_deploy_state_file "$1"; }
-vmspawn_save_deploy_last() {
-    deploy_ui_save_deploy_last "$1" "$2" "$3" "$4" "${VMSPAWN_VERSION:-}" "${VMSPAWN_COMMIT:-}"
+fabric_deploy_state_file() { deploy_ui_deploy_state_file "$1"; }
+fabric_save_deploy_last() {
+    deploy_ui_save_deploy_last "$1" "$2" "$3" "$4" "${FABRIC_VERSION:-}" "${FABRIC_COMMIT:-}"
 }
-vmspawn_load_deploy_last() { deploy_ui_load_deploy_last "$1"; }
+fabric_load_deploy_last() { deploy_ui_load_deploy_last "$1"; }
 
-vmspawn_elapsed_fmt() {
+fabric_elapsed_fmt() {
     local s="$1" m=$((s / 60)) r=$((s % 60))
     ((m > 0)) && printf '%dm ' "$m"
     printf '%ds' "$r"
 }
 
-vmspawn_print_success() {
+fabric_print_success() {
     local host="$1" elapsed="$2" user="$3"
     deploy_ui_success "$host" "$elapsed" "./scripts/deploy remote ${user}@${host} --quick"
 }
 
-vmspawn_remote_dir_for_user() {
+fabric_remote_dir_for_user() {
     local user="$1"
     if [[ -n "${DEPLOY_DIR:-}" || -n "${REMOTE_DIR:-}" ]]; then
         echo "${REMOTE_DIR:-${DEPLOY_DIR}}"
@@ -53,7 +53,7 @@ vmspawn_remote_dir_for_user() {
     fi
 }
 
-vmspawn_sudo_prefix_for_user() {
+fabric_sudo_prefix_for_user() {
     local user="$1"
     [[ "$user" == "root" ]] && echo "" || echo "sudo"
 }

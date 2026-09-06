@@ -32,8 +32,8 @@ available through the Zyvor Fabric API.
 ## Setup
 
 ```bash
-export VMSPAWN_HOST="http://localhost:3000"
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+export FABRIC_HOST="http://localhost:3000"
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 ```
@@ -41,7 +41,7 @@ TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
 If you do not have a test VM, create one:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms" \
+curl -s -X POST "$FABRIC_HOST/api/vms" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -66,7 +66,7 @@ priority levels.
 Retrieve recent journal entries for a specific VM:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/web-01/logs?lines=20" \
+curl -s "$FABRIC_HOST/api/vms/web-01/logs?lines=20" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -110,11 +110,11 @@ at the specified level or more severe are returned.
 
 ```bash
 # Show only errors and above (priority 0-3)
-curl -s "$VMSPAWN_HOST/api/vms/web-01/logs?priority=3" \
+curl -s "$FABRIC_HOST/api/vms/web-01/logs?priority=3" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
 # Show warnings and above
-curl -s "$VMSPAWN_HOST/api/vms/web-01/logs?priority=4&lines=50" \
+curl -s "$FABRIC_HOST/api/vms/web-01/logs?priority=4&lines=50" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -123,7 +123,7 @@ curl -s "$VMSPAWN_HOST/api/vms/web-01/logs?priority=4&lines=50" \
 Retrieve host-level journal entries (not VM-specific):
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/logs?lines=30" \
+curl -s "$FABRIC_HOST/api/logs?lines=30" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -131,7 +131,7 @@ Filter system logs by priority:
 
 ```bash
 # System errors only
-curl -s "$VMSPAWN_HOST/api/logs?priority=3&lines=100" \
+curl -s "$FABRIC_HOST/api/logs?priority=3&lines=100" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -142,7 +142,7 @@ entries to a directory on the host. This enables centralized log collection
 without installing agents inside the VM.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/web-01/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/web-01/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -173,7 +173,7 @@ levels.
 ### List Compliance Profiles
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/compliance/profiles" \
+curl -s "$FABRIC_HOST/api/compliance/profiles" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -223,7 +223,7 @@ The default `cis-baseline-v1` profile is always available and includes these
 Run a compliance scan against a specific VM:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/compliance/scan/web-01" \
+curl -s -X POST "$FABRIC_HOST/api/compliance/scan/web-01" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"profile_id": "cis-baseline-v1"}' | jq .
@@ -254,7 +254,7 @@ Expected response:
 List all historical compliance scan results:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/compliance/results" \
+curl -s "$FABRIC_HOST/api/compliance/results" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -277,7 +277,7 @@ using systemd credentials.
 ### Create a Secret
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/secrets" \
+curl -s -X POST "$FABRIC_HOST/api/secrets" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -311,7 +311,7 @@ Expected response:
 ### List Secrets
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/secrets" \
+curl -s "$FABRIC_HOST/api/secrets" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -332,7 +332,7 @@ Values are always redacted in the response:
 ### Get a Specific Secret
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/secrets/sec-abc12345" \
+curl -s "$FABRIC_HOST/api/secrets/sec-abc12345" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -343,7 +343,7 @@ VMStartOptions. The secrets are delivered via SMBIOS or VSOCK -- never on the
 command line.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/web-01/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/web-01/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -378,11 +378,11 @@ Then restart VMs that use the credential to pick up the new value.
 
 ```bash
 # Delete old secret
-curl -s -X DELETE "$VMSPAWN_HOST/api/secrets/sec-abc12345" \
+curl -s -X DELETE "$FABRIC_HOST/api/secrets/sec-abc12345" \
   -H "Authorization: Bearer $TOKEN"
 
 # Create new secret with updated value
-curl -s -X POST "$VMSPAWN_HOST/api/secrets" \
+curl -s -X POST "$FABRIC_HOST/api/secrets" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -396,14 +396,14 @@ curl -s -X POST "$VMSPAWN_HOST/api/secrets" \
   }' | jq .
 
 # Restart VMs to pick up the new credential
-curl -s -X POST "$VMSPAWN_HOST/api/vms/web-01/restart" \
+curl -s -X POST "$FABRIC_HOST/api/vms/web-01/restart" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Delete a Secret
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/secrets/sec-abc12345" \
+curl -s -X DELETE "$FABRIC_HOST/api/secrets/sec-abc12345" \
   -H "Authorization: Bearer $TOKEN"
 
 # Returns:
@@ -416,11 +416,11 @@ curl -s -X DELETE "$VMSPAWN_HOST/api/secrets/sec-abc12345" \
 
 ```bash
 # Delete test secrets
-curl -s -X DELETE "$VMSPAWN_HOST/api/secrets/$SECRET_ID" \
+curl -s -X DELETE "$FABRIC_HOST/api/secrets/$SECRET_ID" \
   -H "Authorization: Bearer $TOKEN"
 
 # Stop the test VM
-curl -s -X POST "$VMSPAWN_HOST/api/vms/web-01/stop" \
+curl -s -X POST "$FABRIC_HOST/api/vms/web-01/stop" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 

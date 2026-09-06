@@ -27,7 +27,7 @@ tip()  { deploy_ui_note "$@"; }
 
 banner_deploy() {
     local host="$1" user="$2" rdir="$3" mode="$4"
-    local ver="${VMSPAWN_VERSION:-dev}" commit="${VMSPAWN_COMMIT:-?}"
+    local ver="${FABRIC_VERSION:-dev}" commit="${FABRIC_COMMIT:-?}"
     deploy_ui_banner "Remote deploy → ${user}@${host}" "${ver} · ${commit}"
     deploy_ui_kv "🎯" "SSH target" "${user}@${host}"
     deploy_ui_kv "📁" "Remote tree" "$rdir"
@@ -36,7 +36,7 @@ banner_deploy() {
     deploy_ui_note "Build runs on the server (sources rsync'd — not compiled locally)"
 }
 
-elapsed_fmt() { vmspawn_elapsed_fmt "$1"; }
+elapsed_fmt() { fabric_elapsed_fmt "$1"; }
 
 DEPLOY_SSH_OPTS=(
     -o StrictHostKeyChecking=accept-new
@@ -97,9 +97,9 @@ EOF
 
 [[ "${1:-}" == -h || "${1:-}" == --help ]] && usage
 
-vmspawn_build_metadata "$REPO"
+fabric_build_metadata "$REPO"
 
-if [[ $# -gt 0 && "${1:-}" == -* ]] && vmspawn_load_deploy_last "$REPO"; then
+if [[ $# -gt 0 && "${1:-}" == -* ]] && fabric_load_deploy_last "$REPO"; then
     set -- "${USER}@${HOST}" "$@"
     ok "Using .deploy-last → ${USER}@${HOST}"
 fi
@@ -243,7 +243,7 @@ if [[ "$MODE" == check ]]; then
 fi
 
 if [[ $# -eq 0 ]]; then
-    if vmspawn_load_deploy_last "$REPO"; then
+    if fabric_load_deploy_last "$REPO"; then
         set -- "${USER}@${HOST}"
         ok "Using .deploy-last → ${USER}@${HOST}"
     elif [[ -n "${DEPLOY_HOST:-}" ]]; then
@@ -271,8 +271,8 @@ else
 fi
 
 REMOTE="${USER}@${HOST}"
-SUDO="$(vmspawn_sudo_prefix_for_user "$USER")"
-REMOTE_DIR="$(vmspawn_remote_dir_for_user "$USER")"
+SUDO="$(fabric_sudo_prefix_for_user "$USER")"
+REMOTE_DIR="$(fabric_remote_dir_for_user "$USER")"
 
 if [[ -z "$BIND" ]] && [[ "$HOST" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] && [[ "$HOST" != "127.0.0.1" ]]; then
     BIND="0.0.0.0"
@@ -417,7 +417,7 @@ fi
 $cargo_cmd
 " || die "remote compile failed"
     ok "Remote compile finished — run without --remote-build/--remote-check to install"
-    vmspawn_save_deploy_last "$REPO" "$HOST" "$USER" "remote-${mk_target}"
+    fabric_save_deploy_last "$REPO" "$HOST" "$USER" "remote-${mk_target}"
     hr
     deploy_ui_celebrate "Compile finished in $(elapsed_fmt $((SECONDS - DEPLOY_T0)))"
     tip "Next: ./scripts/deploy remote ${USER}@${HOST} --quick"
@@ -425,7 +425,7 @@ $cargo_cmd
 fi
 
 if [[ "${SYNC_ONLY:-0}" == 1 ]] || $SKIP_INSTALL; then
-    vmspawn_save_deploy_last "$REPO" "$HOST" "$USER" "sync-only"
+    fabric_save_deploy_last "$REPO" "$HOST" "$USER" "sync-only"
     hr
     deploy_ui_celebrate "Sync finished in $(elapsed_fmt $((SECONDS - DEPLOY_T0)))"
     tip "Sources live on the server under ${REMOTE_DIR} — run full deploy when ready."
@@ -485,7 +485,7 @@ echo 'System deps installed'
     ok "System dependencies installed"
     install_step=$((install_step + 1))
     if $DEPS_ONLY; then
-        vmspawn_save_deploy_last "$REPO" "$HOST" "$USER" "deps-only"
+        fabric_save_deploy_last "$REPO" "$HOST" "$USER" "deps-only"
         deploy_ui_celebrate "Deps installed in $(elapsed_fmt $((SECONDS - DEPLOY_T0)))"
         exit 0
     fi
@@ -684,7 +684,7 @@ fi
 ELAPSED=$((SECONDS - DEPLOY_T0))
 MODE_SAVE=full
 $QUICK && MODE_SAVE=quick
-vmspawn_save_deploy_last "$REPO" "$HOST" "$USER" "$MODE_SAVE"
+fabric_save_deploy_last "$REPO" "$HOST" "$USER" "$MODE_SAVE"
 
 deploy_ui_highlight "📋 Post-deploy checklist"
 deploy_ui_checklist "zyvor-fabricd" "$(ssh_r_bash "$REMOTE" 'systemctl is-active zyvor-fabricd 2>/dev/null || echo unknown' | tr -d '\r')"
@@ -692,7 +692,7 @@ deploy_ui_checklist "machined" "$(ssh_r_bash "$REMOTE" 'systemctl is-active syst
 deploy_ui_checklist "health" "$(curl -skf --connect-timeout 5 "https://${HOST}:${API_PORT}/health" >/dev/null && echo 200 || echo fail)"
 
 deploy_ui_celebrate "Ship it!"
-vmspawn_print_success "$HOST" "$ELAPSED" "$USER"
+fabric_print_success "$HOST" "$ELAPSED" "$USER"
 deploy_ui_kv "🔗" "SSH" "ssh ${USER}@${HOST}"
 if [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]] && [[ -z "${FABRIC_ADMIN_PASSWORD:-}" ]] && [[ -z "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
     deploy_ui_kv "🔑" "Login" "admin / Admin@321  (FABRIC_LAB_DEFAULTS=1 · reset: FORCE_ADMIN_RESET=1)"
@@ -725,7 +725,7 @@ if $VERIFY_APIS; then
             ADMIN_PW='Admin@321'
         fi
     fi
-    if [[ -n "$ADMIN_PW" ]] && VMSPAWN_USER=admin VMSPAWN_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "http://${HOST}:${API_PORT}"; then
+    if [[ -n "$ADMIN_PW" ]] && FABRIC_USER=admin FABRIC_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "http://${HOST}:${API_PORT}"; then
         deploy_ui_celebrate "API audit passed"
     else
         warn "API audit failed (deploy itself succeeded)"

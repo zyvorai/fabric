@@ -53,7 +53,7 @@ export default function DiskConverter() {
         <div>
           <label className="block text-xs text-slate-400 mb-1">Source File Path</label>
           <input value={source} onChange={e => setSource(e.target.value)}
-            placeholder="/var/lib/vmspawn/images/disk.raw"
+            placeholder="/var/lib/zyvor-fabricd/images/disk.raw"
             className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>

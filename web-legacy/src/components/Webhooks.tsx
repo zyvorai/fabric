@@ -28,7 +28,7 @@ const EVENTS = [
   'migration.started', 'migration.completed',
 ];
 
-const WEBHOOKS_KEY = 'vmspawnd_webhooks';
+const WEBHOOKS_KEY = 'zyvor_fabric_webhooks';
 
 function loadWebhooks(): WebhookConfig[] {
   try { return JSON.parse(localStorage.getItem(WEBHOOKS_KEY) || '[]'); } catch { return []; }

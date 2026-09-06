@@ -3,8 +3,8 @@
 set -euo pipefail
 
 HOST="${1:-http://127.0.0.1:9095}"
-USER="${VMSPAWN_USER:-sus}"
-PASS="${VMSPAWN_PASS:-max}"
+USER="${FABRIC_USER:-sus}"
+PASS="${FABRIC_PASS:-max}"
 
 login() {
   curl -sf -X POST "${HOST}/api/auth/login" \

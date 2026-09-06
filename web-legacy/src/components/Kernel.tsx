@@ -24,7 +24,7 @@ export default function Kernel() {
     // We do this once alongside CPU topology
     if (!kernelInfo) {
       try {
-        const token = sessionStorage.getItem('vmspawnd_token');
+        const token = sessionStorage.getItem('zyvor_fabric_token');
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
         const res = await fetch('/api/system/info', { headers });

@@ -415,7 +415,7 @@ pub struct VMStartOptions {
     /// Terminal background color (ANSI SGR)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
-    /// Quiet mode (suppress vmspawn status output)
+    /// Quiet mode (suppress VM status output)
     #[serde(default)]
     pub quiet: bool,
 

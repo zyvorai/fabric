@@ -109,7 +109,7 @@ export default function Storage() {
           {createType === 'local' ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input className={inputCls} placeholder="Pool name" value={localForm.name} onChange={e => setLocalForm({ ...localForm, name: e.target.value })} />
-              <input className={inputCls} placeholder="Path (e.g. /var/lib/vmspawn/pools/my-pool)" value={localForm.path} onChange={e => setLocalForm({ ...localForm, path: e.target.value })} />
+              <input className={inputCls} placeholder="Path (e.g. /var/lib/zyvor-fabricd/pools/my-pool)" value={localForm.path} onChange={e => setLocalForm({ ...localForm, path: e.target.value })} />
               <button onClick={createPool} className={btnPrimary}>Create</button>
             </div>
           ) : (

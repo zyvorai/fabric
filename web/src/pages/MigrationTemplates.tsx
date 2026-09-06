@@ -9,16 +9,29 @@ import ConfirmDialog from '../components/ConfirmDialog'
 
 interface MigrationTemplate { id: string; name: string; description: string; format: string; cpus: number; memory: number; network: string; compress: boolean; created_at: string }
 
-const STORAGE_KEY = 'vmspawnd_migration_templates'
+const STORAGE_KEY = 'zyvor_fabric_migration_templates'
+const LEGACY_STORAGE_KEY = 'vmspawnd_migration_templates'
+
+function loadCustomTemplates(): MigrationTemplate[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || '[]'
+    const templates = JSON.parse(raw)
+    if (!localStorage.getItem(STORAGE_KEY) && localStorage.getItem(LEGACY_STORAGE_KEY)) {
+      localStorage.setItem(STORAGE_KEY, raw)
+      localStorage.removeItem(LEGACY_STORAGE_KEY)
+    }
+    return templates
+  } catch {
+    return []
+  }
+}
+function saveCustomTemplates(templates: MigrationTemplate[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(templates)) }
 
 const BUILTIN_TEMPLATES: MigrationTemplate[] = [
   { id: 'builtin-linux-prod', name: 'Production Linux', description: 'Standard production Linux VM migration', format: 'qcow2', cpus: 4, memory: 8192, network: 'bridge', compress: true, created_at: '' },
   { id: 'builtin-linux-dev', name: 'Dev/Test Linux', description: 'Quick lightweight migration for development', format: 'qcow2', cpus: 2, memory: 2048, network: 'user', compress: false, created_at: '' },
   { id: 'builtin-windows', name: 'Windows Server', description: 'Windows Server with virtio drivers', format: 'qcow2', cpus: 4, memory: 16384, network: 'bridge', compress: true, created_at: '' },
 ]
-
-function loadCustomTemplates(): MigrationTemplate[] { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] } }
-function saveCustomTemplates(templates: MigrationTemplate[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(templates)) }
 
 export default function MigrationTemplates() {
   const { confirmState, confirm, cancel } = useConfirm()

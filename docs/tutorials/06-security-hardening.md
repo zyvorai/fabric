@@ -35,7 +35,7 @@ Any user account on the host system can log in to the API.
 ### Log In
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/auth/login" \
+curl -s -X POST "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "username": "admin",
@@ -63,7 +63,7 @@ export TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ### Check Current User
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/auth/me" \
+curl -s "$FABRIC_HOST/api/auth/me" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -192,7 +192,7 @@ Payload: {
 Include the token in every API request:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms" \
+curl -s "$FABRIC_HOST/api/vms" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -210,7 +210,7 @@ expires, the API returns `401 Unauthorized`:
 Re-authenticate to obtain a new token:
 
 ```bash
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 ```
@@ -235,7 +235,7 @@ interfaces. They provide per-VM network security.
 Create a "web-server" profile that allows HTTP/HTTPS and SSH:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/firewall/profiles" \
+curl -s -X POST "$FABRIC_HOST/api/firewall/profiles" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -299,7 +299,7 @@ Expected response:
 ### Create a Database Profile
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/firewall/profiles" \
+curl -s -X POST "$FABRIC_HOST/api/firewall/profiles" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -336,14 +336,14 @@ curl -s -X POST "$VMSPAWN_HOST/api/firewall/profiles" \
 ### List Profiles
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/firewall/profiles" \
+curl -s "$FABRIC_HOST/api/firewall/profiles" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Assign a Profile to a VM
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/firewall/assign" \
+curl -s -X POST "$FABRIC_HOST/api/firewall/assign" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -357,7 +357,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/firewall/assign" \
 Group VMs into security zones for broader policies:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/firewall/zones" \
+curl -s -X POST "$FABRIC_HOST/api/firewall/zones" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -370,7 +370,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/firewall/zones" \
 ### Check Firewall Status
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/firewall/vms/web-server-01/status" \
+curl -s "$FABRIC_HOST/api/firewall/vms/web-server-01/status" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -384,7 +384,7 @@ for managing encryption keys.
 ### Register a Key Provider
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/encryption/providers" \
+curl -s -X POST "$FABRIC_HOST/api/encryption/providers" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -418,7 +418,7 @@ Expected response:
 Verify connectivity and functionality:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/encryption/providers/kp-b2c3d4e5-f6a7-8901-bcde-f23456789012/test" \
+curl -s -X POST "$FABRIC_HOST/api/encryption/providers/kp-b2c3d4e5-f6a7-8901-bcde-f23456789012/test" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -427,7 +427,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/encryption/providers/kp-b2c3d4e5-f6a7-8901-bc
 Define encryption requirements for VMs:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/encryption/policies" \
+curl -s -X POST "$FABRIC_HOST/api/encryption/policies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -445,14 +445,14 @@ curl -s -X POST "$VMSPAWN_HOST/api/encryption/policies" \
 ### Check VM Encryption Status
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/encryption/vms/web-server-01/status" \
+curl -s "$FABRIC_HOST/api/encryption/vms/web-server-01/status" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### List Key Providers
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/encryption/providers" \
+curl -s "$FABRIC_HOST/api/encryption/providers" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -466,7 +466,7 @@ inter-host encryption.
 ### Create a Certificate Authority
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/certificates/cas" \
+curl -s -X POST "$FABRIC_HOST/api/certificates/cas" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -498,7 +498,7 @@ Expected response:
 ### Issue a Certificate
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/certificates/requests" \
+curl -s -X POST "$FABRIC_HOST/api/certificates/requests" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -515,7 +515,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/certificates/requests" \
 ### List Certificates
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/certificates" \
+curl -s "$FABRIC_HOST/api/certificates" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -524,7 +524,7 @@ curl -s "$VMSPAWN_HOST/api/certificates" \
 Set up automatic certificate renewal:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/certificates/rotations" \
+curl -s -X POST "$FABRIC_HOST/api/certificates/rotations" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -537,7 +537,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/certificates/rotations" \
 ### Certificate Health Dashboard
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/certificates/health" \
+curl -s "$FABRIC_HOST/api/certificates/health" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -567,7 +567,7 @@ and status. Audit logs are essential for compliance and incident investigation.
 ### Query Audit Logs
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/logs?limit=20" \
+curl -s "$FABRIC_HOST/api/audit/logs?limit=20" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -607,42 +607,42 @@ Expected response:
 Filter by user:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/logs?user=admin&limit=50" \
+curl -s "$FABRIC_HOST/api/audit/logs?user=admin&limit=50" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 Filter by action:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/logs?action=DELETE&limit=50" \
+curl -s "$FABRIC_HOST/api/audit/logs?action=DELETE&limit=50" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 Filter by resource:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/logs?resource_type=vm&resource_name=web-server-01" \
+curl -s "$FABRIC_HOST/api/audit/logs?resource_type=vm&resource_name=web-server-01" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 Filter by time range:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/logs?start_time=2026-04-12T00:00:00Z&end_time=2026-04-12T23:59:59Z" \
+curl -s "$FABRIC_HOST/api/audit/logs?start_time=2026-04-12T00:00:00Z&end_time=2026-04-12T23:59:59Z" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 Filter by status:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/logs?status=failed&limit=100" \
+curl -s "$FABRIC_HOST/api/audit/logs?status=failed&limit=100" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Full-Text Search
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/logs?search=web-server&limit=50" \
+curl -s "$FABRIC_HOST/api/audit/logs?search=web-server&limit=50" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -651,7 +651,7 @@ curl -s "$VMSPAWN_HOST/api/audit/logs?search=web-server&limit=50" \
 Export logs for compliance or external analysis:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/audit/export?start_time=2026-04-01T00:00:00Z&end_time=2026-04-12T23:59:59Z" \
+curl -s "$FABRIC_HOST/api/audit/export?start_time=2026-04-01T00:00:00Z&end_time=2026-04-12T23:59:59Z" \
   -H "Authorization: Bearer $TOKEN" > audit-export.json
 ```
 
@@ -691,7 +691,7 @@ issuer = "Zyvor Fabric"
 Request a TOTP secret and provisioning URI:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/2fa/setup" \
+curl -s -X POST "$FABRIC_HOST/api/v1/auth/2fa/setup" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -712,7 +712,7 @@ Add the secret to your authenticator app using the provisioning URI or QR code.
 Confirm setup by providing a valid TOTP code from your authenticator:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/2fa/verify" \
+curl -s -X POST "$FABRIC_HOST/api/v1/auth/2fa/verify" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -736,7 +736,7 @@ Expected response:
 Once 2FA is enabled, include the `totp_code` field in login requests:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/sign-in" \
+curl -s -X POST "$FABRIC_HOST/api/v1/auth/sign-in" \
   -H "Content-Type: application/json" \
   -d '{
     "username": "admin",
@@ -748,7 +748,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/sign-in" \
 ### Disable 2FA
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/v1/auth/2fa" \
+curl -s -X DELETE "$FABRIC_HOST/api/v1/auth/2fa" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -767,7 +767,7 @@ on subsequent API requests.
 ### Revoke the Current Token
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/token/revoke" \
+curl -s -X POST "$FABRIC_HOST/api/v1/auth/token/revoke" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -784,7 +784,7 @@ Expected response:
 Admins can revoke any token by its JTI:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/token/revoke" \
+curl -s -X POST "$FABRIC_HOST/api/v1/auth/token/revoke" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -795,7 +795,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/v1/auth/token/revoke" \
 ### List Revoked Tokens
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/v1/auth/token/revoked" \
+curl -s "$FABRIC_HOST/api/v1/auth/token/revoked" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -816,7 +816,7 @@ such as database passwords, API keys, and certificates used by VMs.
 ### Create a Secret
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/secrets" \
+curl -s -X POST "$FABRIC_HOST/api/v1/secrets" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -845,21 +845,21 @@ Expected response:
 ### List Secrets
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/v1/secrets" \
+curl -s "$FABRIC_HOST/api/v1/secrets" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Get Secret Metadata
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/v1/secrets/db-password" \
+curl -s "$FABRIC_HOST/api/v1/secrets/db-password" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Update a Secret
 
 ```bash
-curl -s -X PUT "$VMSPAWN_HOST/api/v1/secrets/db-password" \
+curl -s -X PUT "$FABRIC_HOST/api/v1/secrets/db-password" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -870,7 +870,7 @@ curl -s -X PUT "$VMSPAWN_HOST/api/v1/secrets/db-password" \
 ### Delete a Secret
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/v1/secrets/db-password" \
+curl -s -X DELETE "$FABRIC_HOST/api/v1/secrets/db-password" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -879,7 +879,7 @@ curl -s -X DELETE "$VMSPAWN_HOST/api/v1/secrets/db-password" \
 Secrets can be injected into VMs via cloud-init or systemd credentials:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/vms/my-vm/secrets" \
+curl -s -X POST "$FABRIC_HOST/api/v1/vms/my-vm/secrets" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -899,7 +899,7 @@ and include remediation guidance.
 ### List Available Compliance Profiles
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/v1/compliance/profiles" \
+curl -s "$FABRIC_HOST/api/v1/compliance/profiles" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -937,7 +937,7 @@ Expected response:
 ### Scan a VM
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/compliance/scan" \
+curl -s -X POST "$FABRIC_HOST/api/v1/compliance/scan" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -968,7 +968,7 @@ Expected response:
 ### Review Scan Results
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/v1/compliance/scans/cs-b2c3d4e5-f6a7-8901-bcde-f23456789012/findings" \
+curl -s "$FABRIC_HOST/api/v1/compliance/scans/cs-b2c3d4e5-f6a7-8901-bcde-f23456789012/findings" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -996,7 +996,7 @@ Expected response:
 ### Scan History
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/v1/compliance/scans?vm_name=web-server-01" \
+curl -s "$FABRIC_HOST/api/v1/compliance/scans?vm_name=web-server-01" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -1030,7 +1030,7 @@ The following QMP commands are allowed by default:
 ### Send an Allowed QMP Command
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/v1/vms/my-vm/qmp" \
+curl -s -X POST "$FABRIC_HOST/api/v1/vms/my-vm/qmp" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

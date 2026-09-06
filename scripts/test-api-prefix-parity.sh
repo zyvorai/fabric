@@ -3,11 +3,11 @@
 set -euo pipefail
 
 HOST="${1:-http://127.0.0.1:9095}"
-USER="${VMSPAWN_USER:-admin}"
-PASS="${VMSPAWN_PASS:-}"
+USER="${FABRIC_USER:-admin}"
+PASS="${FABRIC_PASS:-}"
 
 if [[ -z "$PASS" ]]; then
-  echo "Set VMSPAWN_PASS (or pass credentials via env)" >&2
+  echo "Set FABRIC_PASS (or pass credentials via env)" >&2
   exit 1
 fi
 

@@ -43,7 +43,7 @@ export default function DownloadDisk() {
         <div className="flex items-end gap-3">
           <div className="flex-1">
             <label className="block text-xs text-slate-400 mb-1">Image Path</label>
-            <input value={customPath} onChange={e => setCustomPath(e.target.value)} placeholder="/var/lib/vmspawn/images/custom.qcow2"
+            <input value={customPath} onChange={e => setCustomPath(e.target.value)} placeholder="/var/lib/zyvor-fabricd/images/custom.qcow2"
               className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-blue-500" />
           </div>
           {customPath.trim() && (

@@ -16,7 +16,7 @@ All tutorials assume:
 Set these shell variables before starting any tutorial:
 
 ```bash
-export VMSPAWN_HOST="http://localhost:3000"
+export FABRIC_HOST="http://localhost:3000"
 export TOKEN="your-jwt-token-here"
 ```
 
@@ -39,7 +39,7 @@ export TOKEN="your-jwt-token-here"
 
 ## Conventions Used
 
-- **`$VMSPAWN_HOST`** / **`$FABRIC_HOST`** -- Base URL of the Zyvor Fabric API (default `https://127.0.0.1:9095` in production-style deploys; older examples may use port 3000 for a local UI proxy)
+- **`$FABRIC_HOST`** -- Base URL of the Zyvor Fabric API (default `https://127.0.0.1:9095` in production-style deploys; older examples may use port 3000 for a local UI proxy)
 - **`$TOKEN`** -- A valid Fabric JWT bearer token obtained via `/api/auth/login` (Tutorials 01–07)
 - **`$OS_TOKEN` / `OS_*`** -- OpenStack Keystone token and env vars (Tutorial 08)
 - All `curl` examples include `-s` (silent) and pipe through `jq` for readability; use `-sk` against lab self-signed TLS
@@ -50,7 +50,7 @@ export TOKEN="your-jwt-token-here"
 
 ```bash
 # Log in and capture the token
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 

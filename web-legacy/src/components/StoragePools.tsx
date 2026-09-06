@@ -80,7 +80,7 @@ export default function StoragePools() {
               </select></div>
             {(poolType === 'local' || poolType === 'zfs' || poolType === 'ceph') && (
               <div><label className="block text-xs text-slate-400 mb-1">{poolType === 'local' ? 'Path' : 'Pool Name'}</label>
-                <input value={path} onChange={e => setPath(e.target.value)} placeholder={poolType === 'local' ? '/var/lib/vmspawn/pools/...' : 'pool-name'}
+                <input value={path} onChange={e => setPath(e.target.value)} placeholder={poolType === 'local' ? '/var/lib/zyvor-fabricd/pools/...' : 'pool-name'}
                   className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-blue-500" /></div>
             )}
             {poolType === 'nfs' && (<>

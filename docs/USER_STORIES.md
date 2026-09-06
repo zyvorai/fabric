@@ -8,7 +8,7 @@ Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
 | Persona | Name | Focus |
 |---------|------|-------|
-| Private Cloud Admin | Alex | VM lifecycle via the active driver (FluxVM by default, or FluxVM) |
+| Private Cloud Admin | Alex | VM lifecycle via FluxVM |
 | Platform Engineer | Morgan | K8s operator and Terraform |
 | Developer | Jordan | CLI/web console/API for VM operations |
 
@@ -16,7 +16,7 @@ Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
 ### Story 1 — Create VM via CLI
 
-**As Alex** (Private Cloud Admin), I want full vmspawn lifecycle from zyvorctl, **so that** I deliver reliable outcomes.
+**As Alex** (Private Cloud Admin), I want full Fabric VM lifecycle from zyvorctl, **so that** I deliver reliable outcomes.
 
 | Criterion | Notes |
 |-----------|-------|

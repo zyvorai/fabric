@@ -36,7 +36,7 @@ export default function APIPlayground() {
   const send = async () => {
     setSending(true);
     try {
-      const token = sessionStorage.getItem('vmspawnd_token');
+      const token = sessionStorage.getItem('zyvor_fabric_token');
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
       if (body && (method === 'POST' || method === 'PUT')) headers['Content-Type'] = 'application/json';

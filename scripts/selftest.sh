@@ -43,7 +43,7 @@ done
 
 # ── System tools ──
 section "System Tools"
-for tool in systemd-vmspawn machinectl qemu-img systemd-nspawn; do
+for tool in qemu-img; do
     if command -v "$tool" &>/dev/null; then
         pass "$tool: $(command -v "$tool")"
     else

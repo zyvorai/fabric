@@ -17,7 +17,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    const savedUsername = localStorage.getItem('vmspawnd_username');
+    const savedUsername = localStorage.getItem('zyvor_fabric_username');
     localStorage.removeItem('vmspawnd_password');
     if (savedUsername) {
       setUsername(savedUsername);
@@ -34,11 +34,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       await onLogin(username, password);
 
       if (rememberMe) {
-        localStorage.setItem('vmspawnd_username', username);
-        localStorage.setItem('vmspawnd_remember', 'true');
+        localStorage.setItem('zyvor_fabric_username', username);
+        localStorage.setItem('zyvor_fabric_remember', 'true');
       } else {
-        localStorage.removeItem('vmspawnd_username');
-        localStorage.removeItem('vmspawnd_remember');
+        localStorage.removeItem('zyvor_fabric_username');
+        localStorage.removeItem('zyvor_fabric_remember');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -154,7 +154,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <div className="mt-5 pt-4 border-t border-slate-700/50 text-center">
             <span className="text-slate-500 text-xs">
-              Systemd-native private cloud control plane &middot; Powered by systemd-vmspawn
+              Zyvor Fabric · FluxVM private cloud control plane
             </span>
           </div>
         </form>

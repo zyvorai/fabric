@@ -137,6 +137,6 @@ Then use the appropriate name for context (product in prose, `zyvor-fabricd` in 
 
 - Product: [zyvor.dev](https://zyvor.dev)
 - Repository: [github.com/zyvorai/fabric](https://github.com/zyvorai/fabric)
-- Migration: [MIGRATION-FROM-VMSPAWN.md](MIGRATION-FROM-VMSPAWN.md)
+- Naming: [NAMING.md](NAMING.md)
 - Documentation: [docs/index.md](index.md)
 - Client decks: [client-presentations/](client-presentations/)

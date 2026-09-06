@@ -34,6 +34,3 @@ export const ZYVOR_FABRIC_HELP: ProductHelpMeta = {
 
 /** Technical daemon name (systemd unit, API host). */
 export const ZYVOR_FABRIC_DAEMON = 'zyvor-fabricd'
-
-/** @deprecated Use ZYVOR_FABRIC_HELP */
-export const VMSPAWN_HELP = ZYVOR_FABRIC_HELP

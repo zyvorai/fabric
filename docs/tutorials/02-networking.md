@@ -30,8 +30,8 @@ configuration.
 ## Setup
 
 ```bash
-export VMSPAWN_HOST="http://localhost:3000"
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+export FABRIC_HOST="http://localhost:3000"
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 ```
@@ -77,7 +77,7 @@ like a virtual switch.
 ### Create a Bridge
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/bridges" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/bridges" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -136,21 +136,21 @@ Expected response:
 ### List Bridges
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/networkd/bridges" \
+curl -s "$FABRIC_HOST/api/networkd/bridges" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Get a Specific Bridge
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-345678901234" \
+curl -s "$FABRIC_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-345678901234" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Update a Bridge
 
 ```bash
-curl -s -X PUT "$VMSPAWN_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-345678901234" \
+curl -s -X PUT "$FABRIC_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-345678901234" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -170,7 +170,7 @@ curl -s -X PUT "$VMSPAWN_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-34567
 ### Delete a Bridge
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-345678901234" \
+curl -s -X DELETE "$FABRIC_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-345678901234" \
   -H "Authorization: Bearer $TOKEN"
 
 # Returns 204 No Content
@@ -181,7 +181,7 @@ curl -s -X DELETE "$VMSPAWN_HOST/api/networkd/bridges/c3d4e5f6-a7b8-9012-cdef-34
 When starting a VM, enable TAP networking to attach it to a bridge:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/web-server/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/web-server/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -199,7 +199,7 @@ VLANs provide Layer 2 isolation on top of a physical or bridge interface.
 ### Create a VLAN
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/vlans" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/vlans" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -235,7 +235,7 @@ Expected response:
 ### Create a Second VLAN for Application Servers
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/vlans" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/vlans" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -252,7 +252,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/vlans" \
 ### List VLANs
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/networkd/vlans" \
+curl -s "$FABRIC_HOST/api/networkd/vlans" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -288,7 +288,7 @@ throughput.
 ### Create a Bond
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/bonds" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/bonds" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -340,7 +340,7 @@ Expected response:
 ### List Bonds
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/networkd/bonds" \
+curl -s "$FABRIC_HOST/api/networkd/bonds" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -355,7 +355,7 @@ Forward host ports to VM services. This is implemented through nftables rules.
 Forward host port 8080 to a VM's port 80:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/port-forwards" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/port-forwards" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -387,7 +387,7 @@ Expected response:
 ### Forward SSH Access
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/port-forwards" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/port-forwards" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -409,7 +409,7 @@ ssh -p 2222 user@host-ip
 ### List Port Forwards
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/networkd/port-forwards" \
+curl -s "$FABRIC_HOST/api/networkd/port-forwards" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -426,7 +426,7 @@ Allow the `app` tier to receive HTTP traffic and communicate with the `database`
 tier:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/network-policies" \
+curl -s -X POST "$FABRIC_HOST/api/network-policies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -485,7 +485,7 @@ Expected response:
 Create a default-deny policy, then allowlist specific flows:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/network-policies" \
+curl -s -X POST "$FABRIC_HOST/api/network-policies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -504,7 +504,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/network-policies" \
 ### List Network Policies
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/network-policies" \
+curl -s "$FABRIC_HOST/api/network-policies" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -517,7 +517,7 @@ Zyvor Fabric supports internal DNS zones for VM name resolution.
 ### Create a DNS Zone
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/dns/zones" \
+curl -s -X POST "$FABRIC_HOST/api/dns/zones" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -543,7 +543,7 @@ Expected response:
 DNS policies control which VMs can resolve which domains:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/dns/policies" \
+curl -s -X POST "$FABRIC_HOST/api/dns/policies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -561,7 +561,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/dns/policies" \
 ### List DNS Zones
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/dns/zones" \
+curl -s "$FABRIC_HOST/api/dns/zones" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -578,7 +578,7 @@ addresses automatically.
 ### Configure DHCP on a Bridge
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/dhcp" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/dhcp" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -639,7 +639,7 @@ itself (if you're running a DNS forwarder there) or upstream resolvers.
 
 ```bash
 # Advertise two upstream resolvers with a longer lease time
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/dhcp" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/dhcp" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -660,7 +660,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/dhcp" \
 Create a standalone TAP interface for direct VM attachment:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/taps" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/taps" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -675,7 +675,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/taps" \
 MACVTAP provides direct attachment to the physical NIC without a bridge:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/macvtaps" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/macvtaps" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -690,7 +690,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/macvtaps" \
 VXLAN extends Layer 2 networks across hosts for multi-node setups:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/vxlans" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/vxlans" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -711,7 +711,7 @@ Here is a real-world setup with a bridge, two VLANs, and network policies:
 
 ```bash
 # 1. Create the main bridge
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/bridges" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/bridges" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -723,7 +723,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/bridges" \
   }' | jq .id
 
 # 2. Create app VLAN
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/vlans" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/vlans" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -734,7 +734,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/vlans" \
   }' | jq .id
 
 # 3. Create database VLAN
-curl -s -X POST "$VMSPAWN_HOST/api/networkd/vlans" \
+curl -s -X POST "$FABRIC_HOST/api/networkd/vlans" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -745,7 +745,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/networkd/vlans" \
   }' | jq .id
 
 # 4. Allow app -> db on port 5432 only
-curl -s -X POST "$VMSPAWN_HOST/api/network-policies" \
+curl -s -X POST "$FABRIC_HOST/api/network-policies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -765,17 +765,17 @@ curl -s -X POST "$VMSPAWN_HOST/api/network-policies" \
 
 ```bash
 # Delete VLANs (use actual IDs from your responses)
-curl -s -X DELETE "$VMSPAWN_HOST/api/networkd/vlans/$VLAN_APP_ID" \
+curl -s -X DELETE "$FABRIC_HOST/api/networkd/vlans/$VLAN_APP_ID" \
   -H "Authorization: Bearer $TOKEN"
-curl -s -X DELETE "$VMSPAWN_HOST/api/networkd/vlans/$VLAN_DB_ID" \
+curl -s -X DELETE "$FABRIC_HOST/api/networkd/vlans/$VLAN_DB_ID" \
   -H "Authorization: Bearer $TOKEN"
 
 # Delete bridge
-curl -s -X DELETE "$VMSPAWN_HOST/api/networkd/bridges/$BRIDGE_ID" \
+curl -s -X DELETE "$FABRIC_HOST/api/networkd/bridges/$BRIDGE_ID" \
   -H "Authorization: Bearer $TOKEN"
 
 # Delete network policies
-curl -s -X DELETE "$VMSPAWN_HOST/api/network-policies/$POLICY_ID" \
+curl -s -X DELETE "$FABRIC_HOST/api/network-policies/$POLICY_ID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

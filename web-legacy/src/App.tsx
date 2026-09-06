@@ -370,7 +370,7 @@ function App() {
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [selectedVM, setSelectedVM] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('vmspawnd_theme') !== 'light');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('zyvor_fabric_theme') !== 'light');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
@@ -385,9 +385,9 @@ function App() {
   };
 
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem('vmspawnd_authenticated') === 'true';
-    const hasToken = !!sessionStorage.getItem('vmspawnd_token');
-    const savedUsername = localStorage.getItem('vmspawnd_username') || sessionStorage.getItem('vmspawnd_username');
+    const loggedIn = sessionStorage.getItem('zyvor_fabric_authenticated') === 'true';
+    const hasToken = !!sessionStorage.getItem('zyvor_fabric_token');
+    const savedUsername = localStorage.getItem('zyvor_fabric_username') || sessionStorage.getItem('zyvor_fabric_username');
     if (loggedIn && hasToken && savedUsername) {
       setIsAuthenticated(true);
       setDisplayUsername(savedUsername);
@@ -408,7 +408,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('light-theme', !darkMode);
-    localStorage.setItem('vmspawnd_theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('zyvor_fabric_theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
   useEffect(() => {
@@ -423,23 +423,23 @@ function App() {
     }
     const result = await auth.login(username, password);
     if (result.token) {
-      sessionStorage.setItem('vmspawnd_token', result.token);
+      sessionStorage.setItem('zyvor_fabric_token', result.token);
     }
     setIsAuthenticated(true);
     setDisplayUsername(result.username || username);
-    sessionStorage.setItem('vmspawnd_authenticated', 'true');
-    sessionStorage.setItem('vmspawnd_username', result.username || username);
+    sessionStorage.setItem('zyvor_fabric_authenticated', 'true');
+    sessionStorage.setItem('zyvor_fabric_username', result.username || username);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem('vmspawnd_token');
-    sessionStorage.removeItem('vmspawnd_authenticated');
-    sessionStorage.removeItem('vmspawnd_username');
+    sessionStorage.removeItem('zyvor_fabric_token');
+    sessionStorage.removeItem('zyvor_fabric_authenticated');
+    sessionStorage.removeItem('zyvor_fabric_username');
     setCurrentView('dashboard');
     setSelectedVM(null);
-    localStorage.removeItem('vmspawnd_username');
-    localStorage.removeItem('vmspawnd_remember');
+    localStorage.removeItem('zyvor_fabric_username');
+    localStorage.removeItem('zyvor_fabric_remember');
     setDisplayUsername('admin');
   };
 

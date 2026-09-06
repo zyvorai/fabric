@@ -25,8 +25,8 @@ well as full and incremental backups with retention policies.
 ## Setup
 
 ```bash
-export VMSPAWN_HOST="http://localhost:3000"
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+export FABRIC_HOST="http://localhost:3000"
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 ```
@@ -34,7 +34,7 @@ TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
 Create a test VM for this tutorial:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms" \
+curl -s -X POST "$FABRIC_HOST/api/vms" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -65,7 +65,7 @@ Prefer `Disk` for routine checkpoints. Use `Full` only when you need process/mem
 Create a snapshot of the VM. The VM can be running or stopped.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots" \
+curl -s -X POST "$FABRIC_HOST/api/vms/snapshot-demo/snapshots" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -104,7 +104,7 @@ Simulate a workflow by creating a chain of snapshots:
 
 ```bash
 # Snapshot after "installing updates"
-curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots" \
+curl -s -X POST "$FABRIC_HOST/api/vms/snapshot-demo/snapshots" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -113,7 +113,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots" \
   }' | jq .
 
 # Snapshot after "deploying application"
-curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots" \
+curl -s -X POST "$FABRIC_HOST/api/vms/snapshot-demo/snapshots" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -125,7 +125,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots" \
 ### Step 3: List Snapshots
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots" \
+curl -s "$FABRIC_HOST/api/vms/snapshot-demo/snapshots" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -169,7 +169,7 @@ Expected response:
 ### Step 4: Get Snapshot Details
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots/a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
+curl -s "$FABRIC_HOST/api/vms/snapshot-demo/snapshots/a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -180,11 +180,11 @@ state captured by the snapshot.
 
 ```bash
 # Stop the VM first
-curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/stop" \
+curl -s -X POST "$FABRIC_HOST/api/vms/snapshot-demo/stop" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
 # Revert to the "before-update" snapshot
-curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots/a1b2c3d4-e5f6-7890-abcd-ef1234567890/revert" \
+curl -s -X POST "$FABRIC_HOST/api/vms/snapshot-demo/snapshots/a1b2c3d4-e5f6-7890-abcd-ef1234567890/revert" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -201,7 +201,7 @@ Now start the VM again -- it will be in the state it was when the snapshot was
 taken:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/snapshot-demo/start" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -215,7 +215,7 @@ When snapshots have parent-child relationships, the tree endpoint shows the
 hierarchy:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots/tree" \
+curl -s "$FABRIC_HOST/api/vms/snapshot-demo/snapshots/tree" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -266,7 +266,7 @@ Deleting a snapshot removes it from both the state store and the QCOW2 image.
 This requires Admin privileges.
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/vms/snapshot-demo/snapshots/c3d4e5f6-a7b8-9012-cdef-345678901234" \
+curl -s -X DELETE "$FABRIC_HOST/api/vms/snapshot-demo/snapshots/c3d4e5f6-a7b8-9012-cdef-345678901234" \
   -H "Authorization: Bearer $TOKEN"
 
 # Returns 204 No Content
@@ -283,7 +283,7 @@ corruption.
 ### Step 8: Create a Full Backup
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/backups" \
+curl -s -X POST "$FABRIC_HOST/api/backups" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -314,7 +314,7 @@ Expected response:
 The backup runs asynchronously. Monitor its progress:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/backups/jobs/d4e5f6a7-b8c9-0123-defg-456789012345" \
+curl -s "$FABRIC_HOST/api/backups/jobs/d4e5f6a7-b8c9-0123-defg-456789012345" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -340,7 +340,7 @@ Incremental backups only save data that changed since the last backup, making
 them faster and smaller:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/backups" \
+curl -s -X POST "$FABRIC_HOST/api/backups" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -357,14 +357,14 @@ curl -s -X POST "$VMSPAWN_HOST/api/backups" \
 List all backups:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/backups" \
+curl -s "$FABRIC_HOST/api/backups" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 Filter by VM name:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/backups?vm=snapshot-demo" \
+curl -s "$FABRIC_HOST/api/backups?vm=snapshot-demo" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -391,7 +391,7 @@ Expected response:
 ### Step 11: Get Backup Details
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/backups/e5f6a7b8-c9d0-1234-efgh-567890123456" \
+curl -s "$FABRIC_HOST/api/backups/e5f6a7b8-c9d0-1234-efgh-567890123456" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -400,7 +400,7 @@ curl -s "$VMSPAWN_HOST/api/backups/e5f6a7b8-c9d0-1234-efgh-567890123456" \
 Restore a backup to the original VM or a new VM:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/backups/restore" \
+curl -s -X POST "$FABRIC_HOST/api/backups/restore" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -425,7 +425,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/backups/restore" \
 ### Step 13: View Backup Statistics
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/backups/stats" \
+curl -s "$FABRIC_HOST/api/backups/stats" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -453,7 +453,7 @@ Deleting a backup removes both the state-store entry and the backup file from
 disk. Requires Admin privileges.
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/backups/e5f6a7b8-c9d0-1234-efgh-567890123456" \
+curl -s -X DELETE "$FABRIC_HOST/api/backups/e5f6a7b8-c9d0-1234-efgh-567890123456" \
   -H "Authorization: Bearer $TOKEN"
 
 # Returns 204 No Content
@@ -469,7 +469,7 @@ how often, and how long to retain the backups.
 ### Step 15: Create a Backup Policy
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/backups/policies" \
+curl -s -X POST "$FABRIC_HOST/api/backups/policies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -501,7 +501,7 @@ Expected response:
 ### Create a Weekly Full Backup Policy
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/backups/policies" \
+curl -s -X POST "$FABRIC_HOST/api/backups/policies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -525,7 +525,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/backups/policies" \
 ### List Backup Policies
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/backups/policies" \
+curl -s "$FABRIC_HOST/api/backups/policies" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -558,10 +558,10 @@ curl -s "$VMSPAWN_HOST/api/backups/policies" \
 ## Cleanup
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/snapshot-demo/stop" \
+curl -s -X POST "$FABRIC_HOST/api/vms/snapshot-demo/stop" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
-curl -s -X DELETE "$VMSPAWN_HOST/api/vms/snapshot-demo" \
+curl -s -X DELETE "$FABRIC_HOST/api/vms/snapshot-demo" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

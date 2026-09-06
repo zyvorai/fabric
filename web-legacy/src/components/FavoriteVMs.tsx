@@ -16,7 +16,7 @@ interface VM {
   ip?: string;
 }
 
-const FAVORITES_KEY = 'vmspawnd_favorites';
+const FAVORITES_KEY = 'zyvor_fabric_favorites';
 
 function getFavorites(): string[] {
   try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]'); } catch { return []; }

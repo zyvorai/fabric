@@ -43,7 +43,7 @@ Configure your monitoring system to poll `/health` every 30-60 seconds:
 ```yaml
 # Prometheus blackbox exporter example
 modules:
-  vmspawn_health:
+  zyvor_fabricd_health:
     prober: http
     http:
       valid_http_versions: ["HTTP/1.1", "HTTP/2"]

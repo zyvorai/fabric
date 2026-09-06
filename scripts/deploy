@@ -50,7 +50,7 @@ Examples:
   $(basename "$0") remote --quick
   $(basename "$0") check sus@host
 
-State: $(vmspawn_deploy_state_file "$REPO_DIR")
+State: $(fabric_deploy_state_file "$REPO_DIR")
 See also: docs/KUBERNETES.md
 EOF
 }
@@ -64,7 +64,7 @@ case "$cmd" in
         exit 0
         ;;
     status)
-        if vmspawn_load_deploy_last "$REPO_DIR"; then
+        if fabric_load_deploy_last "$REPO_DIR"; then
             deploy_ui_banner "📊 Deploy status" "${VERSION:-?} @ ${COMMIT:-?}" "🖥️"
             deploy_ui_kv "🎯" "Host" "${HOST:-?}"
             deploy_ui_kv "👤" "User" "${USER:-root}"

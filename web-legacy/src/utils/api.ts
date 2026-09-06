@@ -13,15 +13,15 @@ const BASE = '/api';
 // ---- Token management -----------------------------------------------------
 
 function getToken(): string | null {
-  return sessionStorage.getItem('vmspawnd_token');
+  return sessionStorage.getItem('zyvor_fabric_token');
 }
 
 export function setToken(token: string) {
-  sessionStorage.setItem('vmspawnd_token', token);
+  sessionStorage.setItem('zyvor_fabric_token', token);
 }
 
 export function clearToken() {
-  sessionStorage.removeItem('vmspawnd_token');
+  sessionStorage.removeItem('zyvor_fabric_token');
 }
 
 // ---- Core HTTP helpers ----------------------------------------------------

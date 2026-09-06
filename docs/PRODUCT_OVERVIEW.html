@@ -258,7 +258,7 @@ providing enterprise features without enterprise complexity.</p>
 <hr />
 <h2 id="what-is-Zyvor Fabric">What Is Zyvor Fabric?</h2>
 <p>Zyvor Fabric is a production-grade virtual machine management platform
-built in Rust. It wraps systemd-vmspawn and systemd-machined with a
+built in Rust. It drives VMs through FluxVM with a
 complete management layer:</p>
 <ul>
 <li><strong>One binary, one config file, one systemd service</strong> —
@@ -274,11 +274,10 @@ migration, GPU passthrough, backup/restore, network policies</li>
 # That&#39;s it. Platform is running.</code></pre>
 <hr />
 <h2 id="key-differentiators">Key Differentiators</h2>
-<h3 id="built-on-systemd-not-a-custom-hypervisor">1. Built on systemd
-(Not a Custom Hypervisor)</h3>
-<p>Zyvor Fabric leverages systemd-vmspawn and systemd-machined — the VM
-management tools built into every modern Linux distribution. This
-means:</p>
+<h3 id="built-on-fluxvm-not-a-custom-hypervisor">1. Built on FluxVM
+(Not a Custom Hypervisor Stack)</h3>
+<p>Zyvor Fabric launches guests through FluxVM — a disposable-VM engine
+with no systemd dependency of its own. This means:</p>
 <ul>
 <li>No custom kernel modules or hypervisor patches</li>
 <li>VMs are first-class systemd units with journal logging, socket
@@ -558,7 +557,7 @@ class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="
            | Provider  |         |    |    |    |    |
            +-----------+         |    |    |    |    |
                                   v    v    v    v    v
-                           systemd-vmspawn + systemd-machined</code></pre>
+                           FluxVM</code></pre>
 <hr />
 <h2 id="deployment-models">Deployment Models</h2>
 <h3 id="single-server">Single Server</h3>

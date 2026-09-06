@@ -55,8 +55,8 @@ pools, live migration, high availability, and Distributed Resource Scheduling
 ## Setup
 
 ```bash
-export VMSPAWN_HOST="http://localhost:3000"
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+export FABRIC_HOST="http://localhost:3000"
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 ```
@@ -69,7 +69,7 @@ A datacenter is the top-level organizational unit. It groups clusters that share
 a common network and storage fabric.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/datacenters" \
+curl -s -X POST "$FABRIC_HOST/api/datacenters" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -101,21 +101,21 @@ DC_ID="dc-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 ### List Datacenters
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/datacenters" \
+curl -s "$FABRIC_HOST/api/datacenters" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Get Datacenter Details
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/datacenters/$DC_ID" \
+curl -s "$FABRIC_HOST/api/datacenters/$DC_ID" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Update a Datacenter
 
 ```bash
-curl -s -X PUT "$VMSPAWN_HOST/api/datacenters/$DC_ID" \
+curl -s -X PUT "$FABRIC_HOST/api/datacenters/$DC_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -133,7 +133,7 @@ cluster should have compatible CPU architectures.
 ### Production Cluster
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/datacenters/$DC_ID/clusters" \
+curl -s -X POST "$FABRIC_HOST/api/datacenters/$DC_ID/clusters" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -167,7 +167,7 @@ CLUSTER_ID="cl-b2c3d4e5-f6a7-8901-bcde-f23456789012"
 ### Staging Cluster
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/datacenters/$DC_ID/clusters" \
+curl -s -X POST "$FABRIC_HOST/api/datacenters/$DC_ID/clusters" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -181,7 +181,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/datacenters/$DC_ID/clusters" \
 ### List Clusters
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/datacenters/$DC_ID/clusters" \
+curl -s "$FABRIC_HOST/api/datacenters/$DC_ID/clusters" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -195,7 +195,7 @@ Zyvor Fabric instance.
 ### Register Host 01
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/hosts" \
+curl -s -X POST "$FABRIC_HOST/api/hosts" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -227,7 +227,7 @@ Expected response:
 ### Register Host 02
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/hosts" \
+curl -s -X POST "$FABRIC_HOST/api/hosts" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -246,7 +246,7 @@ Hosts send periodic heartbeats to report their current state. The API exposes
 this data:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/hosts/host-c3d4e5f6-a7b8-9012-cdef-345678901234/heartbeat" \
+curl -s "$FABRIC_HOST/api/hosts/host-c3d4e5f6-a7b8-9012-cdef-345678901234/heartbeat" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -267,7 +267,7 @@ Expected response:
 ### List Hosts
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/hosts" \
+curl -s "$FABRIC_HOST/api/hosts" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -281,7 +281,7 @@ and memory limits to prevent any single workload from starving others.
 ### Create a Web Tier Pool
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/resource-pools" \
+curl -s -X POST "$FABRIC_HOST/api/resource-pools" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -322,7 +322,7 @@ Expected response:
 ### Create a Database Tier Pool
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/resource-pools" \
+curl -s -X POST "$FABRIC_HOST/api/resource-pools" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -356,7 +356,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/resource-pools" \
 ### List Resource Pools
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/resource-pools" \
+curl -s "$FABRIC_HOST/api/resource-pools" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -365,7 +365,7 @@ curl -s "$VMSPAWN_HOST/api/resource-pools" \
 Check whether a cluster can accommodate a new VM before creating it:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/resource-pools/$POOL_ID/admission-check" \
+curl -s -X POST "$FABRIC_HOST/api/resource-pools/$POOL_ID/admission-check" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -396,7 +396,7 @@ Move VMs between hosts within a cluster. Zyvor Fabric supports live migration
 Migrate a running VM to another host with near-zero downtime:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/migrations" \
+curl -s -X POST "$FABRIC_HOST/api/migrations" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -428,7 +428,7 @@ Expected response:
 ### Monitor Migration Progress
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/migrations/mig-e5f6a7b8-c9d0-1234-efgh-567890123456" \
+curl -s "$FABRIC_HOST/api/migrations/mig-e5f6a7b8-c9d0-1234-efgh-567890123456" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -489,14 +489,14 @@ pending --> pre_check --> syncing --> switching --> completed
 ### List Migrations
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/migrations" \
+curl -s "$FABRIC_HOST/api/migrations" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Cancel a Migration
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/migrations/mig-e5f6a7b8-c9d0-1234-efgh-567890123456/cancel" \
+curl -s -X POST "$FABRIC_HOST/api/migrations/mig-e5f6a7b8-c9d0-1234-efgh-567890123456/cancel" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -542,7 +542,7 @@ If `host-01` fails:
 HA is configured at the cluster level:
 
 ```bash
-curl -s -X PUT "$VMSPAWN_HOST/api/datacenters/$DC_ID/clusters/$CLUSTER_ID" \
+curl -s -X PUT "$FABRIC_HOST/api/datacenters/$DC_ID/clusters/$CLUSTER_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -561,7 +561,7 @@ prevent hotspots.
 ### Configure DRS
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/drs/configure" \
+curl -s -X POST "$FABRIC_HOST/api/drs/configure" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -598,7 +598,7 @@ Expected response:
 Ask DRS to analyze current cluster state and suggest migrations:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/drs/recommendations" \
+curl -s -X POST "$FABRIC_HOST/api/drs/recommendations" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -651,7 +651,7 @@ Expected response:
 Check the current balance across all hosts:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/drs/clusters/$CLUSTER_ID/balance" \
+curl -s -X POST "$FABRIC_HOST/api/drs/clusters/$CLUSTER_ID/balance" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -667,7 +667,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/drs/clusters/$CLUSTER_ID/balance" \
 When creating a new VM, ask DRS where to place it:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/drs/placement" \
+curl -s -X POST "$FABRIC_HOST/api/drs/placement" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -736,10 +736,10 @@ Datacenter: us-east
 
 ```bash
 # Delete clusters and datacenters (use actual IDs)
-curl -s -X DELETE "$VMSPAWN_HOST/api/datacenters/$DC_ID/clusters/$CLUSTER_ID" \
+curl -s -X DELETE "$FABRIC_HOST/api/datacenters/$DC_ID/clusters/$CLUSTER_ID" \
   -H "Authorization: Bearer $TOKEN"
 
-curl -s -X DELETE "$VMSPAWN_HOST/api/datacenters/$DC_ID" \
+curl -s -X DELETE "$FABRIC_HOST/api/datacenters/$DC_ID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

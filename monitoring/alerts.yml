@@ -2,7 +2,7 @@ groups:
   - name: zyvor-fabricd
     interval: 30s
     rules:
-      - alert: VMSpawndDown
+      - alert: ZyvorFabricdDown
         expr: up{job="zyvor-fabricd"} == 0
         for: 1m
         labels:

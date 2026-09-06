@@ -26,10 +26,10 @@ and be ready to explore more advanced features.
 Set your environment variables. Every command in this tutorial uses them.
 
 ```bash
-export VMSPAWN_HOST="http://localhost:3000"
+export FABRIC_HOST="http://localhost:3000"
 
 # Authenticate (replace credentials with your own)
-TOKEN=$(curl -s "$VMSPAWN_HOST/api/auth/login" \
+TOKEN=$(curl -s "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}' | jq -r '.token')
 
@@ -39,7 +39,7 @@ echo "Token: $TOKEN"
 Verify the connection:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms" \
+curl -s "$FABRIC_HOST/api/vms" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -61,7 +61,7 @@ Expected response (empty list on a fresh install):
 Zyvor Fabric includes a catalog of well-known cloud images. List what is available:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/images/cloud" \
+curl -s "$FABRIC_HOST/api/images/cloud" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -108,7 +108,7 @@ Download the Fedora 41 cloud image. This runs in the background and returns
 immediately:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/images/cloud/download" \
+curl -s -X POST "$FABRIC_HOST/api/images/cloud/download" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -133,7 +133,7 @@ Expected response:
 Check the download progress:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/images/downloads" \
+curl -s "$FABRIC_HOST/api/images/downloads" \
   -H "Authorization: Bearer $TOKEN" | jq '.[] | select(.name == "fedora-41")'
 ```
 
@@ -143,7 +143,7 @@ Wait until `state` is `"completed"`. The image is saved to
 You can also verify it appears in the image list:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/images/list" \
+curl -s "$FABRIC_HOST/api/images/list" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -175,7 +175,7 @@ Expected response:
 Create a VM definition. This registers the VM in Zyvor Fabric but does not start it.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms" \
+curl -s -X POST "$FABRIC_HOST/api/vms" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -229,7 +229,7 @@ Expected response:
 ### Verify the VM Exists
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/my-first-vm" \
+curl -s "$FABRIC_HOST/api/vms/my-first-vm" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -239,7 +239,7 @@ The list endpoint supports pagination:
 
 ```bash
 # First page of 10 results
-curl -s "$VMSPAWN_HOST/api/vms?offset=0&limit=10" \
+curl -s "$FABRIC_HOST/api/vms?offset=0&limit=10" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -250,7 +250,7 @@ curl -s "$VMSPAWN_HOST/api/vms?offset=0&limit=10" \
 Start the VM with default options (no request body needed):
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/start" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -266,7 +266,7 @@ The start operation is asynchronous. The API returns `202 Accepted` immediately
 and the VM transitions through `starting` to `running`. Poll the VM status:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/my-first-vm" \
+curl -s "$FABRIC_HOST/api/vms/my-first-vm" \
   -H "Authorization: Bearer $TOKEN" | jq '.state'
 ```
 
@@ -277,7 +277,7 @@ Wait until the state is `"running"`.
 You can pass `VMStartOptions` in the request body for fine-grained control:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/start" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/start" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -305,7 +305,7 @@ reference.
 Once the VM is running, you can view its resource usage:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/my-first-vm/metrics" \
+curl -s "$FABRIC_HOST/api/vms/my-first-vm/metrics" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -358,7 +358,7 @@ Cloud-init lets you customize the VM on first boot: set users, install packages,
 run commands, and configure networking.
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/cloud-init" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/cloud-init" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -404,7 +404,7 @@ The cloud-init ISO is generated and can be attached to the VM. Restart the VM
 for cloud-init to take effect:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/restart" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/restart" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -429,7 +429,7 @@ Expected response:
 Pause the VM (freezes execution but keeps state in memory):
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/pause" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/pause" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -442,7 +442,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/pause" \
 Resume the VM:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/resume" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/resume" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -457,7 +457,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/resume" \
 Create an exact copy of a VM. The VM must be stopped for linked clones:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/clone" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/clone" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -490,7 +490,7 @@ be stopped.
 ### Stop the VM
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/stop" \
+curl -s -X POST "$FABRIC_HOST/api/vms/my-first-vm/stop" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -505,7 +505,7 @@ curl -s -X POST "$VMSPAWN_HOST/api/vms/my-first-vm/stop" \
 Deleting a VM requires Admin privileges and permanently removes it:
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/vms/my-first-vm" \
+curl -s -X DELETE "$FABRIC_HOST/api/vms/my-first-vm" \
   -H "Authorization: Bearer $TOKEN"
 
 # Returns 204 No Content on success
@@ -514,7 +514,7 @@ curl -s -X DELETE "$VMSPAWN_HOST/api/vms/my-first-vm" \
 Clean up the clone too:
 
 ```bash
-curl -s -X DELETE "$VMSPAWN_HOST/api/vms/my-first-vm-clone" \
+curl -s -X DELETE "$FABRIC_HOST/api/vms/my-first-vm-clone" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -526,7 +526,7 @@ Instead of downloading pre-built cloud images, you can build custom images using
 mkosi (make operating system image):
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/images/build" \
+curl -s -X POST "$FABRIC_HOST/api/images/build" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -558,7 +558,7 @@ Supported distributions: `fedora`, `ubuntu`, `debian`, `centos`, `arch`,
 Monitor the build:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/images/builds" \
+curl -s "$FABRIC_HOST/api/images/builds" \
   -H "Authorization: Bearer $TOKEN" | jq '.[] | select(.name == "custom-fedora")'
 ```
 
@@ -570,7 +570,7 @@ You can import VM images from other hypervisors (VMDK, VDI, VHD) by converting
 them to QCOW2:
 
 ```bash
-curl -s -X POST "$VMSPAWN_HOST/api/images/import" \
+curl -s -X POST "$FABRIC_HOST/api/images/import" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -617,7 +617,7 @@ Expected response:
 Check for errors on the VM object:
 
 ```bash
-curl -s "$VMSPAWN_HOST/api/vms/my-first-vm" \
+curl -s "$FABRIC_HOST/api/vms/my-first-vm" \
   -H "Authorization: Bearer $TOKEN" | jq '.last_error'
 ```
 

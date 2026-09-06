@@ -15,7 +15,7 @@ interface MigrationTemplate {
   created_at: string;
 }
 
-const TEMPLATES_KEY = 'vmspawnd_migration_templates';
+const TEMPLATES_KEY = 'zyvor_fabric_migration_templates';
 
 function loadTemplates(): MigrationTemplate[] {
   try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]'); } catch { return []; }

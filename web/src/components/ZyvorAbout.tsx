@@ -9,13 +9,6 @@ export const ZYVOR_FABRIC_PRODUCT = ZYVOR_FABRIC_HELP.name
 export const ZYVOR_FABRIC_VERSION = ZYVOR_FABRIC_HELP.version
 export const ZYVOR_FABRIC_TAGLINE = ZYVOR_FABRIC_HELP.tagline
 
-/** @deprecated Use ZYVOR_FABRIC_PRODUCT */
-export const VMSPAWN_PRODUCT = ZYVOR_FABRIC_PRODUCT
-/** @deprecated Use ZYVOR_FABRIC_VERSION */
-export const VMSPAWN_VERSION = ZYVOR_FABRIC_VERSION
-/** @deprecated Use ZYVOR_FABRIC_TAGLINE */
-export const VMSPAWN_TAGLINE = ZYVOR_FABRIC_TAGLINE
-
 const ORANGE = '#f97316'
 
 export type HelpDocLink = {
@@ -23,7 +16,7 @@ export type HelpDocLink = {
   href: string
 }
 
-export const VMSPAWN_HELP_LINKS: HelpDocLink[] = [
+export const ZYVOR_FABRIC_HELP_LINKS: HelpDocLink[] = [
   {
     label: 'Documentation',
     href: 'https://github.com/zyvorai/fabric/tree/main/docs',
@@ -84,7 +77,7 @@ export default function ZyvorAbout({ className = '' }: { className?: string }) {
       <div>
         <h4 className="text-xs font-semibold text-[#6e6e73] uppercase tracking-wider mb-2">Documentation</h4>
         <ul className="space-y-2">
-          {VMSPAWN_HELP_LINKS.map((link) => (
+          {ZYVOR_FABRIC_HELP_LINKS.map((link) => (
             <li key={link.href}>
               <a
                 href={link.href}

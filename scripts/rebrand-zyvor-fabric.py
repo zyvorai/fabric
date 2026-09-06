@@ -37,7 +37,7 @@ PROTECTED = [
     "zyvor-fabricd.conf",
     "zyvor-fabricd.spec",
     "zyvor-fabricd.local",
-    "vmspawnd_token",
+    "zyvor_fabric_token",
     "zyvor-fabricd-saved-login",
     "vmspawnd_username",
     "zyvor-fabricd-theme",

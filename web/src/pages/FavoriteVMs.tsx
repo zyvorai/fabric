@@ -14,10 +14,21 @@ import { useToastContext } from '../contexts/ToastContext'
 
 interface FavoriteVM { name: string; added_at: string }
 
-const STORAGE_KEY = 'vmspawnd_favorites'
+const STORAGE_KEY = 'zyvor_fabric_favorites'
+const LEGACY_STORAGE_KEY = 'vmspawnd_favorites'
 
 function loadFavorites(): FavoriteVM[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || '[]'
+    const favs = JSON.parse(raw)
+    if (!localStorage.getItem(STORAGE_KEY) && localStorage.getItem(LEGACY_STORAGE_KEY)) {
+      localStorage.setItem(STORAGE_KEY, raw)
+      localStorage.removeItem(LEGACY_STORAGE_KEY)
+    }
+    return favs
+  } catch {
+    return []
+  }
 }
 function saveFavorites(favs: FavoriteVM[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(favs)) }
 

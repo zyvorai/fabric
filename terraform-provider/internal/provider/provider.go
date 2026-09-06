@@ -10,9 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-var _ provider.Provider = &vmspawndProvider{}
+var _ provider.Provider = &fabricdProvider{}
 
-type vmspawndProvider struct {
+type fabricdProvider struct {
 	version string
 }
 
@@ -23,16 +23,16 @@ type providerModel struct {
 
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &vmspawndProvider{version: version}
+		return &fabricdProvider{version: version}
 	}
 }
 
-func (p *vmspawndProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (p *fabricdProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "zyvor-fabricd"
 	resp.Version = p.version
 }
 
-func (p *vmspawndProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *fabricdProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Zyvor Fabric control plane (zyvor-fabricd REST API).",
 		Attributes: map[string]schema.Attribute{
@@ -49,7 +49,7 @@ func (p *vmspawndProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 	}
 }
 
-func (p *vmspawndProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+func (p *fabricdProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var config providerModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
@@ -66,7 +66,7 @@ func (p *vmspawndProvider) Configure(ctx context.Context, req provider.Configure
 	resp.ResourceData = client
 }
 
-func (p *vmspawndProvider) Resources(_ context.Context) []func() resource.Resource {
+func (p *fabricdProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewVMResource,
 		NewStoragePoolResource,
@@ -75,7 +75,7 @@ func (p *vmspawndProvider) Resources(_ context.Context) []func() resource.Resour
 	}
 }
 
-func (p *vmspawndProvider) DataSources(_ context.Context) []func() datasource.DataSource {
+func (p *fabricdProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewVMDataSource,
 	}
