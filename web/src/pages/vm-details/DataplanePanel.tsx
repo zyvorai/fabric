@@ -28,6 +28,7 @@ import { formatUserError } from '../../utils/apiError'
 import { usePermissions } from '../../hooks/usePermissions'
 import { StatusBadge } from '../../components/ui'
 import SubsystemBanner from '../../components/SubsystemBanner'
+import { TerminalTextarea } from '../../components/AppleTerminalFrame'
 
 type PanelTab = 'status' | 'policy' | 'stats' | 'flows'
 
@@ -452,15 +453,15 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
           </div>
 
           {showJson ? (
-            <textarea
-              className={`${inputCls} h-56 font-mono text-xs`}
+            <TerminalTextarea
+              title="dataplane — policy JSON"
+              className="h-56"
               value={jsonText}
               onChange={(e) => {
                 setJsonText(e.target.value)
                 setDirty(true)
               }}
               readOnly={!canWrite}
-              spellCheck={false}
             />
           ) : (
             <div className="bg-white rounded-xl border border-[#d2d2d7] p-4 space-y-4">

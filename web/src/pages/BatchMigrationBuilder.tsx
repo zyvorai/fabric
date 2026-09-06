@@ -3,12 +3,12 @@
 
 import { useState } from 'react'
 import { Plus, Trash2, Download, Copy, Check, ChevronDown, ChevronUp, Layers } from 'lucide-react'
+import { PageHeader } from '../components/ui'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
 
 interface MigrationEntry { id: number; name: string; source: string; target_format: string; cpus: number; memory: number; expanded: boolean }
 
 let entryCounter = 0
-
-import { PageHeader } from '../components/ui'
 
 export default function BatchMigrationBuilder() {
   const [entries, setEntries] = useState<MigrationEntry[]>([])
@@ -73,16 +73,33 @@ export default function BatchMigrationBuilder() {
       )}
 
       {entries.length > 0 && (
-        <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
-          <div className="px-4 py-3 border-b border-[var(--zf-hairline)] flex items-center justify-between">
-            <span className="text-sm font-semibold text-[var(--zf-ink)]">JSON Preview ({entries.length} VMs)</span>
-            <div className="flex items-center gap-2">
-              <button onClick={handleCopy} title="Copy JSON" className="zf-btn zf-btn-ghost zf-btn-sm">{copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy'}</button>
-              <button onClick={handleDownload} title="Download JSON" className="zf-btn zf-btn-ghost zf-btn-sm"><Download className="w-3.5 h-3.5" /> Download</button>
+        <AppleTerminalFrame
+          title={`batch-migration — JSON preview (${entries.length} VMs)`}
+          bodyClassName="max-h-64 overflow-y-auto px-3 py-2 whitespace-pre"
+          trailing={
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={handleCopy}
+                title="Copy JSON"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                {copied ? <Check className="w-3 h-3 text-[#28c840]" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                title="Download JSON"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <Download className="w-3 h-3" /> Download
+              </button>
             </div>
-          </div>
-          <pre className="p-4 text-xs text-[var(--zf-ink)] font-mono bg-[var(--zf-canvas)] max-h-64 overflow-y-auto whitespace-pre">{json}</pre>
-        </div>
+          }
+        >
+          {json}
+        </AppleTerminalFrame>
       )}
     </div>
   )

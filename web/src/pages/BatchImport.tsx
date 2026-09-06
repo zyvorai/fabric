@@ -6,6 +6,7 @@ import { Upload, Download, Eye, Send, CheckCircle, XCircle, Clock, Loader2, File
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
+import { TerminalTextarea } from '../components/AppleTerminalFrame'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 
 interface VMEntry { name: string; cpus: number; memory: string; image: string }
@@ -108,8 +109,15 @@ export default function BatchImport() {
             <p className="text-sm text-[var(--zf-muted)]">Drag & drop a <span className="text-[var(--zf-ink)] font-medium">.yaml</span> or <span className="text-[var(--zf-ink)] font-medium">.json</span> file, or click to browse</p>
             <input ref={fileRef} type="file" accept=".yaml,.yml,.json" className="hidden" onChange={handleFileSelect} />
           </div>
-          <div><label className="block text-sm font-medium text-[var(--zf-muted)] mb-2">Or paste YAML/JSON directly</label>
-            <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={12} className="w-full bg-[var(--zf-canvas)] border border-[var(--zf-hairline)] rounded-lg p-4 text-sm text-[var(--zf-ink)] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--zf-ink)]/20 resize-y" placeholder={exampleYAML} />
+          <div>
+            <label className="block text-sm font-medium text-[var(--zf-muted)] mb-2">Or paste YAML/JSON directly</label>
+            <TerminalTextarea
+              title="batch-import — YAML/JSON"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              rows={12}
+              placeholder={exampleYAML}
+            />
           </div>
           {parseError && (
             <ErrorBanner title="Could not parse input" headline={parseError} />

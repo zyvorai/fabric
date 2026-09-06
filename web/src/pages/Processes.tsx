@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
 import { formatHttpErrorBody, formatUserError, sanitizeErrorText } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
@@ -264,9 +265,13 @@ export default function Processes() {
           ) : detail ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {detail.cmdline && (
-                <div className="col-span-full bg-[var(--zf-surface)] border border-[var(--zf-hairline)] rounded-lg p-3">
-                  <div className="text-xs text-[var(--zf-muted)] mb-1">Command Line</div>
-                  <div className="text-sm text-[var(--zf-ink)] font-mono break-all">{detail.cmdline}</div>
+                <div className="col-span-full">
+                  <AppleTerminalFrame
+                    title={`pid ${selectedPid} — cmdline`}
+                    bodyClassName="max-h-32 overflow-auto px-3 py-2 whitespace-pre-wrap break-all"
+                  >
+                    {detail.cmdline}
+                  </AppleTerminalFrame>
                 </div>
               )}
               {detail.io_read_bytes !== undefined && (

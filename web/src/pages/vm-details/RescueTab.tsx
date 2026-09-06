@@ -8,6 +8,7 @@ import { rescueVM, inspectVM } from '../../api/guestRescue'
 import { useToastContext } from '../../contexts/ToastContext'
 import { toastFailure } from '../../utils/toastError'
 import { usePermissions } from '../../hooks/usePermissions'
+import { AppleTerminalFrame } from '../../components/AppleTerminalFrame'
 
 export default function RescueTab({ vm }: { vm: VM }) {
   const toast = useToastContext()
@@ -200,9 +201,12 @@ export default function RescueTab({ vm }: { vm: VM }) {
           Inspect Disk
         </button>
         {inspectResult && (
-          <pre className="text-xs text-[#1d1d1f] font-mono bg-[#f5f5f7] rounded-lg p-3 overflow-x-auto max-h-64 overflow-y-auto">
+          <AppleTerminalFrame
+            title="inspect — guest disk"
+            bodyClassName="max-h-64 overflow-auto px-3 py-2 whitespace-pre"
+          >
             {JSON.stringify(inspectResult, null, 2)}
-          </pre>
+          </AppleTerminalFrame>
         )}
       </div>
     </div>

@@ -184,7 +184,14 @@ export default function JobMonitor() {
                     )
                   })}
                 </div>
-                {selected.error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 font-mono">{selected.error}</div>}
+                {selected.error && (
+                  <AppleTerminalFrame
+                    title="job — error"
+                    bodyClassName="max-h-32 overflow-y-auto px-3 py-2 whitespace-pre-wrap text-[#ff453a]"
+                  >
+                    {selected.error}
+                  </AppleTerminalFrame>
+                )}
               </div>
               <AppleTerminalFrame
                 title={`${selected.name || selected.vm_name || selected.id} — job logs`}

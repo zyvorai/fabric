@@ -1,7 +1,15 @@
 // Copyright 2026 Zyvor
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ReactNode, UIEventHandler, Ref } from 'react'
+import type { ReactNode, UIEventHandler, Ref, TextareaHTMLAttributes } from 'react'
+
+/** Shared styles for monospace editors inside AppleTerminalFrame. */
+export const TERM_TEXTAREA_CLASS =
+  'w-full bg-transparent border-0 px-3 py-2 text-[12px] leading-[1.45] text-[#f5f5f7] placeholder:text-white/30 focus:outline-none focus:ring-0 resize-y disabled:opacity-50 read-only:opacity-80 selection:bg-[#0a84ff]/40'
+
+export const TERM_FONT_STYLE = {
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+} as const
 
 type AppleTerminalFrameProps = {
   title: string
@@ -73,4 +81,32 @@ export const TERM_LEVEL_COLOR: Record<string, string> = {
   CRITICAL: '#ff453a',
   DEBUG: '#8e8e93',
   debug: '#8e8e93',
+}
+
+type TerminalTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  title: string
+  trailing?: ReactNode
+  frameClassName?: string
+}
+
+/** Editable code/YAML/JSON surface with Terminal.app chrome. */
+export function TerminalTextarea({
+  title,
+  trailing,
+  frameClassName,
+  className = '',
+  style,
+  spellCheck = false,
+  ...textareaProps
+}: TerminalTextareaProps) {
+  return (
+    <AppleTerminalFrame title={title} trailing={trailing} bodyClassName="p-0" className={frameClassName}>
+      <textarea
+        {...textareaProps}
+        spellCheck={spellCheck}
+        className={`${TERM_TEXTAREA_CLASS} ${className}`.trim()}
+        style={{ ...TERM_FONT_STYLE, ...style }}
+      />
+    </AppleTerminalFrame>
+  )
 }

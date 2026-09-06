@@ -27,6 +27,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader, Modal } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
+import { TerminalTextarea } from '../components/AppleTerminalFrame'
 
 export default function ContentLibrary() {
   const toast = useToastContext()
@@ -505,8 +506,12 @@ function HostComplianceModal({ profile, onClose }: { profile: HostProfile; onClo
         </div>
         <div>
           <label className="block text-sm font-medium mb-1 text-[var(--zf-ink)]">Host's current config (JSON)</label>
-          <textarea value={configText} onChange={e => setConfigText(e.target.value)} rows={8}
-            className="input-field font-mono text-xs" />
+          <TerminalTextarea
+            title="host-config — JSON"
+            value={configText}
+            onChange={e => setConfigText(e.target.value)}
+            rows={8}
+          />
           {configError && <p className="text-xs text-[var(--zf-danger)] mt-1">{configError}</p>}
           <p className="text-xs text-[var(--zf-muted)] mt-1">Pre-filled from the profile's reference settings — edit to reflect what's actually configured on this host.</p>
         </div>

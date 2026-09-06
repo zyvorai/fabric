@@ -8,7 +8,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader, Card } from '../components/ui'
 import { formatUserError } from '../utils/apiError'
 import { hintsForError } from '../utils/daemonHints'
-import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
+import { AppleTerminalFrame, TerminalTextarea } from '../components/AppleTerminalFrame'
 import { AnsiText } from '../components/AnsiText'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -216,11 +216,11 @@ export default function APIPlayground() {
           {(method === 'POST' || method === 'PUT') && (
             <div>
               <label className="block text-xs font-medium text-[var(--zf-muted)] mb-1.5">Request Body (JSON)</label>
-              <textarea
+              <TerminalTextarea
+                title="request — JSON body"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={6}
-                className="input-field font-mono resize-y"
                 placeholder='{"key": "value"}'
               />
             </div>
@@ -262,13 +262,18 @@ export default function APIPlayground() {
                   Response Headers ({Object.keys(response.headers).length})
                 </summary>
                 <div className="px-4 pb-3">
-                  <div className="text-xs font-mono text-[var(--zf-muted)] space-y-0.5">
+                  <AppleTerminalFrame
+                    title="response — headers"
+                    bodyClassName="max-h-40 overflow-y-auto px-3 py-2"
+                  >
                     {Object.entries(response.headers).map(([k, v]) => (
                       <div key={k}>
-                        <span className="text-[var(--zf-muted)]">{k}:</span> {v}
+                        <span className="text-[#64d2ff]">{k}</span>
+                        <span className="text-white/40">: </span>
+                        <span>{v}</span>
                       </div>
                     ))}
-                  </div>
+                  </AppleTerminalFrame>
                 </div>
               </details>
 

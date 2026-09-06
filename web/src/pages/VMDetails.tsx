@@ -12,7 +12,7 @@ import {
   Network, Camera, Terminal, Cpu, MemoryStick, Pause, Copy, Wifi,
   AlertCircle, Loader2, RefreshCw, Plus, Plug, Usb, Cloud, Settings, Wrench, Shield,
 } from 'lucide-react'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useToastContext } from '../contexts/ToastContext'
 import { useVMActions } from '../hooks/useVMActions'
 import { StatusBadge } from '../components/ui'
@@ -438,34 +438,62 @@ function MetricsTab({ vm }: { vm: VM }) {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="zf-panel p-5">
-          <h3 className="text-sm font-medium text-[var(--zf-muted)] mb-3">CPU Usage</h3>
-          <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={history}>
+          <h3 className="text-sm font-medium text-[var(--zf-ink)] mb-3">CPU Usage</h3>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={history} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--zf-link)" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="var(--zf-link)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="time" stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis domain={[0, 100]} stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
+              <CartesianGrid stroke="var(--zf-hairline)" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="time"
+                tick={{ fill: 'var(--zf-muted)', fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tick={{ fill: 'var(--zf-ink)', fontSize: 11, fontWeight: 500 }}
+                tickLine={false}
+                axisLine={false}
+                width={40}
+                tickFormatter={(v) => `${v}%`}
+              />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'CPU']} />
               <Area type="monotone" dataKey="cpu" stroke="var(--zf-link)" strokeWidth={1.5} fill="url(#cpuGrad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
         <div className="zf-panel p-5">
-          <h3 className="text-sm font-medium text-[var(--zf-muted)] mb-3">Memory Usage</h3>
-          <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={history}>
+          <h3 className="text-sm font-medium text-[var(--zf-ink)] mb-3">Memory Usage</h3>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={history} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="memGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--zf-success)" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="var(--zf-success)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="time" stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis domain={[0, 100]} stroke="var(--zf-hairline)" fontSize={10} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `${v}%`} />
+              <CartesianGrid stroke="var(--zf-hairline)" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="time"
+                tick={{ fill: 'var(--zf-muted)', fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tick={{ fill: 'var(--zf-ink)', fontSize: 11, fontWeight: 500 }}
+                tickLine={false}
+                axisLine={false}
+                width={40}
+                tickFormatter={(v) => `${v}%`}
+              />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'Memory']} />
               <Area type="monotone" dataKey="memory" stroke="var(--zf-success)" strokeWidth={1.5} fill="url(#memGrad)" dot={false} />
             </AreaChart>
@@ -1368,29 +1396,36 @@ function LogsTab({ vm }: { vm: VM }) {
           {showActivity ? '▾' : '▸'} Activity (create/start/stop history)
         </button>
         {showActivity && (
-          <div className="zf-panel overflow-hidden mt-2">
-            {activity.length === 0 ? (
+          activity.length === 0 ? (
+            <div className="zf-panel mt-2">
               <p className="text-[var(--zf-muted)] text-sm p-4">No activity recorded for this VM.</p>
-            ) : (
-              <div className="font-mono text-xs">
-                {activity.map((log) => (
-                  <div key={log.id} className="flex gap-4 px-5 py-2 hover:bg-black/[0.03] transition-colors border-b border-[var(--zf-hairline)] last:border-b-0">
-                    <span className="text-[var(--zf-muted)] shrink-0 tabular-nums">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                    <span className={`shrink-0 w-16 uppercase ${log.status === 'success' ? 'text-[var(--zf-link)]' : 'text-[var(--zf-danger)]'}`}>
-                      {log.status === 'success' ? 'INFO' : 'ERROR'}
-                    </span>
-                    <span className="text-[var(--zf-muted)] shrink-0 w-20">{log.action}</span>
-                    <span className="text-[var(--zf-ink)]">
-                      {log.details || `${log.action} by ${log.user}`}
-                      {log.error && <span className="text-[var(--zf-danger)] ml-2">({log.error})</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <AppleTerminalFrame
+              title={`${vm.name} — activity`}
+              className="mt-2"
+              bodyClassName="max-h-64 overflow-y-auto px-3 py-2"
+            >
+              {activity.map((log) => (
+                <div key={log.id} className="flex gap-3 py-0.5">
+                  <span className="text-white/40 shrink-0 tabular-nums">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                  <span
+                    className="shrink-0 w-14 uppercase"
+                    style={{ color: log.status === 'success' ? '#64d2ff' : '#ff453a' }}
+                  >
+                    {log.status === 'success' ? 'INFO' : 'ERROR'}
+                  </span>
+                  <span className="text-white/50 shrink-0 w-16">{log.action}</span>
+                  <span className="min-w-0 break-words">
+                    {log.details || `${log.action} by ${log.user}`}
+                    {log.error && <span className="text-[#ff453a] ml-2">({log.error})</span>}
+                  </span>
+                </div>
+              ))}
+            </AppleTerminalFrame>
+          )
         )}
       </div>
     </div>

@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { Download, Copy, Check, ChevronUp, ChevronDown } from 'lucide-react'
 import { PageHeader } from '../components/ui'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
 
 interface ConfigField { key: string; label: string; type: 'text' | 'number' | 'select' | 'checkbox'; options?: string[]; placeholder?: string }
 interface ConfigSection { name: string; key: string; expanded: boolean; fields: ConfigField[] }
@@ -118,20 +119,33 @@ export default function ManifestBuilder() {
 
         {/* YAML preview */}
         <div className="space-y-3">
-          <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
-            <div className="px-4 py-3 border-b border-[var(--zf-hairline)] flex items-center justify-between">
-              <span className="text-sm font-semibold text-[var(--zf-ink)]">YAML Preview</span>
-              <div className="flex items-center gap-2">
-                <button onClick={handleCopy} title="Copy to clipboard" className="zf-btn zf-btn-ghost zf-btn-sm">
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy'}
+          <AppleTerminalFrame
+            title="manifest — YAML preview"
+            bodyClassName="max-h-[500px] overflow-y-auto px-3 py-2 whitespace-pre"
+            trailing={
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  title="Copy to clipboard"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  {copied ? <Check className="w-3 h-3 text-[#28c840]" /> : <Copy className="w-3 h-3" />}
+                  {copied ? 'Copied' : 'Copy'}
                 </button>
-                <button onClick={handleDownload} title="Download YAML" className="zf-btn zf-btn-ghost zf-btn-sm">
-                  <Download className="w-3.5 h-3.5" /> Download
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  title="Download YAML"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <Download className="w-3 h-3" /> Download
                 </button>
               </div>
-            </div>
-            <pre className="p-4 text-xs text-[var(--zf-ink)] font-mono bg-[var(--zf-canvas)] max-h-[500px] overflow-y-auto whitespace-pre">{yaml}</pre>
-          </div>
+            }
+          >
+            {yaml}
+          </AppleTerminalFrame>
         </div>
       </div>
     </div>

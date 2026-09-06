@@ -6,6 +6,7 @@ import { Cloud, Loader2 } from 'lucide-react'
 import type { VM } from '../../api/vm'
 import { configureCloudInit } from '../../api/cloudInit'
 import ErrorBanner from '../../components/ErrorBanner'
+import { TerminalTextarea } from '../../components/AppleTerminalFrame'
 import { formatUserError } from '../../utils/apiError'
 import { toastFailure } from '../../utils/toastError'
 import { useToastContext } from '../../contexts/ToastContext'
@@ -143,25 +144,25 @@ export default function CloudInitTab({ vm }: { vm: VM }) {
         </div>
 
         <div>
-          <label className="block text-xs text-[#6e6e73] mb-1">User data (cloud-config YAML)</label>
-          <textarea
+          <label className="block text-xs text-[#6e6e73] mb-1.5">User data (cloud-config YAML)</label>
+          <TerminalTextarea
+            title="user-data — cloud-config"
             value={userData}
             onChange={(e) => setUserData(e.target.value)}
             disabled={!canWrite}
-            rows={12}
-            className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] font-mono disabled:opacity-50"
+            rows={14}
           />
         </div>
 
         <div>
-          <label className="block text-xs text-[#6e6e73] mb-1">Network config (JSON, optional)</label>
-          <textarea
+          <label className="block text-xs text-[#6e6e73] mb-1.5">Network config (JSON, optional)</label>
+          <TerminalTextarea
+            title="network-config — JSON"
             value={networkConfig}
             onChange={(e) => setNetworkConfig(e.target.value)}
             disabled={!canWrite}
-            rows={4}
+            rows={6}
             placeholder='{"version": 2, "ethernets": { ... }}'
-            className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] font-mono disabled:opacity-50"
           />
         </div>
 
