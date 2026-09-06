@@ -2,49 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Real X.509 certificate generation using the `rcgen` crate.
-//!
-//! Provides helpers to generate self-signed CA certificates and issue
-//! end-entity certificates signed by a CA.  All output is PEM-encoded and
-//! fingerprints are real SHA-256 hashes of the DER-encoded certificate.
 
 use anyhow::{Context, Result};
+use rcgen::string::Ia5String;
 use rcgen::{
-    BasicConstraints, CertificateParams, DistinguishedName, DnType, Ia5String, IsCa, KeyPair,
+    BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, Issuer, KeyPair,
     KeyUsagePurpose, SanType,
 };
 use sha2::{Digest, Sha256};
 
-/// Result of generating a CA certificate.
 pub struct CaOutput {
-    /// PEM-encoded CA certificate.
     pub cert_pem: String,
-    /// PEM-encoded CA private key (PKCS#8).
     pub key_pem: String,
-    /// SHA-256 fingerprint of the DER-encoded certificate (`sha256:<hex>`).
     pub fingerprint: String,
 }
 
-/// Result of issuing an end-entity certificate.
 pub struct CertOutput {
-    /// PEM-encoded certificate.
     pub cert_pem: String,
-    /// PEM-encoded private key (PKCS#8).
     pub key_pem: String,
-    /// SHA-256 fingerprint of the DER-encoded certificate (`sha256:<hex>`).
     pub fingerprint: String,
-    /// Serial number (hex-encoded from the certificate).
     pub serial: String,
 }
 
-/// Compute a `sha256:<hex>` fingerprint from DER-encoded certificate bytes.
 pub fn compute_fingerprint(der_bytes: &[u8]) -> String {
     let hash = Sha256::digest(der_bytes);
     format!("sha256:{}", hex::encode(hash))
 }
 
-/// Generate a self-signed CA certificate and key pair.
-///
-/// Returns a [`CaOutput`] containing PEM-encoded cert/key and the fingerprint.
 pub fn generate_ca(common_name: &str, validity_days: u32) -> Result<CaOutput> {
     let mut params = CertificateParams::default();
 
@@ -55,7 +39,6 @@ pub fn generate_ca(common_name: &str, validity_days: u32) -> Result<CaOutput> {
     params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
     params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
 
-    // Set validity period.
     let now = time::OffsetDateTime::now_utc();
     params.not_before = now;
     params.not_after = now
@@ -67,21 +50,13 @@ pub fn generate_ca(common_name: &str, validity_days: u32) -> Result<CaOutput> {
         .self_signed(&key_pair)
         .context("failed to self-sign CA certificate")?;
 
-    let fingerprint = compute_fingerprint(cert.der().as_ref());
-    let cert_pem = cert.pem();
-    let key_pem = key_pair.serialize_pem();
-
     Ok(CaOutput {
-        cert_pem,
-        key_pem,
-        fingerprint,
+        fingerprint: compute_fingerprint(cert.der().as_ref()),
+        cert_pem: cert.pem(),
+        key_pem: key_pair.serialize_pem(),
     })
 }
 
-/// Issue an end-entity certificate signed by a CA.
-///
-/// `san_names` are added as DNS Subject Alternative Names.
-/// Returns a [`CertOutput`] with PEM-encoded cert/key, fingerprint, and serial.
 pub fn issue_certificate(
     common_name: &str,
     san_names: &[String],
@@ -95,45 +70,33 @@ pub fn issue_certificate(
     dn.push(DnType::CommonName, common_name);
     params.distinguished_name = dn;
 
-    // Add Subject Alternative Names.
     for name in san_names {
         let ia5 =
             Ia5String::try_from(name.as_str()).context(format!("invalid SAN name: {}", name))?;
         params.subject_alt_names.push(SanType::DnsName(ia5));
     }
 
-    // Set validity period.
     let now = time::OffsetDateTime::now_utc();
     params.not_before = now;
     params.not_after = now
         .checked_add(time::Duration::days(validity_days as i64))
         .context("validity period overflow")?;
 
-    // Parse the CA certificate and key.
     let ca_key_pair =
         KeyPair::from_pem(ca_key_pem).context("failed to parse CA private key PEM")?;
-    let ca_params = CertificateParams::from_ca_cert_pem(ca_cert_pem)
+    let issuer = Issuer::from_ca_cert_pem(ca_cert_pem, ca_key_pair)
         .context("failed to parse CA certificate PEM")?;
-    let ca_cert = ca_params
-        .self_signed(&ca_key_pair)
-        .context("failed to reconstruct CA certificate")?;
 
-    // Generate a new key pair for the end-entity certificate.
     let key_pair = KeyPair::generate().context("failed to generate certificate key pair")?;
     let cert = params
-        .signed_by(&key_pair, &ca_cert, &ca_key_pair)
+        .signed_by(&key_pair, &issuer)
         .context("failed to sign certificate with CA")?;
 
-    let fingerprint = compute_fingerprint(cert.der().as_ref());
-    let cert_pem = cert.pem();
-    let key_pem = key_pair.serialize_pem();
-    let serial = uuid::Uuid::new_v4().to_string();
-
     Ok(CertOutput {
-        cert_pem,
-        key_pem,
-        fingerprint,
-        serial,
+        fingerprint: compute_fingerprint(cert.der().as_ref()),
+        cert_pem: cert.pem(),
+        key_pem: key_pair.serialize_pem(),
+        serial: uuid::Uuid::new_v4().to_string(),
     })
 }
 
@@ -147,7 +110,6 @@ mod tests {
         assert!(ca.cert_pem.contains("BEGIN CERTIFICATE"));
         assert!(ca.key_pem.contains("BEGIN PRIVATE KEY"));
         assert!(ca.fingerprint.starts_with("sha256:"));
-        // SHA-256 hex = 64 chars, plus "sha256:" prefix = 71 chars
         assert_eq!(ca.fingerprint.len(), 71);
     }
 
@@ -173,9 +135,7 @@ mod tests {
     #[test]
     fn test_fingerprint_deterministic() {
         let data = b"some certificate bytes";
-        let fp1 = compute_fingerprint(data);
-        let fp2 = compute_fingerprint(data);
-        assert_eq!(fp1, fp2);
+        assert_eq!(compute_fingerprint(data), compute_fingerprint(data));
     }
 
     #[test]

@@ -219,7 +219,7 @@ fn default_jwt_secret() -> String {
 }
 
 fn generate_random_secret() -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let mut rng = rand::rng();
     (0..64)
         .map(|_| rng.sample(rand::distr::Alphanumeric) as char)
