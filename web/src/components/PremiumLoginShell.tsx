@@ -67,7 +67,8 @@ export function PremiumLoginShell({
     'VMs, networking, and storage — driven by FluxVM. Scroll to sign in.'
   const formHeading =
     panelSubtitle ?? (panelTitle && panelTitle !== 'Sign in' ? panelTitle : 'Sign in')
-  const wordmark = (productWordmark ?? productName).trim() || 'Zyvor Fabric'
+  const wordmark =
+    productWordmark !== undefined ? productWordmark.trim() : (productName || 'Zyvor Fabric').trim()
   const pageClass = [
     'login-page',
     'login-store-page',
@@ -86,9 +87,11 @@ export function PremiumLoginShell({
         <section className="login-chapter login-chapter-hero" data-tone={accent} aria-label={productName}>
           <div className="login-chapter-inner">
             {logo ? <div className="login-logo inline-flex mb-5">{logo}</div> : null}
-            <p className="login-wordmark" aria-label={productName}>
-              {wordmark}
-            </p>
+            {wordmark ? (
+              <p className="login-wordmark" aria-label={productName}>
+                {wordmark}
+              </p>
+            ) : null}
             {instanceMeta ? <div className="login-instance-meta">{instanceMeta}</div> : null}
             <h1 className="login-hero-title">{heroTitle}</h1>
             {tagline ? <p className="login-tagline">{tagline}</p> : null}

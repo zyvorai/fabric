@@ -270,11 +270,19 @@ export default function SignIn() {
           aria-label="zyvor.dev"
           title="zyvor.dev"
         >
-          <ZyvorLockup markClassName="w-9 h-9" wordmarkClassName="text-[1.35rem] text-[#f5f5f7]" />
+          <span className="inline-flex items-center gap-2">
+            <ZyvorLockup
+              markClassName="w-9 h-9"
+              wordmarkClassName="text-[1.35rem] text-[#1d1d1f]"
+            />
+            <span className="text-[1.15rem] font-medium text-[#6e6e73] tracking-[-0.02em] leading-none">
+              Fabric
+            </span>
+          </span>
         </a>
       }
       productName="Zyvor Fabric"
-      productWordmark="Zyvor Fabric"
+      productWordmark=""
       heroTitle="Private cloud. One daemon."
       heroSubheadline="VMs, networking, storage, and security — driven by FluxVM on Linux KVM."
       accent="orange"
