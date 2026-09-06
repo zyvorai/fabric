@@ -25,8 +25,8 @@ Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API,
 
 ### Feature guides
 
-- **[Customer Feature Guide](docs/zyvor-fabric-customer-feature-guide.md)** — **55 features** across **9 areas** (also [PDF](docs/zyvor-fabric-customer-feature-guide.pdf))
-- **[Customer manual](docs/customer/README.md)** — every console surface, page by page
+- **[User Feature Guide](docs/zyvor-fabric-user-feature-guide.md)** — **55 features** across **9 areas** (also [PDF](docs/zyvor-fabric-user-feature-guide.pdf))
+- **[User manual](docs/user/README.md)** — every console surface, page by page
 
 ---
 
@@ -470,7 +470,7 @@ quadrantChart
 
 Operator guide (enablement, create-bridged recipe, troubleshooting, UX checklist):
 [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md).
-Customer console: [docs/customer/pages/infrastructure/dataplane.md](docs/customer/pages/infrastructure/dataplane.md).
+User console: [docs/user/pages/infrastructure/dataplane.md](docs/user/pages/infrastructure/dataplane.md).
 
 Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com/zyvorai/fluxvm#why-network-fabric-is-faster-than-traditional-vm-networking).
 
@@ -514,7 +514,7 @@ Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com
 | SCIM identity | [docs/scim-identity.md](docs/scim-identity.md) |
 | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |
 | Host maintenance | [docs/host-lifecycle.md](docs/host-lifecycle.md) |
-| Customer manuals | [docs/customer/README.md](docs/customer/README.md) |
+| User manuals | [docs/user/README.md](docs/user/README.md) |
 | Full catalog | [docs/index.md](docs/index.md) |
 | Integrations | [integrations/](integrations/) |
 | Operator | [operator/README.md](operator/README.md) |

@@ -6,7 +6,7 @@ Console routes under `/app` — every primary navigable ops route.
 
 _Generated: 2026-09-02 · 84 routes_
 
-Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
+Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 
 ## Marketing & auth
 
@@ -145,5 +145,5 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 
 ## Related
 
-- [Customer docs home](README.md)
+- [User docs home](README.md)
 - [Page-by-page guides](pages/README.md)

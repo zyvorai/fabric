@@ -6,7 +6,7 @@ Zyvor Fabric is a complete Rust control plane giving you Proxmox- and KubeVirt-c
 
 **480+** REST API endpoints · **4** management interfaces · **40+** Rust backend crates · **6** storage backends · **37+** web dashboard pages · **1** binary, one config, one service
 
-This is the customer-facing onboarding guide — how to access the product, your first workflows, and how to use every feature. A print-ready PDF of the same content sits alongside this file.
+This is the user-facing onboarding guide — how to access the product, your first workflows, and how to use every feature. A print-ready PDF of the same content sits alongside this file.
 
 ## Contents
 

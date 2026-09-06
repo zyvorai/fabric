@@ -79,4 +79,4 @@ cd web && npm run dev -- --host 127.0.0.1 --port 3000
 # Sign in: admin / any password (e.g. preview)
 ```
 
-See also [ux.md](ux.md) for conventions and [customer/PAGE_INDEX.md](customer/PAGE_INDEX.md) for the full route catalog.
+See also [ux.md](ux.md) for conventions and [user/PAGE_INDEX.md](user/PAGE_INDEX.md) for the full route catalog.

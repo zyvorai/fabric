@@ -20,7 +20,7 @@
 - VM templates
 - VM state persistence
 - VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor)
-- **VM edge dataplane (FluxVM Network Fabric v3 GA)** — proxied at `/api/vms/{name}/dataplane/*`; VM **Dataplane** tab (Status / Policy / Stats / Flows + identity); Dashboard **VM dataplane** capability; `zyvorctl dataplane` with `ZYVOR_FABRIC_URL` / `ZYVOR_FABRIC_TOKEN` for HTTPS. Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) and [customer dataplane](docs/customer/pages/infrastructure/dataplane.md).
+- **VM edge dataplane (FluxVM Network Fabric v3 GA)** — proxied at `/api/vms/{name}/dataplane/*`; VM **Dataplane** tab (Status / Policy / Stats / Flows + identity); Dashboard **VM dataplane** capability; `zyvorctl dataplane` with `ZYVOR_FABRIC_URL` / `ZYVOR_FABRIC_TOKEN` for HTTPS. Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) and [user dataplane](docs/user/pages/infrastructure/dataplane.md).
 - CPU and memory configuration (`--cpus`, `--ram`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)

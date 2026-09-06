@@ -20,7 +20,7 @@ Zyvor Fabric includes a built-in billing system that tracks resource consumption
 - **Configurable pricing** -- Set per-unit rates for CPU, memory, disk, and network usage.
 - **Automatic usage tracking** -- Resource consumption is metered continuously and aggregated per billing period.
 - **Invoice generation** -- Generate itemized invoices per tenant on demand.
-- **Tenant isolation** -- VMs are assigned to tenants via labels, enabling cost allocation across teams or customers.
+- **Tenant isolation** -- VMs are assigned to tenants via labels, enabling cost allocation across teams or users.
 
 The billing system is designed for internal chargeback and showback. It does not process payments directly but produces the data needed for integration with financial systems.
 

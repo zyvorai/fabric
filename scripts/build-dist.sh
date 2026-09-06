@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 # SPDX-License-Identifier: Apache-2.0
-# scripts/build-dist.sh — build a self-contained customer distribution
+# scripts/build-dist.sh — build a self-contained user distribution
 # tar.gz: prebuilt zyvor-fabric + FluxVM (+ guestkit vendor agents)
 # binaries, web dashboard, configs, systemd units, and an offline
-# install.sh. No cargo/npm/rustc required on the customer's machine to
+# install.sh. No cargo/npm/rustc required on the user's machine to
 # install it — only to build it here.
 #
 # This repo can't produce Linux binaries on macOS, so the actual `cargo

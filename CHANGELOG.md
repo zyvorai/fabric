@@ -42,9 +42,9 @@
 - VNC canvas silently rendering at 0x0.
 - WebSocket console-open failures were swallowed instead of surfacing to the browser.
 - `generate-page-index.mjs` had regressed the `/app` route prefix and marketing section.
-- A dead link and a wrong brand mark in the customer guide index.
+- A dead link and a wrong brand mark in the user guide index.
 - Stale `vmspawnd`/`vmctl-tui` references and a wrong Ansible API port in docs.
-- zyvorctl CLI examples throughout the customer feature guide and README used a nonexistent `zyvorctl vm <subcommand>` pattern, a `--name` flag, and a `4G` memory suffix — none of which the real CLI supports. Corrected to match the actual flat command surface.
+- zyvorctl CLI examples throughout the user feature guide and README used a nonexistent `zyvorctl vm <subcommand>` pattern, a `--name` flag, and a `4G` memory suffix — none of which the real CLI supports. Corrected to match the actual flat command surface.
 - GPU passthrough docs described vGPU/Intel GVT-g support, GPU-specific REST endpoints, and a `zyvorctl gpu` CLI subcommand — none of which exist. Rewritten to describe the real capability: generic PCI/VFIO passthrough.
 - Fictional etcd-clustering and memory-based live-migration content removed from docs.
 

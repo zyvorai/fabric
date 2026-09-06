@@ -1,4 +1,4 @@
-# Zyvor Fabric — Customer Documentation
+# Zyvor Fabric — User Documentation
 
 Private cloud control plane with no systemd dependency — vCenter-style VM ops, DRS, FT, replication, and distributed storage.
 
@@ -10,19 +10,19 @@ Private cloud control plane with no systemd dependency — vCenter-style VM ops,
 | Look up any screen | [Complete page index](PAGE_INDEX.md) |
 | Deploy, auth, ports | [Admin basics](admin-basics.md) |
 | Multi-page jobs | [Common workflows](workflows.md) |
-| Capability map | [Feature Guide](../zyvor-fabric-customer-feature-guide.md) |
+| Capability map | [Feature Guide](../zyvor-fabric-user-feature-guide.md) |
 
 ## Printable PDFs
 
 ```bash
-node scripts/customer-docs/build-customer-pdfs.mjs
+node scripts/user-docs/build-user-pdfs.mjs
 ```
 
 Output lands in [`pdf/`](pdf/):
 
 | PDF | Contents |
 |-----|----------|
-| `Zyvor-Fabric-Customer-README.pdf` | This overview |
+| `Zyvor-Fabric-User-README.pdf` | This overview |
 | `Zyvor-Fabric-Getting-Started.pdf` | Access, basics, workflows |
 | `Zyvor-Fabric-Page-by-Page.pdf` | Complete page manual |
 | `Zyvor-Fabric-Admin-Basics.pdf` | Deploy, auth, ports |

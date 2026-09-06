@@ -207,5 +207,5 @@ sudo cat /run/fluxvm/ebpf/vms/*/iface /run/fluxvm/ebpf/vms/*/schema_version
 - [FluxVM driver](fluxvm.md) — full driver surface
 - [Networking](../../networking.md) — Fabric SDN + bridges + this plane
 - [Web UI](../../web-ui.md) — console surfaces
-- [Customer: VM Dataplane](../../customer/pages/infrastructure/dataplane.md)
+- [User: VM Dataplane](../../user/pages/infrastructure/dataplane.md)
 - FluxVM [network-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/network-fabric.md) · [ebpf-cilium.md](https://github.com/zyvorai/fluxvm/blob/main/docs/ebpf-cilium.md)

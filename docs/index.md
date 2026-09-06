@@ -113,7 +113,7 @@ Detailed documentation for each major feature area.
 |----------|-------------|
 | [Networking Overview](networking.md) | Network architecture, SDN stack, and VM edge dataplane |
 | [VM edge dataplane (Network Fabric v3)](guides/vm-drivers/fluxvm-dataplane.md) | Fabric proxy of FluxVM TC/eBPF — API, Web, CLI, lab UX |
-| [Customer: VM Dataplane](customer/pages/infrastructure/dataplane.md) | Console walkthrough for Status / Policy / Stats / Flows |
+| [User: VM Dataplane](user/pages/infrastructure/dataplane.md) | Console walkthrough for Status / Policy / Stats / Flows |
 | Networking (netlink) | Bridges, VLANs, bonds, taps, macvtaps, VXLANs, SR-IOV |
 | Network Policies | Cilium-style label-based ingress/egress rules |
 | VM Firewall | Per-VM firewall profiles and zones via nftables |

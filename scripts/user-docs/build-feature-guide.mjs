@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Regenerate docs/zyvor-fabric-customer-feature-guide.{html,pdf} from the
- * current docs/zyvor-fabric-customer-feature-guide.md, using the same
- * theme/wrapHtml pipeline as build-customer-pdfs.mjs -- kept as a separate
- * script because that one's `books` array is hardcoded to docs/customer/*,
+ * Regenerate docs/zyvor-fabric-user-feature-guide.{html,pdf} from the
+ * current docs/zyvor-fabric-user-feature-guide.md, using the same
+ * theme/wrapHtml pipeline as build-user-pdfs.mjs -- kept as a separate
+ * script because that one's `books` array is hardcoded to docs/user/*,
  * a different directory this top-level guide isn't part of.
  */
 import { execFileSync } from 'node:child_process'
@@ -16,13 +16,13 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 try {
-  const envText = readFileSync(resolve(ROOT, 'scripts/customer-docs/product.env'), 'utf8')
+  const envText = readFileSync(resolve(ROOT, 'scripts/user-docs/product.env'), 'utf8')
   for (const line of envText.split('\n')) {
     const m = line.match(/^([A-Z0-9_]+)=(.*)$/)
     if (m) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '')
   }
 } catch {}
-const PRODUCT = process.env.CUSTOMER_DOCS_PRODUCT || 'Product'
+const PRODUCT = process.env.USER_DOCS_PRODUCT || 'Product'
 
 const MARKED_CANDIDATES = [
   resolve(ROOT, '.docs-tools/node_modules/marked/bin/marked.js'),
@@ -92,7 +92,7 @@ th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:to
 hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 blockquote{border-left:3px solid ${ACCENT};padding:.2em .9em;color:#475569;margin:.8em 0}
 </style></head><body>
-<section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
+<section class="cover"><div class="kicker">ZyvorAI Labs · User Documentation</div>
 <h1>${theme.brandHtml}</h1>
 <div class="sub">${sub}</div>
 <div class="badge">${today}</div>
@@ -110,9 +110,9 @@ if (!MARKED) fail('marked not found at any known path')
 const chrome = findChrome()
 if (!chrome) fail('Chrome/Chromium required')
 
-const SRC = resolve(ROOT, 'docs/zyvor-fabric-customer-feature-guide.md')
-const HTML_OUT = resolve(ROOT, 'docs/zyvor-fabric-customer-feature-guide.html')
-const PDF_OUT = resolve(ROOT, 'docs/zyvor-fabric-customer-feature-guide.pdf')
+const SRC = resolve(ROOT, 'docs/zyvor-fabric-user-feature-guide.md')
+const HTML_OUT = resolve(ROOT, 'docs/zyvor-fabric-user-feature-guide.html')
+const PDF_OUT = resolve(ROOT, 'docs/zyvor-fabric-user-feature-guide.pdf')
 
 const raw = readFileSync(SRC, 'utf8')
 const h1Match = raw.match(/^#\s+([^\n]+)\n/)

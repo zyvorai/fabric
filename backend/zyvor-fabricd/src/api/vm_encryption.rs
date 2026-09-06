@@ -284,7 +284,7 @@ pub async fn encrypt_vm(
     // wizard and never started has no FluxVM-side record yet, so disk
     // resolution fails here. Surface that as a clear precondition instead of
     // leaking "known to FluxVM" (an internal driver/dependency name the
-    // customer has no reason to recognize) straight into the error toast.
+    // user has no reason to recognize) straight into the error toast.
     if let Err(e) = &disk_path {
         if e.to_string().contains("known to FluxVM") {
             return (

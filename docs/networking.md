@@ -24,8 +24,8 @@ per-VM TC/eBPF edge as first-class API, Web, and CLI.
 Full enablement, troubleshooting, and lab UX checklist:
 [guides/vm-drivers/fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md).
 
-Customer console walkthrough:
-[customer/pages/infrastructure/dataplane.md](customer/pages/infrastructure/dataplane.md).
+User console walkthrough:
+[user/pages/infrastructure/dataplane.md](user/pages/infrastructure/dataplane.md).
 
 ---
 

@@ -92,7 +92,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 
 ## Related
 
-- [Customer page index](../customer/PAGE_INDEX.md)
+- [User page index](../user/PAGE_INDEX.md)
 - [UX conventions](../ux.md)
 - [Web UI summary](../web-ui.md)
 - [API reference](../api.md)
