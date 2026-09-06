@@ -522,6 +522,69 @@ a:hover {
   color: var(--zf-ink);
 }
 
+/* Terminal.app chrome — always near-black, both themes.
+   Light-theme remaps match Tailwind substrings like selection:bg-[#0a…] and
+   would otherwise paint these panes white with light text. */
+.zf-terminal {
+  background: #1c1c1e !important;
+  border: 1px solid rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22) !important;
+  color: #f5f5f7 !important;
+  color-scheme: dark;
+}
+.zf-terminal-titlebar {
+  background: #2c2c2e !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #f5f5f7 !important;
+}
+.zf-terminal-title {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+.zf-terminal-live {
+  color: #28c840 !important;
+}
+.zf-terminal-body,
+.zf-terminal-input,
+textarea.zf-terminal-input {
+  background: #1c1c1e !important;
+  color: #f5f5f7 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.zf-terminal .text-white,
+.zf-terminal .text-\[\#f5f5f7\],
+.zf-terminal [class*="text-white/"] {
+  color: #f5f5f7 !important;
+}
+.zf-terminal-body ::selection {
+  background: rgba(10, 132, 255, 0.4);
+}
+.zf-terminal-empty {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+.zf-terminal-input,
+textarea.zf-terminal-input {
+  caret-color: #f5f5f7;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.zf-terminal-input::placeholder,
+textarea.zf-terminal-input::placeholder {
+  color: rgba(255, 255, 255, 0.3) !important;
+}
+.zf-terminal-input::selection,
+textarea.zf-terminal-input::selection {
+  background: rgba(10, 132, 255, 0.4);
+}
+/* Keep title-bar trailing controls readable on black chrome */
+.zf-terminal-titlebar button,
+.zf-terminal-titlebar label {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+.zf-terminal-titlebar button:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
 .input-field,
 input.input-field,
 select.input-field,
@@ -793,14 +856,14 @@ textarea.input-field {
    force those specific elements light even while everything around them
    is dark. */
 html:not([data-theme='dark']) {
-  [class*="bg-slate-95"],
-  [class*="bg-slate-9"],
-  [class*="bg-slate-8"],
-  [class*="bg-slate-7"],
-  [class*="bg-[#0a"],
-  [class*="bg-[#0b"],
-  [class*="bg-[#0e"],
-  [class*="bg-[#0f"] {
+  [class*="bg-slate-95"]:not(.zf-terminal):not(.zf-terminal *),
+  [class*="bg-slate-9"]:not(.zf-terminal):not(.zf-terminal *),
+  [class*="bg-slate-8"]:not(.zf-terminal):not(.zf-terminal *),
+  [class*="bg-slate-7"]:not(.zf-terminal):not(.zf-terminal *),
+  [class*="bg-[#0a"]:not(.zf-terminal):not(.zf-terminal *),
+  [class*="bg-[#0b"]:not(.zf-terminal):not(.zf-terminal *),
+  [class*="bg-[#0e"]:not(.zf-terminal):not(.zf-terminal *),
+  [class*="bg-[#0f"]:not(.zf-terminal):not(.zf-terminal *) {
     background-color: var(--zf-surface) !important;
     background-image: none !important;
   }

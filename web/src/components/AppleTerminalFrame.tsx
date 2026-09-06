@@ -3,9 +3,11 @@
 
 import type { ReactNode, UIEventHandler, Ref, TextareaHTMLAttributes } from 'react'
 
-/** Shared styles for monospace editors inside AppleTerminalFrame. */
+/** Shared styles for monospace editors inside AppleTerminalFrame.
+ *  Avoid Tailwind `selection:bg-[#0a…]` / `bg-[#0…]` class substrings — light-theme
+ *  compatibility remaps those to canvas white and wash out the terminal. */
 export const TERM_TEXTAREA_CLASS =
-  'w-full bg-transparent border-0 px-3 py-2 text-[12px] leading-[1.45] text-[#f5f5f7] placeholder:text-white/30 focus:outline-none focus:ring-0 resize-y disabled:opacity-50 read-only:opacity-80 selection:bg-[#0a84ff]/40'
+  'zf-terminal-input w-full border-0 px-3 py-2 text-[12px] leading-[1.45] focus:outline-none focus:ring-0 resize-y disabled:opacity-50 read-only:opacity-80'
 
 export const TERM_FONT_STYLE = {
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -25,7 +27,7 @@ type AppleTerminalFrameProps = {
   emptyMessage?: string
 }
 
-/** macOS Terminal.app-style chrome: traffic lights + near-black body. */
+/** macOS Terminal.app-style chrome: always black, even in light theme. */
 export function AppleTerminalFrame({
   title,
   live,
@@ -39,29 +41,27 @@ export function AppleTerminalFrame({
   emptyMessage = 'No output yet',
 }: AppleTerminalFrameProps) {
   return (
-    <div
-      className={`rounded-xl overflow-hidden border border-black/40 shadow-lg shadow-black/20 bg-[#1c1c1e] ${className}`.trim()}
-    >
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-[#2c2c2e]">
+    <div className={`zf-terminal rounded-xl overflow-hidden ${className}`.trim()}>
+      <div className="zf-terminal-titlebar flex items-center gap-2 px-4 py-2.5">
         <span className="w-3 h-3 rounded-full bg-[#ff5f57]" aria-hidden />
         <span className="w-3 h-3 rounded-full bg-[#febc2e]" aria-hidden />
         <span className="w-3 h-3 rounded-full bg-[#28c840]" aria-hidden />
-        <span className="ml-3 text-xs text-white/50 font-medium truncate tracking-wide min-w-0 flex-1">
+        <span className="zf-terminal-title ml-3 text-xs font-medium truncate tracking-wide min-w-0 flex-1">
           {title}
         </span>
         {live && (
-          <span className="text-[10px] uppercase tracking-wider text-[#28c840] shrink-0">Live</span>
+          <span className="zf-terminal-live text-[10px] uppercase tracking-wider shrink-0">Live</span>
         )}
         {trailing}
       </div>
       <div
         ref={bodyRef}
         onScroll={onBodyScroll}
-        className={`font-mono text-[12px] leading-[1.45] text-[#f5f5f7] selection:bg-[#0a84ff]/40 ${bodyClassName}`}
-        style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
+        className={`zf-terminal-body font-mono text-[12px] leading-[1.45] ${bodyClassName}`}
+        style={TERM_FONT_STYLE}
       >
         {empty ? (
-          <div className="p-8 text-center text-white/40 text-sm">{emptyMessage}</div>
+          <div className="zf-terminal-empty p-8 text-center text-sm">{emptyMessage}</div>
         ) : (
           children
         )}
