@@ -232,7 +232,7 @@ export default function VMDetails() {
       <div className="border-b border-[var(--zf-hairline)] min-w-0 max-w-full">
         <nav
           className="grid w-full min-w-0 gap-x-0.5 gap-y-0 -mb-px"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(5.75rem, max-content))' }}
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(7.25rem, 1fr))' }}
           aria-label="VM sections"
         >
           {tabs.map((tab) => {
