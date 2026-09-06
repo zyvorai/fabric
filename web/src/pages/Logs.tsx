@@ -10,6 +10,8 @@ import { formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
+import { AppleTerminalFrame, TERM_LEVEL_COLOR } from '../components/AppleTerminalFrame'
+import { AnsiText } from '../components/AnsiText'
 
 interface LogEntry {
   id?: string
@@ -95,26 +97,6 @@ export default function Logs() {
     URL.revokeObjectURL(url)
   }
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'INFO': return 'text-[var(--zf-link)]'
-      case 'WARN': case 'WARNING': return 'text-amber-800'
-      case 'ERROR': case 'CRITICAL': return 'text-red-700'
-      case 'DEBUG': return 'text-[var(--zf-muted)]'
-      default: return 'text-[var(--zf-ink)]'
-    }
-  }
-
-  const getLevelBg = (level: string) => {
-    switch (level) {
-      case 'INFO': return 'bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
-      case 'WARN': case 'WARNING': return 'bg-amber-50 border-amber-200'
-      case 'ERROR': case 'CRITICAL': return 'bg-red-50 border-red-200'
-      case 'DEBUG': return 'bg-black/[0.04] border-[var(--zf-hairline)]'
-      default: return 'bg-[var(--zf-surface)] border-[var(--zf-hairline)]'
-    }
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -197,44 +179,37 @@ export default function Logs() {
         </div>
       </div>
 
-      {/* Log Stream */}
-      <div className="bg-[var(--zf-canvas)] rounded-lg border border-[var(--zf-hairline)] overflow-hidden">
-        <div ref={logContainerRef} className="h-[600px] overflow-y-auto font-mono text-sm" id="log-container">
-          {loading ? (
-            <div className="flex items-center justify-center h-full text-[var(--zf-muted)]">
-              Loading logs...
+      <AppleTerminalFrame
+        title="zyvor-fabricd — audit log"
+        live={!loading}
+        bodyRef={logContainerRef}
+        bodyClassName="h-[600px] overflow-y-auto px-3 py-2"
+        empty={filteredLogs.length === 0}
+        emptyMessage={loading ? 'Loading logs…' : 'No logs to display'}
+      >
+        {filteredLogs.map((log, index) => (
+            <div
+              key={log.id || index}
+              className="flex items-start gap-3 py-1 hover:bg-white/[0.04] rounded px-1 -mx-1"
+            >
+              <span className="text-white/30 text-[11px] whitespace-nowrap tabular-nums shrink-0">
+                {log.timestamp.length > 19 ? log.timestamp.slice(0, 19).replace('T', ' ') : log.timestamp}
+              </span>
+              <span
+                className="font-semibold text-[11px] whitespace-nowrap shrink-0 w-14"
+                style={{ color: TERM_LEVEL_COLOR[log.level] || '#f5f5f7' }}
+              >
+                {log.level}
+              </span>
+              <span className="text-white/40 text-[11px] whitespace-nowrap shrink-0 max-w-[8rem] truncate">
+                [{log.source}]
+              </span>
+              <span className="flex-1 min-w-0 break-words whitespace-pre-wrap">
+                <AnsiText text={log.message} />
+              </span>
             </div>
-          ) : filteredLogs.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-[var(--zf-muted)]">
-              No logs to display
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--zf-hairline)]">
-              {filteredLogs.map((log, index) => (
-                <div
-                  key={log.id || index}
-                  className={`p-3 hover:bg-black/[0.02] transition ${getLevelBg(log.level)} border-l-4`}
-                >
-                  <div className="flex items-start gap-4">
-                    <span className="text-[var(--zf-muted)] text-xs whitespace-nowrap">
-                      {log.timestamp.length > 19 ? log.timestamp.slice(0, 19).replace('T', ' ') : log.timestamp}
-                    </span>
-                    <span className={`font-bold text-xs whitespace-nowrap ${getLevelColor(log.level)}`}>
-                      {log.level}
-                    </span>
-                    <span className="text-[var(--zf-muted)] text-xs whitespace-nowrap">
-                      [{log.source}]
-                    </span>
-                    <span className="text-[var(--zf-ink)] flex-1">
-                      {log.message}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+          ))}
+      </AppleTerminalFrame>
     </div>
   )
 }

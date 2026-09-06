@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
-import { Clock, CheckCircle, AlertCircle, Loader2, Terminal, XCircle } from 'lucide-react'
+import { Clock, CheckCircle, AlertCircle, Loader2, XCircle } from 'lucide-react'
 import { apiFetch } from '../api/client'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
@@ -10,6 +10,8 @@ import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
+import { AnsiText } from '../components/AnsiText'
 
 interface Job {
   id: string
@@ -52,7 +54,7 @@ export default function JobMonitor() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
   const [follow, setFollow] = useState(true)
-  const logRef = useRef<HTMLPreElement>(null)
+  const logRef = useRef<HTMLDivElement>(null)
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -184,16 +186,26 @@ export default function JobMonitor() {
                 </div>
                 {selected.error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 font-mono">{selected.error}</div>}
               </div>
-              {/* Live logs */}
-              <div className="bg-[var(--zf-canvas)] rounded-xl border border-[var(--zf-hairline)] overflow-hidden">
-                <div className="px-4 py-3 border-b border-[var(--zf-hairline)] flex items-center justify-between">
-                  <div className="flex items-center gap-2"><Terminal className="w-4 h-4 text-emerald-700" /><span className="text-sm font-semibold text-[var(--zf-ink)]">Logs</span></div>
-                  <label className="flex items-center gap-2 text-xs text-[var(--zf-muted)] cursor-pointer"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="rounded border-[var(--zf-hairline)]" /> Follow</label>
-                </div>
-                <pre ref={logRef} className="p-4 text-xs font-mono text-emerald-700 bg-[var(--zf-surface)] max-h-80 overflow-y-auto whitespace-pre">
-                  {logs.length > 0 ? logs.join('\n') : 'No logs available — click a running job to stream logs'}
-                </pre>
-              </div>
+              <AppleTerminalFrame
+                title={`${selected.name || selected.vm_name || selected.id} — job logs`}
+                live={selected.status === 'running'}
+                trailing={
+                  <label className="flex items-center gap-2 text-[11px] text-white/50 cursor-pointer shrink-0">
+                    <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="rounded border-white/20" />
+                    Follow
+                  </label>
+                }
+                bodyRef={logRef}
+                bodyClassName="max-h-80 overflow-y-auto px-3 py-2 whitespace-pre-wrap"
+                empty={logs.length === 0}
+                emptyMessage="No logs available — click a running job to stream logs"
+              >
+                {logs.map((line, i) => (
+                  <div key={i}>
+                    <AnsiText text={line} />
+                  </div>
+                ))}
+              </AppleTerminalFrame>
             </>
           ) : (
             <div className="bg-[var(--zf-canvas)] rounded-xl p-10 border border-[var(--zf-hairline)] text-center text-[var(--zf-muted)] text-sm">Select a job to view details and logs</div>

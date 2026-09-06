@@ -8,6 +8,8 @@ import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader, Card } from '../components/ui'
 import { formatUserError } from '../utils/apiError'
 import { hintsForError } from '../utils/daemonHints'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
+import { AnsiText } from '../components/AnsiText'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
@@ -271,9 +273,12 @@ export default function APIPlayground() {
               </details>
 
               <div className="p-4">
-                <pre className="text-sm text-[var(--zf-ink)] font-mono whitespace-pre-wrap break-words max-h-[400px] overflow-y-auto">
-                  {response.body || '(empty body)'}
-                </pre>
+                <AppleTerminalFrame
+                  title={`${response.status} ${response.statusText} — ${response.duration}ms`}
+                  bodyClassName="max-h-[400px] overflow-y-auto px-3 py-2 whitespace-pre-wrap break-words"
+                >
+                  <AnsiText text={response.body || '(empty body)'} />
+                </AppleTerminalFrame>
               </div>
             </Card>
           )}

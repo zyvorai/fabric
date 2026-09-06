@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../api/client'
 import { PageHeader } from '../components/ui'
 import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
+import { AnsiText } from '../components/AnsiText'
 
 type PanelKey = 'top' | 'iostat' | 'vmstat' | 'netstat'
 
@@ -112,14 +114,15 @@ export default function Debug() {
               <div className="p-2">
                 {state.error ? (
                   <div className="p-4 text-center text-[var(--zf-danger)] text-sm">{state.error}</div>
-                ) : state.lines.length === 0 && !state.loading ? (
-                  <div className="p-4 text-center text-[var(--zf-muted)] text-sm">
-                    Click Refresh to load data
-                  </div>
                 ) : (
-                  <pre className="bg-[var(--zf-surface)] rounded-lg p-4 text-emerald-700 text-xs font-mono overflow-x-auto max-h-80 overflow-y-auto whitespace-pre">
-                    {state.lines.join('\n')}
-                  </pre>
+                  <AppleTerminalFrame
+                    title={panel.label.toLowerCase()}
+                    bodyClassName="max-h-80 overflow-auto px-3 py-2 whitespace-pre"
+                    empty={state.lines.length === 0 && !state.loading}
+                    emptyMessage={state.loading ? 'Loading…' : 'Click Refresh to load data'}
+                  >
+                    <AnsiText text={state.lines.join('\n')} />
+                  </AppleTerminalFrame>
                 )}
               </div>
             </div>

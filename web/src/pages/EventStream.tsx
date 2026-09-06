@@ -7,6 +7,8 @@ import { useEventStream, type VMEventPayload } from '../hooks/useEventStream'
 import ErrorBanner from '../components/ErrorBanner'
 import { PageHeader } from '../components/ui'
 import { hintsForError } from '../utils/daemonHints'
+import { AppleTerminalFrame, TERM_LEVEL_COLOR } from '../components/AppleTerminalFrame'
+import { AnsiText } from '../components/AnsiText'
 
 interface StreamEvent {
   id: number
@@ -18,20 +20,7 @@ interface StreamEvent {
 }
 
 function levelColor(level: string): string {
-  switch (level) {
-    case 'error': return 'text-red-600'
-    case 'warning': return 'text-amber-600'
-    case 'debug': return 'text-[var(--zf-muted)]'
-    default: return 'text-[var(--zf-link)]'
-  }
-}
-
-function levelBg(level: string): string {
-  switch (level) {
-    case 'error': return 'bg-red-50'
-    case 'warning': return 'bg-amber-50'
-    default: return ''
-  }
+  return TERM_LEVEL_COLOR[level] || '#64d2ff'
 }
 
 function mapPayload(payload: VMEventPayload): StreamEvent {
@@ -140,26 +129,35 @@ export default function EventStream() {
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        className="rounded-xl border border-[var(--zf-hairline)] bg-white max-h-[70vh] overflow-y-auto font-mono text-sm"
+      <AppleTerminalFrame
+        title="event stream — SSE"
+        live={connected && !paused}
+        bodyRef={containerRef}
+        bodyClassName="max-h-[70vh] overflow-y-auto px-3 py-2"
+        empty={filtered.length === 0}
+        emptyMessage="Waiting for events…"
       >
-        {filtered.length === 0 ? (
-          <div className="p-8 text-center text-[var(--zf-muted)]">Waiting for events…</div>
-        ) : (
-          filtered.map((ev) => (
-            <div
-              key={ev.id}
-              className={`flex gap-3 px-4 py-2 border-b border-[var(--zf-hairline)] ${levelBg(ev.level)}`}
+        {filtered.map((ev) => (
+          <div
+            key={ev.id}
+            className="flex gap-3 py-1 hover:bg-white/[0.04] rounded px-1 -mx-1"
+          >
+            <span className="text-white/30 shrink-0 tabular-nums text-[11px]">
+              {ev.timestamp.toLocaleTimeString(undefined, { hour12: false })}
+            </span>
+            <span
+              className="shrink-0 uppercase text-[11px] font-semibold w-14"
+              style={{ color: levelColor(ev.level) }}
             >
-              <span className="text-[var(--zf-muted)] shrink-0">{ev.timestamp.toLocaleTimeString()}</span>
-              <span className={`shrink-0 uppercase text-xs font-bold ${levelColor(ev.level)}`}>{ev.level}</span>
-              <span className="text-[var(--zf-ink)] font-medium shrink-0">{ev.source}</span>
-              <span className="text-[var(--zf-ink)] truncate">{ev.message}</span>
-            </div>
-          ))
-        )}
-      </div>
+              {ev.level}
+            </span>
+            <span className="text-[#ffd60a]/70 font-medium shrink-0">{ev.source}</span>
+            <span className="min-w-0 break-words whitespace-pre-wrap">
+              <AnsiText text={ev.message} />
+            </span>
+          </div>
+        ))}
+      </AppleTerminalFrame>
     </div>
   )
 }

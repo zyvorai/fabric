@@ -9,6 +9,7 @@ import { formatHttpErrorBody, formatUserError } from '../utils/apiError'
 import { toastFailure } from '../utils/toastError'
 import { hintsForError } from '../utils/daemonHints'
 import { useToastContext } from '../contexts/ToastContext'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
 
 export default function Kernel() {
   const toast = useToastContext()
@@ -107,11 +108,11 @@ export default function Kernel() {
       </div>
 
       {(data?.cmdline || data?.boot_cmdline) && (
-        <div className="bg-[var(--zf-surface)] rounded-xl border border-[var(--zf-hairline)] p-5">
-          <h3 className="text-base font-semibold text-[var(--zf-ink)] mb-3">Boot Command Line</h3>
-          <pre className="text-xs text-[var(--zf-ink)] bg-[var(--zf-canvas)] rounded-lg p-4 overflow-x-auto font-mono whitespace-pre-wrap break-all">
+        <div className="bg-[var(--zf-surface)] rounded-xl border border-[var(--zf-hairline)] p-5 space-y-3">
+          <h3 className="text-base font-semibold text-[var(--zf-ink)]">Boot Command Line</h3>
+          <AppleTerminalFrame title="kernel — cmdline" bodyClassName="max-h-40 overflow-auto px-3 py-2 whitespace-pre-wrap break-all">
             {data.cmdline || data.boot_cmdline}
-          </pre>
+          </AppleTerminalFrame>
         </div>
       )}
 

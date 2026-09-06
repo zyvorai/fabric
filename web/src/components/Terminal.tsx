@@ -6,6 +6,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { getToken } from '../api/client'
 import { RotateCw } from 'lucide-react'
+import { AppleTerminalFrame } from './AppleTerminalFrame'
 
 interface TerminalProps {
   vmName: string
@@ -25,28 +26,41 @@ export default function Terminal({ vmName }: TerminalProps) {
     setStatus('connecting')
     terminalRef.current.replaceChildren()
 
-    // Create terminal
     const term = new XTerm({
       cursorBlink: true,
-      fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontSize: 13,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       theme: {
-        background: '#000000',
-        foreground: '#ffffff',
+        background: '#1c1c1e',
+        foreground: '#f5f5f7',
+        cursor: '#f5f5f7',
+        selectionBackground: '#0a84ff66',
+        black: '#8e8e93',
+        red: '#ff453a',
+        green: '#32d74b',
+        yellow: '#ffd60a',
+        blue: '#0a84ff',
+        magenta: '#bf5af2',
+        cyan: '#64d2ff',
+        white: '#f5f5f7',
+        brightBlack: '#636366',
+        brightRed: '#ff6961',
+        brightGreen: '#30db5b',
+        brightYellow: '#ffd426',
+        brightBlue: '#409cff',
+        brightMagenta: '#da8fff',
+        brightCyan: '#70d7ff',
+        brightWhite: '#ffffff',
       },
     })
 
     term.open(terminalRef.current)
     xtermRef.current = term
 
-    // Connect WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const token = getToken()
     const wsUrl = `${protocol}//${window.location.host}/ws/console/${vmName}${token ? `?token=${encodeURIComponent(token)}` : ''}`
     const ws = new WebSocket(wsUrl)
-    // The backend streams raw PTY bytes as binary frames (not guaranteed
-    // valid UTF-8) — without this, event.data below is a Blob, which
-    // xterm's write() silently ignores, so nothing ever renders.
     ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
@@ -72,7 +86,6 @@ export default function Terminal({ vmName }: TerminalProps) {
       term.write('\r\nConnection closed\r\n')
     }
 
-    // Send data from terminal to WebSocket
     term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(data)
@@ -81,43 +94,45 @@ export default function Terminal({ vmName }: TerminalProps) {
 
     wsRef.current = ws
 
-    // Cleanup
     return () => {
       ws.close()
       term.dispose()
     }
   }, [vmName, connectAttempt])
 
-  const statusMeta: Record<Status, { label: string; dot: string; text: string }> = {
-    connecting: { label: 'Connecting…', dot: 'bg-amber-400 animate-pulse', text: 'text-amber-400' },
-    connected: { label: 'Connected', dot: 'bg-emerald-400', text: 'text-emerald-400' },
-    disconnected: { label: 'Disconnected', dot: 'bg-slate-500', text: 'text-slate-400' },
+  const statusMeta: Record<Status, { label: string; color: string }> = {
+    connecting: { label: 'Connecting…', color: '#ffd60a' },
+    connected: { label: 'Connected', color: '#28c840' },
+    disconnected: { label: 'Disconnected', color: '#8e8e93' },
   }
   const meta = statusMeta[status]
 
   return (
-    <div className="relative rounded-xl border border-slate-700/50 overflow-hidden bg-gradient-to-b from-slate-900 to-black">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/10 bg-slate-900/70">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
-          <span className={`text-xs font-medium ${meta.text}`}>{meta.label}</span>
+    <AppleTerminalFrame
+      title={`${vmName} — tty`}
+      live={status === 'connected'}
+      trailing={
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px]" style={{ color: meta.color }}>{meta.label}</span>
+          {status === 'disconnected' && (
+            <button
+              type="button"
+              onClick={() => setConnectAttempt((n) => n + 1)}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              Reconnect
+            </button>
+          )}
         </div>
-        {status === 'disconnected' && (
-          <button
-            type="button"
-            onClick={() => setConnectAttempt((n) => n + 1)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-            Reconnect
-          </button>
-        )}
-      </div>
+      }
+      bodyClassName="p-2"
+    >
       <div
         ref={terminalRef}
-        className="w-full p-2"
+        className="w-full"
         style={{ minHeight: '500px' }}
       />
-    </div>
+    </AppleTerminalFrame>
   )
 }

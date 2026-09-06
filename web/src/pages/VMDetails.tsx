@@ -34,6 +34,7 @@ import AdvancedTab from './vm-details/AdvancedTab'
 import RescueTab from './vm-details/RescueTab'
 import DataplanePanel from './vm-details/DataplanePanel'
 import { AnsiText } from '../components/AnsiText'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
 import { isSpinnerNoise } from '../utils/ansi'
 
 type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'dataplane' | 'snapshots' | 'logs' | 'hotplug' | 'devices' | 'cloudinit' | 'advanced' | 'rescue'
@@ -1312,81 +1313,51 @@ function LogsTab({ vm }: { vm: VM }) {
       )}
 
       {!error && loading && displayLogs.length === 0 && (
-        <div className="rounded-xl overflow-hidden border border-black/40 bg-[#1c1c1e]">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-[#2c2c2e]">
-            <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
-            <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
-            <span className="w-3 h-3 rounded-full bg-[#28c840]" />
-            <span className="ml-3 text-xs text-white/40 font-medium truncate">{vm.name} — console</span>
-          </div>
-          <div className="p-8 text-center">
-            <Loader2 className="w-6 h-6 text-white/40 mx-auto mb-2 animate-spin" />
-            <p className="text-white/40 text-sm">Loading console output...</p>
-          </div>
-        </div>
+        <AppleTerminalFrame title={`${vm.name} — console`} empty emptyMessage="Loading console output..." />
       )}
 
       {!error && !loading && displayLogs.length === 0 && (
-        <div className="rounded-xl overflow-hidden border border-black/40 bg-[#1c1c1e]">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-[#2c2c2e]">
-            <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
-            <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
-            <span className="w-3 h-3 rounded-full bg-[#28c840]" />
-            <span className="ml-3 text-xs text-white/40 font-medium truncate">{vm.name} — console</span>
-          </div>
-          <div className="p-8 text-center">
-            <Terminal className="w-10 h-10 text-white/25 mx-auto mb-3" />
-            <p className="text-white/40 text-sm">
-              {vm.state === 'stopped'
-                ? "No console output captured yet — it appears here once this VM has booted at least once."
-                : 'No console output yet — this can take a few seconds right after boot.'}
-            </p>
-          </div>
-        </div>
+        <AppleTerminalFrame
+          title={`${vm.name} — console`}
+          empty
+          emptyMessage={
+            vm.state === 'stopped'
+              ? 'No console output captured yet — it appears here once this VM has booted at least once.'
+              : 'No console output yet — this can take a few seconds right after boot.'
+          }
+        />
       )}
 
       {displayLogs.length > 0 && (
-        <div className="rounded-xl overflow-hidden border border-black/40 shadow-lg shadow-black/20 bg-[#1c1c1e]">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-[#2c2c2e]">
-            <span className="w-3 h-3 rounded-full bg-[#ff5f57]" aria-hidden />
-            <span className="w-3 h-3 rounded-full bg-[#febc2e]" aria-hidden />
-            <span className="w-3 h-3 rounded-full bg-[#28c840]" aria-hidden />
-            <span className="ml-3 text-xs text-white/50 font-medium truncate tracking-wide">
-              {vm.name} — console
-            </span>
-            {autoRefresh && (
-              <span className="ml-auto text-[10px] uppercase tracking-wider text-[#28c840]">Live</span>
-            )}
-          </div>
-          <div
-            ref={termRef}
-            onScroll={onTermScroll}
-            className="font-mono text-[12px] leading-[1.45] max-h-[36rem] overflow-y-auto px-3 py-2 text-[#f5f5f7] selection:bg-[#0a84ff]/40"
-            style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
-          >
-            {displayLogs.map((log, i) => {
-              let ts = ''
-              try {
-                ts = new Date(log.timestamp).toLocaleTimeString(undefined, { hour12: false })
-              } catch { /* ignore */ }
-              const pri = log.priority?.toLowerCase() || 'info'
-              return (
-                <div key={i} className="flex gap-2.5 py-[1px] hover:bg-white/[0.04] rounded px-1 -mx-1">
-                  <span className="text-white/25 shrink-0 tabular-nums w-[4.5rem] text-right select-none">
-                    {ts}
-                  </span>
-                  <span
-                    className={`mt-[6px] w-1.5 h-1.5 rounded-full shrink-0 ${LOG_PRIORITY_DOT[pri] || 'bg-zinc-500'}`}
-                    title={pri}
-                  />
-                  <span className="min-w-0 break-words whitespace-pre-wrap">
-                    <AnsiText text={log.message} />
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <AppleTerminalFrame
+          title={`${vm.name} — console`}
+          live={autoRefresh}
+          bodyRef={termRef}
+          onBodyScroll={onTermScroll}
+          bodyClassName="font-mono text-[12px] leading-[1.45] max-h-[36rem] overflow-y-auto px-3 py-2 text-[#f5f5f7] selection:bg-[#0a84ff]/40"
+        >
+          {displayLogs.map((log, i) => {
+            let ts = ''
+            try {
+              ts = new Date(log.timestamp).toLocaleTimeString(undefined, { hour12: false })
+            } catch { /* ignore */ }
+            const pri = log.priority?.toLowerCase() || 'info'
+            return (
+              <div key={i} className="flex gap-2.5 py-[1px] hover:bg-white/[0.04] rounded px-1 -mx-1">
+                <span className="text-white/25 shrink-0 tabular-nums w-[4.5rem] text-right select-none">
+                  {ts}
+                </span>
+                <span
+                  className={`mt-[6px] w-1.5 h-1.5 rounded-full shrink-0 ${LOG_PRIORITY_DOT[pri] || 'bg-zinc-500'}`}
+                  title={pri}
+                />
+                <span className="min-w-0 break-words whitespace-pre-wrap">
+                  <AnsiText text={log.message} />
+                </span>
+              </div>
+            )
+          })}
+        </AppleTerminalFrame>
       )}
 
       <div>

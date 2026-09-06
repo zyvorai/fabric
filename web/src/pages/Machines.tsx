@@ -25,6 +25,8 @@ import SubsystemBanner from '../components/SubsystemBanner'
 import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
+import { AppleTerminalFrame } from '../components/AppleTerminalFrame'
+import { AnsiText } from '../components/AnsiText'
 
 export default function Machines() {
   const navigate = useNavigate()
@@ -340,11 +342,17 @@ export default function Machines() {
                   <button onClick={runShell} className="zf-btn zf-btn-primary zf-btn-sm">Run</button>
                 </div>
                 {shellOutput && (
-                  <div className="bg-[var(--zf-canvas)] rounded p-3 font-mono text-xs max-h-64 overflow-auto">
-                    {shellOutput.stdout && <pre className="text-[var(--zf-ink)] whitespace-pre-wrap">{shellOutput.stdout}</pre>}
-                    {shellOutput.stderr && <pre className="text-red-600 whitespace-pre-wrap">{shellOutput.stderr}</pre>}
-                    <div className="text-[var(--zf-muted)] mt-2 border-t border-[var(--zf-hairline)] pt-1">exit code: {shellOutput.exit_code}</div>
-                  </div>
+                  <AppleTerminalFrame
+                    title={`shell — exit ${shellOutput.exit_code}`}
+                    bodyClassName="max-h-64 overflow-auto px-3 py-2 whitespace-pre-wrap"
+                  >
+                    {shellOutput.stdout ? <AnsiText text={shellOutput.stdout} /> : null}
+                    {shellOutput.stderr ? (
+                      <div className="mt-1">
+                        <AnsiText text={shellOutput.stderr} />
+                      </div>
+                    ) : null}
+                  </AppleTerminalFrame>
                 )}
               </div>
 
