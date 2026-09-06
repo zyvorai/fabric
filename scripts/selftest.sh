@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: Apache-2.0
 # ============================================================================
 # selftest.sh — Post-install verification for zyvor-fabricd
 # ============================================================================

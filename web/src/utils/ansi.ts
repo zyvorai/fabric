@@ -1,4 +1,4 @@
-// Copyright 2026 Zyvor
+// Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
 /** Terminal.app-ish ANSI colors on a near-black background. */

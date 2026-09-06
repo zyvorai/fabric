@@ -1,3 +1,6 @@
+// Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+// SPDX-License-Identifier: Apache-2.0
+
 // Package main runs client smoke checks against a live zyvor-fabricd (see scripts/acceptance-smoke.sh).
 package main
 

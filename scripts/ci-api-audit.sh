@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: Apache-2.0
 # CI smoke: build zyvor-fabricd, start on localhost, run audit-ux-apis.sh
 set -euo pipefail
 

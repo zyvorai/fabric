@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: Apache-2.0
 # scripts/build-vendor-binaries.sh — build & install the three guest-side
 # binaries zyvor-fabricd serves/injects but does not build itself:
 #

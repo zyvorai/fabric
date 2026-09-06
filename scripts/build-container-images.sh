@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 # SPDX-License-Identifier: Apache-2.0
 # Build the two local images docker-compose.yml expects: zyvor-fabricd's own
 # (a plain single-context build) and fluxvm's (which needs the sibling

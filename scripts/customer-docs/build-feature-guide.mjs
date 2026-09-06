@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Regenerate docs/zyvor-fabric-customer-feature-guide.{html,pdf} from the
  * current docs/zyvor-fabric-customer-feature-guide.md, using the same

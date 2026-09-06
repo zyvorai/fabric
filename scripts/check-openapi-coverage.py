@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: Apache-2.0
 """Fail if audit tier-1 GET paths are missing from openapi.yaml."""
 from __future__ import annotations
 
