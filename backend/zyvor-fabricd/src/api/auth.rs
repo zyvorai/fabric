@@ -93,6 +93,8 @@ pub struct LoginResponse {
     pub user_id: String,
     pub role: String,
     pub username: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -100,6 +102,8 @@ pub struct MeResponse {
     pub id: String,
     pub username: String,
     pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 pub async fn login(
@@ -152,6 +156,7 @@ pub async fn login(
         Database {
             user_id: String,
             role: security::Role,
+            tenant: Option<String>,
         },
         Pam,
     }
@@ -213,6 +218,7 @@ pub async fn login(
             AuthSource::Database {
                 user_id: db_user.id,
                 role: db_user.role,
+                tenant: db_user.tenant,
             }
         } else {
             let pam_result = tokio::task::spawn_blocking({
@@ -310,20 +316,24 @@ pub async fn login(
         }
     }
 
-    let (user_id, role) = match auth_source {
-        AuthSource::Database { user_id, role } => (user_id, role),
+    let (user_id, role, tenant) = match auth_source {
+        AuthSource::Database {
+            user_id,
+            role,
+            tenant,
+        } => (user_id, role, tenant),
         AuthSource::Pam => {
             let role = if req.username == "root" || is_admin_user(&req.username).await {
                 security::Role::Admin
             } else {
                 security::Role::User
             };
-            (req.username.clone(), role)
+            (req.username.clone(), role, None)
         }
     };
 
     let token = jwt_config
-        .generate_token(&user_id, role.clone())
+        .generate_token_with_tenant(&user_id, role.clone(), tenant.clone())
         .map_err(|_| {
             crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
         })?;
@@ -340,6 +350,7 @@ pub async fn login(
         user_id: user_id.clone(),
         role: role_str,
         username: req.username,
+        tenant,
     }))
 }
 
@@ -392,6 +403,7 @@ pub async fn me(
                 id: user.id,
                 username: user.username,
                 role: role_str,
+                tenant: user.tenant.or(claims.tenant.clone()),
             }));
         }
 
@@ -406,6 +418,7 @@ pub async fn me(
                 id: user.id,
                 username: user.username,
                 role: role_str,
+                tenant: user.tenant.or(claims.tenant.clone()),
             }));
         }
     }
@@ -415,6 +428,7 @@ pub async fn me(
         id: claims.sub.clone(),
         username: claims.sub,
         role: role_str,
+        tenant: claims.tenant,
     }))
 }
 

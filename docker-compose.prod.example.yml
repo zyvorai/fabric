@@ -46,7 +46,7 @@ services:
       - SYS_CHROOT
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-fk", "https://localhost:${ZYVOR_FABRICD_PORT:-9095}/health"]
+      test: ["CMD-SHELL", "curl -sfk https://localhost:${ZYVOR_FABRICD_PORT:-9095}/health >/dev/null && curl -sfk https://localhost:${ZYVOR_FABRICD_PORT:-9095}/readyz >/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3

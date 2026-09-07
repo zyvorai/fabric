@@ -24,6 +24,9 @@ pub struct Claims {
     pub exp: usize, // expiration time
     #[serde(default)]
     pub jti: String, // JWT ID for revocation
+    /// When set, scopes VM create/list/get/mutate to this tenant (mirrors FluxVM token tenant).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,6 +68,15 @@ impl JwtConfig {
     }
 
     pub fn generate_token(&self, user_id: &str, role: Role) -> Result<String> {
+        self.generate_token_with_tenant(user_id, role, None)
+    }
+
+    pub fn generate_token_with_tenant(
+        &self,
+        user_id: &str,
+        role: Role,
+        tenant: Option<String>,
+    ) -> Result<String> {
         let hours = if self.expiration_hours < 1 {
             tracing::warn!(
                 "Token expiration_hours ({}) is too low, using minimum of 1 hour",
@@ -84,6 +96,7 @@ impl JwtConfig {
             role,
             exp: expiration,
             jti: uuid::Uuid::new_v4().to_string(),
+            tenant: tenant.filter(|t| !t.is_empty()),
         };
 
         let token = encode(
@@ -217,6 +230,7 @@ fn unauthenticated_claims() -> Claims {
         role: Role::Viewer,
         exp: usize::MAX,
         jti: String::new(),
+        tenant: None,
     }
 }
 
@@ -329,6 +343,8 @@ pub struct User {
     pub username: String,
     pub password_hash: String,
     pub role: Role,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 impl User {
@@ -339,6 +355,7 @@ impl User {
             username,
             password_hash,
             role,
+            tenant: None,
         })
     }
 
@@ -358,6 +375,8 @@ pub struct LoginResponse {
     pub token: String,
     pub user_id: String,
     pub role: Role,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 // Audit logging

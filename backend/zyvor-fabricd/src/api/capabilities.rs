@@ -34,6 +34,9 @@ pub struct CapabilitiesResponse {
     pub vm_dataplane: SubsystemStatus,
     pub auth: SubsystemStatus,
     pub events: SubsystemStatus,
+    /// External Hubble UI link when `network.hubble_ui_url` is configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hubble_ui_url: Option<String>,
 }
 
 /// GET /api/v1/capabilities — live status of core platform subsystems.
@@ -55,6 +58,12 @@ pub async fn get_capabilities(
         vm_dataplane,
         auth,
         events,
+        hubble_ui_url: state
+            .config
+            .network
+            .hubble_ui_url
+            .clone()
+            .filter(|u| !u.is_empty()),
     })
 }
 

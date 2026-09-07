@@ -2221,6 +2221,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     // Apply auth middleware if enabled
     if let Some(ref jwt_config) = state.jwt_config {
         api_routes = api_routes.route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::tenant_scope::tenant_guard_middleware,
+        ));
+        api_routes = api_routes.route_layer(axum::middleware::from_fn_with_state(
             jwt_config.clone(),
             security::auth_middleware,
         ));

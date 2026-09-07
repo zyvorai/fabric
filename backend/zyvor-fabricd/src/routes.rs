@@ -74,7 +74,7 @@ fn json_error_safe(
 }
 
 pub async fn list_vms(
-    RequireRead(_claims): RequireRead,
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(pagination): Query<PaginationQuery>,
 ) -> impl IntoResponse {
@@ -83,10 +83,15 @@ pub async fn list_vms(
     // Cap limit to prevent abuse
     let limit = limit.min(1000);
 
+    let tenant_filter = match crate::tenant_scope::apply_list_tenant_filter(&claims, pagination.tenant) {
+        Ok(t) => t,
+        Err((status, msg)) => return json_error(status, msg).into_response(),
+    };
+
     match state.store.list_vms_paginated(offset, limit) {
         Ok((mut vms, mut total)) => {
-            if let Some(ref tenant) = pagination.tenant {
-                vms.retain(|vm| vm_tenant(vm).as_deref() == Some(tenant.as_str()));
+            if let Some(ref tenant) = tenant_filter {
+                vms.retain(|vm| crate::tenant_scope::vm_tenant(vm).as_deref() == Some(tenant.as_str()));
                 total = vms.len();
             }
             (
@@ -95,21 +100,9 @@ pub async fn list_vms(
             )
                 .into_response()
         }
-        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims)
+        Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
             .into_response(),
     }
-}
-
-fn vm_tenant(vm: &VM) -> Option<String> {
-    if let Some(ref labels) = vm.labels {
-        if let Some(t) = labels.get("tenant") {
-            return Some(t.clone());
-        }
-    }
-    vm.tags.as_ref().and_then(|tags| {
-        tags.iter()
-            .find_map(|t| t.strip_prefix("tenant:").map(|s| s.to_string()))
-    })
 }
 
 pub async fn get_vm(
@@ -237,7 +230,7 @@ pub async fn update_tags(
 pub async fn create_vm(
     RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
-    Json(req): Json<CreateVMRequest>,
+    Json(mut req): Json<CreateVMRequest>,
 ) -> impl IntoResponse {
     if let Err((status, msg)) = validate_vm_name(&req.name) {
         return json_error(status, msg).into_response();
@@ -249,6 +242,11 @@ pub async fn create_vm(
             format!("Invalid VM parameters: {}", errors.join("; ")),
         )
         .into_response();
+    }
+
+    match crate::tenant_scope::apply_create_tenant(&claims, req.tenant.take()) {
+        Ok(t) => req.tenant = t,
+        Err((status, msg)) => return json_error(status, msg).into_response(),
     }
 
     // Acquire per-VM lock before duplicate check to prevent TOCTOU races

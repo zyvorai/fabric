@@ -125,6 +125,10 @@ pub struct NetworkConfig {
     pub networkd_config_dir: String,
     #[serde(default = "default_networkd_file_prefix")]
     pub networkd_file_prefix: String,
+    /// Optional URL for an external Cilium Hubble UI. Fabric does not embed
+    /// Hubble; when set, the console surfaces a link (coexistence only).
+    #[serde(default)]
+    pub hubble_ui_url: Option<String>,
 }
 
 fn default_networkd_config_dir() -> String {
@@ -387,6 +391,7 @@ impl Config {
                 bridge: "br0".to_string(),
                 networkd_config_dir: default_networkd_config_dir(),
                 networkd_file_prefix: default_networkd_file_prefix(),
+                hubble_ui_url: None,
             },
             controller: ControllerConfig::default(),
             auth: AuthConfig::default(),
@@ -431,6 +436,7 @@ mod tests {
                 bridge: "br0".into(),
                 networkd_config_dir: default_networkd_config_dir(),
                 networkd_file_prefix: default_networkd_file_prefix(),
+                hubble_ui_url: None,
             },
             controller: ControllerConfig::default(),
             auth: AuthConfig::default(),

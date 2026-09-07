@@ -58,12 +58,12 @@ impl UserDb {
         )
         .context("Failed to create users table")?;
 
-        // Migration: add TOTP columns if they don't exist
-        // We use a try approach — ignore errors if columns already exist.
+        // Migrations: add columns if they don't exist (ignore "duplicate column").
         let _ = conn.execute_batch(
             "ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT NULL;
              ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0;",
         );
+        let _ = conn.execute("ALTER TABLE users ADD COLUMN tenant TEXT DEFAULT NULL", []);
 
         Ok(Self {
             conn: Mutex::new(conn),
@@ -93,24 +93,26 @@ impl UserDb {
     pub fn get_by_username(&self, username: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
         let mut stmt = conn
-            .prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?1")?;
+            .prepare("SELECT id, username, password_hash, role, tenant FROM users WHERE username = ?1")?;
 
         let result = stmt.query_row(params![username], |row| {
             let id: String = row.get(0)?;
             let username: String = row.get(1)?;
             let password_hash: String = row.get(2)?;
             let role_str: String = row.get(3)?;
-            Ok((id, username, password_hash, role_str))
+            let tenant: Option<String> = row.get(4).ok().flatten();
+            Ok((id, username, password_hash, role_str, tenant))
         });
 
         match result {
-            Ok((id, username, password_hash, role_str)) => {
+            Ok((id, username, password_hash, role_str, tenant)) => {
                 let role: Role = serde_json::from_str(&role_str).unwrap_or(Role::Viewer);
                 Ok(Some(User {
                     id,
                     username,
                     password_hash,
                     role,
+                    tenant,
                 }))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -118,27 +120,39 @@ impl UserDb {
         }
     }
 
+    pub fn set_user_tenant(&self, user_id: &str, tenant: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+        conn.execute(
+            "UPDATE users SET tenant = ?1 WHERE id = ?2",
+            params![tenant, user_id],
+        )
+        .context("Failed to update user tenant")?;
+        Ok(())
+    }
+
     pub fn get_by_id(&self, id: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
-        let mut stmt =
-            conn.prepare("SELECT id, username, password_hash, role FROM users WHERE id = ?1")?;
+        let mut stmt = conn
+            .prepare("SELECT id, username, password_hash, role, tenant FROM users WHERE id = ?1")?;
 
         let result = stmt.query_row(params![id], |row| {
             let id: String = row.get(0)?;
             let username: String = row.get(1)?;
             let password_hash: String = row.get(2)?;
             let role_str: String = row.get(3)?;
-            Ok((id, username, password_hash, role_str))
+            let tenant: Option<String> = row.get(4).ok().flatten();
+            Ok((id, username, password_hash, role_str, tenant))
         });
 
         match result {
-            Ok((id, username, password_hash, role_str)) => {
+            Ok((id, username, password_hash, role_str, tenant)) => {
                 let role: Role = serde_json::from_str(&role_str).unwrap_or(Role::Viewer);
                 Ok(Some(User {
                     id,
                     username,
                     password_hash,
                     role,
+                    tenant,
                 }))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),

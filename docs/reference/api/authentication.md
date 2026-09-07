@@ -89,6 +89,7 @@ Tokens are signed with HMAC-SHA256 (`HS256`) using a server-configured secret.
 | `role` | string | User role: `admin`, `user`, or `viewer` |
 | `exp` | integer | Expiration time (Unix timestamp) |
 | `jti` | string | JWT ID -- unique identifier (UUIDv4) for revocation tracking |
+| `tenant` | string (optional) | When set, scopes VM create/list/get/mutate to that tenant |
 
 **Example decoded payload:**
 
@@ -96,6 +97,8 @@ Tokens are signed with HMAC-SHA256 (`HS256`) using a server-configured secret.
 {
   "sub": "admin",
   "role": "admin",
+  "tenant": "acme"
+},
   "exp": 1713000000,
   "jti": "550e8400-e29b-41d4-a716-446655440000"
 }
