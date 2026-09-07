@@ -22,6 +22,7 @@ members = [
     "predictive-drs",
     "distributed-storage",
     "fault-tolerance",
+    "backup",
     "replication",
 
     "site-recovery",

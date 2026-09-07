@@ -56,3 +56,50 @@ pub async fn self_fence(driver: &Arc<dyn VmDriver>) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp() -> std::path::PathBuf {
+        let p = std::env::temp_dir().join(format!(
+            "fabric-quorum-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn single_writer_has_quorum() {
+        let dir = tmp();
+        assert!(check_quorum(dir.to_str().unwrap(), "host-a").unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn majority_alive_keeps_quorum() {
+        let dir = tmp();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        std::fs::write(dir.join("host-b.heartbeat"), now.to_string()).unwrap();
+        std::fs::write(dir.join("host-c.heartbeat"), "1").unwrap(); // stale
+        assert!(check_quorum(dir.to_str().unwrap(), "host-a").unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn minority_alive_loses_quorum() {
+        let dir = tmp();
+        std::fs::write(dir.join("host-b.heartbeat"), "1").unwrap();
+        std::fs::write(dir.join("host-c.heartbeat"), "1").unwrap();
+        // host-a writes a fresh heartbeat inside check_quorum → 1/3 alive
+        assert!(!check_quorum(dir.to_str().unwrap(), "host-a").unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

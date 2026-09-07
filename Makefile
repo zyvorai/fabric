@@ -104,6 +104,16 @@ cli:
 test:
 	cd backend && cargo test
 	cd web && npm test
+	$(MAKE) test-proven-infra
+
+.PHONY: test-proven-infra bench
+test-proven-infra:
+	python3 -m unittest benchmarks.test_harness -v
+	bash scripts/test-upgrade-rollback.sh
+	bash scripts/chaos-qualify.sh
+
+bench:
+	python3 benchmarks/harness.py --allow-offline --out /tmp/fabric-bench-offline.json
 
 doctor:
 	$(MAKE) -C tools/fabric-doctor build

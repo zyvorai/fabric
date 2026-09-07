@@ -28,8 +28,14 @@ Step-by-step walkthroughs for common workflows.
 | [01 First VM](tutorials/01-first-vm.md) | Create, configure, start, and connect to a virtual machine |
 | [02 Networking](tutorials/02-networking.md) | Bridges, VLANs, bonds, port forwarding, network policies |
 | [03 Snapshots & Backups](tutorials/03-snapshots-backups.md) | Snapshots, backup policies, restore |
+| [04 Advanced VM options](tutorials/04-advanced-vm-options.md) | Hotplug, start options, cloud-init |
+| [05 Clustering](tutorials/05-clustering.md) | Datacenters, pools, migration, HA (see also proven-infra limits) |
+| [06 Security hardening](tutorials/06-security-hardening.md) | Auth, RBAC, TLS, audit |
+| [07 Logging & compliance](tutorials/07-logging-compliance.md) | Journals, scans, secrets |
 | [08 OpenStack Clients](tutorials/08-openstack-clients.md) | Drive Fabric with `openstack` CLI / curl (Keystone/Nova/…) |
+| [09 Edge dataplane](tutorials/09-edge-dataplane.md) | FluxVM Network Fabric via Fabric API / CLI / UI |
 | [OpenStack Compatibility reference](openstack-compat.md) | Endpoints, public URL, limitations |
+| [Proven infrastructure](proven-infra/README.md) | Compatibility matrix, SLOs, chaos, upgrade/rollback (#14–#17) |
 
 ---
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- Proven-infra pack for issues #14–#17: `benchmarks/` harness (health / readyz / inventory / concurrent p50/p99), chaos qualification script, `scripts/upgrade-rollback.sh` N→N+1 snapshot/rollback/verify, and docs under `docs/proven-infra/` (compatibility matrix, SLOs, chaos, upgrade).
+- `backup` crate is a workspace member with create/restore/delete and corrupt-archive fail-closed tests.
+- Quorum majority tests in `fault-tolerance` and heartbeat window tests in `ha`.
+
 ### Changed
 - Docs refreshed for JWT `tenant` claim enforcement, `driver.fluxvm_token` when
   FluxVM auth is on, compose `/readyz` healthchecks, and optional

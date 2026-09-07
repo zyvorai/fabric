@@ -3,14 +3,14 @@
 
 | Metric | Value |
 |--------|-------|
-| Workspace crates | 48 |
+| Workspace crates | 50 |
 | Workspace version | 0.2.1 |
 | Web package version | 0.2.1 |
-| React version | 19.1.0 |
-| Rough web route matches | 294 |
-| App.tsx path= count | 103 |
+| React version | 19.2.8 |
+| Rough web route matches | 296 |
+| App.tsx path= count | 104 |
 
 Canonical facts for README/architecture prose:
 
-- Backend workspace: **48 crates**
-- Web UI: **React 19.1.0**
+- Backend workspace: **50 crates**
+- Web UI: **React 19.2.8**

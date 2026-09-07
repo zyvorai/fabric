@@ -39,6 +39,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+__pycache__/
+*.pyc
+benchmarks/baselines/*.json
 
 # Local AI caches
 .grok/

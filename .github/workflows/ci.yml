@@ -112,3 +112,17 @@ jobs:
         run: ./scripts/generate-project-stats.sh
       - name: Fail if stats drifted
         run: git diff --exit-code -- docs/generated/project-stats.md
+
+  proven-infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Benchmark harness unit tests
+        run: python3 -m unittest benchmarks.test_harness -v
+      - name: Upgrade/rollback dry-run
+        run: bash scripts/test-upgrade-rollback.sh
+      - name: Chaos qualify (in-tree track)
+        run: bash scripts/chaos-qualify.sh

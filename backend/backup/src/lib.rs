@@ -200,3 +200,97 @@ impl BackupManager {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn vm_tree(root: &Path) {
+        std::fs::create_dir_all(root.join("disks")).unwrap();
+        std::fs::write(root.join("config.json"), r#"{"cpus":2,"memory":2048}"#).unwrap();
+        std::fs::write(root.join("disks").join("disk0.qcow2"), b"fake-qcow2-bytes").unwrap();
+    }
+
+    #[test]
+    fn create_list_restore_delete_roundtrip() {
+        let tmp = std::env::temp_dir().join(format!("fabric-backup-{}", uuid::Uuid::new_v4()));
+        let vm = tmp.join("vm-src");
+        let store = tmp.join("store");
+        let restore = tmp.join("restore");
+        vm_tree(&vm);
+
+        let mgr = BackupManager::new(&store).unwrap();
+        let backup = mgr
+            .create_backup("web-1", &vm, &BackupConfig::default())
+            .unwrap();
+        assert!(backup.size_bytes > 0);
+        assert!(backup.path.exists());
+        assert_eq!(mgr.list_backups().unwrap().len(), 1);
+        assert_eq!(mgr.get_backup(&backup.id).unwrap().unwrap().id, backup.id);
+
+        mgr.restore_backup(&backup, &restore).unwrap();
+        let restored = restore.join("web-1").join("config.json");
+        assert_eq!(
+            std::fs::read_to_string(restored).unwrap(),
+            r#"{"cpus":2,"memory":2048}"#
+        );
+
+        mgr.delete_backup(&backup.id).unwrap();
+        assert!(mgr.get_backup(&backup.id).unwrap().is_none());
+        assert!(mgr.list_backups().unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn interrupted_archive_does_not_restore() {
+        let tmp = std::env::temp_dir().join(format!("fabric-backup-bad-{}", uuid::Uuid::new_v4()));
+        let store = tmp.join("store");
+        std::fs::create_dir_all(&store).unwrap();
+        let mgr = BackupManager::new(&store).unwrap();
+
+        let bogus = store.join("web-1_19700101_000000.tar.gz");
+        let mut f = File::create(&bogus).unwrap();
+        f.write_all(b"not-a-gzip").unwrap();
+
+        let backup = Backup {
+            id: "deadbeef".into(),
+            vm_name: "web-1".into(),
+            path: bogus,
+            size_bytes: 10,
+            created_at: chrono::Utc::now(),
+            metadata: BackupMetadata {
+                vm_config: serde_json::json!({}),
+                disk_images: vec![],
+                snapshots: vec![],
+            },
+        };
+        let restore = tmp.join("restore");
+        assert!(mgr.restore_backup(&backup, &restore).is_err());
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn uncompressed_backup_roundtrip() {
+        let tmp = std::env::temp_dir().join(format!("fabric-backup-tar-{}", uuid::Uuid::new_v4()));
+        let vm = tmp.join("vm-src");
+        vm_tree(&vm);
+        let mgr = BackupManager::new(tmp.join("store")).unwrap();
+        let cfg = BackupConfig {
+            compress: false,
+            include_snapshots: false,
+            incremental: false,
+        };
+        let backup = mgr.create_backup("db-1", &vm, &cfg).unwrap();
+        assert!(backup
+            .path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .ends_with(".tar"));
+        let restore = tmp.join("restore");
+        mgr.restore_backup(&backup, &restore).unwrap();
+        assert!(restore.join("db-1").join("disks").join("disk0.qcow2").exists());
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+}

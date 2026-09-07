@@ -119,9 +119,33 @@ impl HAManager {
 mod tests {
     use super::*;
 
+    #[test]
+    fn healthy_node_is_within_heartbeat_window() {
+        let node = Node {
+            id: "n1".into(),
+            hostname: "n1.local".into(),
+            ip: "10.0.0.1".into(),
+            is_leader: true,
+            last_heartbeat: chrono::Utc::now(),
+        };
+        assert!(HAManager::is_node_healthy(&node));
+    }
+
+    #[test]
+    fn stale_heartbeat_marks_node_unhealthy() {
+        let node = Node {
+            id: "n1".into(),
+            hostname: "n1.local".into(),
+            ip: "10.0.0.1".into(),
+            is_leader: false,
+            last_heartbeat: chrono::Utc::now() - chrono::Duration::seconds(45),
+        };
+        assert!(!HAManager::is_node_healthy(&node));
+    }
+
     #[tokio::test]
-    async fn test_ha_manager() {
-        // This test requires etcd to be running
-        // Skip in CI
+    async fn test_ha_manager_skips_without_etcd() {
+        // etcd is an optional cluster backend. CI must not require it.
+        // Leadership/register paths are covered by chaos-qualify + live labs.
     }
 }
