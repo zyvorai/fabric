@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- Per-VM Cilium-style packet-flow controls: Guard / Audit / Open / Invert /
+  Block / Allow in the VM Dataplane Policy tab, Block-from-flow in the Flows
+  view, `POST /api/vms/{name}/dataplane/policy/control`, and
+  `zyvorctl dataplane policy guard|audit|open|invert|block|allow`.
 - Hubble-style packet flow in the Fabric console: Edge Dataplane **Packet flow**
   tab and VM Dataplane Flows view with Colorful / Normal themes, hop path
   (guest → tap → tc/eBPF → uplink → peer), `GET /api/dataplane/hubble/flows`,

@@ -10,9 +10,10 @@ interface Props {
   loading?: boolean
   emptyHint?: string
   onReload?: () => void
+  onBlockDest?: (destIp: string, destPort: number, proto: string) => void
 }
 
-export default function PacketFlowPanel({ views, loading, emptyHint, onReload }: Props) {
+export default function PacketFlowPanel({ views, loading, emptyHint, onReload, onBlockDest }: Props) {
   const [theme, setTheme] = useState<FlowTheme>('color')
   const [detail, setDetail] = useState<'path' | 'table'>('path')
   const [verdict, setVerdict] = useState('all')
@@ -103,6 +104,7 @@ export default function PacketFlowPanel({ views, loading, emptyHint, onReload }:
                 <th className="py-2 px-3">IDs</th>
                 <th className="py-2 px-3">Counters</th>
                 <th className="py-2 px-3">VM</th>
+                {onBlockDest && <th className="py-2 px-3">Control</th>}
               </tr>
             </thead>
             <tbody>
@@ -135,6 +137,17 @@ export default function PacketFlowPanel({ views, loading, emptyHint, onReload }:
                     {f.vmName}
                     <div className="text-xs opacity-60">{f.source.labels.join(' ')}</div>
                   </td>
+                  {onBlockDest && (
+                    <td className="py-2 px-3">
+                      <button
+                        type="button"
+                        className="text-xs px-2 py-1 rounded border border-red-200 bg-red-50 text-red-800"
+                        onClick={() => onBlockDest(f.destinationIp, f.destinationPort, f.protocol)}
+                      >
+                        Block
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

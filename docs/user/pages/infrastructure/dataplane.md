@@ -47,6 +47,19 @@ deny, groups, ICMP, Mbps/PPS).
 
 ### Policy
 
+Cilium-style **packet-flow control** (VM edge only — no Cilium-private maps):
+
+| Control | Effect |
+|---------|--------|
+| **Open** | Default allow, enforcement off |
+| **Audit** | Evaluate policy, do not drop (`audit_mode`) |
+| **Guard** | Default-deny enforcement + flow sampling |
+| **Invert** | Swap allow/deny CIDRs and flip default allow |
+| **Block** / **Allow** | Add host or CIDR to deny/allow lists |
+
+Flows tab **Block** adds that destination to `deny_cidrs`.
+Cluster-wide Hubble-lite view: [Edge Dataplane → Packet flow](edge-dataplane.md).
+
 1. Presets (**Allow all** / **Deny all** / **Web egress**) or edit tags.
 2. Ports must look like `tcp/443` or `udp/53` (UI validates).
 3. Optional **Deny CIDRs**, **Groups**, **Labels**, **FQDNs**, **Entities**,
@@ -71,14 +84,14 @@ Allow vs drop counters; LRU flow table with identity, family, 5-tuple, verdict.
 |--------|---------|
 | Status / policy / stats / flows / effective | `/api/vms/{name}/dataplane/…` |
 | Groups / CNP / health / observe / ipcache / refresh-dns | `/api/dataplane/…` |
-| CLI | `zyvorctl dataplane …` |
+| CLI | `zyvorctl dataplane policy guard\|audit\|open\|invert\|block\|allow` |
 
 Tutorials: [Tutorial 09](../../../tutorials/09-edge-dataplane.md) ·
 [edge-dataplane series](../../../tutorials/edge-dataplane/README.md).
 
 ## Related pages
 
-- [Edge Dataplane](edge-dataplane.md) — cluster groups/CNP/health console
+- [Edge Dataplane](edge-dataplane.md) — cluster groups/CNP/health/**Packet flow** console
 - [Network](network.md) — NAT / bridge / port forwards
 - [Net Security](network-security.md) — host SDN (orthogonal)
 - [Virtual Machines](../core/vms.md)

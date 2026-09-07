@@ -382,6 +382,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
                 .post(api::vm_dataplane::set_dataplane_policy),
         )
         .route(
+            "/vms/{name}/dataplane/policy/control",
+            post(api::vm_dataplane::dataplane_policy_control),
+        )
+        .route(
             "/vms/{name}/dataplane/stats",
             get(api::vm_dataplane::dataplane_stats),
         )

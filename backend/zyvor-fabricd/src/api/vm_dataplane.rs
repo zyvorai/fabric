@@ -114,6 +114,39 @@ pub async fn set_dataplane_policy(
     Ok(Json(saved))
 }
 
+/// POST /api/vms/:name/dataplane/policy/control
+/// Cilium-style Guard / Audit / Open / Invert / Block / Allow.
+pub async fn dataplane_policy_control(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<zyvor_fabric_driver_core::policy_control::ControlRequest>,
+) -> Result<Json<VmNetworkPolicy>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    let current = state
+        .driver
+        .get_dataplane_policy(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
+        })?;
+    let next = zyvor_fabric_driver_core::policy_control::apply_control(current, &req)
+        .map_err(|m| crate::api_error::json_error(StatusCode::BAD_REQUEST, m))?;
+    let saved = state
+        .driver
+        .set_dataplane_policy(&name, &next)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to apply dataplane control for VM '{name}'"),
+                e,
+            )
+        })?;
+    tracing::info!("Applied dataplane flow control for '{name}'");
+    Ok(Json(saved))
+}
+
 /// GET /api/vms/:name/dataplane/stats
 pub async fn dataplane_stats(
     RequireRead(_claims): RequireRead,

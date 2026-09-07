@@ -22,6 +22,7 @@ import {
   getDataplanePolicy,
   getDataplaneStats,
   getDataplaneStatus,
+  applyDataplaneControl,
   setDataplanePolicy,
 } from '../../api/dataplane'
 import { useToastContext } from '../../contexts/ToastContext'
@@ -32,7 +33,9 @@ import { StatusBadge } from '../../components/ui'
 import SubsystemBanner from '../../components/SubsystemBanner'
 import { TerminalTextarea } from '../../components/AppleTerminalFrame'
 import PacketFlowPanel from '../../components/PacketFlowPanel'
+import CiliumFlowControls from '../../components/CiliumFlowControls'
 import { fromRawFlow } from '../../lib/packetflow'
+import type { ControlAction } from '../../lib/policyControls'
 
 type PanelTab = 'status' | 'policy' | 'effective' | 'stats' | 'flows'
 
@@ -240,6 +243,25 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
       await load()
     } catch (err) {
       toastFailure(toast, 'Failed to save dataplane policy', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const applyFlowControl = async (
+    action: ControlAction,
+    extra?: { cidr?: string; port?: string },
+  ) => {
+    setSaving(true)
+    try {
+      const saved = await applyDataplaneControl(vmName, { action, ...extra })
+      setPolicy(saved)
+      setJsonText(JSON.stringify(saved, null, 2))
+      setDirty(false)
+      toast.success(`Dataplane ${action} applied`)
+      await load()
+    } catch (err) {
+      toastFailure(toast, `Failed to apply ${action}`, err)
     } finally {
       setSaving(false)
     }
@@ -456,6 +478,17 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
               Viewer accounts can inspect policy but cannot save changes.
             </p>
           )}
+
+          <CiliumFlowControls
+            policy={policy}
+            disabled={!canWrite || saving}
+            onChange={(next) => {
+              setPolicy(next)
+              setJsonText(JSON.stringify(next, null, 2))
+              setDirty(true)
+            }}
+            onApply={applyFlowControl}
+          />
 
           <div className="flex flex-wrap gap-2">
             <PresetBtn disabled={!canWrite} onClick={() => applyPreset('open')} label="Allow all" />
@@ -769,6 +802,15 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
               )}
               emptyHint="No flows match the current filter."
               onReload={() => void load()}
+              onBlockDest={
+                canWrite
+                  ? (ip, port, proto) =>
+                      void applyFlowControl('block', {
+                        cidr: ip,
+                        port: proto && proto !== 'any' ? `${proto}/${port}` : undefined,
+                      })
+                  : undefined
+              }
             />
           )}
         </div>

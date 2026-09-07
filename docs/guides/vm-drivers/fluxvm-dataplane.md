@@ -68,6 +68,7 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/vms/{name}/dataplane/status` | `GET /v1/vms/{id}/network/status` | mode, attached, schema, identity, iface, policy snapshot |
 | `GET /api/vms/{name}/dataplane/policy` | `GET /v1/vms/{id}/network/policy` | Durable policy |
 | `POST /api/vms/{name}/dataplane/policy` | `POST /v1/vms/{id}/network/policy` | Replace durable policy + live maps |
+| `POST /api/vms/{name}/dataplane/policy/control` | read-modify-write FluxVM policy | Guard / Audit / Open / Invert / Block / Allow |
 | `GET /api/vms/{name}/dataplane/effective` | `GET /v1/vms/{id}/network/effective` | Declared + group-merged policy |
 | `GET /api/vms/{name}/dataplane/stats` | `GET /v1/vms/{id}/network/stats` | allow/drop packets + bytes |
 | `GET /api/vms/{name}/dataplane/flows?limit=` | `GET /v1/vms/{id}/network/flows` | LRU flows (`family` 4/6, identity, verdict) |
@@ -130,12 +131,12 @@ Also reachable from the Network tab teaser (**Open Dataplane**).
 | Tab | Contents |
 | --- | --- |
 | **Status** | mode, attached, schema version/compat, policy synced, required, interface, identity, pin dir, **active policy snapshot** |
-| **Policy** | Presets, allow/deny CIDRs, ports, groups/labels, FQDNs, entities, ICMP, audit, Mbps/PPS, Advanced JSON |
+| **Policy** | Presets, Guard/Audit/Open/Invert/Block/Allow controls, allow/deny CIDRs, ports, groups/labels, FQDNs, entities, ICMP, audit, Mbps/PPS, Advanced JSON |
 | **Effective** | Declared + group-merged policy JSON |
 | **Stats** | Allowed/dropped packets + bytes, drop rate, Refresh counters |
-| **Flows** | LRU table with **Identity**, family, 5-tuple, proto, verdict, packets, bytes, last seen; limit + auto-refresh |
+| **Flows** | LRU table with **Identity**, family, 5-tuple, proto, verdict, packets, bytes, last seen; Block-from-flow; limit + auto-refresh |
 
-Also: console **Edge Dataplane** (`/app/edge-dataplane`) — Health · Groups · CNP · Identities · Observe · Ipcache.
+Also: console **Edge Dataplane** (`/app/edge-dataplane`) — Health · Groups · CNP · Identities · Observe · **Packet flow** · Ipcache.
 
 Soft banner when `vm_dataplane` capability is off/unreachable (`SubsystemBanner`).
 

@@ -238,6 +238,30 @@ enum DataplanePolicyCmd {
         #[arg(short, long)]
         file: String,
     },
+    /// Enforce default-deny (Cilium-style Guard)
+    Guard { name: String },
+    /// Evaluate policy without dropping (audit)
+    Audit { name: String },
+    /// Default allow
+    Open { name: String },
+    /// Swap allow/deny CIDRs and flip default allow
+    Invert { name: String },
+    /// Add a deny CIDR (host becomes /32)
+    Block {
+        name: String,
+        #[arg(long)]
+        cidr: String,
+    },
+    /// Add an allow CIDR and optional port
+    Allow {
+        name: String,
+        #[arg(long)]
+        cidr: Option<String>,
+        #[arg(long)]
+        port: Option<String>,
+        #[arg(long)]
+        entity: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -745,6 +769,38 @@ async fn api_post(
     Ok(res.json().await?)
 }
 
+async fn dataplane_control(
+    client: &Client,
+    name: &str,
+    action: &str,
+    cidr: Option<&str>,
+    port: Option<&str>,
+    entity: Option<&str>,
+    fmt: OutputFormat,
+) -> Result<()> {
+    let mut body = serde_json::json!({ "action": action });
+    if let Some(cidr) = cidr {
+        body["cidr"] = serde_json::Value::String(cidr.to_string());
+    }
+    if let Some(port) = port {
+        body["port"] = serde_json::Value::String(port.to_string());
+    }
+    if let Some(entity) = entity {
+        body["entity"] = serde_json::Value::String(entity.to_string());
+    }
+    let val = api_post(
+        client,
+        &format!("/vms/{}/dataplane/policy/control", name),
+        &body,
+    )
+    .await?;
+    println!("Applied dataplane {action} on '{name}'");
+    if !matches!(fmt, OutputFormat::Table) {
+        print_value(&val, fmt);
+    }
+    Ok(())
+}
+
 async fn api_post_empty(client: &Client, path: &str) -> Result<serde_json::Value> {
     tracing::debug!("POST {}{} (empty body)", api_base(), path);
     let res = client.post(format!("{}{}", api_base(), path)).send().await?;
@@ -997,6 +1053,39 @@ impl Cli {
                         if !matches!(fmt, OutputFormat::Table) {
                             print_value(&val, fmt);
                         }
+                    }
+                    DataplanePolicyCmd::Guard { name } => {
+                        dataplane_control(&client, &name, "guard", None, None, None, fmt).await?;
+                    }
+                    DataplanePolicyCmd::Audit { name } => {
+                        dataplane_control(&client, &name, "audit", None, None, None, fmt).await?;
+                    }
+                    DataplanePolicyCmd::Open { name } => {
+                        dataplane_control(&client, &name, "open", None, None, None, fmt).await?;
+                    }
+                    DataplanePolicyCmd::Invert { name } => {
+                        dataplane_control(&client, &name, "invert", None, None, None, fmt).await?;
+                    }
+                    DataplanePolicyCmd::Block { name, cidr } => {
+                        dataplane_control(&client, &name, "block", Some(&cidr), None, None, fmt)
+                            .await?;
+                    }
+                    DataplanePolicyCmd::Allow {
+                        name,
+                        cidr,
+                        port,
+                        entity,
+                    } => {
+                        dataplane_control(
+                            &client,
+                            &name,
+                            "allow",
+                            cidr.as_deref(),
+                            port.as_deref(),
+                            entity.as_deref(),
+                            fmt,
+                        )
+                        .await?;
                     }
                 },
                 DataplaneCmd::Stats { name } => {

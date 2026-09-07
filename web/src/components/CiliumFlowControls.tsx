@@ -1,0 +1,133 @@
+// Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+// SPDX-License-Identifier: Apache-2.0
+
+import { useState } from 'react'
+import type { VmNetworkPolicy } from '../api/dataplane'
+import {
+  applyControl,
+  modeFromPolicy,
+  type ControlAction,
+  type EnforcementMode,
+} from '../lib/policyControls'
+
+interface Props {
+  policy: VmNetworkPolicy
+  disabled?: boolean
+  onChange: (next: VmNetworkPolicy) => void
+  onApply?: (action: ControlAction, extra?: { cidr?: string; port?: string }) => Promise<void> | void
+}
+
+const MODES: { id: EnforcementMode; label: string; hint: string }[] = [
+  { id: 'open', label: 'Open', hint: 'Default allow · not Cilium default-deny' },
+  { id: 'audit', label: 'Audit', hint: 'Evaluate, do not drop (Cilium audit)' },
+  { id: 'guard', label: 'Guard', hint: 'Enforce default-deny at the VM edge' },
+]
+
+export default function CiliumFlowControls({ policy, disabled, onChange, onApply }: Props) {
+  const mode = modeFromPolicy(policy)
+  const [cidr, setCidr] = useState('')
+  const [port, setPort] = useState('tcp/443')
+  const [busy, setBusy] = useState(false)
+
+  const run = async (action: ControlAction, extra?: { cidr?: string; port?: string }) => {
+    if (onApply) {
+      setBusy(true)
+      try {
+        await onApply(action, extra)
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+    onChange(applyControl(policy, { action, ...extra }))
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-[#d2d2d7] p-4 space-y-3">
+      <div>
+        <p className="text-xs font-medium text-[#6e6e73] uppercase tracking-wide">
+          Packet-flow control
+        </p>
+        <p className="text-xs text-[#6e6e73]">
+          Cilium-style Guard / Audit / Open on FluxVM edge policy. Does not write Cilium maps.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            disabled={disabled || busy}
+            title={m.hint}
+            onClick={() => void run(m.id)}
+            className={`px-3 py-1.5 text-sm rounded-lg border ${
+              mode === m.id
+                ? m.id === 'guard'
+                  ? 'bg-red-50 text-red-800 border-red-200'
+                  : m.id === 'audit'
+                    ? 'bg-amber-50 text-amber-900 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-white border-[#d2d2d7] text-[#1d1d1f]'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          disabled={disabled || busy}
+          onClick={() => void run('invert')}
+          className="px-3 py-1.5 text-sm rounded-lg border border-[#d2d2d7] bg-white"
+          title="Swap allow/deny CIDRs and flip default allow"
+        >
+          Invert
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2 items-end">
+        <label className="text-xs text-[#6e6e73]">
+          CIDR / host
+          <input
+            className="mt-1 block bg-white border border-[#d2d2d7] rounded-lg px-2 py-1 text-sm"
+            value={cidr}
+            disabled={disabled}
+            placeholder="1.1.1.1 or 10.0.0.0/8"
+            onChange={(e) => setCidr(e.target.value)}
+          />
+        </label>
+        <label className="text-xs text-[#6e6e73]">
+          Port
+          <input
+            className="mt-1 block bg-white border border-[#d2d2d7] rounded-lg px-2 py-1 text-sm"
+            value={port}
+            disabled={disabled}
+            placeholder="tcp/443"
+            onChange={(e) => setPort(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={disabled || busy || !cidr.trim()}
+          onClick={() => void run('block', { cidr: cidr.trim() })}
+          className="px-3 py-1.5 text-sm rounded-lg border border-red-200 bg-red-50 text-red-800"
+        >
+          Block
+        </button>
+        <button
+          type="button"
+          disabled={disabled || busy || !cidr.trim()}
+          onClick={() => void run('allow', { cidr: cidr.trim(), port: port.trim() || undefined })}
+          className="px-3 py-1.5 text-sm rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800"
+        >
+          Allow
+        </button>
+      </div>
+      <p className="text-xs text-[#6e6e73]">
+        Mode: <strong>{mode}</strong>
+        {policy.audit_mode ? ' · audit' : ''}
+        {policy.default_allow ? ' · default-allow' : ' · default-deny'}
+        {' · '}
+        deny={policy.deny_cidrs?.length ?? 0} allow={policy.allow_cidrs.length}
+      </p>
+    </div>
+  )
+}

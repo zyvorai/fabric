@@ -124,6 +124,13 @@ export function setDataplanePolicy(name: string, policy: VmNetworkPolicy): Promi
   return apiPost(`/api/vms/${encodeURIComponent(name)}/dataplane/policy`, policy)
 }
 
+export function applyDataplaneControl(
+  name: string,
+  req: import('../lib/policyControls').ControlRequest,
+): Promise<VmNetworkPolicy> {
+  return apiPost(`/api/vms/${encodeURIComponent(name)}/dataplane/policy/control`, req)
+}
+
 export function getDataplaneStats(name: string): Promise<DataplaneStats> {
   return apiGet(`/api/vms/${encodeURIComponent(name)}/dataplane/stats`)
 }

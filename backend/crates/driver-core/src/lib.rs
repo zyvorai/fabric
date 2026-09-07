@@ -11,6 +11,8 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 use vm_model::{VMMetrics, VMPressure, VMStartOptions, VMState, VM};
 
+pub mod policy_control;
+
 // ============================================================================
 // Shared types
 // ============================================================================
