@@ -28,6 +28,8 @@ Fabric-side diagrams (control plane, packet path, modes, vs other VMMs):
 | Egress caps | `max_egress_mbps` / `max_egress_pps` on the same classifier |
 | Telemetry | Allow/drop counters + LRU flows with stable **identity** |
 | Bootstrap | ARP/DHCP/NDP/DHCPv6 always allowed |
+| Platform readiness | Fabric `GET /readyz` (store + FluxVM `/readyz`); unauthenticated |
+| Tenant | Create with `tenant` / `labels.tenant` → FluxVM; `GET /api/vms?tenant=` |
 | Attach backends | QEMU / Cloud Hypervisor / Firecracker — scheduler attaches on **all** backends when an iface exists |
 | Soft skip | `mode=ebpf` + `network.mode=none` / user NAT (no host-visible iface) → soft-skip even when `required=true` |
 | GA fail-closed | `required=true` + TAP/netns edge present but attach fails → create/start errors |

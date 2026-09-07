@@ -14,7 +14,7 @@ management, and audit logging.
 
 1. Authenticate users via PAM
 2. Understand role-based access control (RBAC)
-3. Manage JWT tokens
+3. Manage JWT tokens (note: `/health` and `/readyz` stay unauthenticated)
 4. Create and assign firewall profiles
 5. Encrypt VM disks
 6. Manage TLS certificates and certificate authorities
@@ -24,6 +24,7 @@ management, and audit logging.
 10. Manage secrets
 11. Scan VMs for compliance
 12. Configure QMP command allowlists
+13. Assign VM `tenant` for FluxVM / list filters
 
 ---
 
@@ -35,6 +36,10 @@ Any user account on the host system can log in to the API.
 ### Log In
 
 ```bash
+# Unauthenticated probes (always allowed)
+curl -sk "$FABRIC_HOST/health"
+curl -sk "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
+
 curl -s -X POST "$FABRIC_HOST/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{

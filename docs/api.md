@@ -26,7 +26,9 @@ curl -X POST http://localhost:9095/api/auth/login \
   -d "{\"username\": \"admin\", \"password\": \"$PASSWORD\"}"
 ```
 
-Unauthenticated requests receive a `401 Unauthorized` response. The `/api/auth/login` and `/health` endpoints are accessible without authentication. When auth is disabled in config, all endpoints are accessible without a token.
+Unauthenticated requests receive a `401 Unauthorized` response. The `/api/auth/login`, `/health`, and `/readyz` endpoints are accessible without authentication. When auth is disabled in config, all endpoints are accessible without a token.
+
+`GET /readyz` returns JSON `{"ok", "store", "fluxvm"}` (HTTP 503 when not ready). Use it for load-balancer / Kubernetes readiness; keep `/health` for liveness.
 
 ## Overview
 
@@ -319,7 +321,8 @@ Daemon health, configuration, and system information.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/health` | Health check |
+| GET | `/health` | Liveness check (plain OK) |
+| GET | `/readyz` | Readiness (store + FluxVM `/readyz`; 503 if not ready) |
 | GET | `/app/system/info` | System information |
 | GET | `/app/system/config` | Get daemon configuration |
 | PUT | `/app/system/config` | Update daemon configuration |

@@ -6,13 +6,13 @@ proxied by Zyvor Fabric. These are **not** Fabric SDN Net Security
 
 | Tutorial | Focus | Time |
 |----------|-------|------|
-| [01 — Getting started](01-getting-started.md) | Enable edge, health, status, schema=4 | ~15 min |
+| [01 — Getting started](01-getting-started.md) | Enable edge, `/readyz`, health, status, schema=4 | ~15 min |
 | [02 — Per-VM policy](02-per-vm-policy.md) | Allowlists, deny CIDRs, ICMP, rate limits | ~20 min |
 | [03 — Security groups](03-security-groups.md) | Label identities + group CRUD | ~20 min |
 | [04 — CNP documents](04-cnp.md) | Apply CNP JSON via Fabric | ~20 min |
 | [05 — Effective merge](05-effective-merge.md) | Declared vs group-merged policy | ~15 min |
 | [06 — Observe & identities](06-observe.md) | Snapshot + reserved/group IDs | ~15 min |
-| [07 — Health, ipcache, FQDN](07-production-ops.md) | Production ops endpoints | ~15 min |
+| [07 — Health, ipcache, FQDN](07-production-ops.md) | `/readyz`, tenant filter, production ops | ~15 min |
 | [08 — Console UX](08-console-ux.md) | Dataplane tab + Edge Dataplane page | ~15 min |
 
 Parent walkthrough (single long form): [Tutorial 09](../09-edge-dataplane.md).

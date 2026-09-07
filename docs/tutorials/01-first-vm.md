@@ -39,11 +39,13 @@ echo "Token: $TOKEN"
 Verify the connection:
 
 ```bash
+curl -sk "$FABRIC_HOST/readyz" | jq .
 curl -s "$FABRIC_HOST/api/vms" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-Expected response (empty list on a fresh install):
+Expected `/readyz` includes `"ok": true` when the local store and FluxVM are ready.
+Expected VM list (empty on a fresh install):
 
 ```json
 {
@@ -185,6 +187,7 @@ curl -s -X POST "$FABRIC_HOST/api/vms" \
     "memory": 2048,
     "disk": 20,
     "hostname": "my-first-vm",
+    "tenant": "tutorial",
     "tags": ["tutorial", "fedora"],
     "labels": {
       "env": "dev",
@@ -192,6 +195,9 @@ curl -s -X POST "$FABRIC_HOST/api/vms" \
     }
   }' | jq .
 ```
+
+`tenant` is stored as `labels.tenant` and passed to FluxVM on start. Filter later with
+`GET /api/vms?tenant=tutorial`.
 
 Expected response:
 
@@ -207,7 +213,8 @@ Expected response:
   "tags": ["tutorial", "fedora"],
   "labels": {
     "env": "dev",
-    "tutorial": "01"
+    "tutorial": "01",
+    "tenant": "tutorial"
   },
   "created": "2026-04-12T10:05:00Z"
 }

@@ -75,6 +75,7 @@ After success:
 | `http://HOST:30095/` | NodePort (UI + API) |
 | `http://HOST:9095/` | hostNetwork bind |
 | `http://HOST:30095/health` | Liveness smoke |
+| `http://HOST:30095/readyz` | Readiness (store + FluxVM) |
 
 Admin login for **new** Kubernetes deployments (from Secret):
 
@@ -206,6 +207,7 @@ kubectl -n zyvor-fabric get pods,svc,ds
 kubectl -n zyvor-fabric logs -l app=zyvor-fabricd --tail=50
 
 curl -sf http://NODE_IP:30095/health
+curl -sf http://NODE_IP:30095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 # Login
 curl -sf -X POST http://NODE_IP:30095/api/auth/login \
   -H 'Content-Type: application/json' \
@@ -215,6 +217,8 @@ curl -sf -X POST http://NODE_IP:30095/api/auth/login \
 On the node, FluxVM should answer:
 
 ```bash
+curl -sf http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/readyz | jq .
 curl -sf http://127.0.0.1:7788/v1/vms
 ```
 

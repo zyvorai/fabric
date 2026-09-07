@@ -497,9 +497,12 @@ This means `driver.fluxvm_url` in `zyvor-fabricd.toml` doesn't point at a
 reachable `fluxvm serve` instance (wrong URL, FluxVM not started yet, or
 a firewall blocking the connection). Confirm FluxVM itself is up:
 ```bash
-curl http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/readyz | jq .
+curl -sk https://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 ```
-and start it if it isn't (see [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme)).
+and start FluxVM if it isn't (see [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme)
+and [PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md)).
 
 ### VMs fail to start with permission errors
 

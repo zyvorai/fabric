@@ -5,6 +5,15 @@
 Confirm Fabric can reach FluxVM Network Fabric **schema v4**, inspect health,
 and read status on a bridged VM.
 
+## 0. Platform readiness
+
+```bash
+curl -sk "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
+```
+
+Expect `"ok": true`. This is unauthenticated and checks the Fabric store plus
+FluxVM `GET /readyz`.
+
 ## 1. Capability card
 
 ```bash

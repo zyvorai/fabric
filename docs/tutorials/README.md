@@ -16,8 +16,11 @@ All tutorials assume:
 Set these shell variables before starting any tutorial:
 
 ```bash
-export FABRIC_HOST="http://localhost:3000"
+export FABRIC_HOST="https://127.0.0.1:9095"   # or http://localhost:9095
 export TOKEN="your-jwt-token-here"
+
+# Optional smoke before any tutorial:
+curl -sk "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 ```
 
 ---
@@ -26,7 +29,7 @@ export TOKEN="your-jwt-token-here"
 
 | #  | Title                          | Level        | Time   | Description                                                        |
 |----|--------------------------------|--------------|--------|--------------------------------------------------------------------|
-| 01 | [Your First VM](01-first-vm.md)                  | Beginner     | 30 min | Create, start, connect to, and tear down a VM end-to-end.          |
+| 01 | [Your First VM](01-first-vm.md)                  | Beginner     | 30 min | Create, start, connect to, and tear down a VM end-to-end (`tenant`, `/readyz`). |
 | 02 | [VM Networking](02-networking.md)                 | Intermediate | 45 min | Bridges, VLANs, bonds, port forwarding, network policies, and DNS. |
 | 03 | [Snapshots & Backups](03-snapshots-backups.md)    | Intermediate | 30 min | Point-in-time snapshots, backup policies, and disaster recovery.   |
 | 04 | [Advanced VM Configuration](04-advanced-vm-options.md) | Intermediate | 40 min | VMStartOptions, hotplug, disk resize, cloud-init, and credentials. |

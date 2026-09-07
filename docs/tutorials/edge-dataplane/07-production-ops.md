@@ -3,9 +3,20 @@
 **Time:** ~15 min · **Level:** Intermediate · **Prereq:** [01](01-getting-started.md)
 
 Production-oriented cluster endpoints (also in FluxVM
-[production-dataplane.md](https://github.com/zyvorai/fluxvm/blob/main/docs/production-dataplane.md)).
+[production-dataplane.md](https://github.com/zyvorai/fluxvm/blob/main/docs/production-dataplane.md)
+and whole-stack [PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md)).
 
-## Health
+## Platform readiness
+
+```bash
+curl -sk "$FABRIC_HOST/readyz" | jq .
+# Liveness only: curl -sk "$FABRIC_HOST/health"
+```
+
+`ok: false` / HTTP 503 means the Fabric store or FluxVM `/readyz` failed (missing
+state dir, required dataplane not healthy, etc.).
+
+## Dataplane health
 
 ```bash
 curl -sk "$FABRIC_HOST/api/dataplane/health" "${AUTH[@]}" | jq .
@@ -35,6 +46,14 @@ curl -sk -X POST "$FABRIC_HOST/api/dataplane/refresh-dns" "${AUTH[@]}" | jq .
 Expect `{"refreshed": N}`. If refresh fails with “Filter already exists” after a
 schema upgrade, clean stale TC filters and restart the VM (see
 [01](01-getting-started.md)).
+
+## Tenant filter (optional)
+
+VMs created with `"tenant": "acme"` (or `labels.tenant`) are filterable:
+
+```bash
+curl -sk "$FABRIC_HOST/api/vms?tenant=acme" "${AUTH[@]}" | jq '.items[].name'
+```
 
 ## Example: FQDN on VM policy
 

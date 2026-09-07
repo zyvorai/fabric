@@ -63,7 +63,7 @@ export ZYVOR_FABRICD_JWT_SECRET="your-64-char-secret-here"
 
 ### JWT Tokens
 
-All API endpoints (except `/api/auth/login` and `/health`) require authentication via JWT.
+All API endpoints (except `/api/auth/login`, `/health`, and `/readyz`) require authentication via JWT.
 
 **Login:**
 

@@ -53,9 +53,12 @@ sudo dnf install -y \
 
 ```bash
 curl -sf http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/readyz | jq .
 ```
 
-See [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` if this doesn't succeed yet.
+See [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) and
+[PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md)
+for running `fluxvm serve` if this doesn't succeed yet.
 
 ### 3. Enable KVM
 
@@ -114,6 +117,7 @@ sudo apt install -y \
 
 ```bash
 curl -sf http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/readyz | jq .
 ```
 
 See [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` if this doesn't succeed yet.
@@ -298,6 +302,7 @@ VM operations will fail if `fluxvm serve` isn't running or isn't reachable at th
 
 ```bash
 curl -sf http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/readyz | jq .
 ```
 
 If that fails, see [FluxVM's README](https://github.com/zyvorai/fluxvm#readme) for starting it.

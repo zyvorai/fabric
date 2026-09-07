@@ -144,7 +144,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 
 | Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
-| **Health endpoint** | `/health` (HTTP) | Not available | `/api2/json/version` |
+| **Health endpoint** | `/health` + `/readyz` (HTTP) | Not available | `/api2/json/version` |
 | **VM metrics** | REST API (CPU, memory, I/O) | `virsh domstats` | RRD graphs via web UI |
 | **Real-time events** | SSE stream (16 event types) | Event loop API | Not available natively |
 | **Notification channels** | Email, Slack, Webhook, Teams | Not built-in | Email only |

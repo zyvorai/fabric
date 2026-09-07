@@ -57,6 +57,7 @@ export FABRIC_HOST="https://127.0.0.1:9095"
 # export FABRIC_HOST="https://80.79.5.173:9095"
 
 curl -skf "$FABRIC_HOST/health" && echo OK
+curl -skf "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 ```
 
 If health fails, start or deploy Fabric first:

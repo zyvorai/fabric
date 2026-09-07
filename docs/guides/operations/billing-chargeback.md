@@ -166,23 +166,29 @@ Each line item breaks down the cost by resource type per VM, giving tenants full
 
 ## Tenant Assignment
 
-VMs are assigned to tenants using labels. When creating a VM, include a `tenant` label to associate it with a billing tenant:
+VMs are assigned to tenants with the first-class `tenant` field (merged into
+`labels.tenant`) or by setting `labels.tenant` directly. Either way, start
+passes the value to FluxVM, and you can filter with `GET /api/vms?tenant=`.
 
 ```bash
-curl -s -X POST http://localhost:3000/api/vms \
+curl -s -X POST http://localhost:9095/api/vms \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "web-server",
+    "image": "/var/lib/fluxvm/images/ubuntu.qcow2",
     "cpus": 4,
-    "memory_mb": 4096,
-    "disk_gb": 40,
+    "memory": 4096,
+    "disk": 40,
+    "tenant": "tenant-alpha",
     "labels": {
-      "tenant": "tenant-alpha",
       "env": "production",
       "team": "platform"
     }
   }' | jq
+
+curl -s "http://localhost:9095/api/vms?tenant=tenant-alpha" \
+  -H "Authorization: Bearer $TOKEN" | jq '.items[].name'
 ```
 
 ### Label-Based Cost Allocation
@@ -191,7 +197,7 @@ Labels provide flexible cost allocation beyond simple tenant assignment:
 
 | Label | Purpose | Example |
 |-------|---------|---------|
-| `tenant` | Primary billing entity | `tenant-alpha` |
+| `tenant` | Primary billing entity (also first-class create field) | `tenant-alpha` |
 | `env` | Environment classification | `production`, `staging`, `dev` |
 | `team` | Team or department | `platform`, `data`, `frontend` |
 | `project` | Project or cost center | `project-x`, `cc-1234` |

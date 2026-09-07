@@ -17,7 +17,7 @@ bridged (`network_tap`) VM
 
 ## What you will learn
 
-1. Probe capabilities and cluster health (`schema=4`)
+1. Probe readiness (`/readyz`), capabilities, and cluster health (`schema=4`)
 2. Set per-VM allow/deny/ICMP/rate policy
 3. Create security groups and attach by name/labels
 4. Apply a CNP document and inspect effective merge
@@ -36,6 +36,8 @@ TOKEN=$(curl -sk "$FABRIC_HOST/api/auth/login" \
 AUTH=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
 export ZYVOR_FABRIC_URL="$FABRIC_HOST" ZYVOR_FABRIC_TOKEN="$TOKEN"
 
+curl -sk "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
+
 VM=$(curl -sk "$FABRIC_HOST/api/vms" "${AUTH[@]}" | jq -r '
   (if type=="array" then . else (.items // .vms // []) end)
   | map(select(.state=="running" or .status=="Running"))
@@ -51,6 +53,7 @@ Enable edge on FluxVM if needed — see
 ## Step 1: Health and status
 
 ```bash
+curl -sk "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 curl -sk "$FABRIC_HOST/api/capabilities" "${AUTH[@]}" | jq '.vm_dataplane'
 curl -sk "$FABRIC_HOST/api/dataplane/health" "${AUTH[@]}" | jq '{ok, mode, bpf_object_present, groups, policies}'
 curl -sk "$FABRIC_HOST/api/vms/$VM/dataplane/status" "${AUTH[@]}" | jq '{
@@ -58,7 +61,7 @@ curl -sk "$FABRIC_HOST/api/vms/$VM/dataplane/status" "${AUTH[@]}" | jq '{
 }'
 ```
 
-Pass bar: `attached=true`, `schema_version=4`.
+Pass bar: `/readyz` `"ok": true`, then `attached=true`, `schema_version=4`.
 
 ---
 

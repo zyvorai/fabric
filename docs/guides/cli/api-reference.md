@@ -129,6 +129,7 @@ List all VMs with pagination.
 |-----------|------|---------|-------------|
 | `offset`  | int  | 0       | Starting index |
 | `limit`   | int  | 200     | Max results (capped at 1000) |
+| `tenant`  | string | —     | Filter by `labels.tenant` or tag `tenant:…` |
 
 **Response (200):**
 
@@ -142,6 +143,7 @@ List all VMs with pagination.
       "memory_mb": 4096,
       "disk_gb": 40,
       "ip": "192.168.1.100",
+      "labels": { "tenant": "acme" },
       "created": "2026-04-10T14:30:00Z",
       "updated": "2026-04-12T09:15:00Z"
     }
@@ -150,6 +152,11 @@ List all VMs with pagination.
   "offset": 0,
   "limit": 200
 }
+```
+
+```bash
+curl -s "http://localhost:9095/api/vms?tenant=acme" \
+  -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 **curl example:**
@@ -193,15 +200,20 @@ Create a new VM.
 ```json
 {
   "name": "my-vm",
+  "image": "/var/lib/fluxvm/images/ubuntu.qcow2",
   "cpus": 2,
-  "memory_mb": 2048,
-  "disk_gb": 20,
+  "memory": 2048,
+  "disk": 20,
+  "tenant": "acme",
   "labels": {
     "env": "dev",
     "team": "platform"
   }
 }
 ```
+
+Optional `tenant` is merged into `labels["tenant"]` (existing label wins). On
+start, Fabric passes that value to FluxVM’s first-class `CreateVmRequest.tenant`.
 
 VM name constraints: alphanumeric plus `-` and `_`, validated server-side.
 
@@ -214,14 +226,16 @@ VM name constraints: alphanumeric plus `-` and `_`, validated server-side.
 **curl example:**
 
 ```bash
-curl -s -X POST http://localhost:3000/api/vms \
+curl -s -X POST http://localhost:9095/api/vms \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-vm",
+    "image": "/var/lib/fluxvm/images/ubuntu.qcow2",
     "cpus": 2,
-    "memory_mb": 2048,
-    "disk_gb": 20
+    "memory": 2048,
+    "disk": 20,
+    "tenant": "acme"
   }' | jq
 ```
 
@@ -2051,6 +2065,17 @@ curl -s http://localhost:3000/api/events \
 ---
 
 ## System
+
+Unauthenticated probes (no JWT):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Liveness |
+| GET | `/readyz` | Readiness — local store + FluxVM `/readyz` (HTTP 503 if not ready) |
+
+```bash
+curl -sk https://127.0.0.1:9095/readyz | jq .
+```
 
 ### GET /api/system/cpu-topology
 

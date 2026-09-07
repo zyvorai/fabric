@@ -61,8 +61,9 @@ sudo systemctl enable --now zyvor-fabricd
 # Verify it is running
 systemctl status zyvor-fabricd
 
-# Check API health
-curl -s http://localhost:3000/health | jq
+# Check API liveness + readiness (store + FluxVM)
+curl -sk https://127.0.0.1:9095/health
+curl -sk https://127.0.0.1:9095/readyz | jq .
 ```
 
 ### 2. Authenticate
@@ -247,10 +248,12 @@ Ongoing operational tasks for a running Zyvor Fabric deployment.
 
 ### Monitoring
 
-- [ ] **Health check** -- Automated probe of `GET /health` at regular intervals (every 30-60 seconds)
+- [ ] **Liveness** -- Automated probe of `GET /health` at regular intervals (every 30-60 seconds)
+- [ ] **Readiness** -- Probe `GET /readyz` (expects `"ok": true`; HTTP 503 when FluxVM or store is not ready)
 - [ ] **Event stream** -- At least one consumer subscribed to `GET /api/events/stream` for real-time alerting
 - [ ] **Resource stats** -- Periodic collection of `GET /api/system/resource-stats` for capacity planning
 - [ ] **VM metrics** -- Dashboard showing per-VM CPU, memory, and I/O metrics from `GET /api/vms/:name/metrics`
+- [ ] **Tenant filter** -- Operators can list with `GET /api/vms?tenant=…` where VMs set `tenant` / `labels.tenant`
 - [ ] **Notification delivery** -- Monitor `GET /api/notifications/webhooks/deliveries` for failed webhook deliveries
 
 See the [Monitoring Guide](monitoring.md) for detailed setup instructions.
@@ -305,9 +308,11 @@ journalctl -u zyvor-fabricd --since "30 min ago" --no-pager
 sudo systemctl restart zyvor-fabricd
 
 # 3. Verify health (works regardless of how the daemon is supervised)
-curl -s http://localhost:9095/health
+curl -sk https://127.0.0.1:9095/health
+curl -sk https://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 
 # 4. Check VMs are running (VMs persist independently of zyvor-fabricd)
+curl -sf http://127.0.0.1:7788/readyz | jq .
 curl -s http://127.0.0.1:7788/v1/vms
 ```
 

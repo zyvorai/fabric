@@ -6,7 +6,7 @@ The Zyvor Fabric REST API provides comprehensive programmatic access to all plat
 
 1. **RESTful resource model** -- Resources are identified by URL paths. Standard HTTP methods (GET, POST, PUT, DELETE) map to CRUD operations.
 2. **JSON throughout** -- All request and response bodies use JSON (`Content-Type: application/json`).
-3. **JWT authentication** -- All endpoints (except `/api/auth/login` and `/health`) require a Bearer token in the `Authorization` header.
+3. **JWT authentication** -- All endpoints (except `/api/auth/login`, `/health`, and `/readyz`) require a Bearer token in the `Authorization` header.
 4. **Role-based authorization** -- Three roles (Admin, User, Viewer) control access. Endpoints enforce minimum permission levels using extractors: `RequireRead` (Viewer+), `RequireWrite` (User+), `RequireAdmin` (Admin only).
 5. **Consistent error format** -- All errors return `{"error": "message"}` with appropriate HTTP status codes.
 6. **Pagination** -- List endpoints accept `?offset=N&limit=N` query parameters. Default limit is 200, maximum is 1000.

@@ -41,7 +41,8 @@ Machina v0.1 targets these `zyvor-fabricd` surfaces:
 | VM metrics | `GET /api/vms/:name/metrics` | — |
 | Logs / journal | `GET /api/logs`, `GET /api/vms/:name/logs` | — |
 | Live events | — | `GET /api/events/stream` (SSE) |
-| Health | `GET /health` | — |
+| Health | `GET /health` | Liveness |
+| Readiness | `GET /readyz` | Store + FluxVM `/readyz` |
 
 ### Connection profile (`~/.machina/clusters.yaml`)
 

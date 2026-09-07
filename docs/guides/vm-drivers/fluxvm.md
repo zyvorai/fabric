@@ -29,6 +29,11 @@ required = true   # fail-closed when a host-visible VM edge exists
 Operator UX: [fluxvm-dataplane.md](fluxvm-dataplane.md) · tutorials
 [09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).
 
+Production alignment with FluxVM: Fabric `GET /readyz`, create `tenant` /
+`labels.tenant`, and `GET /api/vms?tenant=` — see FluxVM
+[PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md)
+and [production tutorials](https://github.com/zyvorai/fluxvm/blob/main/docs/tutorials/production/README.md).
+
 The FluxVM image must include the BPF `.o` files; the DaemonSet/compose also mounts host `/sys/fs/bpf` and raises memlock (`SYS_RESOURCE` / `ulimit memlock=-1`).
 
 ## What's wired today

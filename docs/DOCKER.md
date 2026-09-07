@@ -45,7 +45,8 @@ BUILDER=docker ./scripts/build-container-images.sh  # or explicitly docker
 
 ```bash
 docker compose up -d      # or: podman compose up -d
-curl http://localhost:9095/health
+curl -sf http://localhost:9095/health
+curl -sf http://localhost:9095/readyz | jq .
 ```
 
 Auth stays **on** even in this profile -- unauthenticated requests are read-only by design, so
@@ -61,7 +62,8 @@ running alongside a bare-metal `zyvor-fabricd` on the same host, or just to avoi
 
 ```bash
 ZYVOR_FABRICD_PORT=19095 docker compose up -d
-curl http://localhost:19095/health
+curl -sf http://localhost:19095/health
+curl -sf http://localhost:19095/readyz | jq .
 ```
 
 This is backed by a real env var the daemon itself reads, `ZYVOR_FABRICD_LISTEN`

@@ -495,6 +495,16 @@ curl -s -X POST http://127.0.0.1:9095/api/v1/backups/policies \
 
 ## Monitoring Setup
 
+### Liveness and readiness
+
+```bash
+curl -sf https://127.0.0.1:9095/health          # liveness
+curl -sf https://127.0.0.1:9095/readyz | jq .   # readiness (store + FluxVM)
+```
+
+Use `/health` for process-up probes and `/readyz` for load-balancer / Kubernetes
+readiness. See also [monitoring.md](../guides/operations/monitoring.md).
+
 ### Prometheus Integration
 
 Zyvor Fabric exposes a Prometheus-compatible metrics endpoint:

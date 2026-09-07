@@ -62,7 +62,9 @@ Content-Type: application/json
 }
 ```
 
-The login endpoint does **not** require an existing JWT token. It is the only public API endpoint (along with `/health`).
+The login endpoint does **not** require an existing JWT token. It is a public
+API endpoint along with `/health` (liveness) and `/readyz` (readiness: Fabric
+store + FluxVM `/readyz`).
 
 ---
 

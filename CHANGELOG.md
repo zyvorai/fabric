@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Changed
+- Docs and tutorials refreshed for `/readyz`, VM `tenant`, and FluxVM production
+  alignment (first-VM, security, edge-dataplane series, install/k8s/docker,
+  monitoring, API reference, billing).
 - Drop remaining `ssahani/` GitHub and Terraform Registry namespaces in favor of `zyvorai/` (`zyvorai/fabric`, `zyvorai/zyvor-fabricd`).
 - Docs refreshed for FluxVM Network Fabric **schema v4** edge dataplane (groups,
   CNP, effective, health/ipcache/FQDN) across operator guides, user pages, and

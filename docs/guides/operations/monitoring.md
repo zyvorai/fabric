@@ -16,19 +16,19 @@ How to monitor Zyvor Fabric health, collect metrics, subscribe to real-time even
 
 ## Health Endpoint
 
-The `/health` endpoint provides a quick liveness check for the zyvor-fabricd service. It does not require authentication.
+The `/health` endpoint provides a quick **liveness** check for the zyvor-fabricd
+service. It does not require authentication. Prefer **`GET /readyz`** for
+readiness: it checks the local VM store and FluxVM’s `/readyz` (state dir +
+dataplane when required) and returns HTTP 503 when not ready.
 
 ```bash
-curl -s http://localhost:3000/health | jq
+curl -sk https://127.0.0.1:9095/health
+curl -sk https://127.0.0.1:9095/readyz | jq .
+# → {"ok": true, "store": true, "fluxvm": {"ok": true, …}}
 ```
 
-**Response:**
-
-```json
-{
-  "status": "ok"
-}
-```
+**Liveness response** (`/health`): plain `OK` (or historic JSON `{"status":"ok"}`
+on older builds).
 
 ### Integration with Monitoring Systems
 
@@ -38,7 +38,8 @@ Zyvor Fabric integrates with systemd's watchdog mechanism. If the process become
 
 **HTTP health probes:**
 
-Configure your monitoring system to poll `/health` every 30-60 seconds:
+Configure your monitoring system to poll `/health` for liveness and `/readyz`
+for readiness every 30-60 seconds:
 
 ```yaml
 # Prometheus blackbox exporter example

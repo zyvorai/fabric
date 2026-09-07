@@ -22,16 +22,14 @@ Zyvor Fabric follows these operational principles:
 ```bash
 # Check daemon status (if running under systemd)
 systemctl status zyvor-fabricd
-# Or, regardless of how it's supervised:
-curl -s http://localhost:9095/health
-
-# API health endpoint
-curl -s http://localhost:3000/health | jq
+# Liveness + readiness (store + FluxVM)
+curl -sk https://127.0.0.1:9095/health
+curl -sk https://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 
 # List running VMs
-TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
+TOKEN=$(curl -s -X POST https://127.0.0.1:9095/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"pass"}' | jq -r '.token')
-curl -s http://localhost:3000/api/vms \
+curl -s https://127.0.0.1:9095/api/vms \
   -H "Authorization: Bearer $TOKEN" | jq '.total'
 ```

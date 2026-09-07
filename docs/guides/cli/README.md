@@ -48,7 +48,7 @@ curl -s -X POST http://localhost:3000/api/vms/my-vm/start \
 
 ## Authentication
 
-All API endpoints (except `/api/auth/login` and `/health`) require a valid JWT token in the `Authorization` header. Tokens are obtained by authenticating against PAM with system credentials.
+All API endpoints (except `/api/auth/login`, `/health`, and `/readyz`) require a valid JWT token in the `Authorization` header. Tokens are obtained by authenticating against PAM with system credentials.
 
 See the [Authentication Reference](../../reference/api/authentication.md) for full details on the token lifecycle and role-based access control.
 

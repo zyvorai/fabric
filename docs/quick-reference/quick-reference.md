@@ -520,7 +520,9 @@ cat /etc/zyvor-fabricd/zyvor-fabricd.toml | toml-lint  # or just try to start
 ls -la /dev/kvm
 
 # Check FluxVM is reachable
-curl http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/healthz
+curl -sf http://127.0.0.1:7788/readyz | jq .
+curl -sk https://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 
 # Check the VM state and last error
 curl -s http://127.0.0.1:9095/api/v1/vms/my-vm \
