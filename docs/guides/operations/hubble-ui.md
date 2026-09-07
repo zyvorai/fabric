@@ -12,7 +12,7 @@ bridge = "vmbr0"
 hubble_ui_url = "https://hubble.example.com"
 ```
 
-`GET /api/capabilities` returns `hubble_ui_url` so the console can open the
-external UI. This is a convenience link only — no map sync, no CEP ownership.
+When set, the Edge Dataplane page shows **Open Hubble** (new tab). This is a
+convenience link only — no map sync, no CEP ownership.
 
 For VM-edge observe (FluxVM-native), use Edge Dataplane / `…/dataplane/flows`.

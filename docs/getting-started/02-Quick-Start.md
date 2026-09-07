@@ -129,6 +129,7 @@ zyvorctl create my-first-vm \
 ```
 
 Optional `--tenant` is stored as `labels.tenant` and passed to FluxVM.
+When FluxVM has bearer auth enabled, set `driver.fluxvm_token` in Fabric config.
 
 ---
 

@@ -18,6 +18,8 @@ export interface Capabilities {
   vm_dataplane: SubsystemStatus
   auth: SubsystemStatus
   events: SubsystemStatus
+  /** External Hubble UI URL when network.hubble_ui_url is set */
+  hubble_ui_url?: string
 }
 
 export function getCapabilities(): Promise<Capabilities> {

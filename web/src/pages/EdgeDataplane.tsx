@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react'
+import { ExternalLink, Loader2, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react'
 import {
   DataplaneHealth,
   IdentityInfo,
@@ -27,6 +27,7 @@ import { formatUserError } from '../utils/apiError'
 import { usePermissions } from '../hooks/usePermissions'
 import SubsystemBanner from '../components/SubsystemBanner'
 import { TerminalTextarea } from '../components/AppleTerminalFrame'
+import { usePlatformInfo } from '../contexts/PlatformInfoContext'
 
 type Tab = 'health' | 'groups' | 'cnp' | 'identities' | 'observe' | 'ipcache'
 
@@ -46,6 +47,8 @@ const SAMPLE_CNP = `{
 export default function EdgeDataplane() {
   const toast = useToastContext()
   const { canWrite } = usePermissions()
+  const { capabilities } = usePlatformInfo()
+  const hubbleUrl = capabilities?.hubble_ui_url?.trim() || ''
   const [tab, setTab] = useState<Tab>('health')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -202,6 +205,18 @@ export default function EdgeDataplane() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {hubbleUrl && (
+            <a
+              href={hubbleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
+              title="Opens external Hubble UI (Cilium). VMs are not Cilium endpoints."
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Open Hubble
+            </a>
+          )}
           {canWrite && (
             <button
               type="button"
