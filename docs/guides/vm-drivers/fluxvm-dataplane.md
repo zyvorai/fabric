@@ -142,9 +142,14 @@ On a bridged running VM with `mode=ebpf`:
 
 1. Sign in → Dashboard shows **VM dataplane · Live · mode=ebpf · attached · schema=4**.
 2. Open VM → **Dataplane → Status** — attached yes, schema 4, policy snapshot populated.
-3. **Policy** — add `tcp/22`, **Save policy** → `POST …/dataplane/policy` returns 200.
-4. **Stats** — non-zero allow and/or drop counters.
-5. **Flows** — rows with matching identity.
+3. **Policy** — add `tcp/22`, deny CIDR, labels, **Save policy** → `POST …/dataplane/policy` returns 200.
+4. **Effective** — membership shows matched groups after attaching a group.
+5. Open **Infrastructure → Edge Dataplane** — Health ok; create a group; apply a CNP; Observe lists endpoints.
+6. **Stats** — counters move after guest traffic (or host-side generators).
+7. **Flows** — rows with matching identity (`sample_rate ≥ 1`).
+
+Hands-on: [Tutorial 09](../../tutorials/09-edge-dataplane.md) ·
+[edge-dataplane series](../../tutorials/edge-dataplane/README.md).
 
 ---
 

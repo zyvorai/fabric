@@ -14,15 +14,20 @@ fluxvm_url = "http://127.0.0.1:7788"   # FluxVM's REST API base URL
 
 See [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` itself.
 
-For Network Fabric v3 (TC/eBPF VM-edge dataplane), Fabric ships [`configs/fluxvm-dataplane.toml`](../../configs/fluxvm-dataplane.toml) and mounts it as `/etc/fluxvm.toml` in compose/k8s:
+For Network Fabric **schema v4** (TC/eBPF VM-edge dataplane — groups, CNP,
+health/ipcache), Fabric ships [`configs/fluxvm-dataplane.toml`](../../configs/fluxvm-dataplane.toml)
+and mounts it as `/etc/fluxvm.toml` in compose/k8s:
 
 ```toml
 [sandbox.dataplane]
 mode = "ebpf"
 bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"
 pin_root = "/sys/fs/bpf/fluxvm"
-required = false   # set true after first green attach on a node
+required = true   # fail-closed when a host-visible VM edge exists
 ```
+
+Operator UX: [fluxvm-dataplane.md](fluxvm-dataplane.md) · tutorials
+[09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).
 
 The FluxVM image must include the BPF `.o` files; the DaemonSet/compose also mounts host `/sys/fs/bpf` and raises memlock (`SYS_RESOURCE` / `ulimit memlock=-1`).
 
@@ -48,7 +53,7 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | SSH info | — | Resolves the VM's MAC (pinned at create time) to an IP via zyvor-fabricd's own DHCP lease file — no vsock/FluxVM call at all. `key_path` is always `null`; key management is the operator's own responsibility (e.g. cloud-init) |
 | Bind-mount replacement (virtiofs) | `VMStartOptions.bind_mounts` (create-time only) | `CreateVmRequest.shared_folders` — one `virtiofsd` per share, auto-mounted in-guest via a generated cloud-init `/etc/fstab` entry |
 | Image catalog CRUD, incl. read-only flag + orphaned-download cleanup | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export/read-only/clean |
-| **Network Fabric v3 (VM edge dataplane)** | `VmDataplaneDriver` | `GET/POST /v1/vms/{id}/network/{policy,status,stats,flows}` — proxied as Fabric `/api/vms/{name}/dataplane/*` |
+| **Network Fabric schema v4 (VM edge dataplane)** | `VmDataplaneDriver` | `/v1/vms/{id}/network/{policy,status,stats,flows,effective}` + `/v1/network/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` — proxied as Fabric `/api/vms/{name}/dataplane/*` and `/api/dataplane/*` |
 
 ### Fabric API and CLI for the dataplane
 
@@ -56,8 +61,13 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | --- | --- |
 | `GET /api/vms/{name}/dataplane/status` | `…/network/status` |
 | `GET/POST /api/vms/{name}/dataplane/policy` | `…/network/policy` |
+| `GET /api/vms/{name}/dataplane/effective` | `…/network/effective` |
 | `GET /api/vms/{name}/dataplane/stats` | `…/network/stats` |
 | `GET /api/vms/{name}/dataplane/flows?limit=` | `…/network/flows` |
+| `GET/POST/DELETE /api/dataplane/groups[/{name}]` | `/v1/network/groups…` |
+| `GET/POST/DELETE /api/dataplane/cnp[/{name}]` | `/v1/network/cnp…` |
+| `GET /api/dataplane/{identities,observe,health,ipcache}` | matching `/v1/network/…` |
+| `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` |
 
 ```bash
 # HTTPS labs — URL + JWT (self-signed accepted when URL is https://)
@@ -67,13 +77,19 @@ export ZYVOR_FABRIC_TOKEN=…   # from POST /api/auth/login
 zyvorctl dataplane status <name>
 zyvorctl dataplane policy get <name>
 zyvorctl dataplane policy set <name> --file policy.json
+zyvorctl dataplane effective <name>
 zyvorctl dataplane stats <name>
 zyvorctl dataplane flows <name> --limit 100
+zyvorctl dataplane health
+zyvorctl dataplane group list
+zyvorctl dataplane cnp list
+zyvorctl dataplane observe
 ```
 
-**Do not confuse** this with Fabric's `/api/network-policies` (label→nftables SDN on the host). The VM-detail tab is labeled **Dataplane**; the Network tab links to it as **“VM edge dataplane (FluxVM)”**.
+**Do not confuse** this with Fabric's `/api/network-policies` (label→nftables SDN on the host). The VM-detail tab is labeled **Dataplane**; cluster UI is **Edge Dataplane** (`/app/edge-dataplane`).
 
-Operator UX detail: [fluxvm-dataplane.md](fluxvm-dataplane.md).
+Operator UX detail: [fluxvm-dataplane.md](fluxvm-dataplane.md) ·
+[Tutorial 09](../../tutorials/09-edge-dataplane.md).
 Log streaming's one fidelity reduction: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority. Image catalog's `pull-tar`/`import-tar`/`export-tar` are permanently unsupported, not just for now — a tar rootfs isn't a bootable disk image for a real hardware VM, so building that would mean writing a full tar-to-bootable-image converter, a different project from wiring up an existing capability.
 
 ## Known gaps (as of FluxVM v0.1.0)
@@ -84,7 +100,7 @@ Log streaming's one fidelity reduction: raw serial console output has no journal
 - **Firecracker jailer / vsock-proxy bookkeeping** — `VmRecord.jail_path`, `vsock_socket`, plus `lvm_lv`/`nbd_pid` (the storage-backend cleanup fields above).
 - **Agent-sandbox surface** — FluxVM's `/v1/sandboxes`, memory snapshots, AutoPause, L7 egress, and `/console` ops UI. Those stay on FluxVM's own API for now; Fabric continues to use the classic `/v1/vms` lifecycle.
 
-**Already wired (no longer gaps):** per-VM netns taps, and Network Fabric v3 dataplane proxy (status/policy/stats/flows) when FluxVM runs with `mode = "ebpf"`.
+**Already wired (no longer gaps):** per-VM netns taps, and Network Fabric **schema v4** dataplane proxy (per-VM + groups/CNP/health/ipcache/refresh-dns) when FluxVM runs with `mode = "ebpf"`.
 
 **Not applicable to this driver at all** (separate ways to run FluxVM, not something a REST-client driver consumes): FluxVM's `fluxvm-kube` Kubernetes `DisposableVm` CRD/operator, and its `fluxvm-agent` distributed fleet registry for multi-host placement. Those are alternatives to embedding FluxVM behind Zyvor Fabric, not features this driver would wrap.
 

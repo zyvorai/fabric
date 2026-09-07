@@ -34,6 +34,10 @@ export TOKEN="your-jwt-token-here"
 | 06 | [Security Hardening](06-security-hardening.md)    | Advanced     | 45 min | PAM auth, RBAC, JWT, firewalls, encryption, certs, and auditing.   |
 | 07 | [Logging & Compliance](07-logging-compliance.md)  | Intermediate | 35 min | Journals, compliance scans, and secrets management.                 |
 | 08 | [OpenStack Clients](08-openstack-clients.md)      | Beginner     | 25 min | Point `openstack` CLI / curl at Fabric’s Keystone/Nova façade.     |
+| 09 | [VM Edge Dataplane](09-edge-dataplane.md)         | Intermediate | 60 min | FluxVM Network Fabric schema v4 via Fabric API / CLI / console.    |
+
+Deep-dive series (groups, CNP, observe, UX):
+[edge-dataplane/](edge-dataplane/README.md).
 
 ---
 

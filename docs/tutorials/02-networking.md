@@ -6,9 +6,10 @@ configuration.
 
 > **Two policy planes:** Fabric **Net Security** network policies are host SDN
 > (label → nftables). Per-VM TC/eBPF edge policy is the **Dataplane** tab /
-> `/api/vms/{name}/dataplane/*` — see
-> [VM edge dataplane](../guides/vm-drivers/fluxvm-dataplane.md). This tutorial
-> focuses on bridges, VLANs, forwards, and Fabric SDN.
+> `/api/vms/{name}/dataplane/*` and cluster `/api/dataplane/*` — see
+> [VM edge dataplane](../guides/vm-drivers/fluxvm-dataplane.md) and
+> [Tutorial 09](09-edge-dataplane.md). This tutorial focuses on bridges, VLANs,
+> forwards, and Fabric SDN.
 
 **Level:** Intermediate
 **Time:** 45 minutes
@@ -786,3 +787,5 @@ curl -s -X DELETE "$FABRIC_HOST/api/network-policies/$POLICY_ID" \
 - [Tutorial 03: Snapshots & Backups](03-snapshots-backups.md) -- Protect your VMs with snapshots and automated backups
 - [Tutorial 05: Multi-Node Clustering](05-clustering.md) -- Use VXLAN and bridges across a cluster
 - [Tutorial 06: Security Hardening](06-security-hardening.md) -- Firewall profiles and network isolation
+- [Tutorial 09: VM Edge Dataplane](09-edge-dataplane.md) -- FluxVM schema v4 groups/CNP via Fabric (orthogonal to Step 5 SDN)
+- [Edge dataplane series](edge-dataplane/README.md) -- Short labs for health, groups, CNP, observe, UX

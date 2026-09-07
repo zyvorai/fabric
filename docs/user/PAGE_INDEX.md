@@ -40,6 +40,7 @@ Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 |------|-------|---------|-------|
 | Network | `/app/network` | Network — Infrastructure surface. | [Open](pages/infrastructure/network.md) |
 | VM Dataplane | `/app/vms/:name` → Dataplane | Per-VM TC/eBPF edge (Network Fabric schema v4) — not host SDN. | [Open](pages/infrastructure/dataplane.md) |
+| Edge Dataplane | `/app/edge-dataplane` | Cluster groups / CNP / health / observe / ipcache (VM edge). | [Open](pages/infrastructure/edge-dataplane.md) |
 | Net Security | `/app/network-security` | Net Security — Infrastructure surface. | [Open](pages/infrastructure/network-security.md) |
 | Storage | `/app/storage` | Storage — Infrastructure surface. | [Open](pages/infrastructure/storage.md) |
 | Storage Pools | `/app/storage-pools` | Storage Pools — Infrastructure surface. | [Open](pages/infrastructure/storage-pools.md) |

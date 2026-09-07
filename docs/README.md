@@ -15,6 +15,7 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | **Web UX** (marketing + `/app` console) | [web-ui.md](web-ui.md) · [ux.md](ux.md) |
 | **User journeys & acceptance criteria** | [USER_STORIES.md](USER_STORIES.md) |
 | **FluxVM VM driver** — config, capability matrix, gaps | [guides/vm-drivers/fluxvm.md](guides/vm-drivers/fluxvm.md) |
+| **VM edge dataplane** (Network Fabric schema v4) | [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md) · [Tutorial 09](tutorials/09-edge-dataplane.md) |
 | **Enterprise identity** (SCIM 2.0) | [scim-identity.md](scim-identity.md) |
 | **OpenStack compatibility** (Keystone/Nova/…) | [openstack-compat.md](openstack-compat.md) · [Tutorial 08](tutorials/08-openstack-clients.md) |
 | **Host maintenance evacuation** | [host-lifecycle.md](host-lifecycle.md) |

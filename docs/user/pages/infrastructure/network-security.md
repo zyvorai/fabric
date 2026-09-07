@@ -4,7 +4,7 @@
 
 Net Security — the advanced SDN and security control plane: network policies scoped to security identities, host firewall profiles/zones/VM assignments, exposed services, QoS traffic shaping, DNS zones/policies, WireGuard VPN tunnels and networks, traffic mirroring, NAT rules/pools/gateways, and bandwidth monitoring with alerts.
 
-For everyday per-VM networking mode and port forwards, see [Network](network.md). For **per-VM TC/eBPF edge** allowlists, Mbps/PPS, and flows (FluxVM Network Fabric), see [VM Dataplane](dataplane.md) — that plane is orthogonal and does not replace these host policies.
+For everyday per-VM networking mode and port forwards, see [Network](network.md). For **per-VM TC/eBPF edge** allowlists, groups/CNP, Mbps/PPS, and flows (FluxVM Network Fabric schema v4), see [VM Dataplane](dataplane.md) and [Edge Dataplane](edge-dataplane.md) — that plane is orthogonal and does not replace these host policies.
 
 ## When to use it
 

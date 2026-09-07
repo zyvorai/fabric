@@ -12,6 +12,7 @@ Complete reference for the Zyvor Fabric REST API, organized by functional catego
 - [Snapshots](#snapshots)
 - [Backups](#backups)
 - [Networking](#networking)
+- [VM edge dataplane (Network Fabric)](#vm-edge-dataplane-network-fabric)
 - [Storage](#storage)
 - [Machines (VM driver)](#machines-vm-driver)
 - [Events](#events)
@@ -1063,6 +1064,49 @@ List backup jobs (running and completed).
 curl -s http://localhost:3000/api/backups/jobs \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
+
+---
+
+## VM edge dataplane (Network Fabric)
+
+FluxVM TC/eBPF edge proxied by Fabric. Orthogonal to host SDN
+`/api/network-policies`. Schema **v4**. Operator guide:
+[fluxvm-dataplane.md](../vm-drivers/fluxvm-dataplane.md).
+
+**Auth:** Viewer+ for reads; Admin for writes (`POST`/`DELETE`).
+
+### Per-VM
+
+| Method | Path | Role |
+|--------|------|------|
+| GET | `/api/vms/{name}/dataplane/status` | mode, attached, schema_version, policy snapshot |
+| GET/POST | `/api/vms/{name}/dataplane/policy` | durable `VmNetworkPolicy` |
+| GET | `/api/vms/{name}/dataplane/effective` | declared + membership + merged |
+| GET | `/api/vms/{name}/dataplane/stats` | allow/drop counters |
+| GET | `/api/vms/{name}/dataplane/flows?limit=` | LRU flows |
+
+### Cluster
+
+| Method | Path | Role |
+|--------|------|------|
+| GET/POST | `/api/dataplane/groups` | list / upsert `SecurityGroup` |
+| GET/DELETE | `/api/dataplane/groups/{name}` | get / delete |
+| GET/POST | `/api/dataplane/cnp` | list / apply CNP JSON |
+| GET/DELETE | `/api/dataplane/cnp/{name}` | get / delete |
+| GET | `/api/dataplane/identities` | reserved + group identities |
+| GET | `/api/dataplane/observe` | snapshot |
+| GET | `/api/dataplane/health` | dataplane health |
+| GET | `/api/dataplane/ipcache` | guest IP → identity |
+| POST | `/api/dataplane/refresh-dns` | re-resolve FQDNs |
+
+```bash
+curl -sk https://127.0.0.1:9095/api/dataplane/health \
+  -H "Authorization: Bearer $TOKEN" | jq
+curl -sk https://127.0.0.1:9095/api/vms/NAME/dataplane/status \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+Tutorials: [09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).
 
 ---
 

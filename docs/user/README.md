@@ -41,6 +41,7 @@ Public marketing: `/`, `/product`, `/platform`, `/security`. Sign in: `/sign-in`
 | Dashboard | `/app` |
 | VMs | `/app/vms` |
 | VM Dataplane (eBPF edge) | `/app/vms/:name` → **Dataplane** — [guide](pages/infrastructure/dataplane.md) |
+| Edge Dataplane (cluster) | `/app/edge-dataplane` — [guide](pages/infrastructure/edge-dataplane.md) |
 | DRS / FT | `/app/drs`, `/app/fault-tolerance` |
 | Site Recovery | `/app/site-recovery` |
 | Settings | `/app/settings` |

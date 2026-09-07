@@ -113,7 +113,10 @@ Detailed documentation for each major feature area.
 |----------|-------------|
 | [Networking Overview](networking.md) | Network architecture, SDN stack, and VM edge dataplane |
 | [VM edge dataplane (Network Fabric schema v4)](guides/vm-drivers/fluxvm-dataplane.md) | Fabric proxy of FluxVM TC/eBPF — API, Web, CLI, lab UX |
-| [User: VM Dataplane](user/pages/infrastructure/dataplane.md) | Console walkthrough for Status / Policy / Stats / Flows |
+| [User: VM Dataplane](user/pages/infrastructure/dataplane.md) | Console walkthrough for Status / Policy / Effective / Stats / Flows |
+| [User: Edge Dataplane](user/pages/infrastructure/edge-dataplane.md) | Cluster groups / CNP / health / observe console |
+| [Tutorial 09: Edge Dataplane](tutorials/09-edge-dataplane.md) | End-to-end lab (API + CLI + UX) |
+| [Edge dataplane series](tutorials/edge-dataplane/README.md) | Short labs: groups, CNP, FQDN, UX |
 | Networking (netlink) | Bridges, VLANs, bonds, taps, macvtaps, VXLANs, SR-IOV |
 | Network Policies | Cilium-style label-based ingress/egress rules |
 | VM Firewall | Per-VM firewall profiles and zones via nftables |

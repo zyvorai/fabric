@@ -1,63 +1,84 @@
-# VM Dataplane (Network Fabric)
+# VM Dataplane (Network Fabric schema v4)
 
 ## Purpose
 
-Per-VM **edge** security and telemetry powered by FluxVM Network Fabric schema v4
-(TC/eBPF on the host-visible TAP/netns interface). Use this to allowlist
-destinations and ports, cap egress Mbps/PPS, and inspect allow/drop counters
-and sampled flows — without touching Fabric’s host SDN.
+Per-VM **edge** security and telemetry powered by FluxVM Network Fabric
+**schema v4** (TC/eBPF on the host-visible TAP/netns interface). Use this to:
+
+- Allowlist destinations and L4 ports (`tcp/PORT`, `udp/PORT`, `icmp/0`)
+- Deny CIDRs that override allows
+- Attach **security groups** / labels and inspect **effective** merged policy
+- Cap egress Mbps/PPS and sample flows
+- Inspect allow/drop counters — without touching Fabric’s host SDN
 
 This is **not** the same as [Net Security](network-security.md) network policies
-(label → host nftables).
+(label → host nftables). For cluster-wide groups/CNP/health UI, see
+[Edge Dataplane](edge-dataplane.md).
 
 ## When to use it
 
-- Lock down what a sandbox / CI / AI agent VM can reach on the network
+- Lock down what a sandbox / CI / AI agent VM can reach
 - Apply a live deny or rate limit without restarting the guest
-- Prove what left the box (stats + flows) without a packet capture tax
-- Confirm eBPF is attached (`schema_version=4`) before turning `required=true`
+- Prove what left the box (stats + flows)
+- Confirm eBPF is attached (`schema_version=4`) before relying on `required=true`
+- Debug group membership via the **Effective** tab
 
 ## How to get there
 
 - Route: `/app/vms/:name` → tab **Dataplane**
 - Shortcut: VM → **Network** → **Open Dataplane**
 - Dashboard: capability card **VM dataplane** (`/app`)
-- Nav: open any running bridged VM from **Virtual Machines**
+- Cluster console: [Edge Dataplane](edge-dataplane.md) (`/app/edge-dataplane`)
 
 ## Operate from the console (UX)
 
 ### Prerequisites
 
-1. FluxVM running with `[sandbox.dataplane] mode = "ebpf"` (see operator guide).
-2. VM created with **bridged / network tap** (`network_tap: true`) so a host
-   veth exists for TC attach.
-3. Write permission on VMs to change policy (read-only users can view).
+1. FluxVM with `[sandbox.dataplane] mode = "ebpf"` (see operator guide).
+2. VM with **bridged / network tap** (`network_tap: true`) so a host `vh…`
+   exists for TC attach.
+3. Write permission to change policy (viewers can inspect).
 
 ### Status
 
-Confirm **Attached = yes**, **Mode = ebpf**, **Schema version = 3**, policy
-synced, and the **Active policy snapshot** (CIDRs, ports, Mbps/PPS).
+Confirm **Attached = yes**, **Mode = ebpf**, **Schema version = 4**, policy
+synced, identity, pin dir, and the **Active policy snapshot** (CIDRs, ports,
+deny, groups, ICMP, Mbps/PPS).
 
 ### Policy
 
-1. Use a preset (**Allow all** / **Deny all** / **Web egress**) or edit tags.
+1. Presets (**Allow all** / **Deny all** / **Web egress**) or edit tags.
 2. Ports must look like `tcp/443` or `udp/53` (UI validates).
-3. Set optional **Max egress Mbps** / **PPS** and **Sample rate** (≥1 for flows).
-4. Click **Save policy**. Changes apply live (brief over-deny possible; never
-   an allow-all gap).
+3. Optional **Deny CIDRs**, **Groups**, **Labels**, **FQDNs**, **Entities**,
+   **Allow ICMP**, **Audit mode**.
+4. Optional **Max egress Mbps** / **PPS** and **Sample rate** (≥1 for flows).
+5. **Save policy** — live map update (brief over-deny possible; never an
+   allow-all gap).
 
-### Stats
+### Effective
 
-View allow vs drop packet/byte counters and drop rate. Use **Refresh counters**.
+JSON snapshot of **declared** policy, **membership** (matched groups /
+identities), and **effective** merged policy (union of CIDRs/ports; tightest
+rate limits; fail-closed default).
 
-### Flows
+### Stats / Flows
 
-Inspect the LRU flow table: **Identity**, family, source/destination, ports,
-protocol, verdict, packets, bytes, last seen. Adjust limit or enable
-auto-refresh.
+Allow vs drop counters; LRU flow table with identity, family, 5-tuple, verdict.
+
+## API & CLI (quick)
+
+| Action | Surface |
+|--------|---------|
+| Status / policy / stats / flows / effective | `/api/vms/{name}/dataplane/…` |
+| Groups / CNP / health / observe / ipcache / refresh-dns | `/api/dataplane/…` |
+| CLI | `zyvorctl dataplane …` |
+
+Tutorials: [Tutorial 09](../../../tutorials/09-edge-dataplane.md) ·
+[edge-dataplane series](../../../tutorials/edge-dataplane/README.md).
 
 ## Related pages
 
+- [Edge Dataplane](edge-dataplane.md) — cluster groups/CNP/health console
 - [Network](network.md) — NAT / bridge / port forwards
 - [Net Security](network-security.md) — host SDN (orthogonal)
 - [Virtual Machines](../core/vms.md)

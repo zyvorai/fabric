@@ -4,8 +4,15 @@
 
 ### Changed
 - Drop remaining `ssahani/` GitHub and Terraform Registry namespaces in favor of `zyvorai/` (`zyvorai/fabric`, `zyvorai/zyvor-fabricd`).
+- Docs refreshed for FluxVM Network Fabric **schema v4** edge dataplane (groups,
+  CNP, effective, health/ipcache/FQDN) across operator guides, user pages, and
+  tutorials ([09-edge-dataplane.md](docs/tutorials/09-edge-dataplane.md),
+  [edge-dataplane/](docs/tutorials/edge-dataplane/README.md)).
 
 ### Added
+- Fabric proxy of FluxVM schema v4: `/api/dataplane/*`, VM `…/dataplane/effective`,
+  Edge Dataplane console (`/app/edge-dataplane`), `zyvorctl dataplane` group/cnp/…
+  commands, and `scripts/test-edge-dataplane-e2e.sh`.
 - Tutorial 08: drive Fabric with OpenStack clients (`docs/tutorials/08-openstack-clients.md`) — Keystone token, Nova/Glance/Neutron/Cinder via `openstack` CLI and curl, public URL setup, Terraform/Ansible outline.
 - `openstack-compat` crate and `/identity` `/compute` `/image` `/network` `/volume` routes: experimental OpenStack wire-protocol façade (Keystone/Nova/Glance/Neutron/Cinder) on the same daemon port as Fabric. Catalog URLs come from `daemon.public_url` / `ZYVOR_FABRICD_PUBLIC_URL` (or listen + TLS). See [docs/openstack-compat.md](docs/openstack-compat.md).
 - `host-lifecycle` crate: deterministic host maintenance evacuation planner and async job manager — preflight blockers, capacity-aware target selection, live/cold migration policy, bounded-parallel execution, and failure semantics that leave a partially evacuated host cordoned rather than guessing. Not yet wired into the scheduler or server routes (see [docs/host-lifecycle.md](docs/host-lifecycle.md) for the intended follow-up integration).
