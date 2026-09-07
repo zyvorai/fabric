@@ -105,6 +105,7 @@ test:
 	cd backend && cargo test
 	cd web && npm test
 	$(MAKE) test-proven-infra
+	$(MAKE) test-devops
 
 .PHONY: test-proven-infra bench
 test-proven-infra:

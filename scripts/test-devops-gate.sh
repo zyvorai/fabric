@@ -18,4 +18,11 @@ FABRIC_URL=http://127.0.0.1:1 FLUXVM_URL=http://127.0.0.1:1 \
   ZYVOR_DEVOPS_TIMEOUT=0.2 ZYVOR_ALLOW_OFFLINE=1 \
   "$GATE"
 
+# Optional live stack (self-signed HTTPS ok via curl -k)
+if [[ "${ZYVOR_DEVOPS_LIVE:-0}" == "1" ]]; then
+  unset FABRIC_URL
+  FLUXVM_URL="${FLUXVM_URL:-http://127.0.0.1:7788}" \
+    ZYVOR_ALLOW_OFFLINE=0 "$GATE"
+fi
+
 echo "test-devops-gate: ok"

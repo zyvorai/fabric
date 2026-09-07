@@ -8,7 +8,10 @@
 - `backup` crate is a workspace member with create/restore/delete and corrupt-archive fail-closed tests.
 - Quorum majority tests in `fault-tolerance` and heartbeat window tests in `ha`.
 - Lab verify scripts: `scripts/test-proven-infra.sh`, `scripts/test-lab-verify.sh`
-  (proven-infra suites + edge dataplane e2e with lab auth fallbacks).
+  (devops units + live gate + proven-infra suites + edge dataplane e2e with lab
+  auth fallbacks; stdin closed for SSH-safe runs).
+- DevOps gate TLS: `scripts/devops-gate.sh` uses `curl -k` and auto-picks Fabric
+  HTTPS then HTTP when `FABRIC_URL` is unset; `make test` runs `test-devops`.
 
 ### Changed
 - Docs refreshed for JWT `tenant` claim enforcement, `driver.fluxvm_token` when

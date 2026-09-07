@@ -4,17 +4,28 @@
 # CI/CD gate: Fabric /health + /readyz, optional FluxVM /healthz + /readyz.
 set -euo pipefail
 
-FABRIC_URL="${FABRIC_URL:-http://127.0.0.1:9095}"
-FLUXVM_URL="${FLUXVM_URL:-http://127.0.0.1:7788}"
 TIMEOUT="${ZYVOR_DEVOPS_TIMEOUT:-3}"
 CHECK_FLUXVM="${ZYVOR_CHECK_FLUXVM:-1}"
 ALLOW_OFFLINE="${ZYVOR_ALLOW_OFFLINE:-0}"
+FLUXVM_URL="${FLUXVM_URL:-http://127.0.0.1:7788}"
 
 probe() {
   local url="$1"
   # -k: lab/self-signed TLS (Fabric HTTPS) must not fail the gate on cert verify
-  curl -sS -k -m "$TIMEOUT" -o /tmp/zyvor-devops-body.$$ -w '%{http_code}' "$url" || echo 000
+  curl -sS -k -m "$TIMEOUT" -o /tmp/zyvor-devops-body.$$ -w '%{http_code}' "$url" 2>/dev/null || echo 000
 }
+
+# Prefer explicit FABRIC_URL; otherwise pick a live lab listener (HTTPS first).
+if [[ -z "${FABRIC_URL:-}" ]]; then
+  FABRIC_URL=""
+  for candidate in https://127.0.0.1:9095 http://127.0.0.1:9095; do
+    if [[ "$(probe "$candidate/health")" == "200" ]]; then
+      FABRIC_URL="$candidate"
+      break
+    fi
+  done
+  FABRIC_URL="${FABRIC_URL:-https://127.0.0.1:9095}"
+fi
 
 fail() {
   echo "devops-gate FAIL: $*" >&2
@@ -24,6 +35,8 @@ fail() {
   fi
   exit 1
 }
+
+echo "devops-gate: FABRIC_URL=$FABRIC_URL FLUXVM_URL=$FLUXVM_URL"
 
 health="$(probe "$FABRIC_URL/health")"
 echo "fabric /health $health"

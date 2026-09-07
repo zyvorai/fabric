@@ -21,10 +21,27 @@ Canonical JSON: [contracts/fabric-fluxvm-readyz.json](contracts/fabric-fluxvm-re
 ## Environment promotion
 
 1. **PR** — contract unit tests + `scripts/test-devops-gate.sh` + proven-infra suites.
-2. **Lab** — `docker compose up` or Helm chart; `scripts/devops-gate.sh`; one `zyvorctl apply`.
+2. **Lab** — bare-metal / compose; `scripts/test-lab-verify.sh` (devops + proven-infra + edge e2e).
 3. **Prod** — snapshot (`scripts/upgrade-rollback.sh snapshot`) → install N+1 → `verify` → keep snapshot.
 
 Pair FluxVM upgrades with [fluxvm `scripts/upgrade-snapshot.sh`](https://github.com/zyvorai/fluxvm) on the same change window.
+
+## Lab HTTPS
+
+Lab `zyvor-fabricd` usually serves **HTTPS with a self-signed cert**.
+`scripts/devops-gate.sh` uses `curl -k` and, when `FABRIC_URL` is unset, probes
+`https://127.0.0.1:9095` then `http://127.0.0.1:9095`.
+
+```bash
+# Full post-deploy gate (stdin closed for nested tools)
+./scripts/test-lab-verify.sh
+
+# Live probe only
+unset FABRIC_URL
+FLUXVM_URL=http://127.0.0.1:7788 ./scripts/devops-gate.sh
+# or:
+ZYVOR_DEVOPS_LIVE=1 ./scripts/test-devops-gate.sh
+```
 
 ## Source of truth (pick one)
 

@@ -13,10 +13,12 @@ Copy these into your platform repo or call them from CI. They assume:
 python3 -m unittest examples.devops.test_contract examples.devops.test_examples
 bash scripts/test-devops-gate.sh
 
-# live stack (compose or bare metal)
-export FABRIC_URL=http://127.0.0.1:9095
+# live stack (compose or bare metal; lab is usually HTTPS + self-signed)
+unset FABRIC_URL   # auto-picks https://127.0.0.1:9095 then http
 export FLUXVM_URL=http://127.0.0.1:7788
 bash scripts/devops-gate.sh
+# or full lab pack:
+#   ./scripts/test-lab-verify.sh
 zyvorctl apply -f examples/devops/apply-vm.yaml
 ```
 
