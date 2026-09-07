@@ -10,4 +10,7 @@ Fabric Phase-1:
 - Docs: [hubble-ui.md](guides/operations/hubble-ui.md)
 
 Cilium-native CEP ownership and in-tree Hubble remain FluxVM/CNI work, not a
-Fabric-only toggle.
+Fabric-only toggle. Phase-2/3 CEP + SID attribution are **Not started** on
+purpose (no private-map fakes). CH QGA Phase-2/3 stay **Blocked** on the CH
+device model; in-tree KVM pause/userspace are Done on FluxVM while memory
+snapshots stay Firecracker — see FluxVM ROADMAP-DENSITY.
