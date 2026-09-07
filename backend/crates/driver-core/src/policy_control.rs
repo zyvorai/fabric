@@ -13,7 +13,8 @@
 //! | **Allow** | add destination CIDR to `allow_cidrs` |
 //! | **Invert**| swap allow/deny CIDR lists and flip `default_allow` |
 //!
-//! Also: explain, dry-run Guard, templates, drop-reason catalog.
+//! Also: explain, dry-run Guard, templates, drop-reason catalog,
+//! flow filters, Guard timers, management lockout, policy fingerprint.
 
 use crate::{FlowRecord, VmNetworkPolicy};
 use serde::{Deserialize, Serialize};
@@ -69,6 +70,7 @@ pub enum DropReason {
     PortDenied,
     RateLimit,
     AuditWouldDrop,
+    ManagementLockout,
     Unknown,
 }
 
@@ -81,6 +83,7 @@ impl DropReason {
             Self::PortDenied => "PORT_DENIED",
             Self::RateLimit => "RATE_LIMIT",
             Self::AuditWouldDrop => "AUDIT_WOULD_DROP",
+            Self::ManagementLockout => "MANAGEMENT_LOCKOUT",
             Self::Unknown => "UNKNOWN",
         }
     }
@@ -115,6 +118,23 @@ pub struct DryRunReport {
     pub would_drop: usize,
     pub examined: usize,
     pub hits: Vec<DryRunHit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GuardTimer {
+    pub vm: String,
+    pub revert: String,
+    pub expires_unix: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowFilter {
+    #[serde(default)]
+    pub verdict: Option<String>,
+    #[serde(default)]
+    pub protocol: Option<String>,
+    #[serde(default)]
+    pub dest_contains: Option<String>,
 }
 
 fn push_unique(list: &mut Vec<String>, value: String) {
@@ -192,6 +212,24 @@ pub fn proto_name(p: u8) -> &'static str {
         58 => "icmpv6",
         _ => "any",
     }
+}
+
+/// Block of Fabric API / default GW should warn (not applied here — caller decides).
+pub fn is_management_cidr(cidr: &str) -> bool {
+    let h = cidr.split('/').next().unwrap_or(cidr);
+    matches!(h, "127.0.0.1" | "::1" | "0.0.0.0") || h.starts_with("169.254.")
+}
+
+pub fn policy_fingerprint(p: &VmNetworkPolicy) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut s = std::collections::hash_map::DefaultHasher::new();
+    p.default_allow.hash(&mut s);
+    p.audit_mode.hash(&mut s);
+    p.allow_cidrs.hash(&mut s);
+    p.deny_cidrs.hash(&mut s);
+    p.allow_ports.hash(&mut s);
+    p.sample_rate.hash(&mut s);
+    s.finish()
 }
 
 pub fn apply_mode(mut p: VmNetworkPolicy, mode: EnforcementMode) -> VmNetworkPolicy {
@@ -296,6 +334,24 @@ pub fn explain(policy: &VmNetworkPolicy, dest_ip: &str, dest_port: u16, proto: &
     let proto = proto.to_ascii_lowercase();
     let token = port_token(&proto, dest_port);
 
+    if is_management_cidr(dest_ip)
+        && policy
+            .deny_cidrs
+            .iter()
+            .any(|c| cidr_contains(c, dest_ip))
+    {
+        return ExplainResult {
+            verdict: "DROPPED".into(),
+            reason: DropReason::ManagementLockout,
+            would_drop: true,
+            matched_deny: Some(dest_ip.into()),
+            matched_allow: None,
+            matched_port: None,
+            mode,
+            summary: format!("DROPPED MANAGEMENT_LOCKOUT dest={dest_ip}"),
+        };
+    }
+
     let matched_deny = policy
         .deny_cidrs
         .iter()
@@ -375,6 +431,34 @@ pub fn dry_run_guard(policy: &VmNetworkPolicy, flows: &[FlowRecord]) -> DryRunRe
         examined: flows.len(),
         hits,
     }
+}
+
+pub fn filter_flows<'a>(flows: &'a [FlowRecord], f: &FlowFilter) -> Vec<&'a FlowRecord> {
+    flows
+        .iter()
+        .filter(|rec| {
+            if let Some(v) = &f.verdict {
+                if v != "all" && !rec.verdict.eq_ignore_ascii_case(v) {
+                    return false;
+                }
+            }
+            if let Some(p) = &f.protocol {
+                if p != "all" && proto_name(rec.protocol) != p.as_str() {
+                    return false;
+                }
+            }
+            if let Some(d) = &f.dest_contains {
+                if !rec.destination.contains(d.as_str()) {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect()
+}
+
+pub fn timer_expired(t: &GuardTimer, now: u64) -> bool {
+    now >= t.expires_unix
 }
 
 pub fn templates() -> Vec<VmNetworkPolicy> {
@@ -560,5 +644,74 @@ mod tests {
         let inv = invert_policy(pol());
         assert!(inv.default_allow);
         assert_eq!(inv.allow_cidrs, vec!["10.66.0.0/16"]);
+    }
+
+    #[test]
+    fn management_lockout() {
+        let p = VmNetworkPolicy {
+            default_allow: true,
+            deny_cidrs: vec!["127.0.0.1/32".into()],
+            ..VmNetworkPolicy::default()
+        };
+        let r = explain(&p, "127.0.0.1", 443, "tcp");
+        assert_eq!(r.reason, DropReason::ManagementLockout);
+        assert!(r.would_drop);
+        assert_eq!(DropReason::ManagementLockout.as_str(), "MANAGEMENT_LOCKOUT");
+        assert!(is_management_cidr("169.254.1.1"));
+        assert!(!is_management_cidr("10.0.0.1"));
+    }
+
+    #[test]
+    fn timer_and_fingerprint() {
+        let t = GuardTimer {
+            vm: "web".into(),
+            revert: "open".into(),
+            expires_unix: 10,
+        };
+        assert!(timer_expired(&t, 11));
+        assert!(!timer_expired(&t, 9));
+        assert_ne!(policy_fingerprint(&pol()), 0);
+    }
+
+    #[test]
+    fn filter_flows_by_verdict() {
+        let flows = vec![
+            FlowRecord {
+                identity: 1,
+                family: 4,
+                source: "10.0.0.2".into(),
+                destination: "1.1.1.1".into(),
+                source_port: 1,
+                destination_port: 443,
+                protocol: 6,
+                verdict: "DROPPED".into(),
+                packets: 1,
+                bytes: 1,
+                last_seen_ns: 0,
+            },
+            FlowRecord {
+                identity: 1,
+                family: 4,
+                source: "10.0.0.2".into(),
+                destination: "8.8.8.8".into(),
+                source_port: 1,
+                destination_port: 53,
+                protocol: 17,
+                verdict: "FORWARDED".into(),
+                packets: 1,
+                bytes: 1,
+                last_seen_ns: 0,
+            },
+        ];
+        let filtered = filter_flows(
+            &flows,
+            &FlowFilter {
+                verdict: Some("DROPPED".into()),
+                protocol: None,
+                dest_contains: None,
+            },
+        );
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].destination, "1.1.1.1");
     }
 }

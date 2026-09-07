@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- Observe-all ops pack: `dataplane-follow` / `doctor` / `bundle` / `timers` /
+  `chaos-failclosed` scripts, GitOps + Terraform dataplane examples, and
+  `policy_control` helpers (management lockout, fingerprint, flow filter,
+  Guard timers) ([docs/dataplane-observe-all.md](docs/dataplane-observe-all.md)).
 - Observe pack on `policy_control`: explain, dry-run Guard, templates
   (open/guard/web/dns-only/no-world), drop-reason catalog;
   `GET …/dataplane/explain`, `GET …/dry-run`, `GET /api/dataplane/templates`,
