@@ -16,6 +16,8 @@
   [edge-dataplane/](docs/tutorials/edge-dataplane/README.md)).
 
 ### Added
+- Edge Dataplane **Open Hubble** button when `network.hubble_ui_url` is set;
+  [ROADMAP-DENSITY.md](docs/ROADMAP-DENSITY.md) for Cilium CEP / density phases.
 - Project-production alignment with FluxVM: unauthenticated `GET /readyz`
   (store + FluxVM `/readyz`), VM `tenant` on create + `GET /api/vms?tenant=`,
   FluxVM client `tenant` / `readyz` / `list_vms_by_tenant`, label→tenant
