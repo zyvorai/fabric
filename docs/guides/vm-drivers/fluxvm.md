@@ -31,7 +31,6 @@ Operator UX: [fluxvm-dataplane.md](fluxvm-dataplane.md) · tutorials
 
 Production alignment with FluxVM: Fabric `GET /readyz`, create `tenant` /
 `labels.tenant`, `GET /api/vms?tenant=`, and `zyvorctl create --tenant` — see FluxVM
-[docs/PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md).
 [PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md)
 and [production tutorials](https://github.com/zyvorai/fluxvm/blob/main/docs/tutorials/production/README.md).
 
