@@ -506,6 +506,9 @@ pub trait VmDataplaneDriver: Send + Sync {
     async fn dataplane_observe(&self) -> Result<serde_json::Value> {
         anyhow::bail!("edge dataplane observe not supported by this backend")
     }
+    async fn dataplane_hubble_flows(&self, _limit: Option<usize>) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({"items": []}))
+    }
     async fn dataplane_health(&self) -> Result<DataplaneHealth> {
         anyhow::bail!("edge dataplane health not supported by this backend")
     }

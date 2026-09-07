@@ -1431,6 +1431,57 @@ impl FluxVmClient {
         Self::parse(resp).await
     }
 
+    /// `GET /v1/network/hubble/flows` — Hubble-lite JSON (hops when FluxVM packet-flow PR is in).
+    pub async fn hubble_flows(
+        &self,
+        limit: Option<usize>,
+        verdict: Option<&str>,
+        protocol: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        let mut url = self.url("/v1/network/hubble/flows")?;
+        {
+            let mut q = url.query_pairs_mut();
+            if let Some(limit) = limit {
+                q.append_pair("limit", &limit.to_string());
+            }
+            if let Some(verdict) = verdict {
+                q.append_pair("verdict", verdict);
+            }
+            if let Some(protocol) = protocol {
+                q.append_pair("protocol", protocol);
+            }
+        }
+        let resp = self.authed(self.http.get(url)).send().await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/network/hubble/flows/text`
+    pub async fn hubble_flows_text(
+        &self,
+        output: &str,
+        detailed: bool,
+        limit: Option<usize>,
+    ) -> Result<String> {
+        let mut url = self.url("/v1/network/hubble/flows/text")?;
+        {
+            let mut q = url.query_pairs_mut();
+            q.append_pair("output", output);
+            if detailed {
+                q.append_pair("detailed", "true");
+            }
+            if let Some(limit) = limit {
+                q.append_pair("limit", &limit.to_string());
+            }
+        }
+        let resp = self.authed(self.http.get(url)).send().await?;
+        let status = resp.status();
+        let body = resp.text().await?;
+        if !status.is_success() {
+            anyhow::bail!("fluxvm hubble text {status}: {body}");
+        }
+        Ok(body)
+    }
+
     /// `GET /v1/network/health`
     pub async fn network_health(&self) -> Result<DataplaneHealth> {
         let resp = self

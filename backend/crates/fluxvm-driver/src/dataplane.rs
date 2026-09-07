@@ -248,6 +248,13 @@ impl VmDataplaneDriver for FluxVmDriver {
         self.client.network_observe().await
     }
 
+    async fn dataplane_hubble_flows(&self, limit: Option<usize>) -> Result<serde_json::Value> {
+        match self.client.hubble_flows(limit, None, None).await {
+            Ok(v) => Ok(v),
+            Err(_) => Ok(serde_json::json!({"items": []})),
+        }
+    }
+
     async fn dataplane_health(&self) -> Result<DataplaneHealth> {
         Ok(to_health(self.client.network_health().await?))
     }

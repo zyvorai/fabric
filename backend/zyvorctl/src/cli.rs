@@ -184,6 +184,13 @@ enum DataplaneCmd {
     RefreshDns,
     /// Snapshot identities/groups/CNPs/labeled VMs
     Observe,
+    /// Hubble-style packet flows (JSON from Fabric; color/plain via --output)
+    Hubble {
+        #[arg(long, default_value = "json")]
+        output: String,
+        #[arg(long, default_value_t = 64)]
+        limit: usize,
+    },
     /// Reserved + group identities
     Identities,
     /// Security groups (FluxVM edge — not Fabric SDN)
@@ -1022,6 +1029,16 @@ impl Cli {
                 DataplaneCmd::Observe => {
                     let val = api_get(&client, "/dataplane/observe").await?;
                     print_value(&val, fmt);
+                }
+                DataplaneCmd::Hubble { output, limit } => {
+                    let val =
+                        api_get(&client, &format!("/dataplane/hubble/flows?limit={}", limit))
+                            .await?;
+                    if output.eq_ignore_ascii_case("json") {
+                        print_value(&val, fmt);
+                    } else {
+                        println!("{}", crate::packetflow::render_hubble_json(&val, &output));
+                    }
                 }
                 DataplaneCmd::Identities => {
                     let val = api_get(&client, "/dataplane/identities").await?;

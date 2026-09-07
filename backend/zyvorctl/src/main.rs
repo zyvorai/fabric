@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod cli;
+mod packetflow;
 
 use anyhow::Result;
 use clap::Parser;

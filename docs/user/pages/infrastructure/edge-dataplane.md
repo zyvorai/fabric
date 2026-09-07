@@ -3,7 +3,8 @@
 ## Purpose
 
 Cluster-wide console for FluxVM Network Fabric **schema v4** — security groups,
-CNP documents, identities, observe snapshot, health, ipcache, and FQDN refresh.
+CNP documents, identities, observe snapshot, Hubble-style packet flow,
+health, ipcache, and FQDN refresh.
 
 This is the **VM edge** control plane proxied by Fabric
 (`/api/dataplane/*`). It does **not** replace [Net Security](network-security.md)
@@ -35,6 +36,7 @@ Per-VM Status / Policy / Effective / Stats / Flows stay on the VM detail
 | **CNP** | Paste JSON → Apply; delete listed documents |
 | **Identities** | Reserved entities + group identities |
 | **Observe** | Read-only JSON snapshot |
+| **Packet flow** | Hubble-lite hops with Colorful / Normal theme |
 | **Ipcache** | Guest IP → identity table |
 | Header **Refresh DNS** | `POST /api/dataplane/refresh-dns` (admin) |
 

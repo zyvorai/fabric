@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- Hubble-style packet flow in the Fabric console: Edge Dataplane **Packet flow**
+  tab and VM Dataplane Flows view with Colorful / Normal themes, hop path
+  (guest → tap → tc/eBPF → uplink → peer), `GET /api/dataplane/hubble/flows`,
+  and `zyvorctl dataplane hubble --output color|plain|json`.
 - DevOps pack: probe contract with FluxVM (`docs/contracts/fabric-fluxvm-readyz.json`), `scripts/devops-gate.sh`, GitHub/GitLab/GitOps/Terraform/Ansible examples under `examples/devops/`, and `docs/DEVOPS.md`.
 - Proven-infra pack for issues #14–#17: `benchmarks/` harness (health / readyz / inventory / concurrent p50/p99), chaos qualification script, `scripts/upgrade-rollback.sh` N→N+1 snapshot/rollback/verify, and docs under `docs/proven-infra/` (compatibility matrix, SLOs, chaos, upgrade).
 - `backup` crate is a workspace member with create/restore/delete and corrupt-archive fail-closed tests.

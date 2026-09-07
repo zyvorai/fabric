@@ -15,4 +15,14 @@ hubble_ui_url = "https://hubble.example.com"
 When set, the Edge Dataplane page shows **Open Hubble** (new tab). This is a
 convenience link only — no map sync, no CEP ownership.
 
-For VM-edge observe (FluxVM-native), use Edge Dataplane / `…/dataplane/flows`.
+For VM-edge observe (FluxVM-native), use Edge Dataplane → **Packet flow**
+(Colorful / Normal) or `GET /api/dataplane/hubble/flows`.
+
+```bash
+zyvorctl dataplane hubble --output color
+zyvorctl dataplane hubble --output plain
+```
+
+This is Hubble-*lite* from FluxVM (guest → tap → tc/eBPF → uplink → peer), not
+Cilium Hubble gRPC. Pair with the FluxVM `feat/hubble-packet-flow` PR so hops
+are populated; otherwise Fabric still draws a path from sampled per-VM flows.

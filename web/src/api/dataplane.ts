@@ -168,6 +168,14 @@ export function getDataplaneObserve(): Promise<Record<string, unknown>> {
   return apiGet('/api/dataplane/observe')
 }
 
+export interface HubbleFlowList {
+  items: import('../lib/packetflow').HubbleFlow[]
+}
+
+export function getDataplaneHubbleFlows(limit = 64): Promise<HubbleFlowList> {
+  return apiGet(`/api/dataplane/hubble/flows?limit=${limit}`)
+}
+
 export function getDataplaneHealth(): Promise<DataplaneHealth> {
   return apiGet('/api/dataplane/health')
 }

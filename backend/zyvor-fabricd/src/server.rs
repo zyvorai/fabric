@@ -414,6 +414,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::vm_dataplane::list_identities),
         )
         .route("/dataplane/observe", get(api::vm_dataplane::observe))
+        .route(
+            "/dataplane/hubble/flows",
+            get(api::vm_dataplane::hubble_flows),
+        )
         .route("/dataplane/health", get(api::vm_dataplane::health))
         .route("/dataplane/ipcache", get(api::vm_dataplane::ipcache))
         .route(

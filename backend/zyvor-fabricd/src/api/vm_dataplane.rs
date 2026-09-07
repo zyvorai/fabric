@@ -296,6 +296,20 @@ pub async fn observe(
     Ok(Json(body))
 }
 
+/// GET /api/dataplane/hubble/flows?limit=
+pub async fn hubble_flows(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<FlowsQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let body = state
+        .driver
+        .dataplane_hubble_flows(q.limit)
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane Hubble flows", e))?;
+    Ok(Json(body))
+}
+
 /// GET /api/dataplane/health
 pub async fn health(
     RequireRead(_claims): RequireRead,

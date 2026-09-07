@@ -31,35 +31,16 @@ import { usePermissions } from '../../hooks/usePermissions'
 import { StatusBadge } from '../../components/ui'
 import SubsystemBanner from '../../components/SubsystemBanner'
 import { TerminalTextarea } from '../../components/AppleTerminalFrame'
+import PacketFlowPanel from '../../components/PacketFlowPanel'
+import { fromRawFlow } from '../../lib/packetflow'
 
 type PanelTab = 'status' | 'policy' | 'effective' | 'stats' | 'flows'
-
-const PROTO: Record<number, string> = {
-  1: 'ICMP',
-  6: 'TCP',
-  17: 'UDP',
-  58: 'ICMPv6',
-}
-
-function protoLabel(n: number): string {
-  return PROTO[n] ?? String(n)
-}
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`
   if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MiB`
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GiB`
-}
-
-function formatAge(lastSeenNs: number): string {
-  if (!lastSeenNs) return '—'
-  const ageMs = Date.now() - lastSeenNs / 1e6
-  if (ageMs < 0) return 'just now'
-  if (ageMs < 1000) return `${Math.round(ageMs)} ms ago`
-  if (ageMs < 60_000) return `${Math.round(ageMs / 1000)}s ago`
-  if (ageMs < 3600_000) return `${Math.round(ageMs / 60_000)}m ago`
-  return `${Math.round(ageMs / 3600_000)}h ago`
 }
 
 const inputCls =
@@ -778,58 +759,17 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
               No flows sampled yet. Set sample rate ≥ 1 on the Policy tab and generate traffic.
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-[#d2d2d7] overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs font-medium text-[#6e6e73] uppercase tracking-wider border-b border-[#d2d2d7]">
-                      <th className="py-2.5 px-3">Identity</th>
-                      <th className="py-2.5 px-3">Family</th>
-                      <th className="py-2.5 px-3">Source</th>
-                      <th className="py-2.5 px-3">Destination</th>
-                      <th className="py-2.5 px-3">Proto</th>
-                      <th className="py-2.5 px-3">Verdict</th>
-                      <th className="py-2.5 px-3">Packets</th>
-                      <th className="py-2.5 px-3">Bytes</th>
-                      <th className="py-2.5 px-3">Last seen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {flows.map((f, i) => (
-                      <tr
-                        key={`${f.identity}-${f.source}-${f.destination}-${f.source_port}-${i}`}
-                        className="border-t border-[#d2d2d7]/60 hover:bg-[#f5f5f7]"
-                      >
-                        <td className="py-2 px-3 font-mono text-xs text-[#6e6e73]">{f.identity}</td>
-                        <td className="py-2 px-3 text-[#6e6e73]">IPv{f.family}</td>
-                        <td className="py-2 px-3 font-mono text-xs">
-                          {f.source}:{f.source_port}
-                        </td>
-                        <td className="py-2 px-3 font-mono text-xs">
-                          {f.destination}:{f.destination_port}
-                        </td>
-                        <td className="py-2 px-3">{protoLabel(f.protocol)}</td>
-                        <td className="py-2 px-3">
-                          <span
-                            className={`text-xs px-1.5 py-0.5 rounded ${
-                              f.verdict.toLowerCase().includes('drop') ||
-                              f.verdict.toLowerCase().includes('deny')
-                                ? 'bg-red-50 text-red-700'
-                                : 'bg-emerald-50 text-emerald-700'
-                            }`}
-                          >
-                            {f.verdict}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3">{f.packets.toLocaleString()}</td>
-                        <td className="py-2 px-3">{formatBytes(f.bytes)}</td>
-                        <td className="py-2 px-3 text-[#6e6e73] text-xs">{formatAge(f.last_seen_ns)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <PacketFlowPanel
+              views={flows.map((f) =>
+                fromRawFlow(f, {
+                  vmName,
+                  dataplaneMode: status?.mode,
+                  labels: policy.labels,
+                }),
+              )}
+              emptyHint="No flows match the current filter."
+              onReload={() => void load()}
+            />
           )}
         </div>
       )}

@@ -13,6 +13,7 @@ import {
   deleteDataplaneGroup,
   emptyPolicy,
   getDataplaneHealth,
+  getDataplaneHubbleFlows,
   getDataplaneObserve,
   listDataplaneCnp,
   listDataplaneGroups,
@@ -28,8 +29,10 @@ import { usePermissions } from '../hooks/usePermissions'
 import SubsystemBanner from '../components/SubsystemBanner'
 import { TerminalTextarea } from '../components/AppleTerminalFrame'
 import { usePlatformInfo } from '../contexts/PlatformInfoContext'
+import PacketFlowPanel from '../components/PacketFlowPanel'
+import { fromHubbleFlow, type PacketFlowView } from '../lib/packetflow'
 
-type Tab = 'health' | 'groups' | 'cnp' | 'identities' | 'observe' | 'ipcache'
+type Tab = 'health' | 'groups' | 'cnp' | 'identities' | 'observe' | 'flows' | 'ipcache'
 
 const SAMPLE_CNP = `{
   "apiVersion": "cilium.io/v2",
@@ -58,6 +61,7 @@ export default function EdgeDataplane() {
   const [identities, setIdentities] = useState<IdentityInfo[]>([])
   const [observe, setObserve] = useState<Record<string, unknown> | null>(null)
   const [ipcache, setIpcache] = useState<IpcacheEntry[]>([])
+  const [packetFlows, setPacketFlows] = useState<PacketFlowView[]>([])
   const [groupName, setGroupName] = useState('web')
   const [groupLabel, setGroupLabel] = useState('app=web')
   const [cnpJson, setCnpJson] = useState(SAMPLE_CNP)
@@ -66,13 +70,14 @@ export default function EdgeDataplane() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [h, g, c, ids, obs, ipc] = await Promise.all([
+      const [h, g, c, ids, obs, ipc, hubble] = await Promise.all([
         getDataplaneHealth(),
         listDataplaneGroups().catch(() => ({ items: [] as SecurityGroup[] })),
         listDataplaneCnp().catch(() => ({ items: [] as unknown[] })),
         listDataplaneIdentities().catch(() => ({ items: [] as IdentityInfo[] })),
         getDataplaneObserve().catch(() => null),
         listDataplaneIpcache().catch(() => ({ items: [] as IpcacheEntry[] })),
+        getDataplaneHubbleFlows(64).catch(() => ({ items: [] })),
       ])
       setHealth(h)
       setGroups(g.items ?? [])
@@ -80,6 +85,8 @@ export default function EdgeDataplane() {
       setIdentities(ids.items ?? [])
       setObserve(obs)
       setIpcache(ipc.items ?? [])
+      const mode = h.mode || 'ebpf'
+      setPacketFlows((hubble.items ?? []).map((f) => fromHubbleFlow(f, mode)))
     } catch (err) {
       setError(formatUserError(err))
     } finally {
@@ -178,6 +185,7 @@ export default function EdgeDataplane() {
     { id: 'cnp', label: 'CNP' },
     { id: 'identities', label: 'Identities' },
     { id: 'observe', label: 'Observe' },
+    { id: 'flows', label: 'Packet flow' },
     { id: 'ipcache', label: 'Ipcache' },
   ]
 
@@ -199,8 +207,8 @@ export default function EdgeDataplane() {
           <div>
             <h1 className="text-xl font-semibold text-[#1d1d1f]">Edge Dataplane</h1>
             <p className="text-sm text-[#6e6e73] max-w-2xl">
-              FluxVM Network Fabric schema v4 — security groups, CNP, identities, health, and
-              ipcache. This is the <strong>VM edge</strong> plane, not Fabric SDN Net Security.
+              FluxVM Network Fabric schema v4 — security groups, CNP, identities, Hubble-style
+              packet flow (colorful / normal), health, and ipcache. VM edge plane, not Fabric SDN.
             </p>
           </div>
         </div>
@@ -457,6 +465,23 @@ export default function EdgeDataplane() {
           value={JSON.stringify(observe ?? {}, null, 2)}
           readOnly
         />
+      )}
+
+      {tab === 'flows' && (
+        <div className="space-y-2">
+          <p className="text-sm text-[#6e6e73]">
+            Hubble-lite packet path from FluxVM (guest → tap → tc/eBPF → uplink → peer). Not Cilium Hubble gRPC.
+            Use <strong>Colorful</strong> or <strong>Normal</strong>. External Hubble remains the Open Hubble link when configured.
+          </p>
+          <PacketFlowPanel
+            views={packetFlows}
+            emptyHint="No sampled flows yet. Enable sample_rate on a VM dataplane policy and generate traffic, or apply the FluxVM packet-flow PR so /v1/network/hubble/flows returns hops."
+            onReload={() => {
+              setLoading(true)
+              void load()
+            }}
+          />
+        </div>
       )}
 
       {tab === 'ipcache' && (

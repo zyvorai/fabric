@@ -75,6 +75,7 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET/POST/DELETE /api/dataplane/cnp[/{name}]` | `/v1/network/cnp…` | CNP apply/list/delete |
 | `GET /api/dataplane/identities` | `GET /v1/network/identities` | Reserved + group identities |
 | `GET /api/dataplane/observe` | `GET /v1/network/observe` | Snapshot identities/groups/CNPs/VMs |
+| `GET /api/dataplane/hubble/flows` | `GET /v1/network/hubble/flows` | Hubble-lite packet flows + hops |
 | `GET /api/dataplane/health` | `GET /v1/network/health` | Dataplane health |
 | `GET /api/dataplane/ipcache` | `GET /v1/network/ipcache` | Guest IP → identity |
 | `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` | Re-resolve FQDN allowlists |
