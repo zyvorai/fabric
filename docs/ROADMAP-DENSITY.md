@@ -9,8 +9,10 @@ Fabric Phase-1:
 - Edge Dataplane **Open Hubble** button (external link only)
 - Docs: [hubble-ui.md](guides/operations/hubble-ui.md)
 
-Cilium-native CEP ownership and in-tree Hubble remain FluxVM/CNI work, not a
-Fabric-only toggle. Phase-2/3 CEP + SID attribution are **Not started** on
-purpose (no private-map fakes). CH QGA Phase-2/3 stay **Blocked** on the CH
-device model; in-tree KVM pause/userspace are Done on FluxVM while memory
-snapshots stay Firecracker — see FluxVM ROADMAP-DENSITY.
+FluxVM now also ships **Hubble-lite** CEP-*shaped* views (`/v1/network/endpoints`,
+`/hubble/*`) without writing Cilium private maps. Real Cilium-agent CEP /
+SID attribution remains **Not started**.
+
+CH QGA: host `--serial socket=qga.sock` path is Done on FluxVM (guest must
+speak QGA); named virtio-serial stays QEMU-only. In-tree KVM pause/userspace/
+lock-mem are Done; memory snapshots stay Firecracker — see FluxVM ROADMAP-DENSITY.
