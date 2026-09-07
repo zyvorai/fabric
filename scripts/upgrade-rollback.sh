@@ -113,8 +113,8 @@ do_rollback() {
 
 do_list() {
   mkdir -p "$BACKUP_ROOT"
-  find "$BACKUP_ROOT" -mindepth 2 -maxdepth 2 -name MANIFEST -printf '%h\n' 2>/dev/null \
-    | sort || true
+  # Portable: GNU find -printf is not available on macOS/BSD.
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort || true
 }
 
 do_verify() {
