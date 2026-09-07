@@ -66,6 +66,7 @@ export default function CreateVM() {
   const [showDownloadImage, setShowDownloadImage] = useState(false)
   const [networkMode, setNetworkMode] = useState<'nat' | 'bridged'>('nat')
   const [staticIp, setStaticIp] = useState(false)
+  const [tenant, setTenant] = useState('')
   const [portForwards, setPortForwards] = useState<{ hostPort: string; guestPort: string; protocol: 'tcp' | 'udp' }[]>([])
 
   const addPortForwardRow = (guestPort = '', hostPort = '') => {
@@ -181,6 +182,7 @@ export default function CreateVM() {
         name, image, cpus, memory, disk: diskGb,
         network_tap: networkMode === 'bridged',
         network_static_ip: networkMode === 'bridged' && staticIp,
+        ...(tenant.trim() ? { tenant: tenant.trim() } : {}),
         ...(port_forwards.length ? { port_forwards } : {}),
       })
       if (showAdvanced) {
@@ -275,6 +277,20 @@ export default function CreateVM() {
                   className="w-full px-3.5 py-2.5 bg-white border border-[var(--zf-hairline)] rounded-lg text-[var(--zf-ink)] placeholder-[var(--zf-muted)] focus:outline-none focus:border-[var(--zf-link)]/50 focus:ring-1 focus:ring-[var(--zf-link)]/20 transition-colors text-sm"
                   required
                   autoFocus
+                />
+              </div>
+
+              <div>
+                <label htmlFor="vm-tenant" className="block text-sm font-medium text-[var(--zf-ink)] mb-1.5">
+                  Tenant <span className="text-[var(--zf-muted)] font-normal">(optional)</span>
+                </label>
+                <input
+                  id="vm-tenant"
+                  type="text"
+                  value={tenant}
+                  onChange={(e) => setTenant(e.target.value)}
+                  placeholder="acme"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[var(--zf-hairline)] rounded-lg text-[var(--zf-ink)] placeholder-[var(--zf-muted)] focus:outline-none focus:border-[var(--zf-link)]/50 focus:ring-1 focus:ring-[var(--zf-link)]/20 transition-colors text-sm"
                 />
               </div>
 
@@ -676,6 +692,12 @@ export default function CreateVM() {
                   <dt className="text-[var(--zf-muted)]">Name</dt>
                   <dd className="text-[var(--zf-ink)] font-medium">{name}</dd>
                 </div>
+                {tenant.trim() && (
+                  <div className="flex justify-between gap-4 border-b border-[var(--zf-hairline)] pb-2">
+                    <dt className="text-[var(--zf-muted)]">Tenant</dt>
+                    <dd className="text-[var(--zf-ink)] font-medium">{tenant.trim()}</dd>
+                  </div>
+                )}
                 <div className="flex justify-between gap-4 border-b border-[var(--zf-hairline)] pb-2">
                   <dt className="text-[var(--zf-muted)]">Image</dt>
                   <dd className="text-[var(--zf-ink)] font-mono text-xs text-right break-all">{image}</dd>

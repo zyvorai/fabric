@@ -214,6 +214,13 @@ curl -sf -X POST http://NODE_IP:30095/api/auth/login \
   -d '{"username":"admin","password":"YOUR_PASSWORD"}'
 ```
 
+DaemonSet probes (base + Helm chart):
+
+| Pod | Liveness | Readiness |
+|-----|----------|-----------|
+| `zyvor-fabricd` | `GET /health` | `GET /readyz` |
+| FluxVM | `GET /healthz` | `GET /readyz` (HTTP 503 when not ready) |
+
 On the node, FluxVM should answer:
 
 ```bash

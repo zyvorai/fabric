@@ -48,7 +48,9 @@ type Report struct {
 // Config controls local and service checks.
 type Config struct {
 	FabricURL       string
+	FabricReadyURL  string
 	FluxVMAddress   string
+	FluxVMReadyURL  string
 	DataDir         string
 	MinimumFreeGiB  uint64
 	HTTPTimeout     time.Duration
@@ -61,7 +63,9 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		FabricURL:      "http://127.0.0.1:9095/health",
+		FabricReadyURL: "http://127.0.0.1:9095/readyz",
 		FluxVMAddress:  "127.0.0.1:7788",
+		FluxVMReadyURL: "http://127.0.0.1:7788/readyz",
 		DataDir:        "/var/lib/zyvor-fabricd",
 		MinimumFreeGiB: 10,
 		HTTPTimeout:    2 * time.Second,

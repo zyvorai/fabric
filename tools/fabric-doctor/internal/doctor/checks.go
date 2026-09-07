@@ -50,7 +50,12 @@ func Run(ctx context.Context, cfg Config, version string) Report {
 	}
 
 	if !cfg.SkipServicePing {
-		results = append(results, checkFabricHealth(ctx, cfg), checkFluxVMTCP(ctx, cfg))
+		results = append(results,
+			checkFabricHealth(ctx, cfg),
+			checkFabricReadyz(ctx, cfg),
+			checkFluxVMTCP(ctx, cfg),
+			checkFluxVMReadyz(ctx, cfg),
+		)
 	}
 
 	return Report{
@@ -340,6 +345,51 @@ func checkFluxVMTCP(ctx context.Context, cfg Config) CheckResult {
 		_ = conn.Close()
 		return StatusPass, "FluxVM TCP endpoint is reachable at " + cfg.FluxVMAddress, ""
 	})
+}
+
+func checkFabricReadyz(ctx context.Context, cfg Config) CheckResult {
+	return timed("service.fabric_readyz", "service", func() (Status, string, string) {
+		readyURL := cfg.FabricReadyURL
+		if readyURL == "" {
+			readyURL = strings.TrimSuffix(cfg.FabricURL, "/health") + "/readyz"
+		}
+		return httpProbe(ctx, cfg, readyURL, "Fabric readiness", "Inspect zyvor-fabricd /readyz (store + FluxVM).")
+	})
+}
+
+func checkFluxVMReadyz(ctx context.Context, cfg Config) CheckResult {
+	return timed("service.fluxvm_readyz", "service", func() (Status, string, string) {
+		readyURL := cfg.FluxVMReadyURL
+		if readyURL == "" {
+			readyURL = "http://" + cfg.FluxVMAddress + "/readyz"
+		}
+		return httpProbe(ctx, cfg, readyURL, "FluxVM readiness", "Inspect FluxVM /readyz (state dir + dataplane when required).")
+	})
+}
+
+func httpProbe(ctx context.Context, cfg Config, endpoint, label, remediation string) (Status, string, string) {
+	client := &http.Client{Timeout: cfg.HTTPTimeout}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return StatusFail, "invalid "+label+" URL: "+err.Error(), "Set a valid http(s) "+label+" endpoint."
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		status := StatusWarn
+		if cfg.StrictServices {
+			status = StatusFail
+		}
+		return status, label + " is not reachable: " + err.Error(), remediation
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		status := StatusWarn
+		if cfg.StrictServices {
+			status = StatusFail
+		}
+		return status, fmt.Sprintf("%s returned HTTP %d", label, resp.StatusCode), remediation
+	}
+	return StatusPass, fmt.Sprintf("%s is reachable (HTTP %d)", label, resp.StatusCode), ""
 }
 
 func tlsCertificateHealth(u *url.URL, timeout time.Duration) string {

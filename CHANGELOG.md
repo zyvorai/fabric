@@ -17,6 +17,9 @@
   (store + FluxVM `/readyz`), VM `tenant` on create + `GET /api/vms?tenant=`,
   FluxVM client `tenant` / `readyz` / `list_vms_by_tenant`, label→tenant
   inheritance on VM start.
+- `zyvorctl create --tenant`, Create VM UI tenant field, fabric-doctor
+  `/readyz` checks (`--fabric-ready-url` / `--fluxvm-ready-url`), and k8s
+  readiness probes (`fabricd` → `/readyz`; FluxVM → `/healthz` + `/readyz`).
 - Fabric proxy of FluxVM schema v4: `/api/dataplane/*`, VM `…/dataplane/effective`,
   Edge Dataplane console (`/app/edge-dataplane`), `zyvorctl dataplane` group/cnp/…
   commands, and `scripts/test-edge-dataplane-e2e.sh`.

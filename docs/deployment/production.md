@@ -503,7 +503,8 @@ curl -sf https://127.0.0.1:9095/readyz | jq .   # readiness (store + FluxVM)
 ```
 
 Use `/health` for process-up probes and `/readyz` for load-balancer / Kubernetes
-readiness. See also [monitoring.md](../guides/operations/monitoring.md).
+readiness (DaemonSet templates already probe `/readyz`; FluxVM uses `/healthz` +
+`/readyz`). See also [monitoring.md](../guides/operations/monitoring.md).
 
 ### Prometheus Integration
 

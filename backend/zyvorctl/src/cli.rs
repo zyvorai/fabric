@@ -69,6 +69,9 @@ enum Commands {
         tags: Option<Vec<String>>,
         #[arg(long, value_parser = parse_label)]
         label: Option<Vec<(String, String)>>,
+        /// Optional tenant id (stored as labels.tenant and passed to FluxVM)
+        #[arg(long)]
+        tenant: Option<String>,
     },
     /// Start a VM
     Start { name: String },
@@ -892,6 +895,7 @@ impl Cli {
                 hostname,
                 tags,
                 label,
+                tenant,
             } => {
                 let labels =
                     label.map(|pairs| pairs.into_iter().collect::<HashMap<String, String>>());
@@ -904,7 +908,7 @@ impl Cli {
                     hostname,
                     tags,
                     labels,
-                    tenant: None,
+                    tenant,
                     port_forwards: Vec::new(),
                     network_tap: false,
                     network_static_ip: false,

@@ -42,9 +42,9 @@ sudo zyvor-fabricd
 
 # CLI
 zyvorctl list
-zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096
+zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 
-# Web UI → https://localhost:9095  (console at /app)
+# Web UI → https://localhost:9095  (console at /app; Create VM has optional Tenant)
 ```
 
 | Goal | Path |
@@ -66,7 +66,7 @@ Verify after start:
 curl -sf http://127.0.0.1:9095/health
 curl -sf http://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 curl -sf http://127.0.0.1:7788/readyz | jq .
-# Multi-tenant: POST /api/vms with "tenant": "acme"; list with GET /api/vms?tenant=acme
+# Multi-tenant: zyvorctl create … --tenant acme; list with GET /api/vms?tenant=acme
 ```
 
 ---

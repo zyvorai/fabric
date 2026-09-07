@@ -79,14 +79,18 @@ spec:
         - name: kvm
           mountPath: /dev/kvm
         readinessProbe:
-          tcpSocket:
+          httpGet:
+            path: /readyz
             port: 7788
+            scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
           failureThreshold: 6
         livenessProbe:
-          tcpSocket:
+          httpGet:
+            path: /healthz
             port: 7788
+            scheme: HTTP
           initialDelaySeconds: 15
           periodSeconds: 20
           failureThreshold: 3

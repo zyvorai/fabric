@@ -17,6 +17,9 @@ For a production VM host:
 - use at least `--min-free-gib 50` for a small node and set a higher site-specific threshold for image-heavy nodes
 - use `--strict-services` only after Fabric and FluxVM are expected to be running
 
+Service checks (after install): Fabric `GET /health` + `GET /readyz`, FluxVM TCP
+and `GET /readyz` (`--fabric-ready-url` / `--fluxvm-ready-url` override defaults).
+
 ## Kubernetes / privileged DaemonSet use
 
 When Fabric runs as a privileged host-network DaemonSet, execute Doctor with the same host visibility if you want meaningful `/dev/kvm`, TUN, cgroup and kernel-module checks. A restricted pod will correctly report those host capabilities as unavailable.

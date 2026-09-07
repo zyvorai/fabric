@@ -43,11 +43,13 @@ func run(args []string) int {
 }
 
 func commonFlags(fs *flag.FlagSet, cfg *doctor.Config, format *string) {
-	fs.StringVar(&cfg.FabricURL, "fabric-url", cfg.FabricURL, "Fabric health endpoint URL")
+	fs.StringVar(&cfg.FabricURL, "fabric-url", cfg.FabricURL, "Fabric liveness endpoint URL (/health)")
+	fs.StringVar(&cfg.FabricReadyURL, "fabric-ready-url", cfg.FabricReadyURL, "Fabric readiness endpoint URL (/readyz)")
 	fs.StringVar(&cfg.FluxVMAddress, "fluxvm-address", cfg.FluxVMAddress, "FluxVM TCP address")
+	fs.StringVar(&cfg.FluxVMReadyURL, "fluxvm-ready-url", cfg.FluxVMReadyURL, "FluxVM readiness endpoint URL (/readyz)")
 	fs.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "Fabric state/data directory")
 	fs.Uint64Var(&cfg.MinimumFreeGiB, "min-free-gib", cfg.MinimumFreeGiB, "minimum free space required")
-	fs.DurationVar(&cfg.HTTPTimeout, "http-timeout", cfg.HTTPTimeout, "Fabric HTTP check timeout")
+	fs.DurationVar(&cfg.HTTPTimeout, "http-timeout", cfg.HTTPTimeout, "HTTP check timeout")
 	fs.DurationVar(&cfg.TCPTimeout, "tcp-timeout", cfg.TCPTimeout, "FluxVM TCP check timeout")
 	fs.BoolVar(&cfg.StrictServices, "strict-services", false, "treat Fabric/FluxVM unreachability as failure instead of warning")
 	fs.BoolVar(&cfg.SkipServicePing, "skip-service-ping", false, "skip Fabric and FluxVM reachability checks")

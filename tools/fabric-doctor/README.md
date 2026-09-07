@@ -22,8 +22,10 @@ It answers two operator questions before a VM host is admitted into service:
 - NTP/time synchronization
 - active Linux Security Modules
 - Fabric `/health` (liveness) and `/readyz` (readiness: store + FluxVM) reachability
-- FluxVM TCP reachability (and `/readyz` when probing the FluxVM URL)
+- FluxVM TCP reachability and HTTP `/readyz` (state dir + dataplane when required)
 - HTTPS certificate lifetime when the Fabric health URL uses TLS
+
+Flags: `--fabric-url`, `--fabric-ready-url`, `--fluxvm-address`, `--fluxvm-ready-url`.
 
 ## Build
 

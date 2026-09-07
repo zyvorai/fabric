@@ -56,6 +56,44 @@ func TestFabricHealthStrictFailure(t *testing.T) {
 	}
 }
 
+func TestFabricReadyzPass(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/readyz" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer ts.Close()
+
+	cfg := DefaultConfig()
+	cfg.FabricReadyURL = ts.URL + "/readyz"
+	cfg.HTTPTimeout = time.Second
+	result := checkFabricReadyz(context.Background(), cfg)
+	if result.Status != StatusPass {
+		t.Fatalf("expected pass, got %+v", result)
+	}
+}
+
+func TestFluxVMReadyzPass(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/readyz" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer ts.Close()
+
+	cfg := DefaultConfig()
+	cfg.FluxVMReadyURL = ts.URL + "/readyz"
+	cfg.HTTPTimeout = time.Second
+	result := checkFluxVMReadyz(context.Background(), cfg)
+	if result.Status != StatusPass {
+		t.Fatalf("expected pass, got %+v", result)
+	}
+}
+
 func TestTableIncludesRemediation(t *testing.T) {
 	report := Report{
 		ToolVersion:  "test",

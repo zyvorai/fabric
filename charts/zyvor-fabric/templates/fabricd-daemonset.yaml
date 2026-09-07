@@ -99,7 +99,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /health
+            path: /readyz
             port: http
             scheme: HTTP
           initialDelaySeconds: 5

@@ -124,8 +124,11 @@ If `zyvorctl` is installed:
 zyvorctl create my-first-vm \
   --image=your-image.qcow2 \
   --cpus=2 \
-  --memory=2048
+  --memory=2048 \
+  --tenant=acme
 ```
+
+Optional `--tenant` is stored as `labels.tenant` and passed to FluxVM.
 
 ---
 
