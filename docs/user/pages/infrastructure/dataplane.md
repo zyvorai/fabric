@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Per-VM **edge** security and telemetry powered by FluxVM Network Fabric v3
+Per-VM **edge** security and telemetry powered by FluxVM Network Fabric schema v4
 (TC/eBPF on the host-visible TAP/netns interface). Use this to allowlist
 destinations and ports, cap egress Mbps/PPS, and inspect allow/drop counters
 and sampled flows — without touching Fabric’s host SDN.
@@ -15,7 +15,7 @@ This is **not** the same as [Net Security](network-security.md) network policies
 - Lock down what a sandbox / CI / AI agent VM can reach on the network
 - Apply a live deny or rate limit without restarting the guest
 - Prove what left the box (stats + flows) without a packet capture tax
-- Confirm eBPF is attached (`schema_version=3`) before turning `required=true`
+- Confirm eBPF is attached (`schema_version=4`) before turning `required=true`
 
 ## How to get there
 

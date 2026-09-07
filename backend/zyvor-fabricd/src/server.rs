@@ -371,7 +371,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/vms/{name}/resume", post(routes::resume_vm))
         .route("/vms/{name}/clone", post(routes::clone_vm))
         .route("/vms/{name}/cloud-init", post(routes::configure_cloud_init))
-        // FluxVM Network Fabric v3 — VM edge dataplane (not Fabric SDN)
+        // FluxVM Network Fabric schema v4 — VM edge dataplane (not Fabric SDN)
         .route(
             "/vms/{name}/dataplane/status",
             get(api::vm_dataplane::dataplane_status),
@@ -388,6 +388,37 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/vms/{name}/dataplane/flows",
             get(api::vm_dataplane::dataplane_flows),
+        )
+        .route(
+            "/vms/{name}/dataplane/effective",
+            get(api::vm_dataplane::dataplane_effective),
+        )
+        .route(
+            "/dataplane/groups",
+            get(api::vm_dataplane::list_groups).post(api::vm_dataplane::upsert_group),
+        )
+        .route(
+            "/dataplane/groups/{name}",
+            get(api::vm_dataplane::get_group).delete(api::vm_dataplane::delete_group),
+        )
+        .route(
+            "/dataplane/cnp",
+            get(api::vm_dataplane::list_cnp).post(api::vm_dataplane::apply_cnp),
+        )
+        .route(
+            "/dataplane/cnp/{name}",
+            get(api::vm_dataplane::get_cnp).delete(api::vm_dataplane::delete_cnp),
+        )
+        .route(
+            "/dataplane/identities",
+            get(api::vm_dataplane::list_identities),
+        )
+        .route("/dataplane/observe", get(api::vm_dataplane::observe))
+        .route("/dataplane/health", get(api::vm_dataplane::health))
+        .route("/dataplane/ipcache", get(api::vm_dataplane::ipcache))
+        .route(
+            "/dataplane/refresh-dns",
+            post(api::vm_dataplane::refresh_dns),
         )
         // Snapshot routes
         .route(

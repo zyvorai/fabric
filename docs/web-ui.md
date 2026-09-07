@@ -20,7 +20,7 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 - Interactive terminal console (xterm.js) and graphical VNC console (noVNC)
 - Live metrics graphs
 - Cilium-style network security management with 9 tabs
-- **VM edge dataplane (Network Fabric v3)** — VM detail → **Dataplane** tab
+- **VM edge dataplane (Network Fabric schema v4)** — VM detail → **Dataplane** tab
   (Status / Policy / Stats / Flows), plus Dashboard **VM dataplane** capability
   card; see [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md)
 - Command palette (`Ctrl+K` / `Cmd+K`) and `g` sequence shortcuts

@@ -54,6 +54,7 @@ const Migrations = lazy(() => import('./pages/Migrations'))
 const Profiles = lazy(() => import('./pages/Profiles'))
 const Snapshots = lazy(() => import('./pages/Snapshots'))
 const NetworkSecurity = lazy(() => import('./pages/NetworkSecurity'))
+const EdgeDataplane = lazy(() => import('./pages/EdgeDataplane'))
 const Processes = lazy(() => import('./pages/Processes'))
 const SecurityDashboard = lazy(() => import('./pages/SecurityDashboard'))
 const Kernel = lazy(() => import('./pages/Kernel'))
@@ -165,6 +166,7 @@ function ConsoleRoutes() {
             <Route path="lifecycle" element={<LifecycleManager />} />
             <Route path="certificates" element={<Certificates />} />
             <Route path="network-security" element={<NetworkSecurity />} />
+            <Route path="edge-dataplane" element={<EdgeDataplane />} />
             <Route path="processes" element={<Processes />} />
             <Route path="security-dashboard" element={<SecurityDashboard />} />
             <Route path="kernel" element={<Kernel />} />

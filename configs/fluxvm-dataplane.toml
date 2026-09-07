@@ -1,8 +1,9 @@
-# FluxVM companion config — Network Fabric v3 GA (for Zyvor Fabric).
+# FluxVM companion config — Network Fabric schema v4 (for Zyvor Fabric).
 # Mounted as /etc/fluxvm.toml when Fabric runs FluxVM via compose/k8s.
 #
 # required=true fail-closes when a host-visible VM edge exists but attach
 # fails. user NAT / mode=none soft-skip (no edge). Fabric SDN stays independent.
+# Aligns with FluxVM configs/network-fabric-prod.toml (groups/CNP/health/ipcache).
 
 [sandbox.dataplane]
 mode = "ebpf"
@@ -15,3 +16,7 @@ allow_ports = ["tcp/443", "tcp/80", "udp/53"]
 max_egress_mbps = 250
 max_egress_pps = 100000
 sample_rate = 100
+
+# On nodes that already run a CNI agent:
+# mode = "cilium"
+# and leave XDP disabled.

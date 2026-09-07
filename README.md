@@ -200,7 +200,7 @@ flowchart TB
   Flux -- library call --> GK[GuestKit<br/>offline mount · chroot · agent bake-in]
   Flux -- vsock --> Agent[fluxvm-guest-agent<br/>inside the running guest]
   Daemon -- "/api/vms/name/dataplane/*" --> Flux
-  Flux -- TC eBPF --> Edge[VM edge dataplane<br/>Network Fabric v3]
+  Flux -- TC eBPF --> Edge[VM edge dataplane<br/>Network Fabric schema v4]
 ```
 
 **Fabric decides what should exist; FluxVM makes it exist; GuestKit prepares the disk.** Each layer is independently useful and Apache-2.0 licensed.
@@ -209,14 +209,14 @@ flowchart TB
 
 ## Network Fabric architecture (how it works)
 
-Fabric exposes FluxVM **Network Fabric v3** (TC/eBPF VM-edge dataplane) as first-class API, CLI, and UI — while keeping Fabric's own host SDN separate. Operator guide: [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). Kernel program source of truth: [FluxVM Network Fabric](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works).
+Fabric exposes FluxVM **Network Fabric schema v4** (TC/eBPF VM-edge dataplane) as first-class API, CLI, and UI — while keeping Fabric's own host SDN separate. Operator guide: [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). Kernel program source of truth: [FluxVM Network Fabric](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works).
 
 ### Two policy planes (do not conflate)
 
 | Plane | Owns | API / UX |
 |-------|------|----------|
 | **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · Security → Network Policies |
-| **VM edge (Network Fabric v3)** | Per-VM allowlists, Mbps/PPS, stats/flows on the TAP/netns edge | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** tab · `zyvorctl dataplane …` |
+| **VM edge (Network Fabric schema v4)** | Per-VM allowlists, Mbps/PPS, stats/flows on the TAP/netns edge | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** tab · `zyvorctl dataplane …` |
 
 ```mermaid
 flowchart LR
@@ -409,7 +409,7 @@ HTTPS labs: `export ZYVOR_FABRIC_URL=https://127.0.0.1:9095` and `export ZYVOR_F
 
 ### Enable packaging
 
-Ship [`configs/fluxvm-dataplane.toml`](configs/fluxvm-dataplane.toml) (`mode = "ebpf"`). Compose/k8s mount it as `/etc/fluxvm.toml`, mount host `/sys/fs/bpf`, and raise memlock (`SYS_RESOURCE` / `ulimit memlock=-1`). Image must include `/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o`. After first green attach (`schema_version=3`, `attached=true`), set `required = true` for fail-closed production.
+Ship [`configs/fluxvm-dataplane.toml`](configs/fluxvm-dataplane.toml) (`mode = "ebpf"`). Compose/k8s mount it as `/etc/fluxvm.toml`, mount host `/sys/fs/bpf`, and raise memlock (`SYS_RESOURCE` / `ulimit memlock=-1`). Image must include `/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o`. After first green attach (`schema_version=4`, `attached=true`), set `required = true` for fail-closed production.
 
 ### Why Fabric + Network Fabric is ahead of other VMMs
 
@@ -423,7 +423,7 @@ flowchart LR
     TNft --> TOut[Host / WAN]
   end
 
-  subgraph fabricPath [Fabric + FluxVM Network Fabric v3]
+  subgraph fabricPath [Fabric + FluxVM Network Fabric schema v4]
     FGuest[Guest] --> FTap[TAP / netns veth]
     FTap --> FEbpf["TC eBPF on VM edge\nLPM · L4 · Mbps/PPS · flows"]
     FEbpf --> FOut[Host / Cilium / Fabric SDN]
@@ -445,10 +445,10 @@ quadrantChart
     QEMU usernet: [0.15, 0.20]
     Cloud hypervisor raw: [0.55, 0.25]
     Firecracker CNI: [0.60, 0.40]
-    Fabric plus Network Fabric v3: [0.88, 0.90]
+    Fabric plus Network Fabric schema v4: [0.88, 0.90]
 ```
 
-| Capability | libvirt / virsh + nft | Shared bridge + host FW | QEMU user NAT | Typical microVM + CNI | **Fabric + Network Fabric v3** |
+| Capability | libvirt / virsh + nft | Shared bridge + host FW | QEMU user NAT | Typical microVM + CNI | **Fabric + Network Fabric schema v4** |
 |---|---|---|---|---|---|
 | Per-VM L3/L4 egress allowlists | Manual chains | Host-wide rules | Soft / limited | Pod-oriented | **First-class** `allow_cidrs` + `tcp\|udp/PORT` |
 | Live policy without detach | Flush/reload gaps | Blast radius | Restart usernet | CNI reconcile | **In-place BPF map update** (~100–120 ms p50 in lab) |
@@ -507,7 +507,7 @@ Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com
 | Security policy | [SECURITY.md](SECURITY.md) |
 | **Fabric Doctor (preflight)** | [docs/FABRIC_DOCTOR.md](docs/FABRIC_DOCTOR.md) · [tools/fabric-doctor](tools/fabric-doctor/) |
 | FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) |
-| **VM edge dataplane (Network Fabric v3)** | [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) |
+| **VM edge dataplane (Network Fabric schema v4)** | [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) |
 | Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
 | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |

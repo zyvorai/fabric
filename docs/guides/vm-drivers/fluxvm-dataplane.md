@@ -1,13 +1,13 @@
 # FluxVM Network Fabric (VM edge dataplane)
 
-Fabric exposes FluxVM **Network Fabric v3** — a TC/eBPF classifier on each VM’s
+Fabric exposes FluxVM **Network Fabric schema v4** — a TC/eBPF classifier on each VM’s
 host-visible edge — as first-class **API · Web · CLI**. This is **not** Fabric’s
 host SDN (`/api/network-policies` → nftables). Both planes can run together.
 
 | Layer | Owns | Surface |
 | --- | --- | --- |
 | **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · **Net Security → Policies** |
-| **VM edge (Network Fabric v3)** | Per-VM L3/L4 allowlists, Mbps/PPS, stats, LRU flows on TAP/netns | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** · `zyvorctl dataplane` |
+| **VM edge (Network Fabric schema v4)** | Per-VM L3/L4 allowlists, Mbps/PPS, stats, LRU flows on TAP/netns | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** · `zyvorctl dataplane` |
 
 Kernel program and safety properties live in FluxVM:
 [Network Fabric architecture](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works) ·
@@ -55,7 +55,7 @@ Requirements:
 4. Bridged Fabric VMs use `network_tap: true` → FluxVM `NetworkSpec::Tap { netns: true }` so the classifier attaches on the **host** veth (`vh…`).
 
 GA default in `configs/fluxvm-dataplane.toml` is already `required = true`.
-Confirm `schema_version=3` + `attached=true` on a bridged VM after deploy.
+Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 
 ---
 
@@ -66,8 +66,16 @@ Confirm `schema_version=3` + `attached=true` on a bridged VM after deploy.
 | `GET /api/vms/{name}/dataplane/status` | `GET /v1/vms/{id}/network/status` | mode, attached, schema, identity, iface, policy snapshot |
 | `GET /api/vms/{name}/dataplane/policy` | `GET /v1/vms/{id}/network/policy` | Durable policy |
 | `POST /api/vms/{name}/dataplane/policy` | `POST /v1/vms/{id}/network/policy` | Replace durable policy + live maps |
+| `GET /api/vms/{name}/dataplane/effective` | `GET /v1/vms/{id}/network/effective` | Declared + group-merged policy |
 | `GET /api/vms/{name}/dataplane/stats` | `GET /v1/vms/{id}/network/stats` | allow/drop packets + bytes |
 | `GET /api/vms/{name}/dataplane/flows?limit=` | `GET /v1/vms/{id}/network/flows` | LRU flows (`family` 4/6, identity, verdict) |
+| `GET/POST/DELETE /api/dataplane/groups[/{name}]` | `/v1/network/groups…` | Security-group CRUD |
+| `GET/POST/DELETE /api/dataplane/cnp[/{name}]` | `/v1/network/cnp…` | CNP apply/list/delete |
+| `GET /api/dataplane/identities` | `GET /v1/network/identities` | Reserved + group identities |
+| `GET /api/dataplane/observe` | `GET /v1/network/observe` | Snapshot identities/groups/CNPs/VMs |
+| `GET /api/dataplane/health` | `GET /v1/network/health` | Dataplane health |
+| `GET /api/dataplane/ipcache` | `GET /v1/network/ipcache` | Guest IP → identity |
+| `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` | Re-resolve FQDN allowlists |
 
 Capability probe (dashboard health card):
 
@@ -76,7 +84,7 @@ GET /api/capabilities → vm_dataplane: { phase, detail }
 ```
 
 When a running sample VM exists with eBPF attached, detail looks like
-`mode=ebpf · attached · schema=3`. With `mode=legacy`, phase is `off`.
+`mode=ebpf · attached · schema=4`. With `mode=legacy`, phase is `off`.
 
 ### Policy JSON shape
 
@@ -85,6 +93,13 @@ When a running sample VM exists with eBPF attached, detail looks like
   "default_allow": false,
   "allow_cidrs": ["0.0.0.0/0", "::/0"],
   "allow_ports": ["tcp/80", "tcp/443", "udp/53"],
+  "deny_cidrs": ["10.66.0.0/16"],
+  "allow_icmp": true,
+  "groups": ["web"],
+  "labels": ["app=web"],
+  "allow_fqdns": [],
+  "entities": [],
+  "audit_mode": false,
   "max_egress_mbps": 100,
   "max_egress_pps": 10000,
   "sample_rate": 1
@@ -93,6 +108,8 @@ When a running sample VM exists with eBPF attached, detail looks like
 
 Ports **must** be `tcp/PORT` or `udp/PORT` (optionally `tcp/8000-8999`). Bare
 `443` is rejected by the UI and ignored/mis-parsed by the dataplane.
+ICMP may use `icmp/0` / `icmp6/0`. Console: **Edge Dataplane** (`/app/edge-dataplane`)
+for cluster groups/CNP/health; VM → **Dataplane** for per-VM policy + **Effective**.
 
 ---
 
@@ -110,9 +127,12 @@ Also reachable from the Network tab teaser (**Open Dataplane**).
 | Tab | Contents |
 | --- | --- |
 | **Status** | mode, attached, schema version/compat, policy synced, required, interface, identity, pin dir, **active policy snapshot** |
-| **Policy** | Presets (Allow all / Deny all / Web egress), CIDR tags, port tags with validation, Mbps/PPS, sample rate, Advanced JSON, Save / Discard |
+| **Policy** | Presets, allow/deny CIDRs, ports, groups/labels, FQDNs, entities, ICMP, audit, Mbps/PPS, Advanced JSON |
+| **Effective** | Declared + group-merged policy JSON |
 | **Stats** | Allowed/dropped packets + bytes, drop rate, Refresh counters |
 | **Flows** | LRU table with **Identity**, family, 5-tuple, proto, verdict, packets, bytes, last seen; limit + auto-refresh |
+
+Also: console **Edge Dataplane** (`/app/edge-dataplane`) — Health · Groups · CNP · Identities · Observe · Ipcache.
 
 Soft banner when `vm_dataplane` capability is off/unreachable (`SubsystemBanner`).
 
@@ -120,8 +140,8 @@ Soft banner when `vm_dataplane` capability is off/unreachable (`SubsystemBanner`
 
 On a bridged running VM with `mode=ebpf`:
 
-1. Sign in → Dashboard shows **VM dataplane · Live · mode=ebpf · attached · schema=3**.
-2. Open VM → **Dataplane → Status** — attached yes, schema 3, policy snapshot populated.
+1. Sign in → Dashboard shows **VM dataplane · Live · mode=ebpf · attached · schema=4**.
+2. Open VM → **Dataplane → Status** — attached yes, schema 4, policy snapshot populated.
 3. **Policy** — add `tcp/22`, **Save policy** → `POST …/dataplane/policy` returns 200.
 4. **Stats** — non-zero allow and/or drop counters.
 5. **Flows** — rows with matching identity.
@@ -141,8 +161,14 @@ export ZYVOR_FABRIC_TOKEN="$(curl -sk -X POST "$ZYVOR_FABRIC_URL/api/auth/login"
 zyvorctl dataplane status <name> -o json
 zyvorctl dataplane policy get <name> -o json
 zyvorctl dataplane policy set <name> --file /tmp/dp-policy.json
+zyvorctl dataplane effective <name> -o json
 zyvorctl dataplane stats <name> -o json
 zyvorctl dataplane flows <name> --limit 20 -o json
+zyvorctl dataplane health -o json
+zyvorctl dataplane group list -o json
+zyvorctl dataplane cnp list -o json
+zyvorctl dataplane observe -o json
+zyvorctl dataplane refresh-dns -o json
 ```
 
 Aliases: `FABRIC_URL`, `FABRIC_TOKEN`. Default URL remains `http://localhost:9095`
@@ -171,7 +197,7 @@ curl -sk -X POST "$ZYVOR_FABRIC_URL/api/vms/lab-dp/start" \
 
 # Wait until state=running, then:
 zyvorctl dataplane status lab-dp -o json
-# expect: mode=ebpf, attached=true, schema_version=3
+# expect: mode=ebpf, attached=true, schema_version=4
 ```
 
 User-mode NAT / `network.mode=none` VMs do **not** attach eBPF (no host edge

@@ -153,18 +153,23 @@ async fn probe_vm_dataplane(state: &AppState) -> SubsystemStatus {
                 SubsystemStatus {
                     phase: SubsystemPhase::Off,
                     detail: Some(
-                        "sandbox.dataplane.mode=legacy — set mode=ebpf (or cilium) for Network Fabric v3"
+                        "sandbox.dataplane.mode=legacy — set mode=ebpf (or cilium) for Network Fabric schema v4"
                             .to_string(),
                     ),
                 }
             } else if st.attached {
+                let schema = st
+                    .schema_version
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "?".into());
+                let upgrade = match st.schema_version {
+                    Some(v) if v < 4 => " · upgrade FluxVM for schema v4 groups/CNP",
+                    _ => "",
+                };
                 SubsystemStatus {
                     phase: SubsystemPhase::Live,
                     detail: Some(format!(
-                        "mode={mode} · attached · schema={}",
-                        st.schema_version
-                            .map(|v| v.to_string())
-                            .unwrap_or_else(|| "?".into())
+                        "mode={mode} · attached · schema={schema}{upgrade}"
                     )),
                 }
             } else {

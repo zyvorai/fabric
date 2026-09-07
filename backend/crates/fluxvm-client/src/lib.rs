@@ -25,8 +25,8 @@
 //! fields behind its newer per-VM storage backends (`storage`: LVM thin/NBD/
 //! Ceph RBD) and the Firecracker-jailer/vsock-proxy bookkeeping (`jail_path`,
 //! `vsock_socket`, `lvm_lv`, `nbd_pid`) — see `fluxvm-driver`'s crate doc
-//! comment for the full gap list. Network Fabric v3 wire types
-//! (`VmNetworkPolicy`, `DataplaneStatus`, …) and
+//! comment for the full gap list. Network Fabric schema v4 wire types
+//! (`VmNetworkPolicy`, groups/CNP/health/ipcache, …) and
 //! `NetworkSpec::Tap.netns` are mirrored here.
 
 use std::path::PathBuf;
@@ -330,7 +330,7 @@ struct PoolListResponse {
 }
 
 // ============================================================================
-// Network Fabric v3 wire types (mirror fluxvm-network::dataplane)
+// Network Fabric schema v4 wire types (mirror fluxvm-network::dataplane)
 // ============================================================================
 
 /// Per-VM edge policy for FluxVM's TC/eBPF Network Fabric dataplane.
@@ -343,6 +343,20 @@ pub struct VmNetworkPolicy {
     pub max_egress_mbps: Option<u32>,
     pub max_egress_pps: Option<u32>,
     pub sample_rate: u32,
+    #[serde(default)]
+    pub deny_cidrs: Vec<String>,
+    #[serde(default)]
+    pub allow_icmp: bool,
+    #[serde(default)]
+    pub groups: Vec<String>,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub allow_fqdns: Vec<String>,
+    #[serde(default)]
+    pub entities: Vec<String>,
+    #[serde(default)]
+    pub audit_mode: bool,
 }
 
 impl Default for VmNetworkPolicy {
@@ -354,6 +368,13 @@ impl Default for VmNetworkPolicy {
             max_egress_mbps: None,
             max_egress_pps: None,
             sample_rate: 0,
+            deny_cidrs: Vec::new(),
+            allow_icmp: false,
+            groups: Vec::new(),
+            labels: Vec::new(),
+            allow_fqdns: Vec::new(),
+            entities: Vec::new(),
+            audit_mode: false,
         }
     }
 }
@@ -401,6 +422,85 @@ pub struct FlowRecord {
 #[derive(Debug, Deserialize)]
 struct FlowListResponse {
     items: Vec<FlowRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SecurityGroup {
+    pub name: String,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub policy: VmNetworkPolicy,
+    #[serde(default)]
+    pub identity: u32,
+    #[serde(default)]
+    pub priority: u32,
+    #[serde(default)]
+    pub description: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GroupListResponse {
+    items: Vec<SecurityGroup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DataplaneHealth {
+    pub mode: String,
+    pub required: bool,
+    pub default_allow: bool,
+    pub bpf_object_present: bool,
+    pub pin_root_present: bool,
+    pub bpffs_present: bool,
+    pub cilium_socket_present: bool,
+    pub groups: usize,
+    pub policies: usize,
+    pub ipcache_entries: usize,
+    pub ok: bool,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IpcacheEntry {
+    pub ip: String,
+    pub identity: u32,
+    pub vm_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+struct IpcacheListResponse {
+    items: Vec<IpcacheEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IdentityInfo {
+    pub id: u32,
+    pub name: String,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub reserved: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct IdentityListResponse {
+    items: Vec<IdentityInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CnpListResponse {
+    items: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RefreshDnsResponse {
+    refreshed: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeletedResponse {
+    deleted: String,
 }
 
 /// Applied to the VM handed back by a pool claim, replacing whatever the
@@ -1180,6 +1280,156 @@ impl FluxVmClient {
         let resp = self.authed(self.http.get(url)).send().await?;
         let body: FlowListResponse = Self::parse(resp).await?;
         Ok(body.items)
+    }
+
+    /// `GET /v1/vms/{id}/network/effective`
+    pub async fn network_effective(&self, id: Uuid) -> Result<serde_json::Value> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/network/effective"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/network/groups`
+    pub async fn list_network_groups(&self) -> Result<Vec<SecurityGroup>> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/groups")?))
+            .send()
+            .await?;
+        let body: GroupListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/network/groups/{name}`
+    pub async fn get_network_group(&self, name: &str) -> Result<SecurityGroup> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/network/groups/{name}"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/network/groups`
+    pub async fn upsert_network_group(&self, group: &SecurityGroup) -> Result<SecurityGroup> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/network/groups")?))
+            .json(group)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `DELETE /v1/network/groups/{name}`
+    pub async fn delete_network_group(&self, name: &str) -> Result<()> {
+        let resp = self
+            .authed(
+                self.http
+                    .delete(self.url(&format!("/v1/network/groups/{name}"))?),
+            )
+            .send()
+            .await?;
+        let _: DeletedResponse = Self::parse(resp).await?;
+        Ok(())
+    }
+
+    /// `GET /v1/network/cnp`
+    pub async fn list_cnp(&self) -> Result<Vec<serde_json::Value>> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/cnp")?))
+            .send()
+            .await?;
+        let body: CnpListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/network/cnp/{name}`
+    pub async fn get_cnp(&self, name: &str) -> Result<serde_json::Value> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/network/cnp/{name}"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/network/cnp` — returns compiled security group JSON.
+    pub async fn apply_cnp(&self, doc: &serde_json::Value) -> Result<serde_json::Value> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/network/cnp")?))
+            .json(doc)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `DELETE /v1/network/cnp/{name}`
+    pub async fn delete_cnp(&self, name: &str) -> Result<()> {
+        let resp = self
+            .authed(
+                self.http
+                    .delete(self.url(&format!("/v1/network/cnp/{name}"))?),
+            )
+            .send()
+            .await?;
+        let _: DeletedResponse = Self::parse(resp).await?;
+        Ok(())
+    }
+
+    /// `GET /v1/network/identities`
+    pub async fn list_identities(&self) -> Result<Vec<IdentityInfo>> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/identities")?))
+            .send()
+            .await?;
+        let body: IdentityListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/network/observe`
+    pub async fn network_observe(&self) -> Result<serde_json::Value> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/observe")?))
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/network/health`
+    pub async fn network_health(&self) -> Result<DataplaneHealth> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/health")?))
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/network/ipcache`
+    pub async fn network_ipcache(&self) -> Result<Vec<IpcacheEntry>> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/ipcache")?))
+            .send()
+            .await?;
+        let body: IpcacheListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `POST /v1/network/refresh-dns`
+    pub async fn refresh_fqdn_policies(&self) -> Result<usize> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/network/refresh-dns")?))
+            .send()
+            .await?;
+        let body: RefreshDnsResponse = Self::parse(resp).await?;
+        Ok(body.refreshed)
     }
 
     async fn expect_no_content(resp: reqwest::Response) -> Result<()> {

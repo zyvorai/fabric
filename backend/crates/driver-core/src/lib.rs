@@ -315,6 +315,7 @@ pub trait PoolDriver: Send + Sync {
 
 /// Per-VM edge policy for FluxVM Network Fabric (TC/eBPF dataplane).
 /// Distinct from Fabric's label→nftables `/network-policies` SDN.
+/// Schema v4 adds deny CIDRs, ICMP, groups/labels, FQDNs, entities, audit.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct VmNetworkPolicy {
@@ -324,6 +325,20 @@ pub struct VmNetworkPolicy {
     pub max_egress_mbps: Option<u32>,
     pub max_egress_pps: Option<u32>,
     pub sample_rate: u32,
+    #[serde(default)]
+    pub deny_cidrs: Vec<String>,
+    #[serde(default)]
+    pub allow_icmp: bool,
+    #[serde(default)]
+    pub groups: Vec<String>,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub allow_fqdns: Vec<String>,
+    #[serde(default)]
+    pub entities: Vec<String>,
+    #[serde(default)]
+    pub audit_mode: bool,
 }
 
 impl Default for VmNetworkPolicy {
@@ -335,8 +350,68 @@ impl Default for VmNetworkPolicy {
             max_egress_mbps: None,
             max_egress_pps: None,
             sample_rate: 0,
+            deny_cidrs: Vec::new(),
+            allow_icmp: false,
+            groups: Vec::new(),
+            labels: Vec::new(),
+            allow_fqdns: Vec::new(),
+            entities: Vec::new(),
+            audit_mode: false,
         }
     }
+}
+
+/// FluxVM security group (label identity + shared L3/L4 policy).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SecurityGroup {
+    pub name: String,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub policy: VmNetworkPolicy,
+    #[serde(default)]
+    pub identity: u32,
+    #[serde(default)]
+    pub priority: u32,
+    #[serde(default)]
+    pub description: String,
+}
+
+/// Cluster dataplane health from FluxVM `GET /v1/network/health`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DataplaneHealth {
+    pub mode: String,
+    pub required: bool,
+    pub default_allow: bool,
+    pub bpf_object_present: bool,
+    pub pin_root_present: bool,
+    pub bpffs_present: bool,
+    pub cilium_socket_present: bool,
+    pub groups: usize,
+    pub policies: usize,
+    pub ipcache_entries: usize,
+    pub ok: bool,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
+/// Guest IP → identity entry from FluxVM ipcache.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IpcacheEntry {
+    pub ip: String,
+    pub identity: u32,
+    pub vm_id: String,
+}
+
+/// Reserved or group identity row.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IdentityInfo {
+    pub id: u32,
+    pub name: String,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub reserved: bool,
 }
 
 /// Live dataplane attach + schema status for one VM.
@@ -379,9 +454,9 @@ pub struct FlowRecord {
     pub last_seen_ns: u64,
 }
 
-/// FluxVM Network Fabric v3 — per-VM TC/eBPF edge dataplane (policy, status,
-/// stats, flows). Name-keyed like the rest of `driver-core`; backends resolve
-/// to their internal id. Orthogonal to Fabric's `/network-policies` SDN.
+/// FluxVM Network Fabric (schema v4) — per-VM TC/eBPF edge dataplane plus
+/// cluster groups/CNP/health. Name-keyed like the rest of `driver-core`;
+/// backends resolve to their internal id. Orthogonal to Fabric SDN.
 #[async_trait]
 pub trait VmDataplaneDriver: Send + Sync {
     async fn dataplane_status(&self, name: &str) -> Result<DataplaneStatus>;
@@ -393,6 +468,53 @@ pub trait VmDataplaneDriver: Send + Sync {
     ) -> Result<VmNetworkPolicy>;
     async fn dataplane_stats(&self, name: &str) -> Result<DataplaneStats>;
     async fn dataplane_flows(&self, name: &str, limit: Option<usize>) -> Result<Vec<FlowRecord>>;
+
+    /// Declared + group-merged policy (`GET …/network/effective`).
+    async fn dataplane_effective(&self, _name: &str) -> Result<serde_json::Value> {
+        anyhow::bail!("edge dataplane effective policy not supported by this backend")
+    }
+
+    async fn dataplane_list_groups(&self) -> Result<Vec<SecurityGroup>> {
+        anyhow::bail!("edge dataplane groups not supported by this backend")
+    }
+    async fn dataplane_get_group(&self, _name: &str) -> Result<SecurityGroup> {
+        anyhow::bail!("edge dataplane groups not supported by this backend")
+    }
+    async fn dataplane_upsert_group(&self, _group: &SecurityGroup) -> Result<SecurityGroup> {
+        anyhow::bail!("edge dataplane groups not supported by this backend")
+    }
+    async fn dataplane_delete_group(&self, _name: &str) -> Result<()> {
+        anyhow::bail!("edge dataplane groups not supported by this backend")
+    }
+
+    async fn dataplane_list_cnp(&self) -> Result<serde_json::Value> {
+        anyhow::bail!("edge dataplane CNP not supported by this backend")
+    }
+    async fn dataplane_get_cnp(&self, _name: &str) -> Result<serde_json::Value> {
+        anyhow::bail!("edge dataplane CNP not supported by this backend")
+    }
+    async fn dataplane_apply_cnp(&self, _doc: &serde_json::Value) -> Result<serde_json::Value> {
+        anyhow::bail!("edge dataplane CNP not supported by this backend")
+    }
+    async fn dataplane_delete_cnp(&self, _name: &str) -> Result<()> {
+        anyhow::bail!("edge dataplane CNP not supported by this backend")
+    }
+
+    async fn dataplane_list_identities(&self) -> Result<Vec<IdentityInfo>> {
+        anyhow::bail!("edge dataplane identities not supported by this backend")
+    }
+    async fn dataplane_observe(&self) -> Result<serde_json::Value> {
+        anyhow::bail!("edge dataplane observe not supported by this backend")
+    }
+    async fn dataplane_health(&self) -> Result<DataplaneHealth> {
+        anyhow::bail!("edge dataplane health not supported by this backend")
+    }
+    async fn dataplane_ipcache(&self) -> Result<Vec<IpcacheEntry>> {
+        anyhow::bail!("edge dataplane ipcache not supported by this backend")
+    }
+    async fn dataplane_refresh_dns(&self) -> Result<usize> {
+        anyhow::bail!("edge dataplane refresh-dns not supported by this backend")
+    }
 }
 
 /// Feature detection for optional capabilities.

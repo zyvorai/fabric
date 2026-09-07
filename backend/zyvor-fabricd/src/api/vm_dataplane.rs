@@ -3,7 +3,8 @@
 
 //! Per-VM FluxVM Network Fabric dataplane — orthogonal to Fabric's
 //! label→nftables `/network-policies` SDN. Proxies FluxVM's
-//! `/v1/vms/{id}/network/{policy,status,stats,flows}` via `VmDataplaneDriver`.
+//! `/v1/vms/{id}/network/*` and `/v1/network/{groups,cnp,…}` via
+//! `VmDataplaneDriver` (schema v4).
 
 use axum::{
     extract::{Path, Query, State},
@@ -13,7 +14,8 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 use zyvor_fabric_driver_core::{
-    DataplaneStats, DataplaneStatus, FlowRecord, VmNetworkPolicy,
+    DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo, IpcacheEntry,
+    SecurityGroup, VmNetworkPolicy,
 };
 
 use crate::server::AppState;
@@ -30,6 +32,35 @@ pub struct FlowListResponse {
     pub items: Vec<FlowRecord>,
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct GroupListResponse {
+    pub items: Vec<SecurityGroup>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct IdentityListResponse {
+    pub items: Vec<IdentityInfo>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct IpcacheListResponse {
+    pub items: Vec<IpcacheEntry>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RefreshDnsResponse {
+    pub refreshed: usize,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct DeletedResponse {
+    pub deleted: String,
+}
+
+fn map_driver_err(status: StatusCode, ctx: &str, e: impl std::fmt::Display) -> (StatusCode, Json<serde_json::Value>) {
+    crate::api_error::json_error(status, format!("{ctx}: {e}"))
+}
+
 /// GET /api/vms/:name/dataplane/status
 pub async fn dataplane_status(
     RequireRead(_claims): RequireRead,
@@ -38,10 +69,7 @@ pub async fn dataplane_status(
 ) -> Result<Json<DataplaneStatus>, (StatusCode, Json<serde_json::Value>)> {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let status = state.driver.dataplane_status(&name).await.map_err(|e| {
-        crate::api_error::json_error(
-            StatusCode::NOT_FOUND,
-            format!("Dataplane status for VM '{name}': {e}"),
-        )
+        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane status for VM '{name}'"), e)
     })?;
     Ok(Json(status))
 }
@@ -58,10 +86,7 @@ pub async fn get_dataplane_policy(
         .get_dataplane_policy(&name)
         .await
         .map_err(|e| {
-            crate::api_error::json_error(
-                StatusCode::NOT_FOUND,
-                format!("Dataplane policy for VM '{name}': {e}"),
-            )
+            map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
         })?;
     Ok(Json(policy))
 }
@@ -79,9 +104,10 @@ pub async fn set_dataplane_policy(
         .set_dataplane_policy(&name, &policy)
         .await
         .map_err(|e| {
-            crate::api_error::json_error(
+            map_driver_err(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to set dataplane policy for VM '{name}': {e}"),
+                &format!("Failed to set dataplane policy for VM '{name}'"),
+                e,
             )
         })?;
     tracing::info!("Updated VM edge dataplane policy for '{name}'");
@@ -96,10 +122,7 @@ pub async fn dataplane_stats(
 ) -> Result<Json<DataplaneStats>, (StatusCode, Json<serde_json::Value>)> {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let stats = state.driver.dataplane_stats(&name).await.map_err(|e| {
-        crate::api_error::json_error(
-            StatusCode::NOT_FOUND,
-            format!("Dataplane stats for VM '{name}': {e}"),
-        )
+        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane stats for VM '{name}'"), e)
     })?;
     Ok(Json(stats))
 }
@@ -117,10 +140,191 @@ pub async fn dataplane_flows(
         .dataplane_flows(&name, q.limit)
         .await
         .map_err(|e| {
-            crate::api_error::json_error(
-                StatusCode::NOT_FOUND,
-                format!("Dataplane flows for VM '{name}': {e}"),
-            )
+            map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane flows for VM '{name}'"), e)
         })?;
     Ok(Json(FlowListResponse { items }))
+}
+
+/// GET /api/vms/:name/dataplane/effective
+pub async fn dataplane_effective(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    let body = state.driver.dataplane_effective(&name).await.map_err(|e| {
+        map_driver_err(
+            StatusCode::NOT_FOUND,
+            &format!("Dataplane effective policy for VM '{name}'"),
+            e,
+        )
+    })?;
+    Ok(Json(body))
+}
+
+/// GET /api/dataplane/groups
+pub async fn list_groups(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<GroupListResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let items = state.driver.dataplane_list_groups().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane groups", e)
+    })?;
+    Ok(Json(GroupListResponse { items }))
+}
+
+/// GET /api/dataplane/groups/:name
+pub async fn get_group(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<SecurityGroup>, (StatusCode, Json<serde_json::Value>)> {
+    let group = state.driver.dataplane_get_group(&name).await.map_err(|e| {
+        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane group '{name}'"), e)
+    })?;
+    Ok(Json(group))
+}
+
+/// POST /api/dataplane/groups
+pub async fn upsert_group(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(group): Json<SecurityGroup>,
+) -> Result<Json<SecurityGroup>, (StatusCode, Json<serde_json::Value>)> {
+    let saved = state
+        .driver
+        .dataplane_upsert_group(&group)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to upsert dataplane group '{}'", group.name),
+                e,
+            )
+        })?;
+    tracing::info!("Upserted edge dataplane group '{}'", saved.name);
+    Ok(Json(saved))
+}
+
+/// DELETE /api/dataplane/groups/:name
+pub async fn delete_group(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<DeletedResponse>, (StatusCode, Json<serde_json::Value>)> {
+    state.driver.dataplane_delete_group(&name).await.map_err(|e| {
+        map_driver_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Failed to delete dataplane group '{name}'"),
+            e,
+        )
+    })?;
+    Ok(Json(DeletedResponse { deleted: name }))
+}
+
+/// GET /api/dataplane/cnp
+pub async fn list_cnp(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let body = state.driver.dataplane_list_cnp().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane CNP list", e)
+    })?;
+    Ok(Json(body))
+}
+
+/// GET /api/dataplane/cnp/:name
+pub async fn get_cnp(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let body = state.driver.dataplane_get_cnp(&name).await.map_err(|e| {
+        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane CNP '{name}'"), e)
+    })?;
+    Ok(Json(body))
+}
+
+/// POST /api/dataplane/cnp
+pub async fn apply_cnp(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(doc): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let body = state.driver.dataplane_apply_cnp(&doc).await.map_err(|e| {
+        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "Failed to apply dataplane CNP", e)
+    })?;
+    tracing::info!("Applied edge dataplane CNP");
+    Ok(Json(body))
+}
+
+/// DELETE /api/dataplane/cnp/:name
+pub async fn delete_cnp(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<DeletedResponse>, (StatusCode, Json<serde_json::Value>)> {
+    state.driver.dataplane_delete_cnp(&name).await.map_err(|e| {
+        map_driver_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Failed to delete dataplane CNP '{name}'"),
+            e,
+        )
+    })?;
+    Ok(Json(DeletedResponse { deleted: name }))
+}
+
+/// GET /api/dataplane/identities
+pub async fn list_identities(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<IdentityListResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let items = state.driver.dataplane_list_identities().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane identities", e)
+    })?;
+    Ok(Json(IdentityListResponse { items }))
+}
+
+/// GET /api/dataplane/observe
+pub async fn observe(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let body = state.driver.dataplane_observe().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane observe", e)
+    })?;
+    Ok(Json(body))
+}
+
+/// GET /api/dataplane/health
+pub async fn health(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<DataplaneHealth>, (StatusCode, Json<serde_json::Value>)> {
+    let body = state.driver.dataplane_health().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane health", e)
+    })?;
+    Ok(Json(body))
+}
+
+/// GET /api/dataplane/ipcache
+pub async fn ipcache(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<IpcacheListResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let items = state.driver.dataplane_ipcache().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane ipcache", e)
+    })?;
+    Ok(Json(IpcacheListResponse { items }))
+}
+
+/// POST /api/dataplane/refresh-dns
+pub async fn refresh_dns(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<RefreshDnsResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let refreshed = state.driver.dataplane_refresh_dns().await.map_err(|e| {
+        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "Dataplane refresh-dns", e)
+    })?;
+    Ok(Json(RefreshDnsResponse { refreshed }))
 }

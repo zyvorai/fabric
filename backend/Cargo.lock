@@ -4438,6 +4438,7 @@ dependencies = [
  "chrono",
  "futures",
  "rand 0.10.2",
+ "serde_json",
  "tokio",
  "tracing",
  "vm-model",

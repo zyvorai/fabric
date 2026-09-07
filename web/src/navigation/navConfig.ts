@@ -78,6 +78,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Network', path: '/app/network', icon: Network },
       { label: 'Net Security', path: '/app/network-security', icon: Shield },
+      { label: 'Edge Dataplane', path: '/app/edge-dataplane', icon: Activity },
       { label: 'Storage', path: '/app/storage', icon: HardDrive },
       { label: 'Storage Pools', path: '/app/storage-pools', icon: Database },
       { label: 'Distributed Storage', path: '/app/distributed-storage', icon: Database },

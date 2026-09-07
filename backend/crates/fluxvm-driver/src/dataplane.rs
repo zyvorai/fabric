@@ -1,13 +1,14 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! `VmDataplaneDriver` backed by FluxVM Network Fabric v3
-//! (`/v1/vms/{id}/network/{policy,status,stats,flows}`).
+//! `VmDataplaneDriver` backed by FluxVM Network Fabric (schema v4)
+//! (`/v1/vms/{id}/network/…` and `/v1/network/{groups,cnp,…}`).
 
 use anyhow::Result;
 use async_trait::async_trait;
 use zyvor_fabric_driver_core::{
-    DataplaneStats, DataplaneStatus, FlowRecord, VmDataplaneDriver, VmNetworkPolicy,
+    DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo, IpcacheEntry,
+    SecurityGroup, VmDataplaneDriver, VmNetworkPolicy,
 };
 use zyvor_fabric_fluxvm_client as client;
 
@@ -21,6 +22,13 @@ fn to_policy(p: client::VmNetworkPolicy) -> VmNetworkPolicy {
         max_egress_mbps: p.max_egress_mbps,
         max_egress_pps: p.max_egress_pps,
         sample_rate: p.sample_rate,
+        deny_cidrs: p.deny_cidrs,
+        allow_icmp: p.allow_icmp,
+        groups: p.groups,
+        labels: p.labels,
+        allow_fqdns: p.allow_fqdns,
+        entities: p.entities,
+        audit_mode: p.audit_mode,
     }
 }
 
@@ -32,6 +40,13 @@ fn from_policy(p: &VmNetworkPolicy) -> client::VmNetworkPolicy {
         max_egress_mbps: p.max_egress_mbps,
         max_egress_pps: p.max_egress_pps,
         sample_rate: p.sample_rate,
+        deny_cidrs: p.deny_cidrs.clone(),
+        allow_icmp: p.allow_icmp,
+        groups: p.groups.clone(),
+        labels: p.labels.clone(),
+        allow_fqdns: p.allow_fqdns.clone(),
+        entities: p.entities.clone(),
+        audit_mode: p.audit_mode,
     }
 }
 
@@ -75,6 +90,62 @@ fn to_flow(f: client::FlowRecord) -> FlowRecord {
     }
 }
 
+fn to_group(g: client::SecurityGroup) -> SecurityGroup {
+    SecurityGroup {
+        name: g.name,
+        labels: g.labels,
+        policy: to_policy(g.policy),
+        identity: g.identity,
+        priority: g.priority,
+        description: g.description,
+    }
+}
+
+fn from_group(g: &SecurityGroup) -> client::SecurityGroup {
+    client::SecurityGroup {
+        name: g.name.clone(),
+        labels: g.labels.clone(),
+        policy: from_policy(&g.policy),
+        identity: g.identity,
+        priority: g.priority,
+        description: g.description.clone(),
+    }
+}
+
+fn to_health(h: client::DataplaneHealth) -> DataplaneHealth {
+    DataplaneHealth {
+        mode: h.mode,
+        required: h.required,
+        default_allow: h.default_allow,
+        bpf_object_present: h.bpf_object_present,
+        pin_root_present: h.pin_root_present,
+        bpffs_present: h.bpffs_present,
+        cilium_socket_present: h.cilium_socket_present,
+        groups: h.groups,
+        policies: h.policies,
+        ipcache_entries: h.ipcache_entries,
+        ok: h.ok,
+        notes: h.notes,
+    }
+}
+
+fn to_ipcache(e: client::IpcacheEntry) -> IpcacheEntry {
+    IpcacheEntry {
+        ip: e.ip,
+        identity: e.identity,
+        vm_id: e.vm_id.to_string(),
+    }
+}
+
+fn to_identity(i: client::IdentityInfo) -> IdentityInfo {
+    IdentityInfo {
+        id: i.id,
+        name: i.name,
+        labels: i.labels,
+        reserved: i.reserved,
+    }
+}
+
 #[async_trait]
 impl VmDataplaneDriver for FluxVmDriver {
     async fn dataplane_status(&self, name: &str) -> Result<DataplaneStatus> {
@@ -114,5 +185,84 @@ impl VmDataplaneDriver for FluxVmDriver {
             .into_iter()
             .map(to_flow)
             .collect())
+    }
+
+    async fn dataplane_effective(&self, name: &str) -> Result<serde_json::Value> {
+        let vm = self.resolve(name).await?;
+        self.client.network_effective(vm.id).await
+    }
+
+    async fn dataplane_list_groups(&self) -> Result<Vec<SecurityGroup>> {
+        Ok(self
+            .client
+            .list_network_groups()
+            .await?
+            .into_iter()
+            .map(to_group)
+            .collect())
+    }
+
+    async fn dataplane_get_group(&self, name: &str) -> Result<SecurityGroup> {
+        Ok(to_group(self.client.get_network_group(name).await?))
+    }
+
+    async fn dataplane_upsert_group(&self, group: &SecurityGroup) -> Result<SecurityGroup> {
+        Ok(to_group(
+            self.client.upsert_network_group(&from_group(group)).await?,
+        ))
+    }
+
+    async fn dataplane_delete_group(&self, name: &str) -> Result<()> {
+        self.client.delete_network_group(name).await
+    }
+
+    async fn dataplane_list_cnp(&self) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({
+            "items": self.client.list_cnp().await?
+        }))
+    }
+
+    async fn dataplane_get_cnp(&self, name: &str) -> Result<serde_json::Value> {
+        self.client.get_cnp(name).await
+    }
+
+    async fn dataplane_apply_cnp(&self, doc: &serde_json::Value) -> Result<serde_json::Value> {
+        self.client.apply_cnp(doc).await
+    }
+
+    async fn dataplane_delete_cnp(&self, name: &str) -> Result<()> {
+        self.client.delete_cnp(name).await
+    }
+
+    async fn dataplane_list_identities(&self) -> Result<Vec<IdentityInfo>> {
+        Ok(self
+            .client
+            .list_identities()
+            .await?
+            .into_iter()
+            .map(to_identity)
+            .collect())
+    }
+
+    async fn dataplane_observe(&self) -> Result<serde_json::Value> {
+        self.client.network_observe().await
+    }
+
+    async fn dataplane_health(&self) -> Result<DataplaneHealth> {
+        Ok(to_health(self.client.network_health().await?))
+    }
+
+    async fn dataplane_ipcache(&self) -> Result<Vec<IpcacheEntry>> {
+        Ok(self
+            .client
+            .network_ipcache()
+            .await?
+            .into_iter()
+            .map(to_ipcache)
+            .collect())
+    }
+
+    async fn dataplane_refresh_dns(&self) -> Result<usize> {
+        self.client.refresh_fqdn_policies().await
     }
 }

@@ -171,6 +171,48 @@ enum DataplaneCmd {
         #[arg(long, default_value = "100")]
         limit: usize,
     },
+    /// Declared + group-merged effective policy
+    Effective { name: String },
+    /// Cluster dataplane health
+    Health,
+    /// Guest IP → identity cache
+    Ipcache,
+    /// Re-resolve FQDN allowlists into CIDRs
+    RefreshDns,
+    /// Snapshot identities/groups/CNPs/labeled VMs
+    Observe,
+    /// Reserved + group identities
+    Identities,
+    /// Security groups (FluxVM edge — not Fabric SDN)
+    #[command(subcommand)]
+    Group(DataplaneGroupCmd),
+    /// CNP documents compiled onto security groups
+    #[command(subcommand)]
+    Cnp(DataplaneCnpCmd),
+}
+
+#[derive(Subcommand)]
+enum DataplaneGroupCmd {
+    List,
+    Get { name: String },
+    /// Create/update from a JSON file (SecurityGroup shape)
+    Create {
+        #[arg(short, long)]
+        file: String,
+    },
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum DataplaneCnpCmd {
+    List,
+    Get { name: String },
+    /// Apply a CNP JSON document
+    Apply {
+        #[arg(short, long)]
+        file: String,
+    },
+    Delete { name: String },
 }
 
 #[derive(Subcommand)]
@@ -955,6 +997,75 @@ impl Cli {
                     .await?;
                     print_value(&val, fmt);
                 }
+                DataplaneCmd::Effective { name } => {
+                    let val =
+                        api_get(&client, &format!("/vms/{}/dataplane/effective", name)).await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Health => {
+                    let val = api_get(&client, "/dataplane/health").await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Ipcache => {
+                    let val = api_get(&client, "/dataplane/ipcache").await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::RefreshDns => {
+                    let val = api_post_empty(&client, "/dataplane/refresh-dns").await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Observe => {
+                    let val = api_get(&client, "/dataplane/observe").await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Identities => {
+                    let val = api_get(&client, "/dataplane/identities").await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Group(g) => match g {
+                    DataplaneGroupCmd::List => {
+                        let val = api_get(&client, "/dataplane/groups").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneGroupCmd::Get { name } => {
+                        let val = api_get(&client, &format!("/dataplane/groups/{}", name)).await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneGroupCmd::Create { file } => {
+                        let group = load_config_file(&file)?;
+                        let val = api_post(&client, "/dataplane/groups", &group).await?;
+                        println!("Upserted dataplane group");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    DataplaneGroupCmd::Delete { name } => {
+                        api_delete(&client, &format!("/dataplane/groups/{}", name)).await?;
+                        println!("Deleted dataplane group '{}'", name);
+                    }
+                },
+                DataplaneCmd::Cnp(c) => match c {
+                    DataplaneCnpCmd::List => {
+                        let val = api_get(&client, "/dataplane/cnp").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneCnpCmd::Get { name } => {
+                        let val = api_get(&client, &format!("/dataplane/cnp/{}", name)).await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneCnpCmd::Apply { file } => {
+                        let doc = load_config_file(&file)?;
+                        let val = api_post(&client, "/dataplane/cnp", &doc).await?;
+                        println!("Applied dataplane CNP");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    DataplaneCnpCmd::Delete { name } => {
+                        api_delete(&client, &format!("/dataplane/cnp/{}", name)).await?;
+                        println!("Deleted dataplane CNP '{}'", name);
+                    }
+                },
             },
 
             // ── Apply / Export ────────────────────────────────────────────

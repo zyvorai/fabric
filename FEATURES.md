@@ -20,7 +20,7 @@
 - VM templates
 - VM state persistence
 - VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor)
-- **VM edge dataplane (FluxVM Network Fabric v3 GA)** — proxied at `/api/vms/{name}/dataplane/*`; VM **Dataplane** tab (Status / Policy / Stats / Flows + identity); Dashboard **VM dataplane** capability; `zyvorctl dataplane` with `ZYVOR_FABRIC_URL` / `ZYVOR_FABRIC_TOKEN` for HTTPS. Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) and [user dataplane](docs/user/pages/infrastructure/dataplane.md).
+- **VM edge dataplane (FluxVM Network Fabric schema v4)** — proxied at `/api/vms/{name}/dataplane/*` and `/api/dataplane/{groups,cnp,health,ipcache,…}`; VM **Dataplane** tab (Status / Policy / Effective / Stats / Flows); console **Edge Dataplane**; Dashboard **VM dataplane** capability; `zyvorctl dataplane` with groups/CNP/health. Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) and [user dataplane](docs/user/pages/infrastructure/dataplane.md).
 - CPU and memory configuration (`--cpus`, `--ram`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)
@@ -38,7 +38,7 @@
 ### CLI (zyvorctl)
 
 - 15+ subcommand groups (vm, policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net, dataplane)
-- `zyvorctl dataplane status|policy|stats|flows` — FluxVM Network Fabric edge (not SDN network-policies)
+- `zyvorctl dataplane status|policy|stats|flows|effective|health|group|cnp|observe|…` — FluxVM Network Fabric edge (not SDN network-policies)
 - Output formats: table, JSON, YAML (`-o json|yaml|table`)
 - Declarative config import: `zyvorctl apply -f config.yaml`
 - Config export: `zyvorctl export <resource> -o yaml`
@@ -198,7 +198,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 ### Network Security (Cilium-style)
 
 - **Network Policies** -- Label-based ingress/egress rules with direction badges, priority, and enforcement status
-- **VM edge dataplane (FluxVM)** -- Separate from SDN: per-VM TC/eBPF allowlists, Mbps/PPS, stats/flows via Dataplane tab / `/api/vms/{name}/dataplane/*` when FluxVM runs `mode=ebpf`. Ports are `tcp|udp/PORT`. Dashboard capability `vm_dataplane`.
+- **VM edge dataplane (FluxVM)** -- Separate from SDN: per-VM TC/eBPF allowlists, groups/CNP, Mbps/PPS, stats/flows via Dataplane tab / `/api/vms/{name}/dataplane/*` and `/api/dataplane/*` when FluxVM runs `mode=ebpf` (schema v4). Ports are `tcp|udp/PORT`. Dashboard capability `vm_dataplane`. Console `/app/edge-dataplane`.
 - **VM Firewall** -- Per-VM profiles with rule builder (protocol/port/CIDR/action), zones, and VM assignments
 - **Service Mesh** -- Virtual IP services with load balancing (round-robin, least-conn, random, IP-hash), backend management
 - **QoS / Traffic Shaping** -- Guaranteed/max rate with burst, priority-based bandwidth management, label selectors

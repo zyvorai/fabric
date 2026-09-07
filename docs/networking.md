@@ -6,7 +6,7 @@ Zyvor Fabric provides comprehensive virtual networking with bridge management, V
 
 ---
 
-## VM edge dataplane (Network Fabric v3)
+## VM edge dataplane (Network Fabric schema v4)
 
 When FluxVM runs with `sandbox.dataplane.mode = "ebpf"`, Fabric proxies the
 per-VM TC/eBPF edge as first-class API, Web, and CLI.

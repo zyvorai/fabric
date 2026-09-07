@@ -23,8 +23,8 @@
 //! FluxVM has since grown — `CreateVmRequest.storage` (LVM thin/NBD/Ceph
 //! RBD backends) and `VmRecord`'s `jail_path`/`vsock_socket`/`lvm_lv`/
 //! `nbd_pid` fields. Bridged VMs already use `NetworkSpec::Tap { netns:
-//! true }`, and Network Fabric v3 (`VmDataplaneDriver`) proxies FluxVM's
-//! `/v1/vms/{id}/network/*` when FluxVM runs with
+//! true }`, and Network Fabric schema v4 (`VmDataplaneDriver`) proxies FluxVM's
+//! `/v1/vms/{id}/network/*` and `/v1/network/{groups,cnp,…}` when FluxVM runs with
 //! `[sandbox.dataplane] mode = "ebpf"`. Also orthogonal to this driver:
 //! FluxVM's `fluxvm-kube` Kubernetes CRD/operator and `fluxvm-agent`
 //! distributed fleet registry.

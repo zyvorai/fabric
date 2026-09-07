@@ -16,6 +16,8 @@ import {
   DataplaneStatus,
   FlowRecord,
   VmNetworkPolicy,
+  emptyPolicy,
+  getDataplaneEffective,
   getDataplaneFlows,
   getDataplanePolicy,
   getDataplaneStats,
@@ -30,16 +32,7 @@ import { StatusBadge } from '../../components/ui'
 import SubsystemBanner from '../../components/SubsystemBanner'
 import { TerminalTextarea } from '../../components/AppleTerminalFrame'
 
-type PanelTab = 'status' | 'policy' | 'stats' | 'flows'
-
-const emptyPolicy = (): VmNetworkPolicy => ({
-  default_allow: true,
-  allow_cidrs: [],
-  allow_ports: [],
-  max_egress_mbps: null,
-  max_egress_pps: null,
-  sample_rate: 0,
-})
+type PanelTab = 'status' | 'policy' | 'effective' | 'stats' | 'flows'
 
 const PROTO: Record<number, string> = {
   1: 'ICMP',
@@ -88,24 +81,32 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
   const [flowLimit, setFlowLimit] = useState(100)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [cidrDraft, setCidrDraft] = useState('')
+  const [denyDraft, setDenyDraft] = useState('')
   const [portDraft, setPortDraft] = useState('')
+  const [groupDraft, setGroupDraft] = useState('')
+  const [labelDraft, setLabelDraft] = useState('')
+  const [fqdnDraft, setFqdnDraft] = useState('')
+  const [entityDraft, setEntityDraft] = useState('')
   const [showJson, setShowJson] = useState(false)
   const [jsonText, setJsonText] = useState('')
+  const [effective, setEffective] = useState<Record<string, unknown> | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [st, pol, stStats, fl] = await Promise.all([
+      const [st, pol, stStats, fl, eff] = await Promise.all([
         getDataplaneStatus(vmName),
         getDataplanePolicy(vmName).catch(() => null),
         getDataplaneStats(vmName).catch(() => null),
         getDataplaneFlows(vmName, flowLimit).catch(() => ({ items: [] as FlowRecord[] })),
+        getDataplaneEffective(vmName).catch(() => null),
       ])
       setStatus(st)
       setStats(stStats)
       setFlows(fl.items)
+      setEffective(eff)
       if (!dirty) {
-        const p = pol ?? st.policy ?? emptyPolicy()
+        const p = { ...emptyPolicy(), ...(pol ?? st.policy ?? {}) }
         setPolicy(p)
         setJsonText(JSON.stringify(p, null, 2))
       }
@@ -177,6 +178,29 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
     updatePolicy({ allow_ports: policy.allow_ports.filter((p) => p !== port) })
   }
 
+  const addTagged = (
+    field: 'deny_cidrs' | 'groups' | 'labels' | 'allow_fqdns' | 'entities',
+    draft: string,
+    setDraft: (v: string) => void,
+  ) => {
+    const v = draft.trim()
+    if (!v) return
+    const cur = policy[field] ?? []
+    if (cur.includes(v)) {
+      toast.error('Already listed')
+      return
+    }
+    updatePolicy({ [field]: [...cur, v] })
+    setDraft('')
+  }
+
+  const removeTagged = (
+    field: 'deny_cidrs' | 'groups' | 'labels' | 'allow_fqdns' | 'entities',
+    value: string,
+  ) => {
+    updatePolicy({ [field]: (policy[field] ?? []).filter((x) => x !== value) })
+  }
+
   const applyPreset = (kind: 'open' | 'deny' | 'web') => {
     if (kind === 'open') {
       updatePolicy({
@@ -243,6 +267,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
   const tabs: { id: PanelTab; label: string }[] = [
     { id: 'status', label: 'Status' },
     { id: 'policy', label: 'Policy' },
+    { id: 'effective', label: 'Effective' },
     { id: 'stats', label: 'Stats' },
     { id: 'flows', label: 'Flows' },
   ]
@@ -294,7 +319,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
           <div>
             <h3 className="text-sm font-semibold text-[#1d1d1f]">VM edge dataplane (FluxVM)</h3>
             <p className="text-xs text-[#6e6e73]">
-              Per-VM TC/eBPF policy, rate limits, stats, and flows — not Fabric SDN network policies.
+              Per-VM TC/eBPF policy (schema v4), groups, rate limits, stats, and flows — not Fabric SDN.
             </p>
           </div>
         </div>
@@ -413,6 +438,18 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                 label="Max PPS"
                 value={(status.policy ?? policy).max_egress_pps?.toString() ?? 'unlimited'}
               />
+              <Stat
+                label="Allow ICMP"
+                value={(status.policy ?? policy).allow_icmp ? 'yes' : 'no'}
+              />
+              <Stat
+                label="Groups"
+                value={String((status.policy ?? policy).groups?.length ?? 0)}
+              />
+              <Stat
+                label="Deny CIDRs"
+                value={String((status.policy ?? policy).deny_cidrs?.length ?? 0)}
+              />
             </div>
             {((status.policy ?? policy).allow_ports.length > 0 ||
               (status.policy ?? policy).allow_cidrs.length > 0) && (
@@ -501,6 +538,92 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                 placeholder="tcp/443"
               />
 
+              <TagList
+                label="Deny CIDRs"
+                hint="Dropped even if an allow CIDR matches"
+                items={policy.deny_cidrs ?? []}
+                draft={denyDraft}
+                setDraft={setDenyDraft}
+                onAdd={() => addTagged('deny_cidrs', denyDraft, setDenyDraft)}
+                onRemove={(v) => removeTagged('deny_cidrs', v)}
+                onClear={() => updatePolicy({ deny_cidrs: [] })}
+                disabled={!canWrite}
+                placeholder="10.66.0.0/16"
+              />
+
+              <TagList
+                label="Groups"
+                hint="Explicit security-group names"
+                items={policy.groups ?? []}
+                draft={groupDraft}
+                setDraft={setGroupDraft}
+                onAdd={() => addTagged('groups', groupDraft, setGroupDraft)}
+                onRemove={(v) => removeTagged('groups', v)}
+                onClear={() => updatePolicy({ groups: [] })}
+                disabled={!canWrite}
+                placeholder="web"
+              />
+
+              <TagList
+                label="Labels"
+                hint="key=value — matches groups with those labels"
+                items={policy.labels ?? []}
+                draft={labelDraft}
+                setDraft={setLabelDraft}
+                onAdd={() => addTagged('labels', labelDraft, setLabelDraft)}
+                onRemove={(v) => removeTagged('labels', v)}
+                onClear={() => updatePolicy({ labels: [] })}
+                disabled={!canWrite}
+                placeholder="app=web"
+              />
+
+              <TagList
+                label="Allow FQDNs"
+                hint="Resolved to CIDRs at apply / refresh-dns"
+                items={policy.allow_fqdns ?? []}
+                draft={fqdnDraft}
+                setDraft={setFqdnDraft}
+                onAdd={() => addTagged('allow_fqdns', fqdnDraft, setFqdnDraft)}
+                onRemove={(v) => removeTagged('allow_fqdns', v)}
+                onClear={() => updatePolicy({ allow_fqdns: [] })}
+                disabled={!canWrite}
+                placeholder="api.example.com"
+              />
+
+              <TagList
+                label="Entities"
+                hint="world, host, cluster, …"
+                items={policy.entities ?? []}
+                draft={entityDraft}
+                setDraft={setEntityDraft}
+                onAdd={() => addTagged('entities', entityDraft, setEntityDraft)}
+                onRemove={(v) => removeTagged('entities', v)}
+                onClear={() => updatePolicy({ entities: [] })}
+                disabled={!canWrite}
+                placeholder="world"
+              />
+
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+                  <input
+                    type="checkbox"
+                    checked={!!policy.allow_icmp}
+                    disabled={!canWrite}
+                    onChange={(e) => updatePolicy({ allow_icmp: e.target.checked })}
+                  />
+                  Allow ICMP / ICMPv6
+                </label>
+                <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+                  <input
+                    type="checkbox"
+                    checked={!!policy.audit_mode}
+                    disabled={!canWrite}
+                    onChange={(e) => updatePolicy({ audit_mode: e.target.checked })}
+                  />
+                  Audit mode (log-and-allow)
+                </label>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className={labelCls}>Max egress Mbps</label>
@@ -575,6 +698,24 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {tab === 'effective' && (
+        <div className="space-y-3">
+          <p className="text-sm text-[#6e6e73]">
+            Declared policy merged with matching security groups (FluxVM edge).
+          </p>
+          {!effective ? (
+            <p className="text-sm text-[#6e6e73]">Effective policy unavailable.</p>
+          ) : (
+            <TerminalTextarea
+              title="dataplane — effective"
+              className="h-80"
+              value={JSON.stringify(effective, null, 2)}
+              readOnly
+            />
+          )}
         </div>
       )}
 
