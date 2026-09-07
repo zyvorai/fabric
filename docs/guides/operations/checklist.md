@@ -254,6 +254,9 @@ Ongoing operational tasks for a running Zyvor Fabric deployment.
 - [ ] **Resource stats** -- Periodic collection of `GET /api/system/resource-stats` for capacity planning
 - [ ] **VM metrics** -- Dashboard showing per-VM CPU, memory, and I/O metrics from `GET /api/vms/:name/metrics`
 - [ ] **Tenant filter** -- Operators can list with `GET /api/vms?tenant=…` where VMs set `tenant` / `labels.tenant`
+- [ ] **JWT tenant** -- Tenant-scoped users have `users.tenant` set; claim enforces create/list/get/mutate
+- [ ] **FluxVM auth** -- If FluxVM tokens are on, `driver.fluxvm_token` matches an admin bearer
+- [ ] **Hubble (optional)** -- `network.hubble_ui_url` only for an external link ([hubble-ui.md](hubble-ui.md))
 - [ ] **Notification delivery** -- Monitor `GET /api/notifications/webhooks/deliveries` for failed webhook deliveries
 
 See the [Monitoring Guide](monitoring.md) for detailed setup instructions.

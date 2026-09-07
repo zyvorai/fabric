@@ -30,7 +30,11 @@ Operator UX: [fluxvm-dataplane.md](fluxvm-dataplane.md) · tutorials
 [09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).
 
 Production alignment with FluxVM: Fabric `GET /readyz`, create `tenant` /
-`labels.tenant`, `GET /api/vms?tenant=`, and `zyvorctl create --tenant` — see FluxVM
+`labels.tenant`, `GET /api/vms?tenant=`, `zyvorctl create --tenant`, and JWT
+`tenant` claim enforcement (create mismatch → 403; get/mutate other tenant → 404).
+When FluxVM enables `[[auth.tokens]]`, set `driver.fluxvm_token`. Optional
+`network.hubble_ui_url` is an external Hubble link only — see
+[hubble-ui.md](../operations/hubble-ui.md). FluxVM production bar:
 [PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md)
 and [production tutorials](https://github.com/zyvorai/fluxvm/blob/main/docs/tutorials/production/README.md).
 

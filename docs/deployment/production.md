@@ -88,7 +88,14 @@ curl -sf "$(grep fluxvm_url /etc/zyvor-fabricd/zyvor-fabricd.toml | cut -d'"' -f
 curl -sf "$(grep fluxvm_url /etc/zyvor-fabricd/zyvor-fabricd.toml | cut -d'"' -f2)/readyz"
 # Fabric readiness (store + FluxVM):
 curl -sf https://127.0.0.1:9095/readyz
-# Tenant filter: GET /api/vms?tenant=acme  (JWT required)
+# Tenant filter: GET /api/vms?tenant=acme  (JWT required; JWT tenant claim force-scopes)
+# When FluxVM auth is on:
+#   [driver]
+#   fluxvm_url = "http://127.0.0.1:7788"
+#   fluxvm_token = "<matching FluxVM admin token>"
+# Optional external Hubble UI link (not in-tree Hubble):
+#   [network]
+#   hubble_ui_url = "https://hubble.example.com"
 
 # 4. Create the zyvor-fabricd system user (optional, for non-root operation)
 sudo useradd --system --home-dir /var/lib/zyvor-fabricd --shell /usr/sbin/nologin zyvor-fabricd
@@ -384,6 +391,8 @@ curl -s http://127.0.0.1:9095/api/v1/audit/logs/export \
 - [ ] Enable authentication (`auth.enabled = true`)
 - [ ] Set an explicit JWT secret via `ZYVOR_FABRICD_JWT_SECRET` environment variable
 - [ ] Reduce token expiration (`token_expiration_hours = 8` or less)
+- [ ] Assign `users.tenant` for tenant-scoped operators (JWT claim enforces create/list/get/mutate)
+- [ ] When FluxVM has `[[auth.tokens]]`, set `driver.fluxvm_token` to a matching admin bearer
 - [ ] Bind to localhost only (`listen = "127.0.0.1:9095"`)
 - [ ] Use a reverse proxy with TLS for external access
 - [ ] Restrict CORS origins to your actual domain(s)
@@ -394,6 +403,7 @@ curl -s http://127.0.0.1:9095/api/v1/audit/logs/export \
 - [ ] Monitor audit logs for unauthorized access attempts
 - [ ] Enable resource quotas to prevent resource exhaustion
 - [ ] Configure firewall rules to restrict management port access
+- [ ] Optional: `network.hubble_ui_url` for an external Hubble link ([hubble-ui.md](../guides/operations/hubble-ui.md))
 
 ### File Permissions
 

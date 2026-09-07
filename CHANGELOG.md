@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Changed
+- Docs refreshed for JWT `tenant` claim enforcement, `driver.fluxvm_token` when
+  FluxVM auth is on, compose `/readyz` healthchecks, and optional
+  `network.hubble_ui_url` ([hubble-ui.md](docs/guides/operations/hubble-ui.md)).
 - Docs and tutorials refreshed for `/readyz`, VM `tenant`, and FluxVM production
   alignment (first-VM, security, edge-dataplane series, install/k8s/docker,
   monitoring, API reference, billing).

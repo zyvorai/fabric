@@ -65,6 +65,16 @@ export ZYVOR_FABRICD_JWT_SECRET="your-64-char-secret-here"
 
 All API endpoints (except `/api/auth/login`, `/health`, and `/readyz`) require authentication via JWT.
 
+Optional **`tenant` claim** (from the user DB `users.tenant` column): when present on the
+JWT, Fabric mirrors FluxVM token-tenant rules —
+
+- create inherits the claim (body mismatch → **403**)
+- list is force-scoped (`?tenant=` mismatch → **403**)
+- get/mutate of another tenant’s VM → **404**
+
+Platform admins without a tenant claim see the full fleet. Set a user’s tenant via the
+auth DB (`UPDATE users SET tenant = 'acme' WHERE username = '…'`) then re-login.
+
 **Login:**
 
 ```bash
@@ -81,7 +91,8 @@ curl -X POST http://localhost:9095/api/auth/login \
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user_id": "admin",
-  "role": "admin"
+  "role": "admin",
+  "tenant": "acme"
 }
 ```
 

@@ -66,7 +66,8 @@ Verify after start:
 curl -sf http://127.0.0.1:9095/health
 curl -sf http://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 curl -sf http://127.0.0.1:7788/readyz | jq .
-# Multi-tenant: zyvorctl create … --tenant acme; list with GET /api/vms?tenant=acme
+# Multi-tenant: zyvorctl create … --tenant acme; JWT tenant claim scopes list/get/mutate
+# When FluxVM auth is on: set driver.fluxvm_token in zyvor-fabricd.toml
 ```
 
 ---

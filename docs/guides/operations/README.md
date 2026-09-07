@@ -7,6 +7,7 @@ This section provides operational procedures for deploying, monitoring, and main
 - **[Operational Checklist](checklist.md)** -- Step-by-step checklists for pre-deployment validation, initial setup (Day 1), and ongoing operations (Day 2+) including disaster recovery procedures.
 - **[Monitoring Guide](monitoring.md)** -- How to monitor Zyvor Fabric health, collect metrics, subscribe to real-time events via SSE, configure notification channels, and set up alerting rules.
 - **[Backup Strategy](backup-strategy.md)** -- Backup types, automated scheduling with backup policies, retention management, restore workflows, and backup verification practices.
+- **[Hubble UI (external)](hubble-ui.md)** -- Optional `network.hubble_ui_url` link; Fabric does not embed Hubble or Cilium-native VM endpoints.
 
 ## Operational Philosophy
 

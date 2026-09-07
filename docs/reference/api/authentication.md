@@ -97,12 +97,15 @@ Tokens are signed with HMAC-SHA256 (`HS256`) using a server-configured secret.
 {
   "sub": "admin",
   "role": "admin",
-  "tenant": "acme"
-},
+  "tenant": "acme",
   "exp": 1713000000,
   "jti": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
+
+When `tenant` is set, create inherits it (body mismatch → 403), list is force-scoped,
+and get/mutate of another tenant’s VM returns 404. Admins with no tenant claim see all VMs.
+Assign via `UPDATE users SET tenant = 'acme' WHERE username = '…'` then re-login.
 
 ### Using the Token
 
