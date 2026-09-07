@@ -184,10 +184,13 @@ enum DataplaneCmd {
     RefreshDns,
     /// Snapshot identities/groups/CNPs/labeled VMs
     Observe,
-    /// Hubble-style packet flows (JSON from Fabric; color/plain via --output)
+    /// Hubble-style packet flows (JSON from Fabric; color/plain via --style)
+    ///
+    /// Uses `--style` (not global `-o/--output`) because `zyvorctl` already
+    /// reserves `-o` for table|json|yaml.
     Hubble {
-        #[arg(long, default_value = "json")]
-        output: String,
+        #[arg(long = "style", default_value = "json")]
+        style: String,
         #[arg(long, default_value_t = 64)]
         limit: usize,
     },
@@ -1030,14 +1033,17 @@ impl Cli {
                     let val = api_get(&client, "/dataplane/observe").await?;
                     print_value(&val, fmt);
                 }
-                DataplaneCmd::Hubble { output, limit } => {
+                DataplaneCmd::Hubble { style, limit } => {
                     let val =
                         api_get(&client, &format!("/dataplane/hubble/flows?limit={}", limit))
                             .await?;
-                    if output.eq_ignore_ascii_case("json") {
-                        print_value(&val, fmt);
+                    // Global `-o json` also forces JSON (same as --style json).
+                    if matches!(fmt, OutputFormat::Json)
+                        || style.eq_ignore_ascii_case("json")
+                    {
+                        print_value(&val, OutputFormat::Json);
                     } else {
-                        println!("{}", crate::packetflow::render_hubble_json(&val, &output));
+                        println!("{}", crate::packetflow::render_hubble_json(&val, &style));
                     }
                 }
                 DataplaneCmd::Identities => {
