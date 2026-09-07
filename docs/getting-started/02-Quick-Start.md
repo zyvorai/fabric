@@ -15,10 +15,13 @@ sudo systemctl start zyvor-fabricd
 Verify it is listening:
 
 ```bash
+curl -sf http://127.0.0.1:9095/health
+curl -sf http://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 curl -s http://127.0.0.1:9095/api/vms | jq .
 ```
 
-Expected output:
+Expected `/readyz` includes `"ok": true` when the store and FluxVM are ready.
+Expected VM list (may require auth depending on config):
 
 ```json
 {

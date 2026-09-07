@@ -21,8 +21,8 @@ It answers two operator questions before a VM host is admitted into service:
 - configurable minimum free space
 - NTP/time synchronization
 - active Linux Security Modules
-- Fabric `/health` reachability
-- FluxVM TCP reachability
+- Fabric `/health` (liveness) and `/readyz` (readiness: store + FluxVM) reachability
+- FluxVM TCP reachability (and `/readyz` when probing the FluxVM URL)
 - HTTPS certificate lifetime when the Fabric health URL uses TLS
 
 ## Build

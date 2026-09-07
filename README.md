@@ -60,6 +60,15 @@ zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096
 
 Default ports: **9095** (API + UI), **7788** (FluxVM on localhost).
 
+Verify after start:
+
+```bash
+curl -sf http://127.0.0.1:9095/health
+curl -sf http://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
+curl -sf http://127.0.0.1:7788/readyz | jq .
+# Multi-tenant: POST /api/vms with "tenant": "acme"; list with GET /api/vms?tenant=acme
+```
+
 ---
 
 ## Deploy

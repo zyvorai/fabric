@@ -80,7 +80,7 @@ zyvor-fabric/
   |   +-- crates/
   |   |   +-- driver-core/     # Driver trait definitions
   |   |   +-- fluxvm-driver/ # FluxVM VmDriver implementation
-  |   |   +-- fluxvm-client/ # REST client for FluxVM's API
+  |   |   +-- fluxvm-client/ # REST client for FluxVM (`readyz`, `list_vms_by_tenant`, `CreateVmRequest.tenant`)
   |   |   +-- storage/         # Storage pool management
   |   |   +-- system/          # System resource management
   |   |   +-- vm/              # VM-level utilities
