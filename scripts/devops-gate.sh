@@ -12,7 +12,8 @@ ALLOW_OFFLINE="${ZYVOR_ALLOW_OFFLINE:-0}"
 
 probe() {
   local url="$1"
-  curl -sS -m "$TIMEOUT" -o /tmp/zyvor-devops-body.$$ -w '%{http_code}' "$url" || echo 000
+  # -k: lab/self-signed TLS (Fabric HTTPS) must not fail the gate on cert verify
+  curl -sS -k -m "$TIMEOUT" -o /tmp/zyvor-devops-body.$$ -w '%{http_code}' "$url" || echo 000
 }
 
 fail() {
