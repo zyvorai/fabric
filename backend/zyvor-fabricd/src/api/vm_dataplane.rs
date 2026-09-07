@@ -147,6 +147,66 @@ pub async fn dataplane_policy_control(
     Ok(Json(saved))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ExplainQuery {
+    pub dest: String,
+    pub port: Option<u16>,
+    pub proto: Option<String>,
+}
+
+/// GET /api/vms/:name/dataplane/explain?dest=&port=&proto=
+pub async fn dataplane_explain(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Query(q): Query<ExplainQuery>,
+) -> Result<
+    Json<zyvor_fabric_driver_core::policy_control::ExplainResult>,
+    (StatusCode, Json<serde_json::Value>),
+> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    let policy = state.driver.get_dataplane_policy(&name).await.map_err(|e| {
+        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
+    })?;
+    Ok(Json(zyvor_fabric_driver_core::policy_control::explain(
+        &policy,
+        &q.dest,
+        q.port.unwrap_or(0),
+        q.proto.as_deref().unwrap_or("any"),
+    )))
+}
+
+/// GET /api/vms/:name/dataplane/dry-run
+pub async fn dataplane_dry_run(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Query(q): Query<FlowsQuery>,
+) -> Result<
+    Json<zyvor_fabric_driver_core::policy_control::DryRunReport>,
+    (StatusCode, Json<serde_json::Value>),
+> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    let policy = state.driver.get_dataplane_policy(&name).await.map_err(|e| {
+        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
+    })?;
+    let flows = state
+        .driver
+        .dataplane_flows(&name, q.limit)
+        .await
+        .unwrap_or_default();
+    Ok(Json(zyvor_fabric_driver_core::policy_control::dry_run_guard(
+        &policy, &flows,
+    )))
+}
+
+/// GET /api/dataplane/templates
+pub async fn dataplane_templates(RequireRead(_claims): RequireRead) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "items": ["open", "guard", "web", "dns-only", "no-world"]
+    }))
+}
+
 /// GET /api/vms/:name/dataplane/stats
 pub async fn dataplane_stats(
     RequireRead(_claims): RequireRead,

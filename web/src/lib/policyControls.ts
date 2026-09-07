@@ -6,6 +6,14 @@ import { emptyPolicy } from '../api/dataplane'
 
 export type EnforcementMode = 'open' | 'audit' | 'guard'
 export type ControlAction = 'open' | 'audit' | 'guard' | 'invert' | 'block' | 'allow'
+export type DropReason =
+  | 'NONE'
+  | 'POLICY_DENIED'
+  | 'DEFAULT_DENY'
+  | 'PORT_DENIED'
+  | 'RATE_LIMIT'
+  | 'AUDIT_WOULD_DROP'
+  | 'UNKNOWN'
 
 export interface ControlRequest {
   action: ControlAction
@@ -14,17 +22,55 @@ export interface ControlRequest {
   entity?: string
 }
 
+export interface ExplainResult {
+  verdict: string
+  reason: DropReason
+  would_drop: boolean
+  matched_deny?: string
+  matched_allow?: string
+  summary: string
+}
+
 export function modeFromPolicy(p: VmNetworkPolicy): EnforcementMode {
   if (p.audit_mode) return 'audit'
   if (p.default_allow) return 'open'
   return 'guard'
 }
 
-function hostCidr(addr: string): string {
-  const a = addr.split('/')[0].trim()
-  if (a.includes(':') && !addr.includes('/')) return `${a}/128`
-  if (a.includes('.') && !addr.includes('/')) return `${a}/32`
-  return addr.trim()
+export function hostCidr(addr: string): string {
+  const raw = addr.trim()
+  const a = raw.split('/')[0]
+  if (a.includes(':') && !raw.includes('/')) return `${a}/128`
+  if (a.includes('.') && !raw.includes('/')) return `${a}/32`
+  return raw
+}
+
+function parseV4(s: string): number | null {
+  const p = s.split('.')
+  if (p.length !== 4) return null
+  let n = 0
+  for (const x of p) {
+    const o = Number(x)
+    if (!Number.isInteger(o) || o < 0 || o > 255) return null
+    n = (n << 8) + o
+  }
+  return n >>> 0
+}
+
+export function cidrContains(cidr: string, ip: string): boolean {
+  const host = ip.split('/')[0]
+  if (cidr.includes(':') || host.includes(':')) {
+    const net = cidr.split('/')[0]
+    return net === host || cidr === host
+  }
+  const [net, plenRaw] = cidr.split('/')
+  const plen = plenRaw === undefined ? 32 : Math.min(32, Number(plenRaw))
+  const n = parseV4(net)
+  const a = parseV4(host)
+  if (n === null || a === null) return cidr === host
+  if (plen === 0) return true
+  const mask = plen === 32 ? 0xffffffff : (~((1 << (32 - plen)) - 1)) >>> 0
+  return (n & mask) === (a & mask)
 }
 
 function pushUnique(list: string[] | undefined, value: string): string[] {
@@ -105,4 +151,101 @@ export function dropFlowTarget(destIp: string, destPort?: number, proto?: string
   const port =
     destPort && proto && proto !== 'any' ? `${proto.toLowerCase()}/${destPort}` : undefined
   return { action: 'block', cidr: destIp, port }
+}
+
+export function explain(
+  policy: VmNetworkPolicy,
+  destIp: string,
+  destPort: number,
+  proto: string,
+): ExplainResult {
+  const protoL = proto.toLowerCase()
+  const token = `${protoL}/${destPort}`
+  const matched_deny = (policy.deny_cidrs ?? []).find((c) => cidrContains(c, destIp))
+  const matched_allow = (policy.allow_cidrs ?? []).find((c) => cidrContains(c, destIp))
+  const portOk =
+    !policy.allow_ports.length ||
+    protoL === 'icmp' ||
+    protoL === 'any' ||
+    policy.allow_ports.some((p) => p.toLowerCase() === token)
+
+  let verdict = 'FORWARDED'
+  let reason: DropReason = 'NONE'
+  let would_drop = false
+  if (matched_deny) {
+    verdict = 'DROPPED'
+    reason = 'POLICY_DENIED'
+    would_drop = true
+  } else if (policy.allow_cidrs.length && !matched_allow && !policy.default_allow) {
+    verdict = 'DROPPED'
+    reason = 'DEFAULT_DENY'
+    would_drop = true
+  } else if (!portOk && !policy.default_allow) {
+    verdict = 'DROPPED'
+    reason = 'PORT_DENIED'
+    would_drop = true
+  } else if (!policy.default_allow && !policy.allow_cidrs.length && !policy.allow_ports.length) {
+    verdict = 'DROPPED'
+    reason = 'DEFAULT_DENY'
+    would_drop = true
+  }
+  if (policy.audit_mode && would_drop) {
+    verdict = 'AUDIT'
+    reason = 'AUDIT_WOULD_DROP'
+  }
+  return {
+    verdict,
+    reason,
+    would_drop,
+    matched_deny,
+    matched_allow,
+    summary: `${verdict} ${reason} dest=${destIp}:${destPort}/${protoL}`,
+  }
+}
+
+export const TEMPLATES: { id: string; label: string }[] = [
+  { id: 'open', label: 'Open' },
+  { id: 'guard', label: 'Guard / deny-all' },
+  { id: 'web', label: 'Web egress' },
+  { id: 'dns-only', label: 'DNS only' },
+  { id: 'no-world', label: 'No world' },
+]
+
+export function templatePolicy(id: string): VmNetworkPolicy | null {
+  const base = emptyPolicy()
+  switch (id) {
+    case 'open':
+      return { ...base, default_allow: true, sample_rate: 1 }
+    case 'guard':
+    case 'deny':
+      return { ...base, default_allow: false, sample_rate: 1 }
+    case 'web':
+      return {
+        ...base,
+        default_allow: false,
+        allow_cidrs: ['0.0.0.0/0', '::/0'],
+        allow_ports: ['tcp/80', 'tcp/443', 'udp/53'],
+        max_egress_mbps: 100,
+        max_egress_pps: 10000,
+        sample_rate: 1,
+      }
+    case 'dns-only':
+      return {
+        ...base,
+        default_allow: false,
+        allow_cidrs: ['0.0.0.0/0'],
+        allow_ports: ['udp/53', 'tcp/53'],
+        sample_rate: 1,
+      }
+    case 'no-world':
+      return {
+        ...base,
+        default_allow: false,
+        deny_cidrs: ['0.0.0.0/0'],
+        entities: ['host'],
+        sample_rate: 1,
+      }
+    default:
+      return null
+  }
 }

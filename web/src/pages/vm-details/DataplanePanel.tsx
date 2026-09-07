@@ -35,7 +35,7 @@ import { TerminalTextarea } from '../../components/AppleTerminalFrame'
 import PacketFlowPanel from '../../components/PacketFlowPanel'
 import CiliumFlowControls from '../../components/CiliumFlowControls'
 import { fromRawFlow } from '../../lib/packetflow'
-import type { ControlAction } from '../../lib/policyControls'
+import { templatePolicy, type ControlAction } from '../../lib/policyControls'
 
 type PanelTab = 'status' | 'policy' | 'effective' | 'stats' | 'flows'
 
@@ -480,6 +480,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
           )}
 
           <CiliumFlowControls
+            vmName={vmName}
             policy={policy}
             disabled={!canWrite || saving}
             onChange={(next) => {
@@ -488,6 +489,21 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
               setDirty(true)
             }}
             onApply={applyFlowControl}
+            onTemplate={(id) => {
+              const tpl = templatePolicy(id)
+              if (!tpl) return
+              setPolicy(tpl)
+              setJsonText(JSON.stringify(tpl, null, 2))
+              setDirty(true)
+              void setDataplanePolicy(vmName, tpl)
+                .then((saved) => {
+                  setPolicy(saved)
+                  setJsonText(JSON.stringify(saved, null, 2))
+                  setDirty(false)
+                  toast.success(`Template ${id} applied`)
+                })
+                .catch((err) => toastFailure(toast, `Failed to apply template ${id}`, err))
+            }}
           />
 
           <div className="flex flex-wrap gap-2">

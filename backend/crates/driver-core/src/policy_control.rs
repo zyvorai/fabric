@@ -12,8 +12,10 @@
 //! | **Block** | add destination CIDR to `deny_cidrs` |
 //! | **Allow** | add destination CIDR to `allow_cidrs` |
 //! | **Invert**| swap allow/deny CIDR lists and flip `default_allow` |
+//!
+//! Also: explain, dry-run Guard, templates, drop-reason catalog.
 
-use crate::VmNetworkPolicy;
+use crate::{FlowRecord, VmNetworkPolicy};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,7 +38,7 @@ impl EnforcementMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ControlAction {
     Open,
@@ -58,20 +60,137 @@ pub struct ControlRequest {
     pub entity: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum DropReason {
+    None,
+    PolicyDenied,
+    DefaultDeny,
+    PortDenied,
+    RateLimit,
+    AuditWouldDrop,
+    Unknown,
+}
+
+impl DropReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "NONE",
+            Self::PolicyDenied => "POLICY_DENIED",
+            Self::DefaultDeny => "DEFAULT_DENY",
+            Self::PortDenied => "PORT_DENIED",
+            Self::RateLimit => "RATE_LIMIT",
+            Self::AuditWouldDrop => "AUDIT_WOULD_DROP",
+            Self::Unknown => "UNKNOWN",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExplainResult {
+    pub verdict: String,
+    pub reason: DropReason,
+    pub would_drop: bool,
+    pub matched_deny: Option<String>,
+    pub matched_allow: Option<String>,
+    pub matched_port: Option<String>,
+    pub mode: EnforcementMode,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DryRunHit {
+    pub source: String,
+    pub destination: String,
+    pub protocol: String,
+    pub destination_port: u16,
+    pub current_verdict: String,
+    pub dry_verdict: String,
+    pub reason: DropReason,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DryRunReport {
+    pub mode: EnforcementMode,
+    pub would_drop: usize,
+    pub examined: usize,
+    pub hits: Vec<DryRunHit>,
+}
+
 fn push_unique(list: &mut Vec<String>, value: String) {
     if !value.is_empty() && !list.iter().any(|x| x == &value) {
         list.push(value);
     }
 }
 
-fn host_cidr(addr: &str) -> String {
-    let addr = addr.split('/').next().unwrap_or(addr).trim();
-    if addr.contains(':') && !addr.contains('/') {
-        format!("{addr}/128")
-    } else if addr.contains('.') && !addr.contains('/') {
-        format!("{addr}/32")
+pub fn host_cidr(addr: &str) -> String {
+    let raw = addr.trim();
+    let host = raw.split('/').next().unwrap_or(raw).trim();
+    if host.contains(':') && !raw.contains('/') {
+        format!("{host}/128")
+    } else if host.contains('.') && !raw.contains('/') {
+        format!("{host}/32")
     } else {
-        addr.to_string()
+        raw.to_string()
+    }
+}
+
+fn parse_ipv4(s: &str) -> Option<u32> {
+    let p: Vec<&str> = s.split('.').collect();
+    if p.len() != 4 {
+        return None;
+    }
+    let mut out = 0u32;
+    for x in p {
+        let o: u32 = x.parse().ok()?;
+        if o > 255 {
+            return None;
+        }
+        out = (out << 8) | o;
+    }
+    Some(out)
+}
+
+pub fn cidr_contains(cidr: &str, ip: &str) -> bool {
+    let ip = ip.split('/').next().unwrap_or(ip);
+    if cidr.contains(':') || ip.contains(':') {
+        let (net, plen) = match cidr.split_once('/') {
+            Some((n, l)) => (n, l.parse::<u32>().unwrap_or(128)),
+            None => (cidr, 128u32),
+        };
+        if plen >= 128 {
+            return net == ip;
+        }
+        return cidr == ip || net == ip;
+    }
+    let (net, plen) = match cidr.split_once('/') {
+        Some((n, l)) => (n, l.parse::<u32>().unwrap_or(32).min(32)),
+        None => (cidr, 32u32),
+    };
+    let Some(n) = parse_ipv4(net) else {
+        return cidr == ip;
+    };
+    let Some(a) = parse_ipv4(ip) else {
+        return false;
+    };
+    if plen == 0 {
+        return true;
+    }
+    let mask = if plen == 32 {
+        u32::MAX
+    } else {
+        !((1u32 << (32 - plen)) - 1)
+    };
+    (n & mask) == (a & mask)
+}
+
+pub fn proto_name(p: u8) -> &'static str {
+    match p {
+        1 => "icmp",
+        6 => "tcp",
+        17 => "udp",
+        58 => "icmpv6",
+        _ => "any",
     }
 }
 
@@ -167,6 +286,143 @@ pub fn apply_control(
     }
 }
 
+fn port_token(proto: &str, dport: u16) -> String {
+    format!("{}/{}", proto.to_ascii_lowercase(), dport)
+}
+
+/// L3/L4 explain against declared VM-edge policy (not group-merged).
+pub fn explain(policy: &VmNetworkPolicy, dest_ip: &str, dest_port: u16, proto: &str) -> ExplainResult {
+    let mode = EnforcementMode::from_policy(policy);
+    let proto = proto.to_ascii_lowercase();
+    let token = port_token(&proto, dest_port);
+
+    let matched_deny = policy
+        .deny_cidrs
+        .iter()
+        .find(|c| cidr_contains(c, dest_ip))
+        .cloned();
+    let matched_allow = policy
+        .allow_cidrs
+        .iter()
+        .find(|c| cidr_contains(c, dest_ip))
+        .cloned();
+    let port_ok = policy.allow_ports.is_empty()
+        || proto == "icmp"
+        || proto == "any"
+        || policy.allow_ports.iter().any(|p| p.eq_ignore_ascii_case(&token));
+
+    let (verdict, reason, would_drop) = if matched_deny.is_some() {
+        ("DROPPED", DropReason::PolicyDenied, true)
+    } else if !policy.allow_cidrs.is_empty() && matched_allow.is_none() && !policy.default_allow {
+        ("DROPPED", DropReason::DefaultDeny, true)
+    } else if !port_ok && !policy.default_allow {
+        ("DROPPED", DropReason::PortDenied, true)
+    } else if !policy.default_allow && policy.allow_cidrs.is_empty() && policy.allow_ports.is_empty()
+    {
+        ("DROPPED", DropReason::DefaultDeny, true)
+    } else {
+        ("FORWARDED", DropReason::None, false)
+    };
+
+    let (verdict, reason) = if policy.audit_mode && would_drop {
+        ("AUDIT", DropReason::AuditWouldDrop)
+    } else {
+        (verdict, reason)
+    };
+
+    ExplainResult {
+        verdict: verdict.into(),
+        reason,
+        would_drop,
+        matched_deny,
+        matched_allow,
+        matched_port: if port_ok && !policy.allow_ports.is_empty() {
+            Some(token)
+        } else {
+            None
+        },
+        mode,
+        summary: format!(
+            "{verdict} {reason} dest={dest_ip}:{dest_port}/{proto} mode={mode:?}",
+            reason = reason.as_str()
+        ),
+    }
+}
+
+pub fn dry_run_guard(policy: &VmNetworkPolicy, flows: &[FlowRecord]) -> DryRunReport {
+    let mut guarded = policy.clone();
+    guarded.default_allow = false;
+    guarded.audit_mode = false;
+    let mut hits = Vec::new();
+    for f in flows {
+        let proto = proto_name(f.protocol);
+        let r = explain(&guarded, &f.destination, f.destination_port, proto);
+        if r.would_drop {
+            hits.push(DryRunHit {
+                source: format!("{}:{}", f.source, f.source_port),
+                destination: format!("{}:{}", f.destination, f.destination_port),
+                protocol: proto.into(),
+                destination_port: f.destination_port,
+                current_verdict: f.verdict.clone(),
+                dry_verdict: r.verdict,
+                reason: r.reason,
+            });
+        }
+    }
+    DryRunReport {
+        mode: EnforcementMode::Guard,
+        would_drop: hits.len(),
+        examined: flows.len(),
+        hits,
+    }
+}
+
+pub fn templates() -> Vec<VmNetworkPolicy> {
+    vec![
+        template_by_id("open").unwrap(),
+        template_by_id("guard").unwrap(),
+    ]
+}
+
+pub fn template_by_id(id: &str) -> Option<VmNetworkPolicy> {
+    Some(match id {
+        "open" => VmNetworkPolicy {
+            default_allow: true,
+            sample_rate: 1,
+            ..VmNetworkPolicy::default()
+        },
+        "guard" | "deny" => VmNetworkPolicy {
+            default_allow: false,
+            sample_rate: 1,
+            ..VmNetworkPolicy::default()
+        },
+        "web" => VmNetworkPolicy {
+            default_allow: false,
+            allow_cidrs: vec!["0.0.0.0/0".into(), "::/0".into()],
+            allow_ports: vec!["tcp/80".into(), "tcp/443".into(), "udp/53".into()],
+            max_egress_mbps: Some(100),
+            max_egress_pps: Some(10_000),
+            sample_rate: 1,
+            ..VmNetworkPolicy::default()
+        },
+        "dns-only" => VmNetworkPolicy {
+            default_allow: false,
+            allow_cidrs: vec!["0.0.0.0/0".into()],
+            allow_ports: vec!["udp/53".into(), "tcp/53".into()],
+            sample_rate: 1,
+            ..VmNetworkPolicy::default()
+        },
+        "no-world" => VmNetworkPolicy {
+            default_allow: false,
+            deny_cidrs: vec!["0.0.0.0/0".into()],
+            entities: vec!["host".into()],
+            sample_rate: 1,
+            ..VmNetworkPolicy::default()
+        },
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +432,16 @@ mod tests {
             default_allow: true,
             allow_cidrs: vec!["10.0.0.0/8".into()],
             deny_cidrs: vec!["1.1.1.1/32".into()],
+            ..VmNetworkPolicy::default()
+        }
+    }
+
+    fn pol() -> VmNetworkPolicy {
+        VmNetworkPolicy {
+            default_allow: false,
+            allow_cidrs: vec!["10.0.0.0/8".into()],
+            deny_cidrs: vec!["10.66.0.0/16".into()],
+            allow_ports: vec!["tcp/443".into()],
             ..VmNetworkPolicy::default()
         }
     }
@@ -223,5 +489,76 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("cidr"));
+    }
+
+    #[test]
+    fn cidr_v4_prefix() {
+        assert!(cidr_contains("10.0.0.0/8", "10.1.2.3"));
+        assert!(!cidr_contains("10.0.0.0/8", "11.0.0.1"));
+        assert!(cidr_contains("8.8.8.8/32", "8.8.8.8"));
+        assert_eq!(host_cidr("8.8.8.8"), "8.8.8.8/32");
+    }
+
+    #[test]
+    fn explain_deny_beats_allow() {
+        let r = explain(&pol(), "10.66.1.1", 443, "tcp");
+        assert!(r.would_drop);
+        assert_eq!(r.reason, DropReason::PolicyDenied);
+    }
+
+    #[test]
+    fn explain_port_denied() {
+        let r = explain(&pol(), "10.1.1.1", 22, "tcp");
+        assert_eq!(r.reason, DropReason::PortDenied);
+    }
+
+    #[test]
+    fn explain_forward_https() {
+        let r = explain(&pol(), "10.1.1.1", 443, "tcp");
+        assert_eq!(r.verdict, "FORWARDED");
+        assert!(!r.would_drop);
+    }
+
+    #[test]
+    fn audit_would_drop() {
+        let mut p = pol();
+        p.audit_mode = true;
+        let r = explain(&p, "1.1.1.1", 443, "tcp");
+        assert_eq!(r.verdict, "AUDIT");
+        assert_eq!(r.reason, DropReason::AuditWouldDrop);
+        assert!(r.would_drop);
+    }
+
+    #[test]
+    fn dry_run_lists_world() {
+        let flows = vec![FlowRecord {
+            identity: 1,
+            family: 4,
+            source: "10.0.0.2".into(),
+            destination: "1.1.1.1".into(),
+            source_port: 1,
+            destination_port: 443,
+            protocol: 6,
+            verdict: "FORWARDED".into(),
+            packets: 1,
+            bytes: 1,
+            last_seen_ns: 0,
+        }];
+        let open = VmNetworkPolicy {
+            default_allow: true,
+            ..VmNetworkPolicy::default()
+        };
+        let report = dry_run_guard(&open, &flows);
+        assert_eq!(report.would_drop, 1);
+        assert_eq!(report.hits[0].reason, DropReason::DefaultDeny);
+    }
+
+    #[test]
+    fn invert_and_guard() {
+        let p = apply_mode(pol(), EnforcementMode::Guard);
+        assert!(!p.default_allow);
+        let inv = invert_policy(pol());
+        assert!(inv.default_allow);
+        assert_eq!(inv.allow_cidrs, vec!["10.66.0.0/16"]);
     }
 }

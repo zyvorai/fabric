@@ -3,7 +3,9 @@
 
 import { useState } from 'react'
 import type { VmNetworkPolicy } from '../api/dataplane'
+import { dryRunDataplane, explainDataplane } from '../api/dataplane'
 import {
+  TEMPLATES,
   applyControl,
   modeFromPolicy,
   type ControlAction,
@@ -13,8 +15,11 @@ import {
 interface Props {
   policy: VmNetworkPolicy
   disabled?: boolean
+  /** When set, enables Explain / Dry-run Guard against the live API. */
+  vmName?: string
   onChange: (next: VmNetworkPolicy) => void
   onApply?: (action: ControlAction, extra?: { cidr?: string; port?: string }) => Promise<void> | void
+  onTemplate?: (id: string) => void
 }
 
 const MODES: { id: EnforcementMode; label: string; hint: string }[] = [
@@ -23,10 +28,21 @@ const MODES: { id: EnforcementMode; label: string; hint: string }[] = [
   { id: 'guard', label: 'Guard', hint: 'Enforce default-deny at the VM edge' },
 ]
 
-export default function CiliumFlowControls({ policy, disabled, onChange, onApply }: Props) {
+export default function CiliumFlowControls({
+  policy,
+  disabled,
+  vmName,
+  onChange,
+  onApply,
+  onTemplate,
+}: Props) {
   const mode = modeFromPolicy(policy)
   const [cidr, setCidr] = useState('')
   const [port, setPort] = useState('tcp/443')
+  const [dest, setDest] = useState('1.1.1.1')
+  const [dport, setDport] = useState('443')
+  const [explainOut, setExplainOut] = useState('')
+  const [dryOut, setDryOut] = useState('')
   const [busy, setBusy] = useState(false)
 
   const run = async (action: ControlAction, extra?: { cidr?: string; port?: string }) => {
@@ -121,6 +137,74 @@ export default function CiliumFlowControls({ policy, disabled, onChange, onApply
           Allow
         </button>
       </div>
+      {onTemplate && (
+        <div className="flex flex-wrap gap-2">
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              disabled={disabled}
+              className="text-xs px-2 py-1 rounded-lg border border-[#d2d2d7] bg-[#f5f5f7]"
+              onClick={() => onTemplate(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {vmName && (
+        <>
+          <div className="flex flex-wrap gap-2 items-end">
+            <input
+              className="bg-white border border-[#d2d2d7] rounded-lg px-2 py-1 text-sm"
+              value={dest}
+              onChange={(e) => setDest(e.target.value)}
+              placeholder="explain dest"
+            />
+            <input
+              className="bg-white border border-[#d2d2d7] rounded-lg px-2 py-1 text-sm w-20"
+              value={dport}
+              onChange={(e) => setDport(e.target.value)}
+            />
+            <button
+              type="button"
+              className="px-3 py-1.5 text-sm rounded-lg border border-[#d2d2d7]"
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  const r = await explainDataplane(vmName, dest, Number(dport) || 0, 'tcp')
+                  setExplainOut(r.summary || `${r.verdict} ${r.reason}`)
+                } catch (e) {
+                  setExplainOut(String(e))
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              Explain
+            </button>
+            <button
+              type="button"
+              className="px-3 py-1.5 text-sm rounded-lg border border-amber-200 bg-amber-50"
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  const r = await dryRunDataplane(vmName)
+                  setDryOut(`Guard dry-run: ${r.would_drop}/${r.examined} flows would drop`)
+                } catch (e) {
+                  setDryOut(String(e))
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              Dry-run Guard
+            </button>
+          </div>
+          {explainOut && <p className="text-xs font-mono text-[#1d1d1f]">{explainOut}</p>}
+          {dryOut && <p className="text-xs font-mono text-[#92640a]">{dryOut}</p>}
+        </>
+      )}
       <p className="text-xs text-[#6e6e73]">
         Mode: <strong>{mode}</strong>
         {policy.audit_mode ? ' · audit' : ''}

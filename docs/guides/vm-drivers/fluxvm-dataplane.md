@@ -69,6 +69,9 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/vms/{name}/dataplane/policy` | `GET /v1/vms/{id}/network/policy` | Durable policy |
 | `POST /api/vms/{name}/dataplane/policy` | `POST /v1/vms/{id}/network/policy` | Replace durable policy + live maps |
 | `POST /api/vms/{name}/dataplane/policy/control` | read-modify-write FluxVM policy | Guard / Audit / Open / Invert / Block / Allow |
+| `GET /api/vms/{name}/dataplane/explain?dest=&port=&proto=` | — | Explain dest:port verdict under current policy |
+| `GET /api/vms/{name}/dataplane/dry-run?limit=` | — | Live flows that would drop under Guard |
+| `GET /api/dataplane/templates` | — | Policy templates (open, guard, web, dns-only, no-world) |
 | `GET /api/vms/{name}/dataplane/effective` | `GET /v1/vms/{id}/network/effective` | Declared + group-merged policy |
 | `GET /api/vms/{name}/dataplane/stats` | `GET /v1/vms/{id}/network/stats` | allow/drop packets + bytes |
 | `GET /api/vms/{name}/dataplane/flows?limit=` | `GET /v1/vms/{id}/network/flows` | LRU flows (`family` 4/6, identity, verdict) |
@@ -80,6 +83,8 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/dataplane/health` | `GET /v1/network/health` | Dataplane health |
 | `GET /api/dataplane/ipcache` | `GET /v1/network/ipcache` | Guest IP → identity |
 | `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` | Re-resolve FQDN allowlists |
+
+Observe pack (explain, dry-run Guard, templates): [dataplane-observe-pack.md](../../dataplane-observe-pack.md).
 
 Capability probe (dashboard health card):
 

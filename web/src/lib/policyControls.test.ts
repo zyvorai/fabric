@@ -6,7 +6,9 @@ import { emptyPolicy } from '../api/dataplane'
 import {
   applyControl,
   applyMode,
+  cidrContains,
   dropFlowTarget,
+  explain,
   invertPolicy,
   modeFromPolicy,
 } from './policyControls'
@@ -48,5 +50,23 @@ describe('policyControls', () => {
       cidr: '1.1.1.1',
       port: 'tcp/443',
     })
+  })
+
+  it('matches IPv4 prefixes', () => {
+    expect(cidrContains('10.0.0.0/8', '10.1.2.3')).toBe(true)
+    expect(cidrContains('10.0.0.0/8', '11.0.0.1')).toBe(false)
+  })
+
+  it('deny beats allow', () => {
+    const p = {
+      ...emptyPolicy(),
+      default_allow: false,
+      allow_cidrs: ['10.0.0.0/8'],
+      deny_cidrs: ['10.66.0.0/16'],
+      allow_ports: ['tcp/443'],
+    }
+    expect(explain(p, '10.66.1.1', 443, 'tcp').reason).toBe('POLICY_DENIED')
+    expect(explain(p, '10.1.1.1', 22, 'tcp').reason).toBe('PORT_DENIED')
+    expect(explain(p, '10.1.1.1', 443, 'tcp').verdict).toBe('FORWARDED')
   })
 })

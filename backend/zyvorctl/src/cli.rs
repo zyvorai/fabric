@@ -176,6 +176,21 @@ enum DataplaneCmd {
     },
     /// Declared + group-merged effective policy
     Effective { name: String },
+    /// Explain whether dest:port would drop under current policy
+    Explain {
+        name: String,
+        dest: String,
+        #[arg(long, default_value_t = 0)]
+        port: u16,
+        #[arg(long, default_value = "any")]
+        proto: String,
+    },
+    /// Show which live flows would drop if Guard were enabled
+    DryRun {
+        name: String,
+        #[arg(long, default_value_t = 64)]
+        limit: usize,
+    },
     /// Cluster dataplane health
     Health,
     /// Guest IP → identity cache
@@ -1104,6 +1119,30 @@ impl Cli {
                 DataplaneCmd::Effective { name } => {
                     let val =
                         api_get(&client, &format!("/vms/{}/dataplane/effective", name)).await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Explain {
+                    name,
+                    dest,
+                    port,
+                    proto,
+                } => {
+                    let val = api_get(
+                        &client,
+                        &format!(
+                            "/vms/{}/dataplane/explain?dest={}&port={}&proto={}",
+                            name, dest, port, proto
+                        ),
+                    )
+                    .await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::DryRun { name, limit } => {
+                    let val = api_get(
+                        &client,
+                        &format!("/vms/{}/dataplane/dry-run?limit={}", name, limit),
+                    )
+                    .await?;
                     print_value(&val, fmt);
                 }
                 DataplaneCmd::Health => {

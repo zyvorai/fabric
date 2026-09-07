@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- Observe pack on `policy_control`: explain, dry-run Guard, templates
+  (open/guard/web/dns-only/no-world), drop-reason catalog;
+  `GET …/dataplane/explain`, `GET …/dry-run`, `GET /api/dataplane/templates`,
+  `zyvorctl dataplane explain|dry-run`
+  ([docs/dataplane-observe-pack.md](docs/dataplane-observe-pack.md)).
 - Per-VM Cilium-style packet-flow controls: Guard / Audit / Open / Invert /
   Block / Allow in the VM Dataplane Policy tab, Block-from-flow in the Flows
   view, `POST /api/vms/{name}/dataplane/policy/control`, and

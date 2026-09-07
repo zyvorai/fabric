@@ -131,6 +131,32 @@ export function applyDataplaneControl(
   return apiPost(`/api/vms/${encodeURIComponent(name)}/dataplane/policy/control`, req)
 }
 
+export function explainDataplane(
+  name: string,
+  dest: string,
+  port = 0,
+  proto = 'any',
+): Promise<{ verdict: string; reason: string; would_drop: boolean; summary: string }> {
+  const q = new URLSearchParams({ dest, port: String(port), proto })
+  return apiGet(`/api/vms/${encodeURIComponent(name)}/dataplane/explain?${q}`)
+}
+
+export function dryRunDataplane(
+  name: string,
+  limit = 100,
+): Promise<{
+  would_drop: number
+  examined: number
+  hits: Array<{
+    destination: string
+    reason: string
+    dry_verdict: string
+    current_verdict: string
+  }>
+}> {
+  return apiGet(`/api/vms/${encodeURIComponent(name)}/dataplane/dry-run?limit=${limit}`)
+}
+
 export function getDataplaneStats(name: string): Promise<DataplaneStats> {
   return apiGet(`/api/vms/${encodeURIComponent(name)}/dataplane/stats`)
 }

@@ -57,6 +57,9 @@ Cilium-style **packet-flow control** (VM edge only — no Cilium-private maps):
 | **Invert** | Swap allow/deny CIDRs and flip default allow |
 | **Block** / **Allow** | Add host or CIDR to deny/allow lists |
 
+Also: **Explain** dest:port, **Dry-run Guard**, and policy **templates** —
+see [dataplane-observe-pack.md](../../../dataplane-observe-pack.md).
+
 Flows tab **Block** adds that destination to `deny_cidrs`.
 Cluster-wide Hubble-lite view: [Edge Dataplane → Packet flow](edge-dataplane.md).
 
