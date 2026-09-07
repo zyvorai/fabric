@@ -10,9 +10,11 @@ ALLOW_OFFLINE="${ZYVOR_ALLOW_OFFLINE:-0}"
 FLUXVM_URL="${FLUXVM_URL:-http://127.0.0.1:7788}"
 
 probe() {
-  local url="$1"
+  local url="$1" code
   # -k: lab/self-signed TLS (Fabric HTTPS) must not fail the gate on cert verify
-  curl -sS -k -m "$TIMEOUT" -o /tmp/zyvor-devops-body.$$ -w '%{http_code}' "$url" 2>/dev/null || echo 000
+  # curl still prints http_code (often 000) on connect failure; do not append another 000.
+  code="$(curl -sS -k -m "$TIMEOUT" -o /tmp/zyvor-devops-body.$$ -w '%{http_code}' "$url" 2>/dev/null || true)"
+  echo "${code:-000}"
 }
 
 # Prefer explicit FABRIC_URL; otherwise pick a live lab listener (HTTPS first).
