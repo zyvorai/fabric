@@ -23,6 +23,9 @@ pub struct PaginationQuery {
     pub offset: Option<usize>,
     #[serde(default)]
     pub limit: Option<usize>,
+    /// Optional Fabric/FluxVM tenant filter — matches `labels.tenant` or tag `tenant:…`.
+    #[serde(default)]
+    pub tenant: Option<String>,
 }
 
 /// GET /api/license - Evaluation trial status. Read-only (RequireRead, not
@@ -81,14 +84,32 @@ pub async fn list_vms(
     let limit = limit.min(1000);
 
     match state.store.list_vms_paginated(offset, limit) {
-        Ok((vms, total)) => (
-            StatusCode::OK,
-            Json(json!({ "items": vms, "total": total, "offset": offset, "limit": limit })),
-        )
-            .into_response(),
+        Ok((mut vms, mut total)) => {
+            if let Some(ref tenant) = pagination.tenant {
+                vms.retain(|vm| vm_tenant(vm).as_deref() == Some(tenant.as_str()));
+                total = vms.len();
+            }
+            (
+                StatusCode::OK,
+                Json(json!({ "items": vms, "total": total, "offset": offset, "limit": limit })),
+            )
+                .into_response()
+        }
         Err(e) => json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &_claims)
             .into_response(),
     }
+}
+
+fn vm_tenant(vm: &VM) -> Option<String> {
+    if let Some(ref labels) = vm.labels {
+        if let Some(t) = labels.get("tenant") {
+            return Some(t.clone());
+        }
+    }
+    vm.tags.as_ref().and_then(|tags| {
+        tags.iter()
+            .find_map(|t| t.strip_prefix("tenant:").map(|s| s.to_string()))
+    })
 }
 
 pub async fn get_vm(

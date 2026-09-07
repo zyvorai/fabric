@@ -52,6 +52,9 @@ export interface CreateVMRequest {
    * (not every image runs one automatically on boot).
    */
   network_static_ip?: boolean
+  /** Optional tenant id — stored as `labels.tenant` and passed to FluxVM. */
+  tenant?: string
+  labels?: Record<string, string>
 }
 
 export interface VMMetrics {

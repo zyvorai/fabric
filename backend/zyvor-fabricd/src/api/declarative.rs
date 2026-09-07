@@ -328,6 +328,7 @@ pub async fn apply_vm_spec(
                 Some(spec.tags.clone())
             },
             labels: None,
+            tenant: None,
             port_forwards: Vec::new(),
             network_tap: false,
             network_static_ip: false,

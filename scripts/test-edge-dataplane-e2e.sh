@@ -79,6 +79,10 @@ echo "Fabric edge dataplane e2e → $BASE"
 login
 section "health / capabilities"
 
+READY="$(curl -sk "$BASE/readyz" || true)"
+echo "$READY" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "ok" in d and "fluxvm" in d' \
+  && pass "GET /readyz" || fail "GET /readyz"
+
 CAP="$(api GET /api/capabilities || true)"
 echo "$CAP" | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d.get("vm_dataplane") or {}; print(v.get("phase"), v.get("detail",""))' \
   && pass "capabilities.vm_dataplane" || fail "capabilities.vm_dataplane"

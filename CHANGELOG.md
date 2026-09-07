@@ -10,6 +10,10 @@
   [edge-dataplane/](docs/tutorials/edge-dataplane/README.md)).
 
 ### Added
+- Project-production alignment with FluxVM: unauthenticated `GET /readyz`
+  (store + FluxVM `/readyz`), VM `tenant` on create + `GET /api/vms?tenant=`,
+  FluxVM client `tenant` / `readyz` / `list_vms_by_tenant`, label→tenant
+  inheritance on VM start.
 - Fabric proxy of FluxVM schema v4: `/api/dataplane/*`, VM `…/dataplane/effective`,
   Edge Dataplane console (`/app/edge-dataplane`), `zyvorctl dataplane` group/cnp/…
   commands, and `scripts/test-edge-dataplane-e2e.sh`.

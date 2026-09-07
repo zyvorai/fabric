@@ -110,6 +110,10 @@ pub struct CreateVMRequest {
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<HashMap<String, String>>,
+    /// Optional first-class tenant. Merged into `labels["tenant"]` on create
+    /// so it flows to FluxVM and `GET /api/vms?tenant=`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub port_forwards: Vec<PortForwardSpec>,
     #[serde(default)]
@@ -919,6 +923,12 @@ impl VM {
     }
 
     pub fn from_request(req: &CreateVMRequest) -> Self {
+        let mut labels = req.labels.clone();
+        if let Some(ref tenant) = req.tenant {
+            let map = labels.get_or_insert_with(HashMap::new);
+            map.entry("tenant".to_string())
+                .or_insert_with(|| tenant.clone());
+        }
         Self {
             name: req.name.clone(),
             state: VMState::Stopped,
@@ -931,7 +941,7 @@ impl VM {
             mac_address: None,
             hostname: req.hostname.clone(),
             tags: req.tags.clone(),
-            labels: req.labels.clone(),
+            labels,
             vnc_port: None,
             created: Utc::now(),
             updated: None,
@@ -982,6 +992,7 @@ mod tests {
             hostname: Some("web-server".to_string()),
             tags: Some(vec!["production".to_string()]),
             labels: Some(labels.clone()),
+            tenant: None,
             port_forwards: Vec::new(),
             network_tap: false,
             network_static_ip: false,

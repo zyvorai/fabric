@@ -109,6 +109,42 @@ fn probe_events(state: &AppState) -> SubsystemStatus {
     }
 }
 
+/// GET /readyz — unauthenticated readiness for load balancers / k8s.
+/// Requires the local state store and FluxVM `/readyz` (when configured).
+pub async fn readyz(State(state): State<Arc<AppState>>) -> impl axum::response::IntoResponse {
+    use axum::http::StatusCode;
+    use axum::Json;
+    use serde_json::json;
+
+    let store_ok = state.store.list_vms_paginated(0, 1).is_ok();
+    let fluxvm_url = state.config.driver.fluxvm_url.trim_end_matches('/').to_string();
+    let fluxvm_ready_url = format!("{fluxvm_url}/readyz");
+    let (fluxvm_ok, fluxvm_body) = match state.http_client.get(&fluxvm_ready_url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let body = resp.json::<serde_json::Value>().await.unwrap_or(json!({}));
+            let ok = body.get("ok").and_then(|v| v.as_bool()).unwrap_or(true);
+            (ok, body)
+        }
+        Ok(resp) => (
+            false,
+            json!({"error": format!("fluxvm readyz HTTP {}", resp.status())}),
+        ),
+        Err(e) => (false, json!({"error": e.to_string()})),
+    };
+    let ok = store_ok && fluxvm_ok;
+    let body = json!({
+        "ok": ok,
+        "store": store_ok,
+        "fluxvm": fluxvm_body,
+    });
+    let status = if ok {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    (status, Json(body))
+}
+
 fn probe_network_security(state: &AppState) -> SubsystemStatus {
     let policy_count = state
         .store

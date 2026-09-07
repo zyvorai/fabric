@@ -54,6 +54,7 @@ impl PoolDriver for FluxVmDriver {
             extra_args: vec![],
             agent: None,
             shared_folders: vec![],
+            tenant: None,
         };
         let pool = self.client.create_pool(name, size, template).await?;
         Ok(to_pool_info(pool))

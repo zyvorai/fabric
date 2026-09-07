@@ -904,6 +904,7 @@ impl Cli {
                     hostname,
                     tags,
                     labels,
+                    tenant: None,
                     port_forwards: Vec::new(),
                     network_tap: false,
                     network_static_ip: false,

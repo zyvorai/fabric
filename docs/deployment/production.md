@@ -85,6 +85,10 @@ ls -la /dev/kvm
 # 3. Verify the `fluxvm` binary is installed and reachable at the URL
 #    configured in zyvor-fabricd.toml (driver.fluxvm_url):
 curl -sf "$(grep fluxvm_url /etc/zyvor-fabricd/zyvor-fabricd.toml | cut -d'"' -f2)/healthz"
+curl -sf "$(grep fluxvm_url /etc/zyvor-fabricd/zyvor-fabricd.toml | cut -d'"' -f2)/readyz"
+# Fabric readiness (store + FluxVM):
+curl -sf https://127.0.0.1:9095/readyz
+# Tenant filter: GET /api/vms?tenant=acme  (JWT required)
 
 # 4. Create the zyvor-fabricd system user (optional, for non-root operation)
 sudo useradd --system --home-dir /var/lib/zyvor-fabricd --shell /usr/sbin/nologin zyvor-fabricd

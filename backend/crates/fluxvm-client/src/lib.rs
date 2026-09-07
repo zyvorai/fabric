@@ -189,6 +189,10 @@ pub struct CreateVmRequest {
     pub agent: Option<AgentSpec>,
     #[serde(default)]
     pub shared_folders: Vec<SharedFolder>,
+    /// First-class FluxVM tenant id (optional). Prefer this over stuffing
+    /// `tenant=` into labels when talking to schema-aware FluxVM builds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 /// A host directory shared into the guest via virtiofs, declared at create
@@ -684,6 +688,21 @@ impl FluxVmClient {
         )
     }
 
+    /// `GET /readyz` — readiness (state dir + dataplane when required).
+    /// Unauthenticated like `/healthz`.
+    pub async fn readyz(&self) -> Result<serde_json::Value> {
+        let resp = self.http.get(self.url("/readyz")?).send().await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /readyz` boolean convenience for probes.
+    pub async fn ready(&self) -> bool {
+        match self.readyz().await {
+            Ok(v) => v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
+            Err(_) => false,
+        }
+    }
+
     pub async fn create_vm(&self, req: &CreateVmRequest) -> Result<VmRecord> {
         let resp = self
             .authed(self.http.post(self.url("/v1/vms")?))
@@ -698,6 +717,15 @@ impl FluxVmClient {
             .authed(self.http.get(self.url("/v1/vms")?))
             .send()
             .await?;
+        let body: VmListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/vms?tenant=` — server-side tenant filter.
+    pub async fn list_vms_by_tenant(&self, tenant: &str) -> Result<Vec<VmRecord>> {
+        let mut url = self.url("/v1/vms")?;
+        url.query_pairs_mut().append_pair("tenant", tenant);
+        let resp = self.authed(self.http.get(url)).send().await?;
         let body: VmListResponse = Self::parse(resp).await?;
         Ok(body.items)
     }

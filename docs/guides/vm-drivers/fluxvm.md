@@ -39,7 +39,8 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 
 | Capability | `driver-core` trait | FluxVM endpoint(s) |
 | --- | --- | --- |
-| Create, list, get, resolve by name | `VMDriver` | `POST`/`GET /v1/vms`, `GET /v1/vms?name=` |
+| Create, list, get, resolve by name | `VMDriver` | `POST`/`GET /v1/vms`, `GET /v1/vms?name=`, `GET /v1/vms?tenant=` |
+| Readiness | — | Fabric `GET /readyz` proxies FluxVM `GET /readyz` + local store |
 | Start, stop, pause, resume, delete | `VMDriver` | `/v1/vms/{id}/{start,stop,pause,resume}`, `DELETE /v1/vms/{id}` |
 | Hotplug (CPU/memory/disk/nic) | — | Generic — resolves `VMDriver::get_control_socket` and speaks QMP directly, no FluxVM-specific wiring needed |
 | CPU pinning (cgroup cpuset) | `ResourceControlDriver::{set,get}_cpuset` | `POST /v1/vms/{id}/resources`, `GET /v1/vms/{id}/cpuset` |

@@ -364,6 +364,7 @@ pub async fn deploy_template(
         hostname: None,
         tags: Some(template.tags.clone()),
         labels: None,
+        tenant: None,
         port_forwards: Vec::new(),
         network_tap: false,
         network_static_ip: false,

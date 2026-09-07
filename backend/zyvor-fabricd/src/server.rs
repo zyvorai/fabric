@@ -2281,6 +2281,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let os_url = state.config.public_base_url();
     let os_cloud = openstack_compat::Cloud::new(os_url);
 
+    // Root `/readyz` needs AppState; the outer router is untyped, so merge a
+    // small state-bearing router (same pattern as nested API routes).
+    let readyz_routes = Router::new()
+        .route("/readyz", get(api::capabilities::readyz))
+        .with_state(state.clone());
+
     Router::new()
         .nest("/api/v1", all_api_routes.clone())
         .nest("/api", all_api_routes)
@@ -2291,6 +2297,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .nest("/image", openstack_compat::image_router(os_cloud.clone()))
         .nest("/network", openstack_compat::network_router(os_cloud.clone()))
         .nest("/volume", openstack_compat::volume_router(os_cloud))
+        .merge(readyz_routes)
         .route("/health", get(|| async { "OK" }))
         .route("/metrics", get(prometheus_exporter::metrics_handler))
         // Unauthenticated on purpose -- cloud-init's first-boot runcmd has

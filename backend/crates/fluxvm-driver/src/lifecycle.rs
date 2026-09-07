@@ -336,6 +336,18 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
                 read_only: bm.read_only,
             })
             .collect(),
+        // Prefer explicit label `tenant=…` so Fabric project/billing labels
+        // flow into FluxVM's first-class tenant filter (`GET /v1/vms?tenant=`).
+        tenant: vm
+            .labels
+            .as_ref()
+            .and_then(|l| l.get("tenant").cloned())
+            .or_else(|| {
+                vm.tags.as_ref().and_then(|tags| {
+                    tags.iter()
+                        .find_map(|t| t.strip_prefix("tenant:").map(|s| s.to_string()))
+                })
+            }),
     })
 }
 
