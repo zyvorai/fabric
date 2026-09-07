@@ -466,6 +466,8 @@ The REST API is organized into the following endpoint groups:
 
 - [integrations/README.md](integrations/README.md) — Machina, Terraform, operator, Ansible, OpenStack-compat
 - [openstack-compat.md](openstack-compat.md) — drive Fabric with `openstack` / Terraform OpenStack / Ansible `os_*`
+- [DEVOPS.md](DEVOPS.md) — CI/CD, GitOps, Terraform, probes, promotion with FluxVM
+- [examples/devops/](../examples/devops/README.md) — copy-paste pipelines and gates
 - [NAMING.md](NAMING.md) — Clone URL and product naming
 
 ## Product Positioning

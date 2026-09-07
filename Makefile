@@ -112,6 +112,11 @@ test-proven-infra:
 	bash scripts/test-upgrade-rollback.sh
 	bash scripts/chaos-qualify.sh
 
+.PHONY: test-devops
+test-devops:
+	cd examples/devops && python3 -m unittest test_contract.py test_examples.py -v
+	bash scripts/test-devops-gate.sh
+
 bench:
 	python3 benchmarks/harness.py --allow-offline --out /tmp/fabric-bench-offline.json
 

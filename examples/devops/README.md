@@ -1,0 +1,51 @@
+# DevOps examples (Fabric)
+
+Copy these into your platform repo or call them from CI. They assume:
+
+- Fabric API on `:9095`
+- FluxVM on `:7788` (sibling [zyvorai/fluxvm](https://github.com/zyvorai/fluxvm))
+- One writer (GitOps **or** Terraform **or** `zyvorctl apply`)
+
+## Local / pipeline gates
+
+```bash
+# unit (no daemon)
+python3 -m unittest examples.devops.test_contract examples.devops.test_examples
+bash scripts/test-devops-gate.sh
+
+# live stack (compose or bare metal)
+export FABRIC_URL=http://127.0.0.1:9095
+export FLUXVM_URL=http://127.0.0.1:7788
+bash scripts/devops-gate.sh
+zyvorctl apply -f examples/devops/apply-vm.yaml
+```
+
+## GitHub Actions
+
+See `github-actions/fabric-gates.yml`. Live job needs a self-hosted runner with KVM.
+
+## Kubernetes GitOps
+
+Operator must already point at fabricd. Then:
+
+```bash
+kubectl apply -k examples/devops/gitops
+kubectl get vm -n team-web
+```
+
+## Terraform
+
+```bash
+cd examples/devops/terraform
+terraform init
+terraform plan -var="token=$FABRIC_TOKEN"
+```
+
+## Ansible
+
+```bash
+ANSIBLE_LIBRARY=sdk/ansible/plugins/modules \
+  ansible-playbook examples/devops/ansible/site.yml
+```
+
+Probe contract: [docs/contracts/fabric-fluxvm-readyz.json](../../docs/contracts/fabric-fluxvm-readyz.json).
