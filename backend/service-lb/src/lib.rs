@@ -7,10 +7,17 @@
 //! owns every TC/XDP program and BPF map. This crate never writes bpffs or
 //! invokes `tc`, `ip`, or `bpftool` directly.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::{collections::{HashMap, HashSet}, fs, io::Write, net::IpAddr, path::{Path, PathBuf}, process::Command};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    io::Write,
+    net::IpAddr,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -267,10 +274,7 @@ pub fn validate_spec(spec: &ServiceSpec) -> Result<()> {
             bail!("DSR cannot be combined with SNAT");
         }
     }
-    if spec.exposure.north_south()
-        && spec.mode == ServiceMode::Nat
-        && spec.snat_address.is_none()
-    {
+    if spec.exposure.north_south() && spec.mode == ServiceMode::Nat && spec.snat_address.is_none() {
         bail!("north-south NAT requires snat_address");
     }
     if let Some(health) = &spec.health_check {
@@ -306,7 +310,12 @@ pub trait ServiceNodeClient: Send + Sync {
     async fn upsert_service(&self, node: &NodeTarget, spec: &ServiceSpec) -> Result<()>;
     async fn delete_service(&self, node: &NodeTarget, name: &str) -> Result<()>;
     async fn export_conntrack(&self, node: &NodeTarget, name: &str) -> Result<ConntrackSnapshot>;
-    async fn import_conntrack(&self, node: &NodeTarget, name: &str, snapshot: &ConntrackSnapshot) -> Result<usize>;
+    async fn import_conntrack(
+        &self,
+        node: &NodeTarget,
+        name: &str,
+        snapshot: &ConntrackSnapshot,
+    ) -> Result<usize>;
 }
 
 #[derive(Clone, Default)]
@@ -382,7 +391,8 @@ impl ServiceNodeClient for FluxVmHttpClient {
         let resp = self
             .auth(
                 node,
-                self.http.get(Self::url(node, "/v1/network/services/advertisements")?),
+                self.http
+                    .get(Self::url(node, "/v1/network/services/advertisements")?),
             )
             .send()
             .await?;
@@ -395,8 +405,7 @@ impl ServiceNodeClient for FluxVmHttpClient {
         let resp = self
             .auth(
                 node,
-                self.http
-                    .post(Self::url(node, "/v1/network/services")?),
+                self.http.post(Self::url(node, "/v1/network/services")?),
             )
             .json(spec)
             .send()
@@ -458,7 +467,9 @@ impl ServiceNodeClient for FluxVmHttpClient {
             .await?;
         let resp = Self::expect_ok(resp, "import service conntrack").await?;
         #[derive(Deserialize)]
-        struct ImportReply { written: usize }
+        struct ImportReply {
+            written: usize,
+        }
         Ok(resp.json::<ImportReply>().await?.written)
     }
 }
@@ -538,10 +549,7 @@ where
         }
         let mut before = Vec::with_capacity(nodes.len());
         for node in nodes {
-            before.push((
-                node.clone(),
-                self.client.get_service(node, name).await?,
-            ));
+            before.push((node.clone(), self.client.get_service(node, name).await?));
         }
         let mut applied = Vec::new();
         for node in nodes {
@@ -588,7 +596,10 @@ where
         }
         let mut before = Vec::with_capacity(nodes.len());
         for node in nodes {
-            before.push((node.clone(), self.client.get_service(node, &spec.name).await?));
+            before.push((
+                node.clone(),
+                self.client.get_service(node, &spec.name).await?,
+            ));
         }
         let active: HashSet<&str> = leases
             .iter()
@@ -598,12 +609,15 @@ where
         let mut applied = Vec::new();
         for node in nodes {
             let mut node_spec = spec.clone();
-            node_spec.advertise = spec.exposure.north_south() && active.contains(node.name.as_str());
+            node_spec.advertise =
+                spec.exposure.north_south() && active.contains(node.name.as_str());
             if let Err(error) = self.client.upsert_service(node, &node_spec).await {
                 let rolled = self.rollback(&spec.name, &applied, &before).await;
                 bail!(
                     "leased service '{}' failed on node '{}': {error:#}; rolled back {:?}",
-                    spec.name, node.name, rolled
+                    spec.name,
+                    node.name,
+                    rolled
                 );
             }
             applied.push(node.clone());
@@ -633,11 +647,15 @@ where
             .map(|lease| lease.node.as_str())
             .collect();
         let mut edge_nodes = Vec::new();
-        for node in nodes.iter().filter(|node| active.contains(node.name.as_str())) {
+        for node in nodes
+            .iter()
+            .filter(|node| active.contains(node.name.as_str()))
+        {
             let snapshot = self.client.get_advertisements(node).await?;
-            let local_ok = snapshot.items.iter().any(|item| {
-                item.service == spec.name && item.vip == spec.vip && item.advertise
-            });
+            let local_ok = snapshot
+                .items
+                .iter()
+                .any(|item| item.service == spec.name && item.vip == spec.vip && item.advertise);
             if local_ok {
                 edge_nodes.push(node.name.clone());
             }
@@ -681,7 +699,9 @@ where
         let entries = snapshot.entries.len();
         let mut replicated_nodes = Vec::new();
         for target in targets {
-            self.client.import_conntrack(target, name, &snapshot).await?;
+            self.client
+                .import_conntrack(target, name, &snapshot)
+                .await?;
             replicated_nodes.push(target.name.clone());
         }
         Ok(ConntrackReplicationReport {
@@ -785,10 +805,18 @@ pub struct BgpAdapterConfig {
     pub file_path: PathBuf,
 }
 
-fn default_vtysh() -> PathBuf { "/usr/bin/vtysh".into() }
-fn default_birdc() -> PathBuf { "/usr/sbin/birdc".into() }
-fn default_bird_include() -> PathBuf { "/run/zyvor/fabric-bird-routes.conf".into() }
-fn default_intent_path() -> PathBuf { "/run/zyvor/bgp-service-intent.json".into() }
+fn default_vtysh() -> PathBuf {
+    "/usr/bin/vtysh".into()
+}
+fn default_birdc() -> PathBuf {
+    "/usr/sbin/birdc".into()
+}
+fn default_bird_include() -> PathBuf {
+    "/run/zyvor/fabric-bird-routes.conf".into()
+}
+fn default_intent_path() -> PathBuf {
+    "/run/zyvor/bgp-service-intent.json".into()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BgpApplyReport {
@@ -802,7 +830,11 @@ fn host_prefix(ip: IpAddr) -> String {
 }
 
 fn intent_prefixes(intent: &BgpVipIntent) -> Vec<String> {
-    if intent.edge_nodes.is_empty() { Vec::new() } else { vec![host_prefix(intent.vip)] }
+    if intent.edge_nodes.is_empty() {
+        Vec::new()
+    } else {
+        vec![host_prefix(intent.vip)]
+    }
 }
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
@@ -824,19 +856,45 @@ pub fn render_frr_commands(
     desired: &BgpVipIntent,
     previous: Option<&BgpVipIntent>,
 ) -> Result<Vec<String>> {
-    if local_asn == 0 { bail!("FRR local_asn must be non-zero"); }
+    if local_asn == 0 {
+        bail!("FRR local_asn must be non-zero");
+    }
     let wanted: HashSet<String> = intent_prefixes(desired).into_iter().collect();
-    let before: HashSet<String> = previous.map(intent_prefixes).unwrap_or_default().into_iter().collect();
-    let mut commands = vec!["configure terminal".to_string(), format!("router bgp {local_asn}")];
+    let before: HashSet<String> = previous
+        .map(intent_prefixes)
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    let mut commands = vec![
+        "configure terminal".to_string(),
+        format!("router bgp {local_asn}"),
+    ];
     for family in [4u8, 6u8] {
-        let afi = if family == 4 { "ipv4 unicast" } else { "ipv6 unicast" };
-        let changed = wanted.iter().chain(before.iter()).any(|p|
-            p.split('/').next().and_then(|ip| ip.parse::<IpAddr>().ok())
-                .is_some_and(|ip| if family == 4 { ip.is_ipv4() } else { ip.is_ipv6() }));
-        if !changed { continue; }
+        let afi = if family == 4 {
+            "ipv4 unicast"
+        } else {
+            "ipv6 unicast"
+        };
+        let changed = wanted.iter().chain(before.iter()).any(|p| {
+            p.split('/')
+                .next()
+                .and_then(|ip| ip.parse::<IpAddr>().ok())
+                .is_some_and(|ip| {
+                    if family == 4 {
+                        ip.is_ipv4()
+                    } else {
+                        ip.is_ipv6()
+                    }
+                })
+        });
+        if !changed {
+            continue;
+        }
         commands.push(format!("address-family {afi}"));
-        let mut withdrawn: Vec<_> = before.difference(&wanted).cloned().collect(); withdrawn.sort();
-        let mut advertised: Vec<_> = wanted.difference(&before).cloned().collect(); advertised.sort();
+        let mut withdrawn: Vec<_> = before.difference(&wanted).cloned().collect();
+        withdrawn.sort();
+        let mut advertised: Vec<_> = wanted.difference(&before).cloned().collect();
+        advertised.sort();
         for prefix in withdrawn {
             let ip: IpAddr = prefix.split('/').next().unwrap().parse()?;
             if (family == 4 && ip.is_ipv4()) || (family == 6 && ip.is_ipv6()) {
@@ -861,7 +919,9 @@ pub fn render_bird_routes(intent: &BgpVipIntent) -> String {
     let mut routes = intent_prefixes(intent);
     routes.sort();
     let mut out = String::from("# generated by Zyvor Fabric Service Fabric v4\n");
-    for prefix in routes { out.push_str(&format!("route {prefix} blackhole;\n")); }
+    for prefix in routes {
+        out.push_str(&format!("route {prefix} blackhole;\n"));
+    }
     out
 }
 
@@ -871,19 +931,30 @@ pub fn reconcile_bgp(
     previous: Option<&BgpVipIntent>,
 ) -> Result<BgpApplyReport> {
     let wanted: HashSet<String> = intent_prefixes(desired).into_iter().collect();
-    let before: HashSet<String> = previous.map(intent_prefixes).unwrap_or_default().into_iter().collect();
-    let mut advertised: Vec<_> = wanted.difference(&before).cloned().collect(); advertised.sort();
-    let mut withdrawn: Vec<_> = before.difference(&wanted).cloned().collect(); withdrawn.sort();
+    let before: HashSet<String> = previous
+        .map(intent_prefixes)
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    let mut advertised: Vec<_> = wanted.difference(&before).cloned().collect();
+    advertised.sort();
+    let mut withdrawn: Vec<_> = before.difference(&wanted).cloned().collect();
+    withdrawn.sort();
     match cfg.kind {
         BgpAdapterKind::File => {
             atomic_write(&cfg.file_path, &serde_json::to_vec_pretty(desired)?)?;
         }
         BgpAdapterKind::Bird => {
             atomic_write(&cfg.bird_include, render_bird_routes(desired).as_bytes())?;
-            let out = Command::new(&cfg.birdc).arg("configure").output()
+            let out = Command::new(&cfg.birdc)
+                .arg("configure")
+                .output()
                 .with_context(|| format!("running {} configure", cfg.birdc.display()))?;
             if !out.status.success() {
-                bail!("birdc configure failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                bail!(
+                    "birdc configure failed: {}",
+                    String::from_utf8_lossy(&out.stderr).trim()
+                );
             }
         }
         BgpAdapterKind::Frr => {
@@ -896,14 +967,22 @@ pub fn reconcile_bgp(
             for command in &commands {
                 cmd.arg("-c").arg(command);
             }
-            let out = cmd.output()
-                .with_context(|| format!("running FRR transaction via {}", cfg.frr_vtysh.display()))?;
+            let out = cmd.output().with_context(|| {
+                format!("running FRR transaction via {}", cfg.frr_vtysh.display())
+            })?;
             if !out.status.success() {
-                bail!("FRR transaction failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                bail!(
+                    "FRR transaction failed: {}",
+                    String::from_utf8_lossy(&out.stderr).trim()
+                );
             }
         }
     }
-    Ok(BgpApplyReport { adapter: cfg.kind, advertised, withdrawn })
+    Ok(BgpApplyReport {
+        adapter: cfg.kind,
+        advertised,
+        withdrawn,
+    })
 }
 
 fn validate_name(name: &str) -> Result<()> {
@@ -961,17 +1040,23 @@ mod tests {
         }
 
         async fn get_advertisements(&self, node: &NodeTarget) -> Result<AdvertisementSnapshot> {
-            Ok(self.advertisements.lock().await.get(&node.name).cloned().unwrap_or(AdvertisementSnapshot {
-                schema_version: 4,
-                generation: 1,
-                items: vec![VipAdvertisement {
-                    service: "payments".into(),
-                    vip: "203.0.113.20".parse().unwrap(),
-                    prefix_len: 32,
-                    advertise: true,
-                    reason: "test".into(),
-                }],
-            }))
+            Ok(self
+                .advertisements
+                .lock()
+                .await
+                .get(&node.name)
+                .cloned()
+                .unwrap_or(AdvertisementSnapshot {
+                    schema_version: 4,
+                    generation: 1,
+                    items: vec![VipAdvertisement {
+                        service: "payments".into(),
+                        vip: "203.0.113.20".parse().unwrap(),
+                        prefix_len: 32,
+                        advertise: true,
+                        reason: "test".into(),
+                    }],
+                }))
         }
 
         async fn upsert_service(&self, node: &NodeTarget, spec: &ServiceSpec) -> Result<()> {
@@ -996,8 +1081,15 @@ mod tests {
             Ok(())
         }
 
-        async fn export_conntrack(&self, node: &NodeTarget, name: &str) -> Result<ConntrackSnapshot> {
-            Ok(self.snapshots.lock().await
+        async fn export_conntrack(
+            &self,
+            node: &NodeTarget,
+            name: &str,
+        ) -> Result<ConntrackSnapshot> {
+            Ok(self
+                .snapshots
+                .lock()
+                .await
                 .get(&(node.name.clone(), name.into()))
                 .cloned()
                 .unwrap_or(ConntrackSnapshot {
@@ -1005,12 +1097,24 @@ mod tests {
                     service: name.into(),
                     service_id: 1,
                     created_unix_ms: 1,
-                    entries: vec![RawMapEntry { map: "fluxvm_fct4".into(), key_hex: "00".into(), value_hex: "00".into() }],
+                    entries: vec![RawMapEntry {
+                        map: "fluxvm_fct4".into(),
+                        key_hex: "00".into(),
+                        value_hex: "00".into(),
+                    }],
                 }))
         }
 
-        async fn import_conntrack(&self, node: &NodeTarget, name: &str, snapshot: &ConntrackSnapshot) -> Result<usize> {
-            self.snapshots.lock().await.insert((node.name.clone(), name.into()), snapshot.clone());
+        async fn import_conntrack(
+            &self,
+            node: &NodeTarget,
+            name: &str,
+            snapshot: &ConntrackSnapshot,
+        ) -> Result<usize> {
+            self.snapshots
+                .lock()
+                .await
+                .insert((node.name.clone(), name.into()), snapshot.clone());
             Ok(snapshot.entries.len())
         }
     }
@@ -1149,8 +1253,18 @@ mod tests {
         s.exposure = ServiceExposure::NorthSouth;
         s.snat_address = Some("192.0.2.10".parse().unwrap());
         let leases = vec![
-            EdgeLease { service: "payments".into(), node: "a".into(), epoch: 7, expires_unix_ms: 200 },
-            EdgeLease { service: "payments".into(), node: "b".into(), epoch: 6, expires_unix_ms: 50 },
+            EdgeLease {
+                service: "payments".into(),
+                node: "a".into(),
+                epoch: 7,
+                expires_unix_ms: 200,
+            },
+            EdgeLease {
+                service: "payments".into(),
+                node: "b".into(),
+                epoch: 6,
+                expires_unix_ms: 50,
+            },
         ];
         let intent = bgp_vip_intent(&s, &leases, 100).unwrap();
         assert_eq!(intent.edge_nodes, vec!["a"]);
@@ -1164,12 +1278,35 @@ mod tests {
         let mut s = service(443);
         s.exposure = ServiceExposure::NorthSouth;
         s.snat_address = Some("192.0.2.10".parse().unwrap());
-        let leases = vec![EdgeLease { service: "payments".into(), node: "b".into(), epoch: 9, expires_unix_ms: 200 }];
-        ServiceOrchestrator::new(client.clone()).apply_with_edge_leases(&s, &ns, &leases, 100).await.unwrap();
+        let leases = vec![EdgeLease {
+            service: "payments".into(),
+            node: "b".into(),
+            epoch: 9,
+            expires_unix_ms: 200,
+        }];
+        ServiceOrchestrator::new(client.clone())
+            .apply_with_edge_leases(&s, &ns, &leases, 100)
+            .await
+            .unwrap();
         let state = client.state.lock().await;
-        assert!(!state.get(&("a".into(), "payments".into())).unwrap().advertise);
-        assert!(state.get(&("b".into(), "payments".into())).unwrap().advertise);
-        assert!(!state.get(&("c".into(), "payments".into())).unwrap().advertise);
+        assert!(
+            !state
+                .get(&("a".into(), "payments".into()))
+                .unwrap()
+                .advertise
+        );
+        assert!(
+            state
+                .get(&("b".into(), "payments".into()))
+                .unwrap()
+                .advertise
+        );
+        assert!(
+            !state
+                .get(&("c".into(), "payments".into()))
+                .unwrap()
+                .advertise
+        );
     }
 
     #[tokio::test]
@@ -1184,7 +1321,6 @@ mod tests {
         assert_eq!(client.snapshots.lock().await.len(), 2);
     }
 
-
     #[tokio::test]
     async fn healthy_bgp_intent_requires_lease_and_local_readiness() {
         let client = FakeClient::default();
@@ -1193,17 +1329,38 @@ mod tests {
         s.vip = "203.0.113.20".parse().unwrap();
         s.exposure = ServiceExposure::NorthSouth;
         s.snat_address = Some("192.0.2.10".parse().unwrap());
-        client.advertisements.lock().await.insert("b".into(), AdvertisementSnapshot {
-            schema_version: 4, generation: 2, items: vec![VipAdvertisement {
-                service: "payments".into(), vip: s.vip, prefix_len: 32, advertise: false, reason: "no ready backend".into()
-            }]
-        });
+        client.advertisements.lock().await.insert(
+            "b".into(),
+            AdvertisementSnapshot {
+                schema_version: 4,
+                generation: 2,
+                items: vec![VipAdvertisement {
+                    service: "payments".into(),
+                    vip: s.vip,
+                    prefix_len: 32,
+                    advertise: false,
+                    reason: "no ready backend".into(),
+                }],
+            },
+        );
         let leases = vec![
-            EdgeLease { service: "payments".into(), node: "a".into(), epoch: 11, expires_unix_ms: 200 },
-            EdgeLease { service: "payments".into(), node: "b".into(), epoch: 11, expires_unix_ms: 200 },
+            EdgeLease {
+                service: "payments".into(),
+                node: "a".into(),
+                epoch: 11,
+                expires_unix_ms: 200,
+            },
+            EdgeLease {
+                service: "payments".into(),
+                node: "b".into(),
+                epoch: 11,
+                expires_unix_ms: 200,
+            },
         ];
         let intent = ServiceOrchestrator::new(client)
-            .healthy_bgp_vip_intent(&s, &ns, &leases, 100).await.unwrap();
+            .healthy_bgp_vip_intent(&s, &ns, &leases, 100)
+            .await
+            .unwrap();
         assert_eq!(intent.edge_nodes, vec!["a"]);
     }
 
@@ -1234,5 +1391,4 @@ mod tests {
         old.edge_nodes.clear();
         assert!(render_bird_routes(&old).contains("generated by Zyvor"));
     }
-
 }

@@ -440,7 +440,10 @@ pub async fn upsert_service(
         .map_err(|e| {
             map_driver_err(
                 StatusCode::BAD_GATEWAY,
-                &format!("Service '{}' applied but status refresh failed", service.name),
+                &format!(
+                    "Service '{}' applied but status refresh failed",
+                    service.name
+                ),
                 e,
             )
         })?;
@@ -538,11 +541,7 @@ pub async fn services_flows(
     axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let limit = q.get("limit").cloned().unwrap_or_else(|| "256".into());
-    fluxvm_json_get(
-        &state,
-        &format!("/v1/network/services/flows?limit={limit}"),
-    )
-    .await
+    fluxvm_json_get(&state, &format!("/v1/network/services/flows?limit={limit}")).await
 }
 
 /// POST /api/dataplane/services/telemetry/export — OTLP/HTTP JSON export.
