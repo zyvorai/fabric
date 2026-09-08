@@ -45,6 +45,24 @@ Step 4 is the next FluxVM runtime contract revision. Until that receiver API
 lands and an end-to-end KVM-host test passes, Fabric must not market native
 live migration as GA.
 
+Fabric exposes the source-side contract on the control plane:
+
+| Fabric API | Role |
+|---|---|
+| `GET /api/runtime/capabilities` | Proxy FluxVM runtime contract |
+| `POST /api/vms/{name}/migration/native/start` | Start prepared-target transport |
+| `GET /api/vms/{name}/migration/native/status` | Poll progress |
+| `POST /api/vms/{name}/migration/native/cancel` | Cancel in-flight transport |
+
+CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`.
+
+## Service Fabric fan-out
+
+`POST/DELETE /api/dataplane/services` go through the `service-lb` crate. By
+default Fabric applies Maglev intent only to `driver.fluxvm_url`. Optional
+`driver.fluxvm_nodes` entries (`name`, `url`, `token`) fan the same intent to
+additional FluxVM nodes with snapshot/rollback on mid-fanout failure.
+
 ## Standalone FluxVM fleet mode
 
 `fluxvm-agent` stays useful as a lightweight standalone multi-host option. It

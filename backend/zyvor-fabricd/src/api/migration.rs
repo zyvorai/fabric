@@ -423,3 +423,190 @@ async fn run_migration(state: Arc<AppState>, migration_id: String, req: Migratio
         }
     }
 }
+
+// ============================================================================
+// Native FluxVM runtime-boundary migration (source-side VMM transport)
+// ============================================================================
+
+fn runtime_mgr(
+    state: &AppState,
+) -> Result<migration::RuntimeMigrationManager, (StatusCode, Json<serde_json::Value>)> {
+    migration::RuntimeMigrationManager::new(
+        &state.config.driver.fluxvm_url,
+        state.config.driver.fluxvm_token.as_deref(),
+    )
+    .map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": format!("FluxVM runtime client: {e}") })),
+        )
+    })
+}
+
+/// GET /api/runtime/capabilities — FluxVM node-local migration/snapshot contract.
+pub async fn runtime_capabilities(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<zyvor_fabric_fluxvm_client::RuntimeCapabilities>, (StatusCode, Json<serde_json::Value>)>
+{
+    let mgr = runtime_mgr(&state)?;
+    let caps = mgr.capabilities().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(caps))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NativeMigrationStartRequest {
+    /// QEMU migration URI, e.g. `tcp:10.0.0.2:4444` or `unix:/run/mig.sock`.
+    pub target_uri: String,
+    #[serde(default)]
+    pub mode: Option<String>,
+    #[serde(default)]
+    pub bandwidth_mbps: Option<u64>,
+    #[serde(default)]
+    pub max_downtime_ms: Option<u64>,
+    #[serde(default)]
+    pub multifd_channels: Option<u8>,
+    /// Required when FluxVM advertises `requiresSharedStorage`.
+    #[serde(default)]
+    pub shared_storage_confirmed: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NativeMigrationStatusResponse {
+    pub vm_name: String,
+    pub phase: String,
+    pub status: String,
+    pub progress_percent: u8,
+    pub ram_transferred: Option<u64>,
+    pub ram_remaining: Option<u64>,
+    pub ram_total: Option<u64>,
+    pub total_time_ms: Option<u64>,
+    pub downtime_ms: Option<u64>,
+    pub error: Option<String>,
+}
+
+fn native_status_response(
+    vm_name: &str,
+    status: zyvor_fabric_fluxvm_client::MigrationStatus,
+) -> NativeMigrationStatusResponse {
+    use zyvor_fabric_fluxvm_client::MigrationPhase;
+    let progress = migration::progress_percent(&status);
+    let phase = match status.phase {
+        MigrationPhase::None => "none",
+        MigrationPhase::Setup => "setup",
+        MigrationPhase::Active => "active",
+        MigrationPhase::PostcopyActive => "postcopy-active",
+        MigrationPhase::Completed => "completed",
+        MigrationPhase::Failed => "failed",
+        MigrationPhase::Cancelled => "cancelled",
+        MigrationPhase::Unknown => "unknown",
+    };
+    NativeMigrationStatusResponse {
+        vm_name: vm_name.to_string(),
+        phase: phase.to_string(),
+        status: status.status,
+        progress_percent: progress,
+        ram_transferred: status.ram_transferred,
+        ram_remaining: status.ram_remaining,
+        ram_total: status.ram_total,
+        total_time_ms: status.total_time_ms,
+        downtime_ms: status.downtime_ms,
+        error: status.error,
+    }
+}
+
+fn parse_mode(
+    raw: Option<&str>,
+) -> Result<zyvor_fabric_fluxvm_client::MigrationMode, (StatusCode, Json<serde_json::Value>)> {
+    match raw.unwrap_or("pre-copy").to_ascii_lowercase().as_str() {
+        "pre-copy" | "precopy" | "pre_copy" => Ok(zyvor_fabric_fluxvm_client::MigrationMode::PreCopy),
+        "post-copy" | "postcopy" | "post_copy" => {
+            Ok(zyvor_fabric_fluxvm_client::MigrationMode::PostCopy)
+        }
+        other => Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("unsupported migration mode '{other}'") })),
+        )),
+    }
+}
+
+/// POST /api/vms/{name}/migration/native/start
+pub async fn start_native_migration(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<NativeMigrationStartRequest>,
+) -> Result<Json<NativeMigrationStatusResponse>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name)
+        .map_err(|(_status, msg)| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
+    if req.target_uri.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "target_uri is required (e.g. tcp:host:port)" })),
+        ));
+    }
+    let options = migration::NativeMigrationOptions {
+        mode: parse_mode(req.mode.as_deref())?,
+        bandwidth_mbps: req.bandwidth_mbps,
+        max_downtime_ms: req.max_downtime_ms.or(Some(300)),
+        multifd_channels: req.multifd_channels.or(Some(4)),
+        shared_storage_confirmed: req.shared_storage_confirmed,
+    };
+    let mgr = runtime_mgr(&state)?;
+    let status = mgr
+        .start_prepared_target(&name, req.target_uri.trim(), &options)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+    tracing::info!(
+        vm = %name,
+        uri = %req.target_uri,
+        "Started native FluxVM migration transport"
+    );
+    Ok(Json(native_status_response(&name, status)))
+}
+
+/// GET /api/vms/{name}/migration/native/status
+pub async fn native_migration_status(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<NativeMigrationStatusResponse>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name)
+        .map_err(|(_status, msg)| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
+    let mgr = runtime_mgr(&state)?;
+    let status = mgr.status(&name).await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(native_status_response(&name, status)))
+}
+
+/// POST /api/vms/{name}/migration/native/cancel
+pub async fn cancel_native_migration(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<NativeMigrationStatusResponse>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name)
+        .map_err(|(_status, msg)| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
+    let mgr = runtime_mgr(&state)?;
+    let status = mgr.cancel(&name).await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(native_status_response(&name, status)))
+}

@@ -47,6 +47,8 @@ tpm-support = { path = "../tpm-support" }
 prometheus-exporter = { path = "../prometheus-exporter" }
 zyvor-fabric-driver-core = { path = "../crates/driver-core" }
 zyvor-fabric-fluxvm-driver = { path = "../crates/fluxvm-driver" }
+zyvor-fabric-fluxvm-client = { path = "../crates/fluxvm-client" }
+service-lb = { path = "../service-lb" }
 zyvor-fabric-storage = { path = "../crates/storage" }
 zyvor-fabric-system = { path = "../crates/system" }
 zyvor-fabric-vm = { path = "../crates/vm" }

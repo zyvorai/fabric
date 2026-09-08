@@ -362,19 +362,46 @@ pub async fn upsert_service(
     State(state): State<Arc<AppState>>,
     Json(service): Json<NetworkServiceSpec>,
 ) -> Result<Json<NetworkServiceStatus>, (StatusCode, Json<serde_json::Value>)> {
-    let saved = state
-        .driver
-        .dataplane_upsert_service(&service)
-        .await
-        .map_err(|e| {
+    let spec = to_service_lb_spec(&service)?;
+    let nodes = service_nodes(&state);
+    let orch = service_lb::ServiceOrchestrator::new(
+        service_lb::FluxVmHttpClient::new().map_err(|e| {
             map_driver_err(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to upsert dataplane service '{}'", service.name),
+                "service-lb client",
                 e,
             )
-        })?;
-    tracing::info!("Upserted edge dataplane service '{}'", saved.name);
-    Ok(Json(saved))
+        })?,
+    );
+    let report = orch.apply(&spec, &nodes).await.map_err(|e| {
+        map_driver_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Failed to upsert dataplane service '{}'", service.name),
+            e,
+        )
+    })?;
+    tracing::info!(
+        service = %report.service,
+        nodes = ?report.applied_nodes,
+        "Upserted Maglev service via service-lb"
+    );
+    // Return status from the primary (local) FluxVM node for UI counters.
+    let saved = state
+        .driver
+        .dataplane_get_service(&service.name)
+        .await
+        .ok();
+    let active = saved
+        .as_ref()
+        .map(|s| s.backends.iter().filter(|b| b.enabled).count())
+        .unwrap_or_else(|| service.backends.iter().filter(|b| b.enabled).count());
+    Ok(Json(NetworkServiceStatus {
+        schema_version: 1,
+        service_id: 0,
+        name: service.name,
+        active_backends: active,
+        maglev_table_size: service.maglev_table_size.unwrap_or(4093),
+    }))
 }
 
 /// DELETE /api/dataplane/services/:name
@@ -383,18 +410,94 @@ pub async fn delete_service(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<DeletedResponse>, (StatusCode, Json<serde_json::Value>)> {
-    state
-        .driver
-        .dataplane_delete_service(&name)
-        .await
-        .map_err(|e| {
+    let nodes = service_nodes(&state);
+    let orch = service_lb::ServiceOrchestrator::new(
+        service_lb::FluxVmHttpClient::new().map_err(|e| {
             map_driver_err(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to delete dataplane service '{name}'"),
+                "service-lb client",
                 e,
             )
-        })?;
+        })?,
+    );
+    let report = orch.delete(&name, &nodes).await.map_err(|e| {
+        map_driver_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Failed to delete dataplane service '{name}'"),
+            e,
+        )
+    })?;
+    tracing::info!(
+        service = %name,
+        nodes = ?report.applied_nodes,
+        "Deleted Maglev service via service-lb"
+    );
     Ok(Json(DeletedResponse { deleted: name }))
+}
+
+fn service_nodes(state: &AppState) -> Vec<service_lb::NodeTarget> {
+    let mut nodes = vec![service_lb::NodeTarget {
+        name: "local".into(),
+        base_url: state.config.driver.fluxvm_url.clone(),
+        token: state.config.driver.fluxvm_token.clone(),
+    }];
+    for n in &state.config.driver.fluxvm_nodes {
+        nodes.push(service_lb::NodeTarget {
+            name: n.name.clone(),
+            base_url: n.url.clone(),
+            token: n.token.clone().or_else(|| state.config.driver.fluxvm_token.clone()),
+        });
+    }
+    nodes
+}
+
+fn to_service_lb_spec(
+    service: &NetworkServiceSpec,
+) -> Result<service_lb::ServiceSpec, (StatusCode, Json<serde_json::Value>)> {
+    use std::net::Ipv4Addr;
+    use service_lb::{ServiceAlgorithm, ServiceBackend, ServiceMode, ServiceProtocol};
+
+    let vip: Ipv4Addr = service.vip.parse().map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": format!("invalid VIP '{}'", service.vip) })),
+        )
+    })?;
+    let protocol = match service.protocol {
+        zyvor_fabric_driver_core::NetworkServiceProtocol::Tcp => ServiceProtocol::Tcp,
+        zyvor_fabric_driver_core::NetworkServiceProtocol::Udp => ServiceProtocol::Udp,
+    };
+    let mode = match service.mode {
+        zyvor_fabric_driver_core::NetworkServiceMode::Nat => ServiceMode::Nat,
+        zyvor_fabric_driver_core::NetworkServiceMode::Dsr => ServiceMode::Dsr,
+    };
+    let mut backends = Vec::with_capacity(service.backends.len());
+    for b in &service.backends {
+        let address: Ipv4Addr = b.address.parse().map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": format!("invalid backend address '{}'", b.address)
+                })),
+            )
+        })?;
+        backends.push(ServiceBackend {
+            address,
+            port: b.port,
+            weight: b.weight,
+            enabled: b.enabled,
+        });
+    }
+    Ok(service_lb::ServiceSpec {
+        name: service.name.clone(),
+        vip,
+        port: service.port,
+        protocol,
+        algorithm: ServiceAlgorithm::Maglev,
+        mode,
+        backends,
+        maglev_table_size: service.maglev_table_size,
+    })
 }
 
 /// GET /api/dataplane/cnp

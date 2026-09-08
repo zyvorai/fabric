@@ -72,6 +72,10 @@ pub struct DriverConfig {
     /// configured. Leave unset against a deployment with auth disabled.
     #[serde(default)]
     pub fluxvm_token: Option<String>,
+    /// Extra FluxVM nodes for Maglev service fan-out via `service-lb`.
+    /// When empty, Fabric applies services only to `fluxvm_url`.
+    #[serde(default)]
+    pub fluxvm_nodes: Vec<FluxVmNodeConfig>,
     /// Prometheus text scrape URL for FluxVM MicroVM histograms
     /// (`MICROVM_METRICS_ADDR`, default `http://127.0.0.1:9108/metrics`).
     /// Set to `off` to disable the Fabric proxy.
@@ -79,11 +83,21 @@ pub struct DriverConfig {
     pub microvm_metrics_url: Option<String>,
 }
 
+/// Optional additional FluxVM node for Service Fabric fan-out.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FluxVmNodeConfig {
+    pub name: String,
+    pub url: String,
+    #[serde(default)]
+    pub token: Option<String>,
+}
+
 impl Default for DriverConfig {
     fn default() -> Self {
         Self {
             fluxvm_url: default_fluxvm_url(),
             fluxvm_token: None,
+            fluxvm_nodes: Vec::new(),
             microvm_metrics_url: default_microvm_metrics_url(),
         }
     }

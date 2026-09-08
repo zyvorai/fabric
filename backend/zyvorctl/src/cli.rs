@@ -155,6 +155,10 @@ enum Commands {
     /// Manage networkd bridges, VLANs, bonds, taps, port-forwards
     #[command(subcommand)]
     Net(NetCmd),
+
+    /// FluxVM runtime contract (capabilities + native migration)
+    #[command(subcommand)]
+    Runtime(RuntimeCmd),
 }
 
 // ─── Sub-command enums ───────────────────────────────────────────────────────
@@ -612,6 +616,36 @@ enum NetCmd {
     Reload,
     /// Show link status
     Links,
+}
+
+#[derive(Subcommand)]
+enum RuntimeCmd {
+    /// Show FluxVM `/v1/runtime/capabilities` via Fabric proxy
+    Capabilities,
+    /// Native FluxVM migration transport (prepared-target / source-side)
+    #[command(subcommand)]
+    Migrate(RuntimeMigrateCmd),
+}
+
+#[derive(Subcommand)]
+enum RuntimeMigrateCmd {
+    /// Start source-side migration to a prepared URI
+    Start {
+        name: String,
+        /// QEMU migration URI, e.g. tcp:10.0.0.2:4444
+        #[arg(long)]
+        uri: String,
+        #[arg(long, default_value = "pre-copy")]
+        mode: String,
+        #[arg(long)]
+        shared_storage: bool,
+        #[arg(long)]
+        bandwidth_mbps: Option<u64>,
+        #[arg(long)]
+        multifd_channels: Option<u8>,
+    },
+    Status { name: String },
+    Cancel { name: String },
 }
 
 // ─── Table row types ─────────────────────────────────────────────────────────
@@ -1843,6 +1877,60 @@ impl Cli {
                     let val = api_get(&client, "/networkd/links").await?;
                     print_value(&val, fmt);
                 }
+            },
+
+            Commands::Runtime(cmd) => match cmd {
+                RuntimeCmd::Capabilities => {
+                    let val = api_get(&client, "/runtime/capabilities").await?;
+                    print_value(&val, fmt);
+                }
+                RuntimeCmd::Migrate(m) => match m {
+                    RuntimeMigrateCmd::Start {
+                        name,
+                        uri,
+                        mode,
+                        shared_storage,
+                        bandwidth_mbps,
+                        multifd_channels,
+                    } => {
+                        let body = serde_json::json!({
+                            "target_uri": uri,
+                            "mode": mode,
+                            "shared_storage_confirmed": shared_storage,
+                            "bandwidth_mbps": bandwidth_mbps,
+                            "multifd_channels": multifd_channels,
+                        });
+                        let val = api_post(
+                            &client,
+                            &format!("/vms/{}/migration/native/start", name),
+                            &body,
+                        )
+                        .await?;
+                        println!("Started native migration for '{}'", name);
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    RuntimeMigrateCmd::Status { name } => {
+                        let val = api_get(
+                            &client,
+                            &format!("/vms/{}/migration/native/status", name),
+                        )
+                        .await?;
+                        print_value(&val, fmt);
+                    }
+                    RuntimeMigrateCmd::Cancel { name } => {
+                        let val = api_post_empty(
+                            &client,
+                            &format!("/vms/{}/migration/native/cancel", name),
+                        )
+                        .await?;
+                        println!("Cancelled native migration for '{}'", name);
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                },
             },
         }
 

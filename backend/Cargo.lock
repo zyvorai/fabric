@@ -1792,19 +1792,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
-name = "service-lb"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "migration"
 version = "0.2.1"
 dependencies = [
@@ -1815,7 +1802,7 @@ dependencies = [
  "tracing",
  "zyvor-fabric-driver-core",
  "zyvor-fabric-fluxvm-client",
-] # ZYVOR_RUNTIME_BOUNDARY_V1
+]
 
 [[package]]
 name = "mime"
@@ -3034,6 +3021,19 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "service-lb"
+version = "0.2.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4668,6 +4668,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "service-lb",
  "service-mesh",
  "sha2",
  "site-recovery",
@@ -4691,6 +4692,7 @@ dependencies = [
  "vpn-mesh",
  "zyvor-fabric-dnsmasq-manager",
  "zyvor-fabric-driver-core",
+ "zyvor-fabric-fluxvm-client",
  "zyvor-fabric-fluxvm-driver",
  "zyvor-fabric-lock-manager",
  "zyvor-fabric-storage",

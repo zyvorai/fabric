@@ -7,9 +7,15 @@ import {
   listMigrations,
   startMigration,
   cancelMigration,
+  getRuntimeCapabilities,
+  startNativeMigration,
+  getNativeMigrationStatus,
+  cancelNativeMigration,
   MigrationStatus,
   MigrationRequest,
   MigrationType,
+  RuntimeCapabilities,
+  NativeMigrationStatus,
 } from '../api/migrations'
 import { listVMs, VM } from '../api/vm'
 import { useToastContext } from '../contexts/ToastContext'
@@ -21,25 +27,82 @@ import { useConfirm } from '../hooks/useConfirm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader } from '../components/ui'
 
+const NATIVE_TRACK_KEY = 'zyvor.nativeMigrations'
+
+function loadTrackedNativeVms(): string[] {
+  try {
+    const raw = sessionStorage.getItem(NATIVE_TRACK_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveTrackedNativeVms(names: string[]) {
+  sessionStorage.setItem(NATIVE_TRACK_KEY, JSON.stringify([...new Set(names)]))
+}
+
+function isNativeTerminal(phase: string) {
+  return ['completed', 'failed', 'cancelled', 'none'].includes(phase)
+}
+
 export default function Migrations() {
   const toast = useToastContext()
   const { confirmState, confirm, cancel } = useConfirm()
   const [migrations, setMigrations] = useState<MigrationStatus[]>([])
+  const [nativeStatuses, setNativeStatuses] = useState<NativeMigrationStatus[]>([])
+  const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null)
+  const [capsError, setCapsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showStartDialog, setShowStartDialog] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
-    void loadMigrations(false)
-    const interval = setInterval(() => void loadMigrations(true), 5000)
+    void loadAll(false)
+    const interval = setInterval(() => void loadAll(true), 5000)
     return () => clearInterval(interval)
   }, [])
 
-  const loadMigrations = async (silent = false) => {
+  const loadNative = async () => {
+    const tracked = loadTrackedNativeVms()
+    if (tracked.length === 0) {
+      setNativeStatuses([])
+      return
+    }
+    const results: NativeMigrationStatus[] = []
+    await Promise.all(
+      tracked.map(async (name) => {
+        try {
+          results.push(await getNativeMigrationStatus(name))
+        } catch {
+          // Drop VMs with no migration session.
+        }
+      }),
+    )
+    setNativeStatuses(results)
+    saveTrackedNativeVms(
+      results.filter((r) => !isNativeTerminal(r.phase)).map((r) => r.vm_name),
+    )
+  }
+
+  const loadAll = async (silent = false) => {
     if (!silent) setLoadError(null)
     try {
-      const data = await listMigrations()
+      const [data, caps] = await Promise.all([
+        listMigrations(),
+        getRuntimeCapabilities().catch((e) => {
+          setCapsError(formatUserError(e))
+          return null
+        }),
+      ])
       setMigrations(data)
+      if (caps) {
+        setCapabilities(caps)
+        setCapsError(null)
+      }
+      await loadNative()
       setLoadError(null)
     } catch (error) {
       const msg = formatUserError(error)
@@ -57,9 +120,20 @@ export default function Migrations() {
     try {
       await cancelMigration(id)
       toast.success('Migration cancelled')
-      loadMigrations()
+      void loadAll(true)
     } catch (error) {
       toastFailure(toast, 'Failed to cancel migration', error)
+    }
+  }
+
+  const handleCancelNative = async (vmName: string) => {
+    if (!await confirm('Cancel Native Migration', `Cancel FluxVM migration transport for '${vmName}'?`, { variant: 'danger', confirmLabel: 'Cancel Migration' })) return
+    try {
+      await cancelNativeMigration(vmName)
+      toast.success('Native migration cancelled')
+      void loadAll(true)
+    } catch (error) {
+      toastFailure(toast, 'Failed to cancel native migration', error)
     }
   }
 
@@ -77,6 +151,8 @@ export default function Migrations() {
   const completedMigrations = migrations.filter(m =>
     ['completed', 'failed', 'cancelled'].includes(m.state)
   )
+  const activeNative = nativeStatuses.filter((s) => !isNativeTerminal(s.phase))
+  const liveCap = capabilities?.migration.find((m) => m.live)
 
   return (
     <div className="space-y-6">
@@ -85,13 +161,13 @@ export default function Migrations() {
           title="Could not load migrations"
           headline={loadError}
           hints={hintsForError(loadError)}
-          onRetry={loadMigrations}
+          onRetry={() => void loadAll()}
         />
       )}
       <PageHeader
         title="Migrations"
         description="Move VMs between hosts for load balancing or maintenance"
-        onRefresh={() => void loadMigrations()}
+        onRefresh={() => void loadAll()}
         primaryAction={
           <button
             onClick={() => setShowStartDialog(true)}
@@ -103,7 +179,51 @@ export default function Migrations() {
         }
       />
 
-      {/* Active Migrations */}
+      <div className="bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)] p-4 space-y-2">
+        <h2 className="text-sm font-semibold text-[var(--zf-ink)]">FluxVM runtime capabilities</h2>
+        {capsError && !capabilities && (
+          <p className="text-sm text-red-700">{capsError}</p>
+        )}
+        {capabilities && (
+          <div className="text-sm text-[var(--zf-muted)] space-y-1">
+            <p>
+              Contract <span className="font-mono text-[var(--zf-ink)]">{capabilities.apiVersion}</span>
+              {' '}· scope <span className="font-mono">{capabilities.scope}</span>
+              {' '}· orchestrator <span className="font-mono">{capabilities.orchestrationOwner}</span>
+            </p>
+            {liveCap ? (
+              <p>
+                Live migration: {liveCap.backend}
+                {liveCap.preCopy ? ' · pre-copy' : ''}
+                {liveCap.postCopy ? ' · post-copy' : ''}
+                {liveCap.multifd ? ' · multifd' : ''}
+                {' · transports '}
+                <span className="font-mono">{liveCap.transports.join(', ') || 'none'}</span>
+                {liveCap.requiresSharedStorage ? ' · requires shared storage' : ''}
+              </p>
+            ) : (
+              <p>No live migration capability advertised by this FluxVM node.</p>
+            )}
+            <p className="text-xs">
+              Source-side transport only — target receiver arming is Phase 2; not marketed as GA.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {activeNative.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Active native (FluxVM) migrations</h2>
+          {activeNative.map((status) => (
+            <NativeMigrationCard
+              key={status.vm_name}
+              status={status}
+              onCancel={() => void handleCancelNative(status.vm_name)}
+            />
+          ))}
+        </div>
+      )}
+
       {activeMigrations.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Active Migrations</h2>
@@ -111,16 +231,15 @@ export default function Migrations() {
             <MigrationCard
               key={migration.id}
               migration={migration}
-              onCancel={() => handleCancel(migration.id)}
+              onCancel={() => void handleCancel(migration.id)}
             />
           ))}
         </div>
       )}
 
-      {/* Migration History */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Migration History</h2>
-        {completedMigrations.length === 0 && activeMigrations.length === 0 ? (
+        {completedMigrations.length === 0 && activeMigrations.length === 0 && activeNative.length === 0 ? (
           <div className="text-center py-12 bg-[var(--zf-surface)] rounded-lg border border-[var(--zf-hairline)]">
             <ArrowRightLeft className="w-16 h-16 mx-auto mb-4 text-[var(--zf-muted)]" />
             <p className="text-xl text-[var(--zf-muted)] mb-4">No migrations yet</p>
@@ -168,11 +287,16 @@ export default function Migrations() {
 
       {showStartDialog && (
         <StartMigrationDialog
+          capabilities={capabilities}
           onClose={() => setShowStartDialog(false)}
-          onSuccess={() => {
-            toast.success('Migration started')
+          onSuccess={(nativeVm?: string) => {
+            toast.success(nativeVm ? 'Native migration started' : 'Migration started')
             setShowStartDialog(false)
-            loadMigrations()
+            if (nativeVm) {
+              const tracked = loadTrackedNativeVms()
+              saveTrackedNativeVms([...tracked, nativeVm])
+            }
+            void loadAll(true)
           }}
         />
       )}
@@ -197,6 +321,9 @@ function StatusBadge({ state }: { state: string }) {
     precheck: 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
     syncing: 'text-amber-800 bg-amber-50 border-amber-200',
     switching: 'text-amber-800 bg-amber-50 border-amber-200',
+    active: 'text-amber-800 bg-amber-50 border-amber-200',
+    setup: 'text-[var(--zf-link)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
+    'postcopy-active': 'text-amber-800 bg-amber-50 border-amber-200',
     completed: 'text-emerald-700 bg-emerald-50 border-emerald-200',
     failed: 'text-red-700 bg-red-50 border-red-200',
     cancelled: 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]',
@@ -239,7 +366,6 @@ function MigrationCard({
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="w-full bg-[var(--zf-canvas)] rounded-full h-2 mb-2">
         <div
           className="bg-[var(--zf-link)] h-2 rounded-full transition-all duration-500"
@@ -262,19 +388,73 @@ function MigrationCard({
   )
 }
 
+function NativeMigrationCard({
+  status,
+  onCancel,
+}: {
+  status: NativeMigrationStatus
+  onCancel: () => void
+}) {
+  const transferred = status.ram_transferred ?? 0
+  return (
+    <div className="bg-[var(--zf-surface)] rounded-lg p-6 border border-[var(--zf-hairline)]">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-bold">{status.vm_name}</h3>
+          <p className="text-sm text-[var(--zf-muted)]">
+            Native FluxVM transport · {status.status}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <StatusBadge state={status.phase} />
+          <button onClick={onCancel} className="zf-btn zf-btn-danger zf-btn-sm">
+            <XCircle className="w-4 h-4" />
+            Cancel
+          </button>
+        </div>
+      </div>
+      <div className="w-full bg-[var(--zf-canvas)] rounded-full h-2 mb-2">
+        <div
+          className="bg-[var(--zf-link)] h-2 rounded-full transition-all duration-500"
+          style={{ width: `${status.progress_percent}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-xs text-[var(--zf-muted)]">
+        <span>{status.progress_percent}% complete</span>
+        {transferred > 0 && (
+          <span>{(transferred / (1024 * 1024)).toFixed(1)} MB RAM transferred</span>
+        )}
+      </div>
+      {status.error && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          {status.error}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StartMigrationDialog({
+  capabilities,
   onClose,
   onSuccess,
 }: {
+  capabilities: RuntimeCapabilities | null
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (nativeVm?: string) => void
 }) {
   const toast = useToastContext()
   const [vms, setVMs] = useState<VM[]>([])
   const [vmName, setVmName] = useState('')
   const [targetHost, setTargetHost] = useState('')
+  const [targetUri, setTargetUri] = useState('')
   const [migrationType, setMigrationType] = useState<MigrationType>('offline')
+  const [mode, setMode] = useState('pre-copy')
+  const [sharedStorage, setSharedStorage] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
+
+  const liveCap = capabilities?.migration.find((m) => m.live)
+  const needsShared = !!liveCap?.requiresSharedStorage
 
   useEffect(() => {
     listVMs()
@@ -283,20 +463,42 @@ function StartMigrationDialog({
   }, [toast])
 
   const handleStart = async () => {
-    if (!vmName || !targetHost.trim()) {
-      toast.error('Please select a VM and enter a target host')
+    if (!vmName) {
+      toast.error('Please select a VM')
       return
     }
 
     setIsStarting(true)
     try {
-      const req: MigrationRequest = {
-        vm_name: vmName,
-        target_host: targetHost,
-        migration_type: migrationType,
+      if (migrationType === 'live') {
+        if (!targetUri.trim()) {
+          toast.error('Enter a migration URI (e.g. tcp:10.0.0.2:4444)')
+          return
+        }
+        if (needsShared && !sharedStorage) {
+          toast.error('Confirm shared storage before starting live migration')
+          return
+        }
+        await startNativeMigration(vmName, {
+          target_uri: targetUri.trim(),
+          mode,
+          shared_storage_confirmed: sharedStorage,
+          multifd_channels: liveCap?.multifd ? 4 : 1,
+        })
+        onSuccess(vmName)
+      } else {
+        if (!targetHost.trim()) {
+          toast.error('Please enter a target host')
+          return
+        }
+        const req: MigrationRequest = {
+          vm_name: vmName,
+          target_host: targetHost,
+          migration_type: migrationType,
+        }
+        await startMigration(req)
+        onSuccess()
       }
-      await startMigration(req)
-      onSuccess()
     } catch (error) {
       toastFailure(toast, 'Failed to start migration', error)
     } finally {
@@ -330,17 +532,6 @@ function StartMigrationDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">Target Host</label>
-            <input
-              type="text"
-              value={targetHost}
-              onChange={(e) => setTargetHost(e.target.value)}
-              placeholder="hostname or IP address"
-              className="input-field"
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">Migration Type</label>
             <select
               value={migrationType}
@@ -348,10 +539,66 @@ function StartMigrationDialog({
               className="input-field"
             >
               <option value="offline">Offline - Stop VM, copy data, start on target</option>
-              <option value="live">Live - Minimal downtime migration</option>
+              <option value="live">Live - FluxVM native transport (prepared target)</option>
               <option value="storage">Storage - Migrate storage volumes only</option>
             </select>
           </div>
+
+          {migrationType === 'live' ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">
+                  Target URI
+                </label>
+                <input
+                  type="text"
+                  value={targetUri}
+                  onChange={(e) => setTargetUri(e.target.value)}
+                  placeholder="tcp:10.0.0.2:4444"
+                  className="input-field font-mono"
+                />
+                {liveCap && (
+                  <p className="mt-1 text-xs text-[var(--zf-muted)]">
+                    Transports: {liveCap.transports.join(', ') || 'none'}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">Mode</label>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="pre-copy">Pre-copy</option>
+                  {liveCap?.postCopy && <option value="post-copy">Post-copy</option>}
+                </select>
+              </div>
+              <label className="flex items-start gap-2 text-sm text-[var(--zf-ink)]">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={sharedStorage}
+                  onChange={(e) => setSharedStorage(e.target.checked)}
+                />
+                <span>
+                  Shared storage confirmed
+                  {needsShared ? ' (required by this FluxVM node)' : ' (optional)'}
+                </span>
+              </label>
+            </>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-[var(--zf-ink)] mb-2">Target Host</label>
+              <input
+                type="text"
+                value={targetHost}
+                onChange={(e) => setTargetHost(e.target.value)}
+                placeholder="hostname or IP address"
+                className="input-field"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 p-6 border-t border-[var(--zf-hairline)]">
@@ -363,7 +610,7 @@ function StartMigrationDialog({
             Cancel
           </button>
           <button
-            onClick={handleStart}
+            onClick={() => void handleStart()}
             disabled={isStarting}
             className="zf-btn zf-btn-primary"
           >
