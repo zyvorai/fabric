@@ -503,6 +503,12 @@ pub struct NetworkServiceSpec {
     /// Opt-in FIB host-routing fast path after NAT (fallback to host stack).
     #[serde(default)]
     pub host_routing: bool,
+    /// Optional site fence for multi-site anycast / policy fan-out (Fabric service-lb).
+    #[serde(default)]
+    pub site_id: Option<String>,
+    /// Optional route domain; defaults with `site_id` to `"default"` in service-lb.
+    #[serde(default)]
+    pub route_domain: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

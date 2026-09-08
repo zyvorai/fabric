@@ -1,10 +1,11 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! Distributed Service Fabric v6 identity/L7 policy orchestration.
+//! Distributed Service Fabric v6+ identity/L7 policy orchestration.
 //! Fabric owns fan-out and rollback; FluxVM owns the local compiler/BPF maps.
+//! Optional site_id / route_domain scoping fences multi-site policy apply.
 
-use crate::NodeTarget;
+use crate::{domain_key, EdgeLease, NodeTarget, ServiceSpec};
 use anyhow::{bail, Context, Result};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -295,19 +296,51 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
         spec: &ServicePolicySpec,
         nodes: &[NodeTarget],
     ) -> Result<PolicyApplyReport> {
+        // Back-compat: no site fencing → fan out to every node.
+        self.apply_with_site(spec, nodes, None, None, &[], 0).await
+    }
+
+    /// Apply identity/L7 policy with optional multi-site fencing.
+    ///
+    /// When `site_id` (or `route_domain`) is set, only nodes that hold an
+    /// active owning-domain [`EdgeLease`] receive the policy. Unset site
+    /// fields keep the legacy all-nodes fan-out.
+    ///
+    /// Unresolved remote identities: FluxVM compiles allow/deny lists against
+    /// the node-local ipcache. Identities that cannot be resolved on a node
+    /// remain fail-closed there (`unresolved_identities` on
+    /// [`ServicePolicyStatus`]); Fabric does not invent cross-site identity
+    /// sync or ClusterMesh datapath. Callers must treat unresolved entries as
+    /// deny until the remote identity is present in that node's ipcache.
+    pub async fn apply_with_site(
+        &self,
+        spec: &ServicePolicySpec,
+        nodes: &[NodeTarget],
+        site_id: Option<&str>,
+        route_domain: Option<&str>,
+        leases: &[EdgeLease],
+        now_unix_ms: u64,
+    ) -> Result<PolicyApplyReport> {
         validate_policy(spec)?;
         if nodes.is_empty() {
             bail!("policy apply requires at least one FluxVM node");
         }
-        let mut before = Vec::with_capacity(nodes.len());
-        for node in nodes {
+        let targets =
+            policy_fanout_nodes(&spec.service, nodes, site_id, route_domain, leases, now_unix_ms);
+        if targets.is_empty() {
+            bail!("policy apply has no nodes in the owning site/route-domain");
+        }
+        let mut before = Vec::with_capacity(targets.len());
+        for node in &targets {
             before.push((
-                node.clone(),
+                (*node).clone(),
                 self.client.get_policy(node, &spec.service).await?,
             ));
         }
         let mut applied = Vec::new();
-        for node in nodes {
+        for node in &targets {
+            // See apply_with_site docs: unresolved identities stay fail-closed
+            // on the FluxVM node; status.unresolved_identities is informational.
             if let Err(e) = self.client.upsert_policy(node, spec).await {
                 let rolled = self.rollback(&spec.service, &applied, &before).await;
                 bail!(
@@ -317,13 +350,33 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
                     rolled
                 );
             }
-            applied.push(node.clone());
+            applied.push((*node).clone());
         }
         Ok(PolicyApplyReport {
             service: spec.service.clone(),
             applied_nodes: applied.into_iter().map(|n| n.name).collect(),
             rolled_back_nodes: Vec::new(),
         })
+    }
+
+    /// Convenience: scope policy fan-out from a [`ServiceSpec`]'s site fields.
+    pub async fn apply_for_service(
+        &self,
+        policy: &ServicePolicySpec,
+        service: &ServiceSpec,
+        nodes: &[NodeTarget],
+        leases: &[EdgeLease],
+        now_unix_ms: u64,
+    ) -> Result<PolicyApplyReport> {
+        self.apply_with_site(
+            policy,
+            nodes,
+            service.site_id.as_deref(),
+            service.route_domain.as_deref(),
+            leases,
+            now_unix_ms,
+        )
+        .await
     }
 
     pub async fn delete(&self, service: &str, nodes: &[NodeTarget]) -> Result<PolicyApplyReport> {
@@ -378,6 +431,37 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
         }
         rolled
     }
+}
+
+/// Select nodes for identity policy fan-out.
+///
+/// Missing `site_id` and `route_domain` → every node (single-site back-compat).
+/// When either is set, only nodes with an active lease in that owning domain
+/// for `service` are targeted.
+fn policy_fanout_nodes<'a>(
+    service: &str,
+    nodes: &'a [NodeTarget],
+    site_id: Option<&str>,
+    route_domain: Option<&str>,
+    leases: &[EdgeLease],
+    now_unix_ms: u64,
+) -> Vec<&'a NodeTarget> {
+    if site_id.is_none() && route_domain.is_none() {
+        return nodes.iter().collect();
+    }
+    let want = domain_key(site_id, route_domain);
+    let leased: HashSet<&str> = leases
+        .iter()
+        .filter(|lease| lease.active(service, now_unix_ms))
+        .filter(|lease| {
+            domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref()) == want
+        })
+        .map(|lease| lease.node.as_str())
+        .collect();
+    nodes
+        .iter()
+        .filter(|node| leased.contains(node.name.as_str()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -486,5 +570,65 @@ mod tests {
         };
         assert!(orch.apply(&spec, &nodes).await.is_err());
         assert!(fake.state.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn site_scoped_policy_fans_out_only_matching_leases() {
+        let fake = Fake::default();
+        let orch = PolicyOrchestrator::new(fake.clone());
+        let nodes = vec![
+            NodeTarget {
+                name: "a".into(),
+                base_url: "http://a".into(),
+                token: None,
+            },
+            NodeTarget {
+                name: "b".into(),
+                base_url: "http://b".into(),
+                token: None,
+            },
+        ];
+        let policy = ServicePolicySpec {
+            service: "web".into(),
+            enabled: true,
+            default_action: PolicyDefaultAction::Deny,
+            allow_identities: vec![1],
+            deny_identities: vec![],
+            audit_only: false,
+            l7: None,
+        };
+        let leases = vec![
+            EdgeLease {
+                service: "web".into(),
+                node: "a".into(),
+                epoch: 1,
+                expires_unix_ms: 200,
+                site_id: Some("site-a".into()),
+                route_domain: Some("rd-1".into()),
+            },
+            EdgeLease {
+                service: "web".into(),
+                node: "b".into(),
+                epoch: 1,
+                expires_unix_ms: 200,
+                site_id: Some("site-b".into()),
+                route_domain: Some("rd-2".into()),
+            },
+        ];
+        let report = orch
+            .apply_with_site(
+                &policy,
+                &nodes,
+                Some("site-a"),
+                Some("rd-1"),
+                &leases,
+                100,
+            )
+            .await
+            .unwrap();
+        assert_eq!(report.applied_nodes, vec!["a"]);
+        let state = fake.state.lock().unwrap();
+        assert!(state.contains_key("a|web"));
+        assert!(!state.contains_key("b|web"));
     }
 }

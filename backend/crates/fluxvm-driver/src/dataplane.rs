@@ -169,6 +169,9 @@ fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
         max_egress_mbps: s.max_egress_mbps,
         flow_sample_rate: s.flow_sample_rate,
         host_routing: s.host_routing,
+        // Fabric-only multi-site fencing; FluxVM does not persist these.
+        site_id: None,
+        route_domain: None,
     }
 }
 

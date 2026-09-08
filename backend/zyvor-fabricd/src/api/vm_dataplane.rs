@@ -526,6 +526,14 @@ pub async fn services_conntrack_gc(
     fluxvm_json_post_empty(&state, "/v1/network/services/conntrack/gc").await
 }
 
+/// POST /api/dataplane/services/pressure/reconcile — adaptive map pressure controller.
+pub async fn services_pressure_reconcile(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_post_empty(&state, "/v1/network/services/pressure/reconcile").await
+}
+
 /// GET /api/dataplane/services/advertisements — VIP advertise snapshot.
 pub async fn services_advertisements(
     RequireRead(_claims): RequireRead,
@@ -806,6 +814,8 @@ fn to_service_lb_spec(
         max_egress_mbps: service.max_egress_mbps,
         flow_sample_rate: service.flow_sample_rate,
         host_routing: service.host_routing,
+        site_id: service.site_id.clone(),
+        route_domain: service.route_domain.clone(),
     })
 }
 

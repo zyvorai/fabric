@@ -1,4 +1,4 @@
-# Fabric ↔ FluxVM Service Fabric v6
+# Fabric ↔ FluxVM Service Fabric v6+
 
 Fabric owns **distributed** service intent; FluxVM owns **node-local** TC/XDP
 execution and maps. Fabric never invokes `bpftool`, `tc`, `ip`, or writes
@@ -6,7 +6,9 @@ execution and maps. Fabric never invokes `bpftool`, `tc`, `ip`, or writes
 
 The **BPF ABI remains schema 4**. **v6** adds identity/L7 service policy and an
 HA mutation queue around that ABI, with **program generation 6** on FluxVM.
-v5 durable leases and sequence/ack HA deltas remain.
+v5 durable leases and sequence/ack HA deltas remain. **v6+** (Fabric) adds
+minimal multi-site anycast fencing via optional `site_id` / `route_domain` on
+service intent and edge leases (default domain when unset).
 
 FluxVM reference: [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) ·
 Boundary: [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md) ·
@@ -15,12 +17,15 @@ FluxVM v6 examples: [service-fabric-v6](https://github.com/zyvorai/fluxvm/tree/m
 Shipped: [phase4](service-fabric-phase4.md) · [phase5](service-fabric-phase5.md) ·
 [phase6](service-fabric-phase6.md).
 
-## Fabric v6 responsibilities
+## Fabric v6+ responsibilities
 
 Everything from v5, plus:
 
 - transactional multi-node **identity / L7 service policy** fan-out (snapshot +
   rollback on partial apply);
+- optional **site/route-domain** fencing for anycast VIP advertise and
+  site-scoped policy fan-out (minimal; full ClusterMesh identity sync remains
+  open — see [phase6](service-fabric-phase6.md));
 - proxy of FluxVM policy and Envoy contract endpoints;
 - HA mutation-queue drain remains on FluxVM; Fabric still drives sequence/ack
   delta replication and full-snapshot fallback.

@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **Service Fabric multi-site fencing** — optional `site_id` / `route_domain` on service
+  intent and edge leases; anycast advertise + policy fan-out scoped to owning domain.
+- **Service Fabric pressure proxy** — `POST /api/dataplane/services/pressure/reconcile`.
 - **Service Fabric v6** — transactional multi-node service identity/L7 policy APIs proxied to FluxVM.
 
 ### Removed

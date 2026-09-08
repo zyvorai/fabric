@@ -1,11 +1,12 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! Fabric orchestration for FluxVM Service Fabric v5.
+//! Fabric orchestration for FluxVM Service Fabric v6+.
 //!
 //! Fabric owns service intent, node selection, rollout and rollback. FluxVM
-//! owns every TC/XDP program and BPF map. v5 adds durable edge leases and
-//! sequence/ack HA delta replication while retaining v4 routing adapters.
+//! owns every TC/XDP program and BPF map. v6+ adds optional multi-site
+//! `site_id` / `route_domain` fencing for anycast VIP advertise and policy
+//! fan-out on top of v5 durable edge leases and sequence/ack HA deltas.
 //! This crate never writes bpffs or invokes `tc`, `ip`, or `bpftool` directly.
 
 pub mod policy;
@@ -142,6 +143,14 @@ pub struct ServiceSpec {
     pub flow_sample_rate: u32,
     #[serde(default)]
     pub host_routing: bool,
+    /// Optional site ownership for multi-site anycast fencing. Missing/`None`
+    /// is treated as the default single-site domain (backward compatible).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site_id: Option<String>,
+    /// Optional route-domain ownership (ClusterMesh-like). Missing/`None` is
+    /// treated as the default domain alongside [`Self::site_id`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route_domain: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -152,20 +161,52 @@ pub struct NodeTarget {
     pub token: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InterfaceOffloadStatus {
+    #[serde(default)]
+    pub gro: Option<bool>,
+    #[serde(default)]
+    pub gso: Option<bool>,
+    #[serde(default)]
+    pub rx_checksumming: Option<bool>,
+    #[serde(default)]
+    pub tx_checksumming: Option<bool>,
+    #[serde(default)]
+    pub combined_channels: Option<u32>,
+    #[serde(default)]
+    pub rx_channels: Option<u32>,
+    #[serde(default)]
+    pub tx_channels: Option<u32>,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HostInterfaceStatus {
     pub interface: String,
     pub tc_program_pinned: bool,
     pub xdp_requested: bool,
     pub xdp_program_pinned: bool,
+    #[serde(default)]
+    pub xdp_mode: String,
+    #[serde(default)]
+    pub offload: InterfaceOffloadStatus,
     pub pin_dir: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HostServiceStatus {
     pub schema_version: u32,
+    #[serde(default)]
+    pub program_generation: u32,
     pub north_south_interfaces: Vec<String>,
     pub xdp_acceleration: bool,
+    #[serde(default)]
+    pub cgroup_connect: bool,
+    #[serde(default)]
+    pub cgroup_connect_attached: bool,
+    #[serde(default)]
+    pub map_tier: String,
     pub interfaces: Vec<HostInterfaceStatus>,
 }
 
@@ -258,12 +299,47 @@ pub struct EdgeLease {
     pub node: String,
     pub epoch: u64,
     pub expires_unix_ms: u64,
+    /// Site that issued this lease; used with [`Self::route_domain`] to fence
+    /// anycast VIP advertise and policy fan-out across sites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route_domain: Option<String>,
 }
 
 impl EdgeLease {
     pub fn active(&self, service: &str, now_unix_ms: u64) -> bool {
         self.service == service && self.expires_unix_ms > now_unix_ms
     }
+}
+
+/// Canonical keys for site/route fencing. Missing values map to `"default"` so
+/// pre-multi-site leases and specs share one single-site domain.
+pub fn domain_key(site_id: Option<&str>, route_domain: Option<&str>) -> (String, String) {
+    (
+        site_id.unwrap_or("default").to_string(),
+        route_domain.unwrap_or("default").to_string(),
+    )
+}
+
+pub fn lease_matches_service_domain(lease: &EdgeLease, spec: &ServiceSpec) -> bool {
+    domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref())
+        == domain_key(spec.site_id.as_deref(), spec.route_domain.as_deref())
+}
+
+/// Active leases that may drive anycast VIP advertise for `spec`.
+pub fn active_domain_leases<'a>(
+    spec: &ServiceSpec,
+    leases: &'a [EdgeLease],
+    now_unix_ms: u64,
+) -> Vec<&'a EdgeLease> {
+    let mut active: Vec<&EdgeLease> = leases
+        .iter()
+        .filter(|lease| lease.active(&spec.name, now_unix_ms))
+        .filter(|lease| lease_matches_service_domain(lease, spec))
+        .collect();
+    active.sort_by(|a, b| a.node.cmp(&b.node));
+    active
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -318,6 +394,19 @@ impl DurableLeaseStore {
         ttl_ms: u64,
         now_unix_ms: u64,
     ) -> Result<EdgeLease> {
+        self.renew_in_domain(service, node, ttl_ms, now_unix_ms, None, None)
+    }
+
+    /// Acquire or replace a lease stamped with optional site/route-domain fencing.
+    pub fn renew_in_domain(
+        &self,
+        service: &str,
+        node: &str,
+        ttl_ms: u64,
+        now_unix_ms: u64,
+        site_id: Option<String>,
+        route_domain: Option<String>,
+    ) -> Result<EdgeLease> {
         validate_name(service)?;
         if node.is_empty() {
             bail!("lease node must not be empty");
@@ -341,6 +430,8 @@ impl DurableLeaseStore {
             node: node.to_string(),
             epoch: next_epoch,
             expires_unix_ms: now_unix_ms.saturating_add(ttl_ms),
+            site_id,
+            route_domain,
         };
         state.leases.push(lease.clone());
         state.generation = state.generation.saturating_add(1);
@@ -928,16 +1019,38 @@ where
                 self.client.get_service(node, &spec.name).await?,
             ));
         }
-        let active: HashSet<&str> = leases
-            .iter()
-            .filter(|lease| lease.active(&spec.name, now_unix_ms))
+        // Cross-site leases are ignored for anycast; only owning-domain leases advertise.
+        let active: HashSet<&str> = active_domain_leases(spec, leases, now_unix_ms)
+            .into_iter()
             .map(|lease| lease.node.as_str())
             .collect();
         let mut applied = Vec::new();
         for node in nodes {
             let mut node_spec = spec.clone();
-            node_spec.advertise =
+            let advertise =
                 spec.exposure.north_south() && active.contains(node.name.as_str());
+            // Fail closed: never apply advertise=true from a mismatched route domain.
+            if advertise {
+                let lease = leases.iter().find(|l| {
+                    l.active(&spec.name, now_unix_ms) && l.node == node.name
+                });
+                match lease {
+                    Some(l) if lease_matches_service_domain(l, spec) => {}
+                    Some(l) => bail!(
+                        "refuse advertise=true across mismatched route domains: lease node '{}' domain {:?} {:?} vs service {:?} {:?}",
+                        l.node,
+                        l.site_id,
+                        l.route_domain,
+                        spec.site_id,
+                        spec.route_domain
+                    ),
+                    None => bail!(
+                        "refuse advertise=true without an owning-domain lease on node '{}'",
+                        node.name
+                    ),
+                }
+            }
+            node_spec.advertise = advertise;
             if let Err(error) = self.client.upsert_service(node, &node_spec).await {
                 let rolled = self.rollback(&spec.name, &applied, &before).await;
                 bail!(
@@ -968,9 +1081,9 @@ where
     ) -> Result<BgpVipIntent> {
         validate_spec(spec)?;
         validate_leases(&spec.name, nodes, leases, now_unix_ms)?;
-        let active: HashSet<&str> = leases
+        let domain_leases = active_domain_leases(spec, leases, now_unix_ms);
+        let active: HashSet<&str> = domain_leases
             .iter()
-            .filter(|lease| lease.active(&spec.name, now_unix_ms))
             .map(|lease| lease.node.as_str())
             .collect();
         let mut edge_nodes = Vec::new();
@@ -988,9 +1101,8 @@ where
             }
         }
         edge_nodes.sort();
-        let lease_epoch = leases
+        let lease_epoch = domain_leases
             .iter()
-            .filter(|lease| lease.active(&spec.name, now_unix_ms))
             .map(|lease| lease.epoch)
             .max()
             .unwrap_or(0);
@@ -1146,6 +1258,9 @@ where
         let _ = store.prune_expired(now_unix_ms)?;
 
         for lease in store.active(&spec.name, now_unix_ms)? {
+            if !lease_matches_service_domain(&lease, spec) {
+                continue;
+            }
             let Some(node) = known.get(lease.node.as_str()).copied() else {
                 store.release(&spec.name, &lease.node)?;
                 continue;
@@ -1170,7 +1285,11 @@ where
             }
         }
 
-        let mut active = store.active(&spec.name, now_unix_ms)?;
+        let mut active: Vec<_> = store
+            .active(&spec.name, now_unix_ms)?
+            .into_iter()
+            .filter(|lease| lease_matches_service_domain(lease, spec))
+            .collect();
         let active_names: HashSet<String> = active.iter().map(|l| l.node.clone()).collect();
         // Prefer the first surviving active edge as a one-time state seed for
         // a replacement. Continuous delta replication keeps normal standbys warm.
@@ -1186,7 +1305,14 @@ where
             if active.len() >= desired_edges {
                 break;
             }
-            let lease = store.renew(&spec.name, &node.name, ttl_ms, now_unix_ms)?;
+            let lease = store.renew_in_domain(
+                &spec.name,
+                &node.name,
+                ttl_ms,
+                now_unix_ms,
+                spec.site_id.clone(),
+                spec.route_domain.clone(),
+            )?;
             let mut staged = spec.clone();
             staged.advertise = false;
             if let Err(error) = self.client.upsert_service(node, &staged).await {
@@ -1303,11 +1429,8 @@ pub fn bgp_vip_intent(
     if !spec.exposure.north_south() {
         bail!("BGP VIP intent requires north-south or both exposure");
     }
-    let mut active: Vec<&EdgeLease> = leases
-        .iter()
-        .filter(|lease| lease.active(&spec.name, now_unix_ms))
-        .collect();
-    active.sort_by(|a, b| a.node.cmp(&b.node));
+    // Cross-site leases are ignored for anycast; only the owning domain advertises.
+    let active = active_domain_leases(spec, leases, now_unix_ms);
     let lease_epoch = active.iter().map(|l| l.epoch).max().unwrap_or(0);
     Ok(BgpVipIntent {
         service: spec.name.clone(),
@@ -1569,8 +1692,12 @@ mod tests {
                 .cloned()
                 .unwrap_or(HostServiceStatus {
                     schema_version: 3,
+                    program_generation: 6,
                     north_south_interfaces: vec!["eno1".into()],
                     xdp_acceleration: true,
+                    cgroup_connect: false,
+                    cgroup_connect_attached: false,
+                    map_tier: String::new(),
                     interfaces: Vec::new(),
                 }))
         }
@@ -1690,6 +1817,8 @@ mod tests {
             max_egress_mbps: None,
             flow_sample_rate: 0,
             host_routing: false,
+            site_id: None,
+            route_domain: None,
         }
     }
 
@@ -1731,8 +1860,12 @@ mod tests {
             "b".into(),
             HostServiceStatus {
                 schema_version: 3,
+                program_generation: 6,
                 north_south_interfaces: Vec::new(),
                 xdp_acceleration: false,
+                cgroup_connect: false,
+                cgroup_connect_attached: false,
+                map_tier: String::new(),
                 interfaces: Vec::new(),
             },
         );
@@ -1794,12 +1927,16 @@ mod tests {
                 node: "a".into(),
                 epoch: 7,
                 expires_unix_ms: 200,
+                site_id: None,
+                route_domain: None,
             },
             EdgeLease {
                 service: "payments".into(),
                 node: "b".into(),
                 epoch: 6,
                 expires_unix_ms: 50,
+                site_id: None,
+                route_domain: None,
             },
         ];
         let intent = bgp_vip_intent(&s, &leases, 100).unwrap();
@@ -1819,6 +1956,8 @@ mod tests {
             node: "b".into(),
             epoch: 9,
             expires_unix_ms: 200,
+            site_id: None,
+            route_domain: None,
         }];
         ServiceOrchestrator::new(client.clone())
             .apply_with_edge_leases(&s, &ns, &leases, 100)
@@ -1885,12 +2024,16 @@ mod tests {
                 node: "a".into(),
                 epoch: 11,
                 expires_unix_ms: 200,
+                site_id: None,
+                route_domain: None,
             },
             EdgeLease {
                 service: "payments".into(),
                 node: "b".into(),
                 epoch: 11,
                 expires_unix_ms: 200,
+                site_id: None,
+                route_domain: None,
             },
         ];
         let intent = ServiceOrchestrator::new(client)
@@ -1912,6 +2055,8 @@ mod tests {
                 node: "a".into(),
                 epoch: 1,
                 expires_unix_ms: 200,
+                site_id: None,
+                route_domain: None,
             }],
             100,
         )
@@ -1962,5 +2107,131 @@ mod tests {
         let raw = serde_json::to_value(&b).unwrap();
         assert_eq!(raw["entries"][0]["operation"], "delete");
         assert_eq!(raw["last_seq"], 10);
+    }
+
+    #[test]
+    fn same_site_lease_advertises_ok() {
+        let mut s = service(443);
+        s.exposure = ServiceExposure::NorthSouth;
+        s.snat_address = Some("192.0.2.10".parse().unwrap());
+        s.site_id = Some("site-a".into());
+        s.route_domain = Some("rd-1".into());
+        let leases = vec![EdgeLease {
+            service: "payments".into(),
+            node: "a".into(),
+            epoch: 3,
+            expires_unix_ms: 200,
+            site_id: Some("site-a".into()),
+            route_domain: Some("rd-1".into()),
+        }];
+        let intent = bgp_vip_intent(&s, &leases, 100).unwrap();
+        assert_eq!(intent.edge_nodes, vec!["a"]);
+        assert_eq!(intent.lease_epoch, 3);
+    }
+
+    #[test]
+    fn cross_site_lease_ignored_for_anycast() {
+        let mut s = service(443);
+        s.exposure = ServiceExposure::NorthSouth;
+        s.snat_address = Some("192.0.2.10".parse().unwrap());
+        s.site_id = Some("site-a".into());
+        s.route_domain = Some("rd-1".into());
+        let leases = vec![
+            EdgeLease {
+                service: "payments".into(),
+                node: "a".into(),
+                epoch: 4,
+                expires_unix_ms: 200,
+                site_id: Some("site-a".into()),
+                route_domain: Some("rd-1".into()),
+            },
+            EdgeLease {
+                service: "payments".into(),
+                node: "b".into(),
+                epoch: 9,
+                expires_unix_ms: 200,
+                site_id: Some("site-b".into()),
+                route_domain: Some("rd-2".into()),
+            },
+        ];
+        let intent = bgp_vip_intent(&s, &leases, 100).unwrap();
+        assert_eq!(intent.edge_nodes, vec!["a"]);
+        assert_eq!(intent.lease_epoch, 4);
+    }
+
+    #[test]
+    fn default_path_unaffected_by_site_fencing() {
+        let mut s = service(443);
+        s.exposure = ServiceExposure::NorthSouth;
+        s.snat_address = Some("192.0.2.10".parse().unwrap());
+        // No site_id / route_domain on service or leases → default domain.
+        let leases = vec![
+            EdgeLease {
+                service: "payments".into(),
+                node: "a".into(),
+                epoch: 7,
+                expires_unix_ms: 200,
+                site_id: None,
+                route_domain: None,
+            },
+            EdgeLease {
+                service: "payments".into(),
+                node: "c".into(),
+                epoch: 2,
+                expires_unix_ms: 200,
+                site_id: None,
+                route_domain: None,
+            },
+        ];
+        let intent = bgp_vip_intent(&s, &leases, 100).unwrap();
+        assert_eq!(intent.edge_nodes, vec!["a", "c"]);
+        assert_eq!(intent.lease_epoch, 7);
+        assert!(lease_matches_service_domain(&leases[0], &s));
+    }
+
+    #[tokio::test]
+    async fn leased_apply_ignores_cross_site_for_advertise() {
+        let client = FakeClient::default();
+        let ns = nodes();
+        let mut s = service(443);
+        s.exposure = ServiceExposure::NorthSouth;
+        s.snat_address = Some("192.0.2.10".parse().unwrap());
+        s.site_id = Some("site-a".into());
+        s.route_domain = Some("rd-1".into());
+        let leases = vec![
+            EdgeLease {
+                service: "payments".into(),
+                node: "a".into(),
+                epoch: 1,
+                expires_unix_ms: 200,
+                site_id: Some("site-a".into()),
+                route_domain: Some("rd-1".into()),
+            },
+            EdgeLease {
+                service: "payments".into(),
+                node: "b".into(),
+                epoch: 2,
+                expires_unix_ms: 200,
+                site_id: Some("site-b".into()),
+                route_domain: Some("rd-other".into()),
+            },
+        ];
+        ServiceOrchestrator::new(client.clone())
+            .apply_with_edge_leases(&s, &ns, &leases, 100)
+            .await
+            .unwrap();
+        let state = client.state.lock().await;
+        assert!(
+            state
+                .get(&("a".into(), "payments".into()))
+                .unwrap()
+                .advertise
+        );
+        assert!(
+            !state
+                .get(&("b".into(), "payments".into()))
+                .unwrap()
+                .advertise
+        );
     }
 }
