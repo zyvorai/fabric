@@ -8,7 +8,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use zyvor_fabric_driver_core::{
     CiliumEndpointView, DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo,
-    IpcacheEntry, SecurityGroup, VmDataplaneDriver, VmNetworkPolicy,
+    IpcacheEntry, NetworkServiceSpec, NetworkServiceStatus, SecurityGroup, VmDataplaneDriver,
+    VmNetworkPolicy,
 };
 use zyvor_fabric_fluxvm_client as client;
 
@@ -109,6 +110,78 @@ fn from_group(g: &SecurityGroup) -> client::SecurityGroup {
         identity: g.identity,
         priority: g.priority,
         description: g.description.clone(),
+    }
+}
+
+fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
+    use zyvor_fabric_driver_core::{
+        NetworkServiceAlgorithm, NetworkServiceBackend, NetworkServiceMode, NetworkServiceProtocol,
+    };
+    NetworkServiceSpec {
+        name: s.name,
+        vip: s.vip,
+        port: s.port,
+        protocol: match s.protocol {
+            client::NetworkServiceProtocol::Tcp => NetworkServiceProtocol::Tcp,
+            client::NetworkServiceProtocol::Udp => NetworkServiceProtocol::Udp,
+        },
+        algorithm: match s.algorithm {
+            client::NetworkServiceAlgorithm::Maglev => NetworkServiceAlgorithm::Maglev,
+        },
+        mode: match s.mode {
+            client::NetworkServiceMode::Nat => NetworkServiceMode::Nat,
+            client::NetworkServiceMode::Dsr => NetworkServiceMode::Dsr,
+        },
+        backends: s
+            .backends
+            .into_iter()
+            .map(|b| NetworkServiceBackend {
+                address: b.address,
+                port: b.port,
+                weight: b.weight,
+                enabled: b.enabled,
+            })
+            .collect(),
+        maglev_table_size: s.maglev_table_size,
+    }
+}
+
+fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
+    use zyvor_fabric_driver_core::{NetworkServiceMode, NetworkServiceProtocol};
+    client::NetworkServiceSpec {
+        name: s.name.clone(),
+        vip: s.vip.clone(),
+        port: s.port,
+        protocol: match s.protocol {
+            NetworkServiceProtocol::Tcp => client::NetworkServiceProtocol::Tcp,
+            NetworkServiceProtocol::Udp => client::NetworkServiceProtocol::Udp,
+        },
+        algorithm: client::NetworkServiceAlgorithm::Maglev,
+        mode: match s.mode {
+            NetworkServiceMode::Nat => client::NetworkServiceMode::Nat,
+            NetworkServiceMode::Dsr => client::NetworkServiceMode::Dsr,
+        },
+        backends: s
+            .backends
+            .iter()
+            .map(|b| client::NetworkServiceBackend {
+                address: b.address.clone(),
+                port: b.port,
+                weight: b.weight,
+                enabled: b.enabled,
+            })
+            .collect(),
+        maglev_table_size: s.maglev_table_size,
+    }
+}
+
+fn to_service_status(s: client::NetworkServiceStatus) -> NetworkServiceStatus {
+    NetworkServiceStatus {
+        schema_version: s.schema_version,
+        service_id: s.service_id,
+        name: s.name,
+        active_backends: s.active_backends,
+        maglev_table_size: s.maglev_table_size,
     }
 }
 
@@ -214,6 +287,35 @@ impl VmDataplaneDriver for FluxVmDriver {
 
     async fn dataplane_delete_group(&self, name: &str) -> Result<()> {
         self.client.delete_network_group(name).await
+    }
+
+    async fn dataplane_list_services(&self) -> Result<Vec<NetworkServiceSpec>> {
+        Ok(self
+            .client
+            .list_network_services()
+            .await?
+            .into_iter()
+            .map(to_service)
+            .collect())
+    }
+
+    async fn dataplane_get_service(&self, name: &str) -> Result<NetworkServiceSpec> {
+        Ok(to_service(self.client.get_network_service(name).await?))
+    }
+
+    async fn dataplane_upsert_service(
+        &self,
+        service: &NetworkServiceSpec,
+    ) -> Result<NetworkServiceStatus> {
+        Ok(to_service_status(
+            self.client
+                .upsert_network_service(&from_service(service))
+                .await?,
+        ))
+    }
+
+    async fn dataplane_delete_service(&self, name: &str) -> Result<()> {
+        self.client.delete_network_service(name).await
     }
 
     async fn dataplane_list_cnp(&self) -> Result<serde_json::Value> {

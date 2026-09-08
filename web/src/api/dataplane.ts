@@ -195,6 +195,49 @@ export function deleteDataplaneGroup(name: string): Promise<void> {
   return apiDelete(`/api/dataplane/groups/${encodeURIComponent(name)}`)
 }
 
+export type NetworkServiceProtocol = 'tcp' | 'udp'
+export type NetworkServiceMode = 'nat' | 'dsr'
+
+export interface NetworkServiceBackend {
+  address: string
+  port: number
+  weight?: number
+  enabled?: boolean
+}
+
+export interface NetworkServiceSpec {
+  name: string
+  vip: string
+  port: number
+  protocol: NetworkServiceProtocol
+  algorithm?: 'maglev'
+  mode?: NetworkServiceMode
+  backends: NetworkServiceBackend[]
+  maglev_table_size?: number | null
+}
+
+export interface NetworkServiceStatus {
+  schema_version: number
+  service_id: number
+  name: string
+  active_backends: number
+  maglev_table_size: number
+}
+
+export function listDataplaneServices(): Promise<{ items: NetworkServiceSpec[] }> {
+  return apiGet('/api/dataplane/services')
+}
+
+export function upsertDataplaneService(
+  service: NetworkServiceSpec,
+): Promise<NetworkServiceStatus> {
+  return apiPost('/api/dataplane/services', service)
+}
+
+export function deleteDataplaneService(name: string): Promise<void> {
+  return apiDelete(`/api/dataplane/services/${encodeURIComponent(name)}`)
+}
+
 export function listDataplaneCnp(): Promise<{ items: unknown[] }> {
   return apiGet('/api/dataplane/cnp')
 }

@@ -418,6 +418,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::vm_dataplane::get_group).delete(api::vm_dataplane::delete_group),
         )
         .route(
+            "/dataplane/services",
+            get(api::vm_dataplane::list_services).post(api::vm_dataplane::upsert_service),
+        )
+        .route(
+            "/dataplane/services/{name}",
+            get(api::vm_dataplane::get_service).delete(api::vm_dataplane::delete_service),
+        )
+        .route(
             "/dataplane/cnp",
             get(api::vm_dataplane::list_cnp).post(api::vm_dataplane::apply_cnp),
         )

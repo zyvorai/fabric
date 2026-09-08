@@ -8,10 +8,12 @@ import {
   DataplaneHealth,
   IdentityInfo,
   IpcacheEntry,
+  NetworkServiceSpec,
   SecurityGroup,
   applyDataplaneCnp,
   deleteDataplaneCnp,
   deleteDataplaneGroup,
+  deleteDataplaneService,
   emptyPolicy,
   getDataplaneHealth,
   getDataplaneHubbleFlows,
@@ -21,8 +23,10 @@ import {
   listDataplaneGroups,
   listDataplaneIdentities,
   listDataplaneIpcache,
+  listDataplaneServices,
   refreshDataplaneDns,
   upsertDataplaneGroup,
+  upsertDataplaneService,
 } from '../api/dataplane'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
@@ -34,7 +38,30 @@ import { usePlatformInfo } from '../contexts/PlatformInfoContext'
 import PacketFlowPanel from '../components/PacketFlowPanel'
 import { fromHubbleFlow, type PacketFlowView } from '../lib/packetflow'
 
-type Tab = 'health' | 'groups' | 'cnp' | 'endpoints' | 'identities' | 'observe' | 'flows' | 'ipcache'
+type Tab =
+  | 'health'
+  | 'services'
+  | 'groups'
+  | 'cnp'
+  | 'endpoints'
+  | 'identities'
+  | 'observe'
+  | 'flows'
+  | 'ipcache'
+
+const SAMPLE_SERVICE = `{
+  "name": "payments",
+  "vip": "10.96.10.25",
+  "port": 443,
+  "protocol": "tcp",
+  "algorithm": "maglev",
+  "mode": "nat",
+  "maglev_table_size": 4093,
+  "backends": [
+    {"address": "10.40.1.21", "port": 8443, "weight": 2, "enabled": true},
+    {"address": "10.40.1.22", "port": 8443, "weight": 1, "enabled": true}
+  ]
+}`
 
 const SAMPLE_CNP = `{
   "apiVersion": "cilium.io/v2",
@@ -59,6 +86,7 @@ export default function EdgeDataplane() {
   const [error, setError] = useState<string | null>(null)
   const [health, setHealth] = useState<DataplaneHealth | null>(null)
   const [groups, setGroups] = useState<SecurityGroup[]>([])
+  const [services, setServices] = useState<NetworkServiceSpec[]>([])
   const [cnps, setCnps] = useState<unknown[]>([])
   const [identities, setIdentities] = useState<IdentityInfo[]>([])
   const [endpoints, setEndpoints] = useState<CiliumEndpointView[]>([])
@@ -68,14 +96,16 @@ export default function EdgeDataplane() {
   const [groupName, setGroupName] = useState('web')
   const [groupLabel, setGroupLabel] = useState('app=web')
   const [cnpJson, setCnpJson] = useState(SAMPLE_CNP)
+  const [serviceJson, setServiceJson] = useState(SAMPLE_SERVICE)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [h, g, c, ids, eps, obs, ipc, hubble] = await Promise.all([
+      const [h, g, svc, c, ids, eps, obs, ipc, hubble] = await Promise.all([
         getDataplaneHealth(),
         listDataplaneGroups().catch(() => ({ items: [] as SecurityGroup[] })),
+        listDataplaneServices().catch(() => ({ items: [] as NetworkServiceSpec[] })),
         listDataplaneCnp().catch(() => ({ items: [] as unknown[] })),
         listDataplaneIdentities().catch(() => ({ items: [] as IdentityInfo[] })),
         listDataplaneEndpoints().catch(() => ({ items: [] as CiliumEndpointView[] })),
@@ -85,6 +115,7 @@ export default function EdgeDataplane() {
       ])
       setHealth(h)
       setGroups(g.items ?? [])
+      setServices(svc.items ?? [])
       setCnps(c.items ?? [])
       setIdentities(ids.items ?? [])
       setEndpoints(eps.items ?? [])
@@ -144,6 +175,35 @@ export default function EdgeDataplane() {
     }
   }
 
+  const applyService = async () => {
+    setBusy(true)
+    try {
+      const service = JSON.parse(serviceJson) as NetworkServiceSpec
+      const status = await upsertDataplaneService(service)
+      toast.success(
+        `Service '${status.name}' saved (${status.active_backends} backends, Maglev ${status.maglev_table_size})`,
+      )
+      await load()
+    } catch (err) {
+      toastFailure(toast, 'Failed to save service', err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeService = async (name: string) => {
+    setBusy(true)
+    try {
+      await deleteDataplaneService(name)
+      toast.success(`Deleted service '${name}'`)
+      await load()
+    } catch (err) {
+      toastFailure(toast, 'Failed to delete service', err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const applyCnp = async () => {
     setBusy(true)
     try {
@@ -186,6 +246,7 @@ export default function EdgeDataplane() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'health', label: 'Health' },
+    { id: 'services', label: 'Services' },
     { id: 'groups', label: 'Groups' },
     { id: 'cnp', label: 'CNP' },
     { id: 'endpoints', label: 'Endpoints' },
@@ -213,9 +274,9 @@ export default function EdgeDataplane() {
           <div>
             <h1 className="text-xl font-semibold text-[#1d1d1f]">Edge Dataplane</h1>
             <p className="text-sm text-[#6e6e73] max-w-2xl">
-              FluxVM Network Fabric schema v4 — security groups, CNP, CEP endpoints
-              (`identity_source`), identities, Hubble-style packet flow, health, and ipcache.
-              VM edge plane, not Fabric SDN.
+              FluxVM Network Fabric schema v4 — Maglev services, security groups, CNP, CEP
+              endpoints (`identity_source`), identities, Hubble-style packet flow, health, and
+              ipcache. VM edge plane, not Fabric SDN.
             </p>
           </div>
         </div>
@@ -312,6 +373,83 @@ export default function EdgeDataplane() {
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {tab === 'services' && (
+        <div className="space-y-4">
+          {canWrite && (
+            <div className="space-y-2">
+              <TerminalTextarea
+                className="min-h-[180px] font-mono text-xs"
+                value={serviceJson}
+                onChange={(e) => setServiceJson(e.target.value)}
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void applyService()}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-[#0071e3] text-white"
+              >
+                <Plus className="w-3.5 h-3.5" /> Apply Maglev service
+              </button>
+              <p className="text-xs text-[#6e6e73]">
+                East-west VIP DNAT on the VM edge (TC 49140). Use a routed service CIDR VIP —
+                not the guest L2 prefix. Mode <code>dsr</code> is rejected until Phase 2.
+              </p>
+            </div>
+          )}
+          <div className="bg-white rounded-xl border border-[#d2d2d7] overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-[#f5f5f7] text-[#6e6e73] text-left">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Name</th>
+                  <th className="px-3 py-2 font-medium">VIP</th>
+                  <th className="px-3 py-2 font-medium">Port</th>
+                  <th className="px-3 py-2 font-medium">Proto</th>
+                  <th className="px-3 py-2 font-medium">Mode</th>
+                  <th className="px-3 py-2 font-medium">Backends</th>
+                  <th className="px-3 py-2 font-medium" />
+                </tr>
+              </thead>
+              <tbody>
+                {services.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-4 text-[#6e6e73]">
+                      No Maglev services yet.
+                    </td>
+                  </tr>
+                )}
+                {services.map((s) => (
+                  <tr key={s.name} className="border-t border-[#d2d2d7]">
+                    <td className="px-3 py-2 font-medium text-[#1d1d1f]">{s.name}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{s.vip}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{s.port}</td>
+                    <td className="px-3 py-2 uppercase text-xs">{s.protocol}</td>
+                    <td className="px-3 py-2 uppercase text-xs">{s.mode ?? 'nat'}</td>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {(s.backends ?? []).filter((b) => b.enabled !== false).length}/
+                      {(s.backends ?? []).length}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {canWrite && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void removeService(s.name)}
+                          className="text-red-600 hover:text-red-700"
+                          aria-label={`Delete ${s.name}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
