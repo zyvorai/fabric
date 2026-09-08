@@ -27,6 +27,7 @@ members = [
 
     "site-recovery",
     "content-library",
+    "service-lb",
     "lifecycle-manager",
     "certificate-manager",
     "security",
