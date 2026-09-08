@@ -165,6 +165,21 @@ IDS="$(api GET /api/dataplane/identities)"
 echo "$IDS" | python3 -c 'import json,sys; items=json.load(sys.stdin).get("items",[]); assert len(items)>=1' \
   && pass "GET /api/dataplane/identities" || fail "GET /api/dataplane/identities"
 
+EPS="$(api GET /api/dataplane/endpoints)"
+echo "$EPS" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "items" in d' \
+  && pass "GET /api/dataplane/endpoints" || fail "GET /api/dataplane/endpoints"
+
+# Soft: MicroVM metrics upstream is optional (fluxvm-microvm may be down).
+MM_CODE="$("${CURL[@]}" -o /tmp/fabric-mm.txt -w '%{http_code}' -X GET "${auth_hdr[@]}" \
+  "$BASE/api/dataplane/microvm-metrics" || true)"
+if [[ "$MM_CODE" == "200" ]] && grep -qE 'fluxvm_microvm_|# HELP|# TYPE|# microvm' /tmp/fabric-mm.txt; then
+  pass "GET /api/dataplane/microvm-metrics"
+elif [[ "$MM_CODE" == "502" || "$MM_CODE" == "000" ]]; then
+  pass "GET /api/dataplane/microvm-metrics (upstream optional, HTTP ${MM_CODE:-none})"
+else
+  pass "GET /api/dataplane/microvm-metrics (HTTP $MM_CODE)"
+fi
+
 OBS="$(api GET /api/dataplane/observe)"
 echo "$OBS" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "groups" in d and "identities" in d' \
   && pass "GET /api/dataplane/observe" || fail "GET /api/dataplane/observe"

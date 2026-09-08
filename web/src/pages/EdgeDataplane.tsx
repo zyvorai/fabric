@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ExternalLink, Loader2, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react'
 import {
+  CiliumEndpointView,
   DataplaneHealth,
   IdentityInfo,
   IpcacheEntry,
@@ -16,6 +17,7 @@ import {
   getDataplaneHubbleFlows,
   getDataplaneObserve,
   listDataplaneCnp,
+  listDataplaneEndpoints,
   listDataplaneGroups,
   listDataplaneIdentities,
   listDataplaneIpcache,
@@ -32,7 +34,7 @@ import { usePlatformInfo } from '../contexts/PlatformInfoContext'
 import PacketFlowPanel from '../components/PacketFlowPanel'
 import { fromHubbleFlow, type PacketFlowView } from '../lib/packetflow'
 
-type Tab = 'health' | 'groups' | 'cnp' | 'identities' | 'observe' | 'flows' | 'ipcache'
+type Tab = 'health' | 'groups' | 'cnp' | 'endpoints' | 'identities' | 'observe' | 'flows' | 'ipcache'
 
 const SAMPLE_CNP = `{
   "apiVersion": "cilium.io/v2",
@@ -59,6 +61,7 @@ export default function EdgeDataplane() {
   const [groups, setGroups] = useState<SecurityGroup[]>([])
   const [cnps, setCnps] = useState<unknown[]>([])
   const [identities, setIdentities] = useState<IdentityInfo[]>([])
+  const [endpoints, setEndpoints] = useState<CiliumEndpointView[]>([])
   const [observe, setObserve] = useState<Record<string, unknown> | null>(null)
   const [ipcache, setIpcache] = useState<IpcacheEntry[]>([])
   const [packetFlows, setPacketFlows] = useState<PacketFlowView[]>([])
@@ -70,11 +73,12 @@ export default function EdgeDataplane() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [h, g, c, ids, obs, ipc, hubble] = await Promise.all([
+      const [h, g, c, ids, eps, obs, ipc, hubble] = await Promise.all([
         getDataplaneHealth(),
         listDataplaneGroups().catch(() => ({ items: [] as SecurityGroup[] })),
         listDataplaneCnp().catch(() => ({ items: [] as unknown[] })),
         listDataplaneIdentities().catch(() => ({ items: [] as IdentityInfo[] })),
+        listDataplaneEndpoints().catch(() => ({ items: [] as CiliumEndpointView[] })),
         getDataplaneObserve().catch(() => null),
         listDataplaneIpcache().catch(() => ({ items: [] as IpcacheEntry[] })),
         getDataplaneHubbleFlows(64).catch(() => ({ items: [] })),
@@ -83,6 +87,7 @@ export default function EdgeDataplane() {
       setGroups(g.items ?? [])
       setCnps(c.items ?? [])
       setIdentities(ids.items ?? [])
+      setEndpoints(eps.items ?? [])
       setObserve(obs)
       setIpcache(ipc.items ?? [])
       const mode = h.mode || 'ebpf'
@@ -183,6 +188,7 @@ export default function EdgeDataplane() {
     { id: 'health', label: 'Health' },
     { id: 'groups', label: 'Groups' },
     { id: 'cnp', label: 'CNP' },
+    { id: 'endpoints', label: 'Endpoints' },
     { id: 'identities', label: 'Identities' },
     { id: 'observe', label: 'Observe' },
     { id: 'flows', label: 'Packet flow' },
@@ -207,8 +213,9 @@ export default function EdgeDataplane() {
           <div>
             <h1 className="text-xl font-semibold text-[#1d1d1f]">Edge Dataplane</h1>
             <p className="text-sm text-[#6e6e73] max-w-2xl">
-              FluxVM Network Fabric schema v4 — security groups, CNP, identities, Hubble-style
-              packet flow (colorful / normal), health, and ipcache. VM edge plane, not Fabric SDN.
+              FluxVM Network Fabric schema v4 — security groups, CNP, CEP endpoints
+              (`identity_source`), identities, Hubble-style packet flow, health, and ipcache.
+              VM edge plane, not Fabric SDN.
             </p>
           </div>
         </div>
@@ -429,6 +436,67 @@ export default function EdgeDataplane() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {tab === 'endpoints' && (
+        <div className="space-y-2">
+          <p className="text-sm text-[#6e6e73]">
+            FluxVM CiliumEndpoint-*shaped* views. When dataplane mode is{' '}
+            <code className="text-xs">cilium</code>, identity may come from the Cilium agent
+            (`identity_source=cilium-agent`); otherwise FluxVM hash. Never writes Cilium private maps.
+          </p>
+          <div className="bg-white rounded-xl border border-[#d2d2d7] overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-[#f5f5f7] text-[#6e6e73] text-left">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Identity</th>
+                  <th className="px-3 py-2 font-medium">Source</th>
+                  <th className="px-3 py-2 font-medium">UUID</th>
+                  <th className="px-3 py-2 font-medium">IPv4</th>
+                  <th className="px-3 py-2 font-medium">State</th>
+                  <th className="px-3 py-2 font-medium">Labels</th>
+                </tr>
+              </thead>
+              <tbody>
+                {endpoints.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-4 text-[#6e6e73]">
+                      No VM endpoints yet. Attach a guest CIDR dataplane policy on a running VM.
+                    </td>
+                  </tr>
+                )}
+                {endpoints.map((ep) => {
+                  const labels = ep['identity-labels'] ?? ep.identity_labels ?? []
+                  const ipv4 =
+                    ep.networking?.addressing?.find((a) => a.ipv4)?.ipv4 ?? '—'
+                  const src = ep.identity_source ?? 'fluxvm-hash'
+                  return (
+                    <tr key={ep.uuid} className="border-t border-[#d2d2d7]">
+                      <td className="px-3 py-2 font-mono text-xs">{ep.identity}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs border ${
+                            src === 'cilium-agent'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : 'bg-[#f5f5f7] text-[#6e6e73] border-[#d2d2d7]'
+                          }`}
+                        >
+                          {src}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs truncate max-w-[10rem]" title={ep.uuid}>
+                        {ep.uuid}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs">{ipv4}</td>
+                      <td className="px-3 py-2">{ep.state}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{labels.join(', ') || '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

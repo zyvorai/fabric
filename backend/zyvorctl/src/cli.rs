@@ -211,6 +211,8 @@ enum DataplaneCmd {
     },
     /// Reserved + group identities
     Identities,
+    /// CiliumEndpoint-*shaped* VM views (`identity_source`)
+    Endpoints,
     /// Security groups (FluxVM edge — not Fabric SDN)
     #[command(subcommand)]
     Group(DataplaneGroupCmd),
@@ -1176,6 +1178,10 @@ impl Cli {
                 }
                 DataplaneCmd::Identities => {
                     let val = api_get(&client, "/dataplane/identities").await?;
+                    print_value(&val, fmt);
+                }
+                DataplaneCmd::Endpoints => {
+                    let val = api_get(&client, "/dataplane/endpoints").await?;
                     print_value(&val, fmt);
                 }
                 DataplaneCmd::Group(g) => match g {

@@ -72,6 +72,11 @@ pub struct DriverConfig {
     /// configured. Leave unset against a deployment with auth disabled.
     #[serde(default)]
     pub fluxvm_token: Option<String>,
+    /// Prometheus text scrape URL for FluxVM MicroVM histograms
+    /// (`MICROVM_METRICS_ADDR`, default `http://127.0.0.1:9108/metrics`).
+    /// Set to `off` to disable the Fabric proxy.
+    #[serde(default = "default_microvm_metrics_url")]
+    pub microvm_metrics_url: Option<String>,
 }
 
 impl Default for DriverConfig {
@@ -79,12 +84,17 @@ impl Default for DriverConfig {
         Self {
             fluxvm_url: default_fluxvm_url(),
             fluxvm_token: None,
+            microvm_metrics_url: default_microvm_metrics_url(),
         }
     }
 }
 
 fn default_fluxvm_url() -> String {
     "http://127.0.0.1:7788".to_string()
+}
+
+fn default_microvm_metrics_url() -> Option<String> {
+    Some("http://127.0.0.1:9108/metrics".into())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

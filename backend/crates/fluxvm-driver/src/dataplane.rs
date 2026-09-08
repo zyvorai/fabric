@@ -7,8 +7,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use zyvor_fabric_driver_core::{
-    DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo, IpcacheEntry,
-    SecurityGroup, VmDataplaneDriver, VmNetworkPolicy,
+    CiliumEndpointView, DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo,
+    IpcacheEntry, SecurityGroup, VmDataplaneDriver, VmNetworkPolicy,
 };
 use zyvor_fabric_fluxvm_client as client;
 
@@ -241,6 +241,25 @@ impl VmDataplaneDriver for FluxVmDriver {
             .await?
             .into_iter()
             .map(to_identity)
+            .collect())
+    }
+
+    async fn dataplane_list_endpoints(&self) -> Result<Vec<CiliumEndpointView>> {
+        Ok(self
+            .client
+            .list_endpoints()
+            .await?
+            .into_iter()
+            .map(|e| CiliumEndpointView {
+                id: e.id,
+                uuid: e.uuid.to_string(),
+                identity: e.identity,
+                identity_source: e.identity_source,
+                identity_labels: e.identity_labels,
+                networking: e.networking,
+                state: e.state,
+                policy: e.policy,
+            })
             .collect())
     }
 

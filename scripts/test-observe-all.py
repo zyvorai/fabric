@@ -100,6 +100,10 @@ class ObserveAll(unittest.TestCase):
         api = (ROOT / "web/src/api/dataplane.ts").read_text()
         self.assertIn("explainDataplane", api)
         self.assertIn("dryRunDataplane", api)
+        self.assertIn("listDataplaneEndpoints", api)
+        edge = (ROOT / "web/src/pages/EdgeDataplane.tsx").read_text()
+        self.assertIn("endpoints", edge)
+        self.assertIn("identity_source", edge)
 
 
 if __name__ == "__main__":

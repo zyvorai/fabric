@@ -416,6 +416,23 @@ pub struct IdentityInfo {
     pub reserved: bool,
 }
 
+/// CiliumEndpoint-*shaped* FluxVM view (agent enrich may set `identity_source`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CiliumEndpointView {
+    pub id: u32,
+    pub uuid: String,
+    pub identity: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_source: Option<String>,
+    #[serde(rename = "identity-labels", default)]
+    pub identity_labels: Vec<String>,
+    #[serde(default)]
+    pub networking: serde_json::Value,
+    pub state: String,
+    #[serde(default)]
+    pub policy: serde_json::Value,
+}
+
 /// Live dataplane attach + schema status for one VM.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DataplaneStatus {
@@ -504,6 +521,9 @@ pub trait VmDataplaneDriver: Send + Sync {
 
     async fn dataplane_list_identities(&self) -> Result<Vec<IdentityInfo>> {
         anyhow::bail!("edge dataplane identities not supported by this backend")
+    }
+    async fn dataplane_list_endpoints(&self) -> Result<Vec<CiliumEndpointView>> {
+        Ok(Vec::new())
     }
     async fn dataplane_observe(&self) -> Result<serde_json::Value> {
         anyhow::bail!("edge dataplane observe not supported by this backend")

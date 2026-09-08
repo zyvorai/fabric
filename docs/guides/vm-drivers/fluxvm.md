@@ -10,6 +10,7 @@ This page covers what's wired up today, what isn't yet, and how to configure it.
 [driver]
 fluxvm_url = "http://127.0.0.1:7788"   # FluxVM's REST API base URL
 # fluxvm_token = "..."                  # only if FluxVM has auth.tokens configured
+# microvm_metrics_url = "http://127.0.0.1:9108/metrics"
 ```
 
 See [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` itself.
@@ -108,7 +109,13 @@ Log streaming's one fidelity reduction: raw serial console output has no journal
 
 - **Pluggable storage backends** — `CreateVmRequest.storage` (LVM thin snapshots, NBD-exported disks, Ceph RBD). Every VM created through this driver gets FluxVM's default qcow2 CoW overlay / raw reflink.
 - **Firecracker jailer / vsock-proxy bookkeeping** — `VmRecord.jail_path`, `vsock_socket`, plus `lvm_lv`/`nbd_pid` (the storage-backend cleanup fields above).
-- **Agent-sandbox surface** — FluxVM's `/v1/sandboxes`, memory snapshots, AutoPause, L7 egress, and `/console` ops UI. Those stay on FluxVM's own API for now; Fabric continues to use the classic `/v1/vms` lifecycle.
+- **Agent-sandbox / FLUXKVM1** — FluxVM's `/v1/sandboxes`, in-tree KVM
+  `FLUXKVM1` memory snapshots, AutoPause, L7 egress, and `/console` ops UI stay
+  on FluxVM's API / lab scripts (`bench-density.sh`, `test-kvm-snapshot-smoke.sh`).
+  Fabric Snapshot Manager remains QMP Disk/Full for classic VMs.
+- **CEP endpoints** — Fabric proxies `GET /api/dataplane/endpoints` (incl.
+  `identity_source`) and scrapes/proxies MicroVM histograms
+  (`/api/dataplane/microvm-metrics`, Prometheus job `fluxvm-microvm`).
 
 **Already wired (no longer gaps):** per-VM netns taps, and Network Fabric **schema v4** dataplane proxy (per-VM + groups/CNP/health/ipcache/refresh-dns) when FluxVM runs with `mode = "ebpf"`.
 

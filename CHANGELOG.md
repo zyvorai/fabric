@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- FluxVM CEP endpoints + MicroVM metrics in Fabric: `GET /api/dataplane/endpoints`
+  (`identity_source`), Edge Dataplane **Endpoints** tab,
+  `GET /api/dataplane/microvm-metrics`, Prometheus job `fluxvm-microvm` (`:9108`),
+  `zyvorctl dataplane endpoints`, and ROADMAP sync with FluxVM Phase 2b/3c.
 - Observe-all ops pack: `dataplane-follow` / `doctor` / `bundle` / `timers` /
   `chaos-failclosed` scripts, GitOps + Terraform dataplane examples, and
   `policy_control` helpers (management lockout, fingerprint, flow filter,

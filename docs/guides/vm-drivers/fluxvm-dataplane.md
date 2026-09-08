@@ -78,6 +78,8 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET/POST/DELETE /api/dataplane/groups[/{name}]` | `/v1/network/groups…` | Security-group CRUD |
 | `GET/POST/DELETE /api/dataplane/cnp[/{name}]` | `/v1/network/cnp…` | CNP apply/list/delete |
 | `GET /api/dataplane/identities` | `GET /v1/network/identities` | Reserved + group identities |
+| `GET /api/dataplane/endpoints` | `GET /v1/network/endpoints` | CEP-*shaped* views (`identity_source`) |
+| `GET /api/dataplane/microvm-metrics` | MicroVM `:9108/metrics` | Schedule→Running histograms (proxy) |
 | `GET /api/dataplane/observe` | `GET /v1/network/observe` | Snapshot identities/groups/CNPs/VMs |
 | `GET /api/dataplane/hubble/flows` | `GET /v1/network/hubble/flows` | Hubble-lite packet flows + hops |
 | `GET /api/dataplane/health` | `GET /v1/network/health` | Dataplane health |

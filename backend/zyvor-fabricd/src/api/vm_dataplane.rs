@@ -14,8 +14,8 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 use zyvor_fabric_driver_core::{
-    DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo, IpcacheEntry,
-    SecurityGroup, VmNetworkPolicy,
+    CiliumEndpointView, DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo,
+    IpcacheEntry, SecurityGroup, VmNetworkPolicy,
 };
 
 use crate::server::AppState;
@@ -40,6 +40,11 @@ pub struct GroupListResponse {
 #[derive(Debug, serde::Serialize)]
 pub struct IdentityListResponse {
     pub items: Vec<IdentityInfo>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct EndpointListResponse {
+    pub items: Vec<CiliumEndpointView>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -376,6 +381,65 @@ pub async fn list_identities(
         map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane identities", e)
     })?;
     Ok(Json(IdentityListResponse { items }))
+}
+
+/// GET /api/dataplane/endpoints — FluxVM CEP-*shaped* views (+ identity_source).
+pub async fn list_endpoints(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<EndpointListResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let items = state.driver.dataplane_list_endpoints().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane endpoints", e)
+    })?;
+    Ok(Json(EndpointListResponse { items }))
+}
+
+/// GET /api/dataplane/microvm-metrics — Prometheus text from FluxVM MicroVM histograms.
+pub async fn microvm_metrics(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<axum::response::Response, (StatusCode, Json<serde_json::Value>)> {
+    use axum::response::IntoResponse;
+    let url = state
+        .config
+        .driver
+        .microvm_metrics_url
+        .as_deref()
+        .unwrap_or("http://127.0.0.1:9108/metrics");
+    if url.is_empty() || url == "off" {
+        return Ok((
+            [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+            "# microvm metrics disabled\n",
+        )
+            .into_response());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "metrics client", e))?;
+    match client.get(url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let body = resp
+                .text()
+                .await
+                .unwrap_or_else(|_| "# empty metrics body\n".into());
+            Ok((
+                [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+                body,
+            )
+                .into_response())
+        }
+        Ok(resp) => Err(map_driver_err(
+            StatusCode::BAD_GATEWAY,
+            "MicroVM metrics",
+            format!("upstream HTTP {}", resp.status()),
+        )),
+        Err(e) => Err(map_driver_err(
+            StatusCode::BAD_GATEWAY,
+            "MicroVM metrics unreachable",
+            e,
+        )),
+    }
 }
 
 /// GET /api/dataplane/observe

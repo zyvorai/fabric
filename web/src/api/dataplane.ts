@@ -94,6 +94,20 @@ export interface IdentityInfo {
   reserved: boolean
 }
 
+export interface CiliumEndpointView {
+  id: number
+  uuid: string
+  identity: number
+  identity_source?: string | null
+  'identity-labels'?: string[]
+  identity_labels?: string[]
+  networking?: {
+    addressing?: Array<{ ipv4?: string | null; ipv6?: string | null }>
+  }
+  state: string
+  policy?: { ingress?: string; egress?: string; audit?: boolean }
+}
+
 export function emptyPolicy(): VmNetworkPolicy {
   return {
     default_allow: true,
@@ -195,6 +209,10 @@ export function deleteDataplaneCnp(name: string): Promise<void> {
 
 export function listDataplaneIdentities(): Promise<{ items: IdentityInfo[] }> {
   return apiGet('/api/dataplane/identities')
+}
+
+export function listDataplaneEndpoints(): Promise<{ items: CiliumEndpointView[] }> {
+  return apiGet('/api/dataplane/endpoints')
 }
 
 export function getDataplaneObserve(): Promise<Record<string, unknown>> {

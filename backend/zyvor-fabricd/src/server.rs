@@ -429,6 +429,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/dataplane/identities",
             get(api::vm_dataplane::list_identities),
         )
+        .route(
+            "/dataplane/endpoints",
+            get(api::vm_dataplane::list_endpoints),
+        )
+        .route(
+            "/dataplane/microvm-metrics",
+            get(api::vm_dataplane::microvm_metrics),
+        )
         .route("/dataplane/observe", get(api::vm_dataplane::observe))
         .route(
             "/dataplane/hubble/flows",

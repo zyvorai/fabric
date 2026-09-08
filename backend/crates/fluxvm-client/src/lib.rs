@@ -492,6 +492,26 @@ struct IdentityListResponse {
     items: Vec<IdentityInfo>,
 }
 
+/// CiliumEndpoint-*shaped* VM edge view from FluxVM (not a real Cilium CEP CR).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CiliumEndpointView {
+    pub id: u32,
+    pub uuid: Uuid,
+    pub identity: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_source: Option<String>,
+    #[serde(rename = "identity-labels", default)]
+    pub identity_labels: Vec<String>,
+    pub networking: serde_json::Value,
+    pub state: String,
+    pub policy: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct EndpointListResponse {
+    items: Vec<CiliumEndpointView>,
+}
+
 #[derive(Debug, Deserialize)]
 struct CnpListResponse {
     items: Vec<serde_json::Value>,
@@ -1419,6 +1439,16 @@ impl FluxVmClient {
             .send()
             .await?;
         let body: IdentityListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/network/endpoints` — CEP-*shaped* views (`identity_source` when mode=cilium).
+    pub async fn list_endpoints(&self) -> Result<Vec<CiliumEndpointView>> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/endpoints")?))
+            .send()
+            .await?;
+        let body: EndpointListResponse = Self::parse(resp).await?;
         Ok(body.items)
     }
 

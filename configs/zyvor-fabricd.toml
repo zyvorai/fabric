@@ -38,6 +38,9 @@ bridge = "br0"
 # fluxvm_url = "http://127.0.0.1:7788"
 # Bearer token for FluxVM's auth layer, if it has auth.tokens configured.
 # fluxvm_token = "..."
+# FluxVM MicroVM Prometheus histograms (default http://127.0.0.1:9108/metrics).
+# microvm_metrics_url = "http://127.0.0.1:9108/metrics"
+# microvm_metrics_url = "off"
 
 [auth]
 # Enable JWT-based authentication (default: true)
