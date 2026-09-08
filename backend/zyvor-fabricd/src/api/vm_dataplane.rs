@@ -396,7 +396,7 @@ pub async fn upsert_service(
         .map(|s| s.backends.iter().filter(|b| b.enabled).count())
         .unwrap_or_else(|| service.backends.iter().filter(|b| b.enabled).count());
     Ok(Json(NetworkServiceStatus {
-        schema_version: 2,
+        schema_version: 3,
         service_id: 0,
         name: service.name.clone(),
         active_backends: active,
@@ -443,7 +443,7 @@ pub async fn delete_service(
     Ok(Json(DeletedResponse { deleted: name }))
 }
 
-/// GET /api/dataplane/services/status — FluxVM host service dataplane status (schema v2).
+/// GET /api/dataplane/services/status — FluxVM host service dataplane status (schema v3).
 pub async fn services_host_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
@@ -466,27 +466,97 @@ pub async fn services_host_stats(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, "/v1/network/services/stats").await
+}
+
+/// GET /api/dataplane/services/health — backend health report (schema v3).
+pub async fn services_health(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, "/v1/network/services/health").await
+}
+
+/// POST /api/dataplane/services/health/reconcile — run active health probes.
+pub async fn services_health_reconcile(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_post_empty(&state, "/v1/network/services/health/reconcile").await
+}
+
+/// POST /api/dataplane/services/conntrack/gc — expire forward/reverse state.
+pub async fn services_conntrack_gc(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_post_empty(&state, "/v1/network/services/conntrack/gc").await
+}
+
+/// GET /api/dataplane/services/advertisements — VIP advertise snapshot.
+pub async fn services_advertisements(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, "/v1/network/services/advertisements").await
+}
+
+async fn fluxvm_json_get(
+    state: &AppState,
+    path: &str,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let url = format!(
-        "{}/v1/network/services/stats",
-        state.config.driver.fluxvm_url.trim_end_matches('/')
+        "{}{}",
+        state.config.driver.fluxvm_url.trim_end_matches('/'),
+        path
     );
     let mut req = reqwest::Client::new().get(&url);
     if let Some(token) = state.config.driver.fluxvm_token.as_deref() {
         req = req.bearer_auth(token);
     }
     let resp = req.send().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service stats", e)
+        map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM GET {path}"), e)
     })?;
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         return Err((
             StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({ "error": format!("FluxVM service stats HTTP {status}: {body}") })),
+            Json(serde_json::json!({ "error": format!("FluxVM {path} HTTP {status}: {body}") })),
         ));
     }
     let body = resp.json::<serde_json::Value>().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service stats JSON", e)
+        map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM {path} JSON"), e)
+    })?;
+    Ok(Json(body))
+}
+
+async fn fluxvm_json_post_empty(
+    state: &AppState,
+    path: &str,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let url = format!(
+        "{}{}",
+        state.config.driver.fluxvm_url.trim_end_matches('/'),
+        path
+    );
+    let mut req = reqwest::Client::new().post(&url);
+    if let Some(token) = state.config.driver.fluxvm_token.as_deref() {
+        req = req.bearer_auth(token);
+    }
+    let resp = req.send().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM POST {path}"), e)
+    })?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("FluxVM {path} HTTP {status}: {body}") })),
+        ));
+    }
+    let body = resp.json::<serde_json::Value>().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM {path} JSON"), e)
     })?;
     Ok(Json(body))
 }
@@ -512,7 +582,8 @@ fn to_service_lb_spec(
 ) -> Result<service_lb::ServiceSpec, (StatusCode, Json<serde_json::Value>)> {
     use std::net::IpAddr;
     use service_lb::{
-        ServiceAlgorithm, ServiceBackend, ServiceExposure, ServiceMode, ServiceProtocol,
+        BackendState, HealthCheckKind, ServiceAlgorithm, ServiceBackend, ServiceExposure,
+        ServiceHealthCheck, ServiceMode, ServiceProtocol,
     };
 
     let bad = |msg: String| {
@@ -546,6 +617,14 @@ fn to_service_lb_spec(
         ),
         None => None,
     };
+    let health_check = service.health_check.as_ref().map(|h| ServiceHealthCheck {
+        kind: match h.kind {
+            zyvor_fabric_driver_core::NetworkHealthCheckKind::Tcp => HealthCheckKind::Tcp,
+        },
+        timeout_ms: h.timeout_ms,
+        unhealthy_threshold: h.unhealthy_threshold,
+        healthy_threshold: h.healthy_threshold,
+    });
     let mut backends = Vec::with_capacity(service.backends.len());
     for b in &service.backends {
         let address: IpAddr = b
@@ -557,6 +636,12 @@ fn to_service_lb_spec(
             port: b.port,
             weight: b.weight,
             enabled: b.enabled,
+            state: match b.state {
+                zyvor_fabric_driver_core::NetworkBackendState::Ready => BackendState::Ready,
+                zyvor_fabric_driver_core::NetworkBackendState::Draining => BackendState::Draining,
+                zyvor_fabric_driver_core::NetworkBackendState::Unhealthy => BackendState::Unhealthy,
+            },
+            drain_until_unix_ms: b.drain_until_unix_ms,
         });
     }
     Ok(service_lb::ServiceSpec {
@@ -570,6 +655,8 @@ fn to_service_lb_spec(
         backends,
         maglev_table_size: service.maglev_table_size,
         snat_address,
+        health_check,
+        advertise: service.advertise,
     })
 }
 

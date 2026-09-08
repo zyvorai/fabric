@@ -232,10 +232,18 @@ enum DataplaneCmd {
 enum DataplaneServiceCmd {
     List,
     Get { name: String },
-    /// Host Maglev/service dataplane status (schema v2)
+    /// Host Maglev/service dataplane status (schema v3)
     Status,
     /// Host Maglev/service counters
     Stats,
+    /// Backend health report
+    Health,
+    /// Run active health reconcile
+    Reconcile,
+    /// Expire conntrack / reverse-NAT state
+    Gc,
+    /// VIP advertisement snapshot
+    Advertisements,
     /// Create/update from a JSON file (NetworkServiceSpec shape)
     Apply {
         #[arg(short, long)]
@@ -1253,6 +1261,30 @@ impl Cli {
                     }
                     DataplaneServiceCmd::Stats => {
                         let val = api_get(&client, "/dataplane/services/stats").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Health => {
+                        let val = api_get(&client, "/dataplane/services/health").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Reconcile => {
+                        let val =
+                            api_post_empty(&client, "/dataplane/services/health/reconcile").await?;
+                        println!("Reconciled dataplane service health");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    DataplaneServiceCmd::Gc => {
+                        let val =
+                            api_post_empty(&client, "/dataplane/services/conntrack/gc").await?;
+                        println!("Garbage-collected service conntrack");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    DataplaneServiceCmd::Advertisements => {
+                        let val = api_get(&client, "/dataplane/services/advertisements").await?;
                         print_value(&val, fmt);
                     }
                     DataplaneServiceCmd::Apply { file } => {

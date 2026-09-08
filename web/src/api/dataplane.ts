@@ -199,12 +199,22 @@ export type NetworkServiceProtocol = 'tcp' | 'udp'
 export type NetworkServiceMode = 'nat' | 'dsr'
 
 export type NetworkServiceExposure = 'east-west' | 'north-south' | 'both'
+export type NetworkBackendState = 'ready' | 'draining' | 'unhealthy'
 
 export interface NetworkServiceBackend {
   address: string
   port: number
   weight?: number
   enabled?: boolean
+  state?: NetworkBackendState
+  drain_until_unix_ms?: number | null
+}
+
+export interface NetworkServiceHealthCheck {
+  kind?: 'tcp'
+  timeout_ms?: number
+  unhealthy_threshold?: number
+  healthy_threshold?: number
 }
 
 export interface NetworkServiceSpec {
@@ -218,6 +228,8 @@ export interface NetworkServiceSpec {
   backends: NetworkServiceBackend[]
   maglev_table_size?: number | null
   snat_address?: string | null
+  health_check?: NetworkServiceHealthCheck | null
+  advertise?: boolean
 }
 
 export interface NetworkServiceStatus {
@@ -267,6 +279,22 @@ export function getDataplaneServicesStatus(): Promise<HostServiceStatus> {
 
 export function getDataplaneServicesStats(): Promise<{ interfaces?: unknown }> {
   return apiGet('/api/dataplane/services/stats')
+}
+
+export function getDataplaneServicesHealth(): Promise<unknown> {
+  return apiGet('/api/dataplane/services/health')
+}
+
+export function reconcileDataplaneServicesHealth(): Promise<unknown> {
+  return apiPost('/api/dataplane/services/health/reconcile', {})
+}
+
+export function gcDataplaneServicesConntrack(): Promise<unknown> {
+  return apiPost('/api/dataplane/services/conntrack/gc', {})
+}
+
+export function getDataplaneServicesAdvertisements(): Promise<unknown> {
+  return apiGet('/api/dataplane/services/advertisements')
 }
 
 export function listDataplaneCnp(): Promise<{ items: unknown[] }> {

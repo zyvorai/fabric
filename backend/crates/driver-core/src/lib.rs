@@ -419,6 +419,10 @@ pub struct NetworkServiceBackend {
     pub weight: u16,
     #[serde(default = "default_svc_enabled")]
     pub enabled: bool,
+    #[serde(default)]
+    pub state: NetworkBackendState,
+    #[serde(default)]
+    pub drain_until_unix_ms: Option<u64>,
 }
 
 fn default_svc_weight() -> u16 {
@@ -426,6 +430,45 @@ fn default_svc_weight() -> u16 {
 }
 fn default_svc_enabled() -> bool {
     true
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkBackendState {
+    #[default]
+    Ready,
+    Draining,
+    Unhealthy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum NetworkHealthCheckKind {
+    Tcp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkServiceHealthCheck {
+    #[serde(default = "default_health_kind")]
+    pub kind: NetworkHealthCheckKind,
+    #[serde(default = "default_health_timeout")]
+    pub timeout_ms: u64,
+    #[serde(default = "default_unhealthy_threshold")]
+    pub unhealthy_threshold: u32,
+    #[serde(default = "default_healthy_threshold")]
+    pub healthy_threshold: u32,
+}
+fn default_health_kind() -> NetworkHealthCheckKind {
+    NetworkHealthCheckKind::Tcp
+}
+fn default_health_timeout() -> u64 {
+    500
+}
+fn default_unhealthy_threshold() -> u32 {
+    3
+}
+fn default_healthy_threshold() -> u32 {
+    2
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -447,6 +490,10 @@ pub struct NetworkServiceSpec {
     /// Required for north-south NAT so replies return through FluxVM reverse NAT.
     #[serde(default)]
     pub snat_address: Option<String>,
+    #[serde(default)]
+    pub health_check: Option<NetworkServiceHealthCheck>,
+    #[serde(default)]
+    pub advertise: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
