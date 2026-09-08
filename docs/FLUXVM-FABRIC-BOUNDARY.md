@@ -69,6 +69,11 @@ Additional proxies: `/api/dataplane/services/{status,stats,health,advertisements
 `POST …/health/reconcile`, `POST …/conntrack/gc`, `POST …/telemetry/export`,
 `GET/POST …/conntrack/delta` (+ `/import`, `/ack`).
 
+FluxVM must expose north-south service TC (`north_south_interfaces`) before HA deltas
+or VIP advertisements are meaningful; north-south NAT services need `snat_address`.
+Maglev DNAT on the VM edge returns `TC_ACT_OK` so per-VM sandbox policy does not
+require backend ports in `allow_ports` for VIP-forwarded flows.
+
 Operator docs: [ebpf-service-fabric.md](ebpf-service-fabric.md) ·
 FluxVM [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) ·
 Examples: [examples/service-fabric-v3/](examples/service-fabric-v3/).

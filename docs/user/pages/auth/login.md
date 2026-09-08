@@ -17,9 +17,10 @@ Sign-in screen for Zyvor Fabric. Authenticates against the local admin account o
 
 ## Operate from the console (UX)
 
-1. Enter a username and password and sign in — a failed attempt shows an inline error.
-2. On success you are taken to `/app` (dashboard).
-3. Two common ways to sign in: **local admin** — username `admin`, password from `.admin_password` on the host — or your own **system user** account when PAM/OIDC is configured.
+1. Enter a **username** and click **Continue**.
+2. Enter your **password** and sign in — a failed attempt shows an inline error.
+3. On success you are taken to `/app` (dashboard).
+4. Two common ways to sign in: **local admin** — username `admin`, password from `.admin_password` on the host — or your own **system user** account when PAM/OIDC is configured.
 
 If you can't sign in, confirm the account exists and that `zyvor-fabricd` is reachable.
 

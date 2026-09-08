@@ -5,7 +5,8 @@
 ## Dashboard
 
 1. Open `https://HOST:9095/app` (or your `FABRIC_HOST`).
-2. Find capability **VM dataplane** — expect **Live** with
+2. Sign in at `/sign-in`: username → **Continue** → password.
+3. Find capability **VM dataplane** — expect **Live** with
    `mode=ebpf · attached · schema=4` when a bridged sample VM is attached.
 
 ## VM → Dataplane
@@ -33,7 +34,7 @@ Route: `/app/edge-dataplane` (nav under **Infrastructure**, beside Net Security)
 | Identities | Reserved + group table |
 | Observe | Full snapshot JSON |
 | Ipcache | Guest IP → identity |
-| (header) Refresh DNS | `POST /api/dataplane/refresh-dns` |
+| (header) Refresh DNS | `POST /api/dataplane/refresh-dns` (best-effort) |
 
 Copy on the page reminds operators this is the **VM edge** / Service Fabric plane,
 not Fabric SDN Net Security. Maglev detail:

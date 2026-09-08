@@ -91,6 +91,15 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 Orthogonal to per-VM policy. Fabric fans out through `service-lb`; FluxVM owns
 programs/maps. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
 
+**Maglev + VM edge:** after VIP DNAT, FluxVM service TC returns `TC_ACT_OK` and stops
+the clsact chain — Maglev-forwarded flows do not need backend ports in VM
+`allow_ports`.
+
+**North-south / HA:** configure FluxVM `[sandbox.dataplane.service]
+north_south_interfaces` on edge nodes. Services need `exposure` north-south or both;
+north-south NAT requires `snat_address`. Fabric proxies HA delta and advertisement
+endpoints below; FluxVM must have north-south TC pinned for them to return data.
+
 | Fabric | FluxVM | Role |
 | --- | --- | --- |
 | `GET/POST /api/dataplane/services` | `/v1/network/services` | List / upsert Maglev service |
@@ -189,6 +198,9 @@ Hands-on: [Tutorial 09](../../tutorials/09-edge-dataplane.md) ·
 
 ## CLI (`zyvorctl`)
 
+`zyvorctl list` decodes the paginated `GET /api/vms` envelope (`{items, total, …}`),
+not a bare JSON array.
+
 ```bash
 # HTTPS labs (self-signed cert accepted when URL is https://)
 export ZYVOR_FABRIC_URL=https://127.0.0.1:9095
@@ -197,6 +209,7 @@ export ZYVOR_FABRIC_TOKEN="$(curl -sk -X POST "$ZYVOR_FABRIC_URL/api/auth/login"
   -d '{"username":"admin","password":"YOUR_PASSWORD"}' \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')"
 
+zyvorctl list -o json          # items[] from paginated /api/vms
 zyvorctl dataplane status <name> -o json
 zyvorctl dataplane policy get <name> -o json
 zyvorctl dataplane policy set <name> --file /tmp/dp-policy.json
@@ -210,12 +223,15 @@ zyvorctl dataplane observe -o json
 zyvorctl dataplane refresh-dns -o json
 ```
 
-Aliases: `FABRIC_URL`, `FABRIC_TOKEN`. Default URL remains `http://localhost:9095`
+Aliases: `FABRIC_URL`, `FABRIC_TOKEN` (same as `ZYVOR_FABRIC_*`). Default URL remains `http://localhost:9095`
 for local Docker eval.
 
 ---
 
 ## Create a bridged VM that attaches
+
+`POST /api/vms` provisions a disk image under Fabric storage (copy/reflink from
+`image`, or `qemu-img create`) so clone and start have a backing file.
 
 ```bash
 # Fabric API — network_tap enables Tap+netns
@@ -253,6 +269,7 @@ iface). That is expected.
 | Policy POST 4xx on ports | Use `tcp/443`, not `443` |
 | `zyvorctl` 401 | Set `ZYVOR_FABRIC_TOKEN` from `/api/auth/login` |
 | `zyvorctl` TLS errors | Use `https://` URL (client accepts self-signed) |
+| Metrics all zero on stopped VM | Expected when VM is in Fabric store but not registered in FluxVM (`200`, not `404`) |
 | Auth file ≠ auth.db after deploy | `FORCE_ADMIN_RESET=1 FABRIC_LAB_DEFAULTS=1 ./scripts/deploy remote …` |
 | Dashboard card stuck “Checking…” | First `/api/capabilities` before login is 401; refresh after sign-in |
 | Conflating SDN vs edge | Net Security policies ≠ Dataplane tab |

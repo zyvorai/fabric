@@ -136,24 +136,14 @@ List all VMs with pagination.
 
 ```json
 {
-  "items": [
-    {
-      "name": "web-server",
-      "state": "running",
-      "cpus": 4,
-      "memory_mb": 4096,
-      "disk_gb": 40,
-      "ip": "192.168.1.100",
-      "labels": { "tenant": "acme" },
-      "created": "2026-04-10T14:30:00Z",
-      "updated": "2026-04-12T09:15:00Z"
-    }
-  ],
+  "items": [ ... ],
   "total": 15,
   "offset": 0,
   "limit": 200
 }
 ```
+
+`zyvorctl list` decodes this paginated envelope (`items`, not a bare array).
 
 ```bash
 curl -s "http://localhost:9095/api/vms?tenant=acme" \
@@ -217,6 +207,10 @@ Optional `tenant` is merged into `labels["tenant"]` (existing label wins). On
 start, Fabric passes that value to FluxVM’s first-class `CreateVmRequest.tenant`.
 
 VM name constraints: alphanumeric plus `-` and `_`, validated server-side.
+
+On create, Fabric provisions a disk image under its storage path (`cp --reflink=auto`
+from `image` when the source exists, otherwise `qemu-img create`) so clone/start
+have a backing file. Failures are logged but do not fail the create.
 
 **Response (201):** Created VM object
 
@@ -400,7 +394,9 @@ curl -s -X POST http://localhost:3000/api/vms/my-vm/resume \
 
 ### POST /api/vms/:name/clone
 
-Clone a VM by duplicating its disk image and creating a new VM record.
+Clone a VM by duplicating its disk image and creating a new VM record. Source disk
+is resolved from the FluxVM driver path or Fabric storage when the VM was created
+via `POST /api/vms` (disk provisioned on create).
 
 **Auth level:** User+
 
@@ -442,17 +438,19 @@ Get runtime metrics for a VM.
 
 **Auth level:** Viewer+
 
+Returns **404** only when the VM is absent from Fabric's store. When the VM exists
+in the store but is not registered in FluxVM (metadata-only / stopped), returns
+**200** with zeroed counters instead of an error.
+
 **Response (200):**
 
 ```json
 {
-  "cpu_usage_percent": 12.5,
-  "memory_used_bytes": 1073741824,
-  "memory_total_bytes": 2147483648,
-  "disk_read_bytes": 50000000,
-  "disk_write_bytes": 25000000,
-  "network_rx_bytes": 10000000,
-  "network_tx_bytes": 5000000
+  "cpu_usage": 0.0,
+  "memory_usage": 0,
+  "disk_usage": 0,
+  "network_rx": 0,
+  "network_tx": 0
 }
 ```
 
@@ -1134,6 +1132,11 @@ Orthogonal Maglev VIP plane. Full contract: [ebpf-service-fabric.md](../../ebpf-
 | POST | `/api/dataplane/services/{name}/conntrack/delta/import` | apply HA delta batch |
 | POST | `/api/dataplane/services/{name}/conntrack/delta/ack` | advance source watermark |
 
+Requires FluxVM `[sandbox.dataplane.service] north_south_interfaces` and service
+`exposure` north-south/both; north-south NAT needs `snat_address`. Maglev VIP DNAT
+on the VM edge stops the TC chain (`TC_ACT_OK`) so backend ports need not appear in
+per-VM `allow_ports`.
+
 ```bash
 curl -sk https://127.0.0.1:9095/api/dataplane/health \
   -H "Authorization: Bearer $TOKEN" | jq
@@ -1171,6 +1174,8 @@ curl -s http://localhost:3000/api/networkd/bridges \
 #### POST /api/networkd/bridges
 
 Create a new bridge interface via direct netlink calls (no systemd-networkd dependency).
+Apply is **idempotent**: if the bridge already exists, settings are updated in place
+(`ensure_bridge`) instead of failing.
 
 **Auth level:** User+
 
@@ -1491,7 +1496,9 @@ curl -s http://localhost:3000/api/storage/pools \
 
 ### POST /api/storage/pools/local
 
-Create a local directory-based storage pool.
+Create a local directory-based storage pool. Creates the pool state directory under
+`{storage.path}/storage` if missing; pool `path` itself must be writable on the host
+(e2e uses `/var/lib/zyvor-fabricd/e2e-pool`, not `/tmp`).
 
 **Auth level:** Admin only
 

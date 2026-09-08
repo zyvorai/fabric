@@ -254,7 +254,7 @@ Detailed documentation for each major feature area.
 
 | Command | Description |
 |---------|-------------|
-| `zyvorctl list` | List VMs with table, JSON, or YAML output |
+| `zyvorctl list` | List VMs (paginated `{items, total, …}` from `GET /api/vms`); set `FABRIC_URL` + `FABRIC_TOKEN` or `ZYVOR_FABRIC_*` for HTTPS labs |
 | `zyvorctl create` | Create a new VM |
 | `zyvorctl start` | Start a stopped VM |
 | `zyvorctl stop` | Stop a running VM |

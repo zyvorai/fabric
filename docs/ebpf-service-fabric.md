@@ -51,6 +51,23 @@ zyvorctl dataplane service delta payments --after-seq 0
 zyvorctl dataplane service delete payments
 ```
 
+## Maglev DNAT and VM edge policy
+
+On VM-edge ingress, Maglev selection + NAT rewrite runs in `fvm_svc_vm` **before**
+the per-VM sandbox classifier. After a successful DNAT the service program returns
+`TC_ACT_OK`, which **stops the TC clsact chain** — rewritten backend
+address/port traffic is not re-filtered by VM `allow_ports`. Operators do **not**
+need backend service ports in per-VM edge allowlists for Maglev-forwarded VIP flows.
+
+## North-south prerequisites (FluxVM)
+
+HA delta export/import/ack and VIP `advertisements` require FluxVM host-side service
+TC to be pinned. Configure `[sandbox.dataplane.service] north_south_interfaces` on
+each edge node (physical uplinks). Service specs must use `exposure` north-south or
+both; north-south **NAT** also requires `snat_address` so backend replies return
+through FluxVM. Fabric proxies these FluxVM endpoints unchanged; it does not attach
+TC programs itself.
+
 ## Ownership reminder
 
 | Plane | Owner |

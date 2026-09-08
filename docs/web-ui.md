@@ -9,7 +9,7 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 | Surface | Routes |
 |---------|--------|
 | Marketing | `/`, `/product`, `/platform`, `/security` |
-| Sign-in | `/sign-in` (legacy `/login` redirects here) |
+| Sign-in | `/sign-in` (legacy `/login` redirects here) — two-step: username → **Continue** → password |
 | Console | `/app/*` (dashboard, VMs, network, storage, ops, …) |
 
 ---
@@ -40,7 +40,7 @@ Human UI is **web only**. CLI (`zyvorctl`), Kubernetes operator, and Terraform r
 |----------|------|
 | `/app` | Capability card **VM dataplane** — Live when FluxVM eBPF is attached (`schema=4`) |
 | `/app/vms/:name` → **Dataplane** | Status, policy (v4 fields), **Effective**, stats, flows |
-| `/app/edge-dataplane` | Health · **Services** (Maglev v3) · Groups · CNP · Identities · Observe · Ipcache |
+| `/app/edge-dataplane` | Health · **Services** (Maglev v5) · Groups · CNP · Identities · Observe · Ipcache · **Refresh DNS** (best-effort) |
 | `/app/vms/:name` → **Network** | Teaser button **Open Dataplane** |
 
 Policy ports must be entered as `tcp/443` / `udp/53`. Bridged (`network_tap`)

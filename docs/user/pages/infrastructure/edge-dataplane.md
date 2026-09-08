@@ -32,19 +32,21 @@ Per-VM Status / Policy / Effective / Stats / Flows stay on the VM detail
 - Nav: **Infrastructure → Edge Dataplane** (beside Net Security)
 - Command palette: search “Edge Dataplane”
 
+Sign in at `/sign-in` with the two-step flow: enter username → **Continue** → password.
+
 ## Operate from the console (UX)
 
 | Tab | Actions |
 |-----|---------|
 | **Health** | Mode, BPF/bpffs presence, group/CNP/ipcache counts, notes |
-| **Services** | Maglev upsert/delete; schema badge; health reconcile; ads JSON; conntrack GC |
+| **Services** | Maglev upsert/delete; schema badge; health reconcile; ads JSON; conntrack GC; HA deltas |
 | **Groups** | Quick create (name + label) or delete rows |
 | **CNP** | Paste JSON → Apply; delete listed documents |
 | **Identities** | Reserved entities + group identities |
 | **Observe** | Read-only JSON snapshot |
 | **Packet flow** | Hubble-lite hops with Colorful / Normal theme |
 | **Ipcache** | Guest IP → identity table |
-| Header **Refresh DNS** | `POST /api/dataplane/refresh-dns` (admin) |
+| Header **Refresh DNS** | `POST /api/dataplane/refresh-dns` (admin); best-effort — succeeds even when FluxVM has no FQDN entries to refresh |
 
 Write actions require admin/write role. Soft banner appears when the
 `vm_dataplane` capability is off or unreachable.
