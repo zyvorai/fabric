@@ -4,12 +4,15 @@
 
 Resource Quotas — cap CPU, memory, disk, and VM-count usage, applied either globally or to VMs matching specific tags, so a team or workload can't consume unlimited host resources.
 
+Exceeded quotas block **new** matching VMs until usage drops. Enable/disable lets you park a quota without deleting it.
+
 ## When to use it
 
 - To limit how many CPUs, how much memory/disk, or how many VMs a team can create
 - To scope a limit to a subset of VMs by tag, rather than the whole host
 - To check whether a quota is currently exceeded and which resource pushed it over
 - To temporarily disable a quota without deleting its configuration
+- Before handing a shared host to multiple teams — tag VMs and attach per-team quotas
 
 ## How to get there
 
@@ -18,15 +21,25 @@ Resource Quotas — cap CPU, memory, disk, and VM-count usage, applied either gl
 
 ## Operate from the console (UX)
 
-1. **Create Quota** — opens a form for the quota name, four numeric limits (max CPUs, max memory in MB, max disk in GB, max VMs), and optional tags to scope it to tagged VMs only (leave tags empty to apply globally). A checkbox lets you enable the quota immediately on creation.
-2. Each quota renders as a card with **Enabled/Disabled** and **Exceeded** badges, and four usage bars (CPUs, memory, disk, VMs) each showing used/limit and a percentage, colored green under 75%, yellow at 75–89%, and red at 90%+.
-3. If a quota is exceeded, the card shows a warning listing which resources are over limit and notes that new VMs matching this quota can't be created until usage drops.
-4. Per-quota actions: **Enable/Disable** (toggle without deleting), **Edit** (opens the same form pre-filled, showing current usage and warning if a new limit would go below what's already in use), and **Delete** (confirmation dialog, cannot be undone).
-5. If no quotas exist yet, the page shows an empty state with a shortcut to create the first one.
+1. **Create Quota** — name; max CPUs, memory (MB), disk (GB), max VMs; optional tags to scope (empty tags = global). Checkbox to enable immediately.
+2. Each quota card shows **Enabled/Disabled** and **Exceeded** badges, plus four usage bars (CPUs, memory, disk, VMs) with used/limit and color (green &lt;75%, yellow 75–89%, red 90%+).
+3. If exceeded, the card lists which resources are over limit and notes that new matching VMs cannot be created until usage drops.
+4. Per-quota: **Enable/Disable**, **Edit** (same form; warns if a new limit would go below current usage), **Delete** (confirmation, cannot be undone).
+5. Empty state offers a shortcut to create the first quota.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+Typical flow: agree tag scheme → create tagged quotas with headroom → watch bars after create storms → disable temporarily for emergency capacity, then re-enable. Cross-check [Capacity](../monitoring/capacity-planning.md) for host-level ceilings.
+
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Profiles](../core/profiles.md)
+- [Templates](templates.md)
+- [Autoscale](autoscale.md)
+- [Capacity](../monitoring/capacity-planning.md)
+- [Virtual Machines](../core/vms.md)
+- [Access Control](../security/access-control.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

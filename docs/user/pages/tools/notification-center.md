@@ -23,11 +23,13 @@ Notification Center — a live, session-only tray of VM events and system alerts
 4. Click the **×** on a notification to dismiss it individually, or **Clear All** to empty the whole feed.
 5. If polling fails, an amber banner reports the error; polling keeps retrying every 10 seconds in the background.
 
-
 5. **Empty / fail:** Check health, auth, and domain dependencies.
 6. **Success:** Live data loads; mutations complete without error toasts.
 
 ## Related pages
 
+- [API Playground](playground.md)
+- [Webhooks](webhooks.md)
+- [VM Compare](vm-compare.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

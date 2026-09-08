@@ -27,9 +27,14 @@ VM Migrations — move a VM from its current host to a different target host, an
 4. **Refresh** — manually reload the list; the page also polls automatically every 5 seconds.
 5. If there are no migrations at all, the page shows an empty state with a shortcut into the Start Migration dialog.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Snapshots](snapshots.md)
+- [Backups](backups.md)
+- [Migration Wizard](migration-wizard.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

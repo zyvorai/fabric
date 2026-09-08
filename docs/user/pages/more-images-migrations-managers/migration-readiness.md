@@ -4,11 +4,14 @@
 
 Migration Readiness — pre-flight checks that verify the environment is in a good state before you start a migration, with a pass/fail summary and per-check detail.
 
+Run this before large Migration Wizard / batch work so failures are environmental, not mid-job surprises.
+
 ## When to use it
 
-- Before kicking off a migration, to confirm the environment is actually ready
-- To see how many errors vs. warnings are blocking readiness before digging in
-- To read the specific message (and detail line) behind a failing or warning check
+- Before starting migrations, to verify host/environment readiness
+- To read per-check pass/fail detail when the summary is not all green
+- Prefer this page when the job matches the purpose above
+- After fixing storage/network/FluxVM issues, to re-validate before retry
 
 ## How to get there
 
@@ -17,14 +20,26 @@ Migration Readiness — pre-flight checks that verify the environment is in a go
 
 ## Operate from the console (UX)
 
-1. The page runs readiness checks as soon as you open it; use the header **Refresh** control to re-run them.
-2. A summary banner at the top reads either **Ready for Migration** (all checks passed) or **Issues Found**, with a count of errors and warnings.
-3. Below it, every individual check is listed with a status icon (green check / yellow warning / red x), its name, a short message, an optional monospace detail line, and a status badge.
-4. This page is read-only — it reports state but doesn't fix anything; resolve issues elsewhere, then come back and refresh.
+1. Open Readiness and run/load the pre-flight check set.
+2. Read the pass/fail summary first.
+3. Expand or scan per-check detail for anything failing.
+4. Remediate owning systems (storage space, FluxVM health, network reachability to remote sources).
+5. Re-run checks until the summary is clean, then proceed to Migration Wizard / Batch Migration.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+Typical flow: Readiness → fix fails → Readiness again → Migration Wizard → Pipeline/History. Dashboard capability chips should already be Live before you trust a green readiness result.
+
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Migration Wizard](../operations/migration-wizard.md)
+- [Batch Migration](batch-migration.md)
+- [Dashboard](../core/home.md)
+- [Migration History](migration-history.md)
+- [Storage](../infrastructure/storage.md)
+- [Job Monitor](job-monitor.md)
+- [Pipeline](pipeline.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

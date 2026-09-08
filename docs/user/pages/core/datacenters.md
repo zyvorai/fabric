@@ -26,9 +26,14 @@ Datacenters — the physical inventory tree: datacenters, the clusters inside ea
 6. Click **+ Host** on a cluster to register a host (hostname, IP address, CPUs, memory in MB), or use the trash icon to remove one — removal is confirmed first.
 7. Toggle a host in or out of maintenance mode with the wrench icon next to it.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Dashboard](home.md)
+- [Virtual Machines](vms.md)
+- [Create VM](create.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

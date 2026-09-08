@@ -27,7 +27,14 @@ Storage Pools — create, start/stop, and monitor the storage backends VM disks 
 
 If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed. Ceph pool health/stats and RBD image management additionally require an Atlas connection — if that's not configured, those specific actions will show an unavailable error rather than the whole page failing.
 
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
+
 ## Related pages
 
+- [Network](network.md)
+- [Net Security](network-security.md)
+- [Edge Dataplane](edge-dataplane.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

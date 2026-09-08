@@ -24,9 +24,18 @@ Backups & Restore — create full or incremental VM backups, track running backu
 5. **Restore** (enabled only once a backup is `completed`) opens a dialog where you either restore over the original VM, or check **Restore to new VM** and give it a name to clone the backup into a fresh VM instead. Restoring always brings back config and disks; VM runtime state is not restored.
 6. **Delete** a backup permanently, after a confirmation dialog warning the action can't be undone.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Snapshots](snapshots.md)
+- [Backup Scheduler](../more-images-migrations-managers/backup-scheduler.md)
+- [Replication](replication.md)
+- [Site Recovery](site-recovery.md)
+- [Migrations](migrations.md)
+- [Migration Wizard](migration-wizard.md)
+- [Schedules](schedules.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

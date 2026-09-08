@@ -16,6 +16,7 @@ proxied by Zyvor Fabric. These are **not** Fabric SDN Net Security
 | [08 — Console UX](08-console-ux.md) | Dataplane tab + Edge Dataplane page | ~15 min |
 
 Parent walkthrough (single long form): [Tutorial 09](../09-edge-dataplane.md).
+Service Maglev VIP: [Tutorial 10](../10-service-fabric.md).
 
 Operator reference: [fluxvm-dataplane.md](../../guides/vm-drivers/fluxvm-dataplane.md) ·
 [Service Fabric v6 (BPF schema 4)](../../ebpf-service-fabric.md) ·

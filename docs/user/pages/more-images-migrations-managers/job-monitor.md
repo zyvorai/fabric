@@ -4,11 +4,14 @@
 
 Job Monitor — a live view of background jobs (disk conversions, migrations, and other pipeline work), with per-job progress, pipeline stage, and streaming logs.
 
+Use this as the operator console for long-running image/migration work started elsewhere.
+
 ## When to use it
 
-- To watch a long-running migration or conversion job progress in real time
-- To find out why a job failed — the error detail and log output are right next to each other
-- To check which pipeline stage a job is currently in (prepare, convert, validate, deploy)
+- To watch conversion/migration jobs with progress, stage, and logs
+- To diagnose a failed job from its streaming log without SSHing in
+- Prefer this page when the job matches the purpose above
+- After starting Disk Converter, Migration Wizard, Image Builder, or related pipelines
 
 ## How to get there
 
@@ -17,15 +20,27 @@ Job Monitor — a live view of background jobs (disk conversions, migrations, an
 
 ## Operate from the console (UX)
 
-1. **Job list** (left) — every job as a card: name (or VM name), a status badge (pending, running, completed, failed, cancelled) with icon, and a progress bar with current step. The list polls every 3 seconds, so running jobs update live.
-2. **Select a job** to open its detail panel on the right: Status, Progress, Phase, and Duration tiles, plus a pipeline-stage tracker (**prepare → convert → validate → deploy**) that highlights the completed stages in green and the current stage in blue (or red if the job failed). A failed job also shows its error message in a dedicated panel.
-3. **Logs** — streams the selected job's log output, polling every 2 seconds. Toggle **Follow** to auto-scroll to the newest lines, or uncheck it to scroll back through earlier output without being pulled back down.
-4. Use the header **refresh** control to force an immediate reload of the job list.
-5. This page is read-only monitoring — there's no way to create, edit, retry, or cancel a job from here.
+1. Open Job Monitor to load active/recent background jobs.
+2. Select a job to inspect percent complete, pipeline stage, and status.
+3. Follow streaming logs for the selected job while it runs.
+4. Refresh if the list looks stale after submitting work from another page.
+5. On failure, capture the log excerpt, then retry from the originating tool (converter/wizard/builder).
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+Typical flow: start a conversion/migration → open Job Monitor → watch stage + logs → on success confirm [Disk Images](disk-images.md) / [Migration History](migration-history.md). [Pipeline](pipeline.md) is a stage-centric companion view.
+
+Operator tip: keep this tab open during long conversions; stage stalls often show up in the streaming log first.
+
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Pipeline](pipeline.md)
+- [Disk Converter](disk-converter.md)
+- [Migration Wizard](../operations/migration-wizard.md)
+- [Migration History](migration-history.md)
+- [Image Builder](image-builder.md)
+- [Job Monitor](job-monitor.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

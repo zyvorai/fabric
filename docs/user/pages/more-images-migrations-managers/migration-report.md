@@ -4,11 +4,14 @@
 
 Migration Report — a shareable summary of all migration jobs (totals by status, average duration) plus the full per-migration detail table, with copy and print actions.
 
+Use for stakeholder updates and post-mortems; History is the raw log, Report is the rollup.
+
 ## When to use it
 
-- To get an at-a-glance count of successful, failed, and running migrations
-- To copy a plain-text summary of migrations for a status update or ticket
-- To print or save the report as a PDF for a record or audit
+- To summarize migration outcomes (counts by status, average duration)
+- To copy or print a shareable report after a migration wave
+- Prefer this page when the job matches the purpose above
+- After History shows the wave is done, to package results for others
 
 ## How to get there
 
@@ -17,14 +20,26 @@ Migration Report — a shareable summary of all migration jobs (totals by status
 
 ## Operate from the console (UX)
 
-1. The page generates a report as soon as you open it; use the header **Refresh** control to regenerate it.
-2. Once data loads, two header actions appear: **Copy Report** — copies a formatted plain-text summary (totals, average duration, and each migration's name/status/VM/duration/error) to your clipboard — and **Print** — opens the browser print dialog with a print-optimized layout.
-3. Five summary tiles: **Total**, **Successful**, **Failed**, **Running**, **Avg Duration**.
-4. A full table below lists every migration: Name, VM, Status badge, Duration, Output path, and Error. If nothing has run yet, you'll see "No migration data."
+1. Open Report to load totals by status and average duration.
+2. Review the per-migration detail table alongside the summary.
+3. Use **Copy** / **Print** (or equivalent share actions on the page) for handoff.
+4. Refresh after new jobs complete so totals stay current.
+5. Drill into failures via [Migration History](migration-history.md) and Job Monitor logs.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+Typical flow: finish wave → Report → copy/print → attach to change ticket → fix failures and re-run readiness/wizard as needed.
+
+Operator tip: print/copy only after History shows the wave is idle so totals are not mid-flight.
+
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Migration History](migration-history.md)
+- [Migration Readiness](migration-readiness.md)
+- [Pipeline](pipeline.md)
+- [Migration Wizard](../operations/migration-wizard.md)
+- [Job Monitor](job-monitor.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

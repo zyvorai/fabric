@@ -4,12 +4,14 @@
 
 ISO Images — a read-only inventory of installer and driver ISO files sitting in the host's configured images directory, showing which VMs currently have each one attached.
 
+Read-only. Attachment changes happen from VM create/detail flows, not here.
+
 ## When to use it
 
-- Before creating a VM that boots from an OS installer ISO, to confirm the file is present on the host and copy its exact path
-- To check whether a VirtIO driver ISO (`virtio-win`) is available for installing or upgrading Windows guest drivers
-- To see which VMs have a given ISO attached before deleting or replacing that file on the host
-- To search a large images directory by name or path
+- To see which installer/driver ISOs are available on the host
+- To find which VMs currently have a given ISO attached
+- Prefer this page when the job matches the purpose above
+- Before a guest install, to confirm the ISO path exists
 
 ## How to get there
 
@@ -18,16 +20,27 @@ ISO Images — a read-only inventory of installer and driver ISO files sitting i
 
 ## Operate from the console (UX)
 
-- **Search** ISOs by name or path.
-- Each row shows the ISO's name, path, size, last-modified time, and the list of VMs that currently have it attached (**Attached VMs**); ISOs named for `virtio-win` get a small **virtio-win** badge next to the name.
-- The list auto-refreshes every 30 seconds, and you can trigger an immediate refresh from the page header.
-- If no ISOs are found, the empty state reminds you to place ISO files in the configured images directory on the host — this page doesn't upload or manage ISOs itself, only lists them.
+1. Open the page and load the ISO inventory from the configured images directory.
+2. Review each ISO's identity and which VMs currently have it attached.
+3. Use search/filter controls if present to narrow by name.
+4. **Refresh** after copying a new ISO onto the host outside the UI.
+5. Proceed to [Create VM](../core/create.md) / VM detail to attach media — this page does not attach or detach.
 
+Typical flow: confirm ISO present → create/boot VM with that media → return here to verify attachment listing. Disk files (not ISOs) are on [Disk Images](disk-images.md).
 
-5. **Empty / fail:** Check health, auth, and domain dependencies.
-6. **Success:** Live data loads; mutations complete without error toasts.
+Operator tip: after copying an ISO onto the host, Refresh before expecting it in Create VM media pickers.
+
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Disk Images](disk-images.md)
+- [Content Library](../operations/content-library.md)
+- [Create VM](../core/create.md)
+- [Upload Disk](upload-disk.md)
+- [Job Monitor](job-monitor.md)
+- [Pipeline](pipeline.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

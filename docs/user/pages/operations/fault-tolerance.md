@@ -25,9 +25,14 @@ Summary tiles show protected VM count, how many are running, how many need atten
 3. **Events** — a timeline of failover events (test and real), each showing status, failover type, source → target host, downtime in ms, timestamp, and the error message if it failed.
 4. **Metrics** — per protected VM: log bandwidth usage, checkpoint latency, secondary host's CPU/memory usage, failover count, and uptime percentage.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Snapshots](snapshots.md)
+- [Backups](backups.md)
+- [Migrations](migrations.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

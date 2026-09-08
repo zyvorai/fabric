@@ -38,6 +38,7 @@ curl -sk "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 | 07 | [Logging & Compliance](07-logging-compliance.md)  | Intermediate | 35 min | Journals, compliance scans, and secrets management.                 |
 | 08 | [OpenStack Clients](08-openstack-clients.md)      | Beginner     | 25 min | Point `openstack` CLI / curl at Fabric’s Keystone/Nova façade.     |
 | 09 | [VM Edge Dataplane](09-edge-dataplane.md)         | Intermediate | 60 min | FluxVM Network Fabric schema v4 via Fabric API / CLI / console.    |
+| 10 | [Service Fabric Maglev VIP](10-service-fabric.md) | Intermediate | 35 min | Maglev VIP + v6 identity/L7 policy via Edge Dataplane Services.   |
 
 Deep-dive series (groups, CNP, observe, UX):
 [edge-dataplane/](edge-dataplane/README.md).

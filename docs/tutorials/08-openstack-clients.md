@@ -49,12 +49,12 @@ Default listen port is **9095** (HTTPS with a self-signed cert in lab deploys).
 
 ## Step 0: Confirm Fabric is up
 
-Replace the host with yours. Lab example: `80.79.5.173`.
+Replace the host with yours (never commit real lab IPs).
 
 ```bash
 export FABRIC_HOST="https://127.0.0.1:9095"
-# Remote lab:
-# export FABRIC_HOST="https://80.79.5.173:9095"
+# Remote:
+# export FABRIC_HOST="https://<host>:9095"
 
 curl -skf "$FABRIC_HOST/health" && echo OK
 curl -skf "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'

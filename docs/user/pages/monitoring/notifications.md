@@ -36,9 +36,17 @@ The page has three tabs — **Channels**, **Rules**, **History** — loaded toge
 
 If the channels list fails to load, an error banner with retry appears; rules and history failing to load independently just show as empty rather than blocking the page.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Alerts](alerts.md)
+- [Logs](logs.md)
+- [Audit](audit.md)
+- [Timeline](timeline.md)
+- [Webhooks](../tools/webhooks.md)
+- [Notification Center](../tools/notification-center.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

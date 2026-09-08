@@ -1,53 +1,95 @@
 # Admin Basics (Zyvor Fabric)
 
+Operator reference for ports, auth, remote deploy, TLS, and the FluxVM dependency. For the first-hour UI path, see [Getting Started](getting-started.md).
+
 ## Ports / access
 
 | Port | Service |
-|------|--------|
-| **9095** | Daemon / API / production web UI |
-| **5173** | Vite UI (dev) |
+|------|---------|
+| **9095** | `zyvor-fabricd` — API + production web UI (same origin) |
+| **7788** | FluxVM (node-local VM engine; Fabric proxies it) |
+| **5173** | Vite UI (dev only) |
 
 Web routes: marketing `/`, `/product`, `/platform`, `/security`; sign-in `/sign-in`; console `/app/*`.
 
-## Auth
+Open the UI at `https://<host>:9095` or `http://127.0.0.1:9095` on the host. Never publish lab IPs in docs or tickets — use `<host>`.
 
-JWT bearer (local admin by default). Optional LDAP/OIDC.
+Health check:
 
-Sign in at `http://127.0.0.1:9095/sign-in`, then open `/app`.
+```bash
+curl -sf http://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
+```
+
+## Auth and admin password
+
+JWT bearer auth (local admin by default). Optional LDAP/OIDC/PAM for system users.
+
+Sign in at `https://<host>:9095/sign-in` with username `admin`, then open `/app`.
 
 ### JWT secret and admin password
 
-Both are auto-generated (cryptographically random, 64 chars) on first start if unset, and
-persisted to disk so they survive restarts — never a hardcoded or predictable default:
+Both are auto-generated (cryptographically random) on first start if unset, and persisted so they survive restarts:
 
 | Env var | Default when unset | Persisted at |
 |---------|---------------------|--------------|
-| `ZYVOR_FABRICD_JWT_SECRET` | Random, generated once | `/var/lib/zyvor-fabricd/.jwt_secret` (mode 0600) |
-| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Random, generated once — never defaults to `admin` | `/var/lib/zyvor-fabricd/.admin_password` |
+| `ZYVOR_FABRICD_JWT_SECRET` | Random, once | `/var/lib/zyvor-fabricd/.jwt_secret` (mode 0600) |
+| `ZYVOR_FABRICD_ADMIN_PASSWORD` | Random, once — never defaults to `admin` | `/var/lib/zyvor-fabricd/.admin_password` |
 
-Retrieve the generated admin password:
+Retrieve or manage the password with the ctl:
 
 ```bash
-cat /var/lib/zyvor-fabricd/.admin_password
+./zyvor-fabricd-ctl password          # show
+sudo cat /var/lib/zyvor-fabricd/.admin_password
+./zyvor-fabricd-ctl password --lab-reset [PASSWORD]   # reseed (lab only)
 ```
 
-Set your own at deploy time instead by exporting the env var before first start — once a
-value is persisted to disk, it's reused across restarts even if the env var is later
-unset, so set it before the very first run if you want a specific value from day one.
+Set `ZYVOR_FABRICD_ADMIN_PASSWORD` (or `FABRIC_ADMIN_PASSWORD`) **before first start** if you want a known value from day one — once persisted, the file wins even if the env var is later unset.
+
+## Deploy (local and remote)
+
+From a Fabric checkout:
+
+| Target | Command |
+|--------|---------|
+| Local full deploy | `./zyvor-fabricd-ctl deploy` (deps → build → install → start) |
+| Bare-metal remote | `./scripts/deploy remote USER@HOST` |
+| Remote, skip OS deps | `./scripts/deploy remote USER@HOST --quick` |
+| Kubernetes lab | `./scripts/deploy k8s USER@HOST` |
+
+Remote bare-metal install opens `0.0.0.0:9095` (HTTPS with a self-signed cert by default). Admin password is generated on deploy unless you set `FABRIC_ADMIN_PASSWORD` / `ZYVOR_FABRICD_ADMIN_PASSWORD`, or `FABRIC_LAB_DEFAULTS=1` for a convenient lab default. Force reseed: `FORCE_ADMIN_RESET=1 ./scripts/deploy remote USER@HOST --quick`.
+
+Useful ctl commands after install: `status`, `logs`, `verify`, `doctor`, `restart`.
+
+## TLS
+
+```bash
+./zyvor-fabricd-ctl tls    # generate self-signed server cert (auto-sudo)
+```
+
+Enable the paths the ctl prints in `/etc/zyvor-fabricd/zyvor-fabricd.toml` (typically under `/etc/zyvor-fabricd/tls/`). Browsers will warn on self-signed certs in lab — replace with a real cert for production. For local HTTP-only testing, `http://127.0.0.1:9095` is fine when TLS is off.
+
+## FluxVM dependency
+
+Fabric does **not** run QEMU itself. It orchestrates VMs through a local [FluxVM](https://github.com/zyvorai/fluxvm) instance on `127.0.0.1:7788` (lifecycle, disks, console/VNC, cgroups, per-VM netns, Network Fabric eBPF).
+
+- Dashboard **VM driver** / readiness must show FluxVM reachable (`fluxvm.ok` on `/readyz`).
+- VM Dataplane (schema v4) and Edge Maglev Services (Service Fabric v6) require FluxVM dataplane features enabled — see [VM Dataplane](pages/infrastructure/dataplane.md) and [Edge Dataplane](pages/infrastructure/edge-dataplane.md).
+- If FluxVM auth is enabled, set `driver.fluxvm_token` in `zyvor-fabricd.toml`.
+
+Sibling checkouts of FluxVM (and GuestKit for image tooling) are expected for full image builds; see the product [README](../../README.md).
 
 ## Install sketch
 
-Follow the product README and deploy/Helm docs in the repository. Verify health endpoints or CLI status before opening the UI.
+1. Deploy locally or `./scripts/deploy remote USER@HOST`.
+2. Confirm `./zyvor-fabricd-ctl status` and `/readyz`.
+3. Retrieve admin password → open `https://<host>:9095/sign-in` → `/app`.
+4. Follow [Getting Started](getting-started.md).
+
+More detail: [Installation](../getting-started/01-Installation.md) · [Web UI](../getting-started/04-Web-UI.md) · [Production](../deployment/production.md).
 
 ## Related
 
 - [Getting Started](getting-started.md)
-
-## Operate from the console (UX)
-
-1. Open this route from the nav or command palette and wait for live API data.
-2. Use filters/search when present; drill into a row for detail.
-3. For mutating actions: confirm role gates and impact before applying.
-4. **Empty / fail:** Check service health, auth, and that required CRDs/backends for this domain are installed.
-5. **Success:** Live data loads; created/updated objects appear without error toasts.
-
+- [Using the Dashboard](using-the-dashboard.md)
+- [Common workflows](workflows.md)
+- [Complete page index](PAGE_INDEX.md)

@@ -4,11 +4,14 @@
 
 Manifest Builder — a client-side form for assembling a VM configuration manifest and exporting it as YAML, with a live preview as you type. It doesn't create a VM or call the API; it's a scratchpad for drafting config to copy elsewhere.
 
+No server mutation. Pair with [Batch Import](batch-import.md) or API Playground when you are ready to apply.
+
 ## When to use it
 
-- To hand-draft a VM manifest for a provisioning script, IaC pipeline, or ticket without going through the Create VM wizard
-- To sketch settings the Create VM wizard doesn't expose — TPM, Secure Boot, CPU mode, console type, or `user`/`bridge`/`tap` networking — and get syntactically valid YAML for them
-- To generate a quick YAML snippet to share with a teammate or paste into documentation
+- To draft a VM YAML manifest with live preview before pasting into automation
+- To explore fields without risking a create call
+- Prefer this page when the job matches the purpose above
+- When teaching teammates the shape of a VM config without using production APIs
 
 ## How to get there
 
@@ -17,17 +20,26 @@ Manifest Builder — a client-side form for assembling a VM configuration manife
 
 ## Operate from the console (UX)
 
-1. Fill in fields under four collapsible sections — **VM Configuration** (expanded by default), **Network**, **Storage**, and **Advanced** — clicking a section header expands or collapses it.
-2. Set VM name, vCPUs, memory, disk image path, and firmware (`uefi`/`bios`) under VM Configuration; network type (`user`/`bridge`/`tap`), bridge name, and MAC address under Network; disk format (`qcow2`/`raw`/`vmdk`), disk size, and a read-only-root checkbox under Storage; and TPM, Secure Boot, console type (`serial`/`virtio`/`none`), and CPU mode (`host`/`max`/`qemu64`) under Advanced.
-3. Leave any field blank or unchecked — it's simply omitted from the generated YAML, so you only need to fill in what matters for your use case.
-4. Watch the **YAML Preview** pane update live as you type, grouped by section with a generated timestamp comment at the top.
-5. **Copy** the YAML to your clipboard, or **Download** it as a `.yaml` file named after the VM (falls back to `vm-manifest.yaml` if no name is set).
+1. Fill the form fields for the VM configuration you want to express.
+2. Watch the **live YAML preview** update as you type.
+3. Copy or export the YAML when it looks right.
+4. Apply elsewhere (Batch Import, API, git) — this page never submits creates.
+5. Start over by clearing fields if the draft goes wrong.
 
+Typical flow: draft → copy YAML → paste into Batch Import or an external pipeline → verify on Virtual Machines. For sizing presets already in the product, also see [Profiles](../core/profiles.md) / [Templates](../operations/templates.md).
 
-5. **Empty / fail:** Check health, auth, and domain dependencies.
-6. **Success:** Live data loads; mutations complete without error toasts.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Batch Import](batch-import.md)
+- [Create VM](../core/create.md)
+- [API Playground](../tools/playground.md)
+- [Templates](../operations/templates.md)
+- [Profiles](../core/profiles.md)
+- [Job Monitor](job-monitor.md)
+- [Pipeline](pipeline.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

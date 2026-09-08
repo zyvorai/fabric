@@ -25,9 +25,14 @@ Four tabs — **Pools**, **Policies**, **Migrations**, **Datastore Clusters** �
 3. **Migrations** — a read-only table of VM storage migrations: source pool, target pool, progress %, bytes transferred, and status (pending / in progress / completed / failed).
 4. **Datastore Clusters** — a table of clusters showing datastore count, whether storage DRS (SDRS) is enabled, space threshold %, total capacity, and VM count. **Create Cluster** sets a name, space threshold %, and IO-latency threshold (ms) that trigger automatic rebalancing.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Network](network.md)
+- [Net Security](network-security.md)
+- [Edge Dataplane](edge-dataplane.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

@@ -4,11 +4,15 @@
 
 Batch Import — bulk-create VMs from a YAML or JSON list, with a preview step and a per-VM status readout as each one is submitted.
 
+Creates VMs via the VM creation API one at a time after Preview. Use [Download Template] for a three-VM sample file.
+
 ## When to use it
 
-- To stand up several VMs at once (e.g. `web-01`, `db-01`, `app-01`) from a single definition file instead of using the Create VM wizard repeatedly
-- To reprovision from a saved YAML/JSON inventory of VMs — one you maintain outside the product (a script, a checked-in file) — starting from the downloadable template as a model
-- To spot bad entries (missing name or image) before anything is created, and see exactly which VMs succeeded or failed if some fail
+- To stand up several VMs at once from a single definition file instead of repeating Create VM
+- To reprovision from a saved YAML/JSON inventory starting from the downloadable template
+- To spot bad entries (missing name or image) before anything is created
+- Prefer this page when the job matches the purpose above
+- When [Batch Migration](batch-migration.md) only builds a migration spec and you need actual creates
 
 ## How to get there
 
@@ -17,17 +21,26 @@ Batch Import — bulk-create VMs from a YAML or JSON list, with a preview step a
 
 ## Operate from the console (UX)
 
-1. **Provide the input** — drag and drop a `.yaml`/`.yml`/`.json` file onto the drop zone (or click to browse), or paste YAML/JSON directly into the text box. Each entry needs a `name` and `image`; `cpus` and `memory` are optional and default to `2` and `2G`. Click **Download Template** for an example file with three sample VMs.
-2. **Preview** — click **Preview** to parse the input into a table of VMs. If entries are missing a name or image, or nothing parses, you get an inline error instead of moving on.
-3. **Review the table** — each row shows the VM's name, vCPUs, memory, and image path, plus a status icon (pending, submitting, submitted, or failed).
-4. **Submit All** — creates the VMs one at a time via the VM creation API. Each row's status updates live as it's submitted; failed rows show the specific error message under the image path. A summary line at the top tracks total, submitted, and failed counts.
-5. **Back to Editor** — return to the input step to fix and re-preview without losing your place.
+1. **Provide input** — drop `.yaml`/`.yml`/`.json`, browse, or paste. Each entry needs `name` and `image`; `cpus`/`memory` optional (default `2` / `2G`). **Download Template** for examples.
+2. **Preview** — parses into a table; missing name/image → inline error.
+3. **Review** — name, vCPUs, memory, image path, status icon (pending/submitting/submitted/failed).
+4. **Submit All** — creates sequentially; live row status; failures show under the image path; summary tracks total/submitted/failed.
+5. **Back to Editor** — fix and re-preview without losing place.
 
+Typical flow: Download Template → edit names/images → Preview → Submit All → check Virtual Machines / Event Stream. Respect [Quotas](../operations/quotas.md) before large batches.
 
-5. **Empty / fail:** Check health, auth, and domain dependencies.
-6. **Success:** Live data loads; mutations complete without error toasts.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Create VM](../core/create.md)
+- [Manifest Builder](manifest-builder.md)
+- [Batch Migration](batch-migration.md)
+- [Quotas](../operations/quotas.md)
+- [Virtual Machines](../core/vms.md)
+- [Job Monitor](job-monitor.md)
+- [Pipeline](pipeline.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

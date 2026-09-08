@@ -4,11 +4,14 @@
 
 Download Disk — browse the disk images available on the Fabric host and download any of them straight to your machine.
 
+Read inventory + download. Uploading is the inverse flow on [Upload Disk](upload-disk.md).
+
 ## When to use it
 
-- To pull a copy of a VM disk image off the host — for backup, for inspection, or to move it to another environment
-- To check how much disk-image storage a host is using and how many distinct formats are present
-- To locate an image that lives outside the default images directory by browsing a custom path
+- To pull a host-side disk image onto your workstation for offline inspection or archive
+- To retrieve a converted or migrated output path after a job finishes
+- Prefer this page when the job matches the purpose above
+- After [Disk Converter](disk-converter.md) or [Pipeline](pipeline.md) completes, to fetch the output file
 
 ## How to get there
 
@@ -17,17 +20,27 @@ Download Disk — browse the disk images available on the Fabric host and downlo
 
 ## Operate from the console (UX)
 
-- Review summary tiles for **Total Images**, **Total Size**, and how many distinct **Formats** are present (qcow2, vmdk, vhd/vhdx, raw, img — each gets its own color badge in the table).
-- **Filter** the list by name, format, or path, and **sort** by Name, Size, or Modified (click a column header to sort, click again to reverse direction).
-- Each row shows the image's name, format badge, size, last-modified time, and full path, with a **Download** button that streams the file to your browser.
-- Use the **Custom Path** field to look at images outside the default directory: enter a file or directory path and click **Browse** to list what's there, or **Download** to fetch a specific file path directly (pressing Enter in the field also triggers a download).
-- **Refresh** reloads the image list from the host.
+1. Open the page and wait for the host disk-image list to load (or use header **Refresh**).
+2. Browse or search the listed images — name, format, size, and path.
+3. Choose an image and start the download to your browser's download location.
+4. Confirm the file size matches expectations before transferring elsewhere.
+5. For inventory without download, [Disk Images](disk-images.md) is a read-only table of the same class of artifacts.
 
+Typical flow: finish convert/migrate → open Download Disk → fetch the output path → optionally delete local copies when done. Paths are host-local under directories such as `/var/lib/…` — not remote lab URLs.
 
-5. **Empty / fail:** Check health, auth, and domain dependencies.
-6. **Success:** Live data loads; mutations complete without error toasts.
+Operator tip: large downloads can take time; keep the tab open until the browser finishes.
+
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz` on `http://127.0.0.1:<port>` or `https://<host>`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Upload Disk](upload-disk.md)
+- [Disk Images](disk-images.md)
+- [Disk Converter](disk-converter.md)
+- [Migration History](migration-history.md)
+- [Job Monitor](job-monitor.md)
+- [Pipeline](pipeline.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

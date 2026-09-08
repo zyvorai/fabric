@@ -28,9 +28,14 @@ System Health — a live, read-only dashboard of host resource utilization, refr
 
 Entirely read-only monitoring — there's no create/edit/delete action here; data refreshes automatically every 2 seconds.
 
-If the page stays empty, check service health, auth configuration, and that dependencies for this domain are installed.
+**Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
+
+**Success:** Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.
 
 ## Related pages
 
+- [Network](network.md)
+- [Net Security](network-security.md)
+- [Edge Dataplane](edge-dataplane.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

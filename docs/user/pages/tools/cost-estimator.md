@@ -24,11 +24,13 @@ Storage Cost Estimator — a what-if calculator that projects cloud storage cost
 5. A horizontal bar chart compares monthly cost across all three cloud providers plus on-prem.
 6. **Copy Estimate to Clipboard** copies a plain-text summary of your inputs and the results — handy for pasting into a ticket or email.
 
-
 5. **Empty / fail:** Check health, auth, and domain dependencies.
 6. **Success:** Live data loads; mutations complete without error toasts.
 
 ## Related pages
 
+- [API Playground](playground.md)
+- [Webhooks](webhooks.md)
+- [VM Compare](vm-compare.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)
