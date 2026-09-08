@@ -1,5 +1,6 @@
 # Changelog
 
+- **Service Fabric v6** — transactional multi-node service identity/L7 policy APIs proxied to FluxVM.
 ## Unreleased
 
 ### Removed
