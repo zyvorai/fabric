@@ -65,7 +65,7 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | Bind-mount replacement (virtiofs) | `VMStartOptions.bind_mounts` (create-time only) | `CreateVmRequest.shared_folders` — one `virtiofsd` per share, auto-mounted in-guest via a generated cloud-init `/etc/fstab` entry |
 | Image catalog CRUD, incl. read-only flag + orphaned-download cleanup | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export/read-only/clean |
 | **Network Fabric schema v4 (VM edge dataplane)** | `VmDataplaneDriver` | `/v1/vms/{id}/network/{policy,status,stats,flows,effective}` + `/v1/network/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` — proxied as Fabric `/api/vms/{name}/dataplane/*` and `/api/dataplane/*` |
-| **Service Fabric schema v4 (Maglev VIP LB)** | `service-lb` + FluxVM services API | `/v1/network/services…` — proxied as `/api/dataplane/services…` (status/health/ads/GC/flows); see [ebpf-service-fabric.md](../../ebpf-service-fabric.md) |
+| **Service Fabric v5 (BPF schema 4 — Maglev VIP LB)** | `service-lb` + FluxVM services API | `/v1/network/services…` — proxied as `/api/dataplane/services…` (status/health/ads/GC/flows/delta); see [ebpf-service-fabric.md](../../ebpf-service-fabric.md) |
 
 ### Fabric API and CLI for the dataplane
 

@@ -13,7 +13,7 @@ Complete reference for the Zyvor Fabric REST API, organized by functional catego
 - [Backups](#backups)
 - [Networking](#networking)
 - [VM edge dataplane (Network Fabric)](#vm-edge-dataplane-network-fabric)
-- [Service Fabric (Maglev VIP LB)](#service-fabric-schema-v4-maglev-vip-lb)
+- [Service Fabric (Maglev VIP LB)](#service-fabric-v5-bpf-schema-4-maglev-vip-lb)
 - [Storage](#storage)
 - [Machines (VM driver)](#machines-vm-driver)
 - [Events](#events)
@@ -1114,7 +1114,7 @@ FluxVM TC/eBPF edge proxied by Fabric. Orthogonal to host SDN
 | GET | `/api/dataplane/ipcache` | guest IP → identity |
 | POST | `/api/dataplane/refresh-dns` | re-resolve FQDNs |
 
-### Service Fabric schema v4 (Maglev VIP LB)
+### Service Fabric v5 (BPF schema 4 — Maglev VIP LB)
 
 Orthogonal Maglev VIP plane. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
 
@@ -1130,6 +1130,9 @@ Orthogonal Maglev VIP plane. Full contract: [ebpf-service-fabric.md](../../ebpf-
 | GET | `/api/dataplane/services/advertisements` | VIP advertise snapshot |
 | GET | `/api/dataplane/services/flows` | FluxScope service flows |
 | POST | `/api/dataplane/services/telemetry/export` | OTLP/HTTP JSON export |
+| GET | `/api/dataplane/services/{name}/conntrack/delta` | HA delta export |
+| POST | `/api/dataplane/services/{name}/conntrack/delta/import` | apply HA delta batch |
+| POST | `/api/dataplane/services/{name}/conntrack/delta/ack` | advance source watermark |
 
 ```bash
 curl -sk https://127.0.0.1:9095/api/dataplane/health \
@@ -1140,6 +1143,7 @@ curl -sk https://127.0.0.1:9095/api/dataplane/services/status \
   -H "Authorization: Bearer $TOKEN" | jq
 zyvorctl dataplane service list
 zyvorctl dataplane service apply --file docs/examples/service-fabric-v3/ha-draining-service.json
+zyvorctl dataplane service delta payments --after-seq 0
 zyvorctl dataplane service flows
 ```
 

@@ -1,7 +1,7 @@
 # Service Fabric phase 3 — shipped as v3
 
 The phase-3 candidates below landed as **Service Fabric schema v3** and remain
-part of the cumulative **v4** dataplane
+part of the cumulative **v5** dataplane (BPF schema 4 ABI)
 ([ebpf-service-fabric.md](ebpf-service-fabric.md)). This page is retained as an
 archive so older links keep working.
 
@@ -17,5 +17,8 @@ archive so older links keep working.
 Phase-4 performance/observability (EDT, FluxScope, host-routing, FRR/BIRD/File)
 shipped as **schema v4** — see [service-fabric-phase4.md](service-fabric-phase4.md).
 
-Remaining candidates (streaming HA deltas, durable lease controller, L7, …):
-[service-fabric-phase5.md](service-fabric-phase5.md).
+Phase-5 HA/state-plane (streaming HA deltas, durable lease controller, incremental
+reconcile) shipped as **v5** — see [service-fabric-phase5.md](service-fabric-phase5.md).
+
+Remaining candidates (L7, identity-aware policy, cgroup connect, …):
+[service-fabric-phase6.md](service-fabric-phase6.md).
