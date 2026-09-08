@@ -956,85 +956,6 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/autoscale/{vm_name}",
             get(api::autoscale::get_scaling_policy).delete(api::autoscale::delete_scaling_policy),
         )
-        // machinectl/machined integration routes
-        .route("/machines", get(api::machined::list_machines))
-        .route("/machines/images", get(api::machined::list_machine_images))
-        .route(
-            "/machines/images/pull-raw",
-            post(api::machined::pull_raw_image),
-        )
-        .route(
-            "/machines/images/pull-tar",
-            post(api::machined::pull_tar_image),
-        )
-        .route(
-            "/machines/images/import-raw",
-            post(api::machined::import_raw_image),
-        )
-        .route(
-            "/machines/images/import-tar",
-            post(api::machined::import_tar_image),
-        )
-        .route("/machines/images/clean", post(api::machined::clean_images))
-        .route(
-            "/machines/images/{name}/clone",
-            post(api::machined::clone_machine_image),
-        )
-        .route(
-            "/machines/images/{name}/rename",
-            post(api::machined::rename_machine_image),
-        )
-        .route(
-            "/machines/images/{name}/read-only",
-            post(api::machined::set_image_read_only),
-        )
-        .route(
-            "/machines/images/{name}/export-raw",
-            post(api::machined::export_raw_image),
-        )
-        .route(
-            "/machines/images/{name}/export-tar",
-            post(api::machined::export_tar_image),
-        )
-        .route(
-            "/machines/images/{name}",
-            delete(api::machined::remove_machine_image),
-        )
-        .route(
-            "/machines/{name}/properties",
-            get(api::machined::show_machine),
-        )
-        .route(
-            "/machines/{name}/poweroff",
-            post(api::machined::poweroff_machine),
-        )
-        .route(
-            "/machines/{name}/reboot",
-            post(api::machined::reboot_machine),
-        )
-        .route(
-            "/machines/{name}/terminate",
-            post(api::machined::terminate_machine),
-        )
-        .route(
-            "/machines/{name}/enable",
-            post(api::machined::enable_machine),
-        )
-        .route(
-            "/machines/{name}/disable",
-            post(api::machined::disable_machine),
-        )
-        .route("/machines/{name}/shell", post(api::machined::shell_machine))
-        .route("/machines/{name}/ssh", get(api::machined::ssh_info))
-        .route(
-            "/machines/{name}/copy-to",
-            post(api::machined::copy_to_machine),
-        )
-        .route(
-            "/machines/{name}/copy-from",
-            post(api::machined::copy_from_machine),
-        )
-        .route("/machines/{name}/bind", post(api::machined::bind_machine))
         // Plugin routes
         .route("/plugins", get(plugins::list_plugins))
         // Resource optimization routes
@@ -3185,65 +3106,14 @@ async fn run_ha_monitor(state: Arc<AppState>) {
                     }
                 }
 
-                // Level 2: SSH kill -9 on leader PID
+                // Level 2 used to SSH `machinectl show … Leader` then kill -9.
+                // machinectl fencing was removed with the systemd-machined surface;
+                // escalate to STONITH / abort instead of guessing FluxVM PIDs.
                 if !fenced {
-                    if let Some(host) = primary_host {
-                        let host_addr = host.address.clone();
-                        let vm_name_for_fence = ft.vm_name.clone();
-
-                        match tokio::time::timeout(
-                            tokio::time::Duration::from_secs(15),
-                            tokio::task::spawn_blocking(move || {
-                                // Get leader PID via SSH (proper argument passing, no shell)
-                                let leader_output = std::process::Command::new("ssh")
-                                    .args([
-                                        "-o",
-                                        "ConnectTimeout=10",
-                                        &format!("root@{}", host_addr),
-                                    ])
-                                    .args([
-                                        "machinectl",
-                                        "show",
-                                        &vm_name_for_fence,
-                                        "--property=Leader",
-                                        "--value",
-                                    ])
-                                    .output()?;
-
-                                if !leader_output.status.success() {
-                                    return Err(std::io::Error::other("Failed to get leader PID"));
-                                }
-
-                                let pid_str = String::from_utf8_lossy(&leader_output.stdout)
-                                    .trim()
-                                    .to_string();
-                                if pid_str.is_empty() {
-                                    return Err(std::io::Error::other("Empty leader PID"));
-                                }
-
-                                // Kill the leader PID via SSH
-                                std::process::Command::new("ssh")
-                                    .args([
-                                        "-o",
-                                        "ConnectTimeout=10",
-                                        &format!("root@{}", host_addr),
-                                    ])
-                                    .args(["kill", "-9", &pid_str])
-                                    .output()
-                            }),
-                        )
-                        .await
-                        {
-                            Ok(Ok(Ok(out))) if out.status.success() => {
-                                tracing::info!(vm = %ft.vm_name, "Level 2 fence succeeded (SSH kill)");
-                                fence_method = Some("ssh_kill".to_string());
-                                fenced = true;
-                            }
-                            _ => {
-                                tracing::warn!(vm = %ft.vm_name, "Level 2 fence failed, escalating");
-                            }
-                        }
-                    }
+                    tracing::warn!(
+                        vm = %ft.vm_name,
+                        "Level 2 fence skipped (machinectl fencing removed); escalating"
+                    );
                 }
 
                 // Level 3: STONITH (optional, requires configured power-off command)

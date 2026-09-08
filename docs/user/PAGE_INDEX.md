@@ -25,7 +25,7 @@ Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 | Dashboard | `/app` | Dashboard — Core surface. | [Open](pages/core/home.md) |
 | Favorites | `/app/favorites` | Favorites — Core surface. | [Open](pages/core/favorites.md) |
 | Virtual Machines | `/app/vms` | Virtual Machines — Core surface. | [Open](pages/core/vms.md) |
-| Machines | `/app/machines` | Machines — Core surface. | [Open](pages/core/machines.md) |
+| Machines | `/app/machines` | **Removed** — use Virtual Machines `/app/vms`. | [Note](pages/core/machines.md) |
 | Profiles | `/app/profiles` | Profiles — Core surface. | [Open](pages/core/profiles.md) |
 | Datacenters | `/app/datacenters` | Datacenters — Core surface. | [Open](pages/core/datacenters.md) |
 | VM Browser | `/app/vm-browser` | VM Browser — Core surface. | [Open](pages/core/vm-browser.md) |

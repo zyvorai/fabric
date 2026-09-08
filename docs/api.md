@@ -651,17 +651,10 @@ Logical datacenter management.
 | PUT | `/app/datacenters/:id` | Update a datacenter |
 | DELETE | `/app/datacenters/:id` | Delete a datacenter |
 
-## Machines
+## Machines (removed)
 
-Host machine management.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/app/machines` | List host machines |
-| POST | `/app/machines` | Register a host machine |
-| GET | `/app/machines/:id` | Get machine details |
-| DELETE | `/app/machines/:id` | Remove a host machine |
-| POST | `/app/machines/:id/maintenance` | Enter maintenance mode |
+The `/app/machines` machinectl / systemd-machined UI was removed. Use Virtual
+Machines (`/app/vms`) and `/api/vms` (FluxVM).
 
 ## Events
 

@@ -281,7 +281,7 @@ fn default_port_forward_protocol() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct VMStartOptions {
     // -- Manager Scope --
-    /// Whether to use the system or user manager/machined instance
+    /// Legacy manager scope (ignored under FluxVM)
     /// (None = auto: system when root, user otherwise)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<ManagerScope>,
@@ -375,7 +375,7 @@ pub struct VMStartOptions {
     /// Unit properties for the scope unit
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub properties: Vec<String>,
-    /// Register with systemd-machined (None = auto based on uid)
+    /// Legacy register flag (ignored; FluxVM does not use systemd-machined)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub register: Option<bool>,
 

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, Suspense, createContext, useContext
 import {
   ChevronDown, LogOut, User,
   Sun, Moon, X, Menu,
-  LayoutDashboard, Star, Monitor, Server, UserCircle, Building2, Globe2, Wand2,
+  LayoutDashboard, Star, Monitor, UserCircle, Building2, Globe2, Wand2,
   Network, Shield, HardDrive, Database, Boxes, Layers, HeartPulse, Container, Plus, Camera, Disc,
   Zap, ShieldCheck, Copy, LifeBuoy, Route, CheckCircle, History, FileText, GitBranch, FileStack, GitMerge, Share2,
   Library, Image, CalendarClock, Archive, Gauge, Recycle, ArrowUpDown, Upload, Download, Activity, Clock, Package, Hammer, Eye,
@@ -22,7 +22,7 @@ import { auth } from './utils/api';
 export type AppView =
   | 'dashboard' | 'vmList' | 'vmDetails' | 'createVM' | 'console'
   | 'snapshots' | 'logs' | 'network' | 'networkSecurity' | 'storage'
-  | 'storagePools' | 'machines' | 'containers' | 'profiles' | 'templates'
+  | 'storagePools' | 'containers' | 'profiles' | 'templates'
   | 'systemHealth' | 'processes' | 'alerts' | 'liveMetrics' | 'kernel'
   | 'debug' | 'explain' | 'analytics' | 'auditLogs' | 'timeline'
   | 'eventStream' | 'resourceOptimizer' | 'capacityPlanning' | 'serviceMap'
@@ -70,7 +70,6 @@ const NetworkPage = React.lazy(() => import('./components/Network'));
 const NetworkSecurity = React.lazy(() => import('./components/NetworkSecurity'));
 const Storage = React.lazy(() => import('./components/Storage'));
 const StoragePools = React.lazy(() => import('./components/StoragePools'));
-const Machines = React.lazy(() => import('./components/Machines'));
 const Containers = React.lazy(() => import('./components/Containers'));
 const Profiles = React.lazy(() => import('./components/Profiles'));
 const Templates = React.lazy(() => import('./components/Templates'));
@@ -156,7 +155,6 @@ const viewRegistry: Record<AppView, React.LazyExoticComponent<any>> = {
   networkSecurity: NetworkSecurity,
   storage: Storage,
   storagePools: StoragePools,
-  machines: Machines,
   containers: Containers,
   profiles: Profiles,
   templates: Templates,
@@ -248,7 +246,6 @@ const navGroups: NavGroup[] = [
       { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4 text-blue-400" /> },
       { id: 'favoriteVMs', label: 'Favorites', icon: <Star className="w-4 h-4 text-yellow-400" /> },
       { id: 'vmList', label: 'VMs', icon: <Monitor className="w-4 h-4 text-blue-400" /> },
-      { id: 'machines', label: 'Machines', icon: <Server className="w-4 h-4 text-slate-400" /> },
       { id: 'profiles', label: 'Profiles', icon: <UserCircle className="w-4 h-4 text-purple-400" /> },
       { id: 'datacenters', label: 'Datacenters', icon: <Building2 className="w-4 h-4 text-emerald-400" /> },
       { id: 'vmBrowser', label: 'VM Browser', icon: <Globe2 className="w-4 h-4 text-cyan-400" /> },

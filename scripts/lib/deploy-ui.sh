@@ -49,7 +49,7 @@ deploy_ui_step_emoji() {
         *install*)                         echo "📦" ;;
         *dashboard*|*web*|*npm*)           echo "🌐" ;;
         *systemd*|*service*|*daemon*|*reload*) echo "⚙️" ;;
-        *libvirt*|*kvm*|*qemu*|*machined*)  echo "🖥️" ;;
+        *libvirt*|*kvm*|*qemu*)  echo "🖥️" ;;
         *verify*|*smoke*|*test*|*health*|*e2e*|*post-flight*) echo "🩺" ;;
         *clean*|*nuke*)                    echo "🧹" ;;
         *detect*|*runtime*)                 echo "🔍" ;;

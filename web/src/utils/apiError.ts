@@ -8,13 +8,12 @@ export const API_ERROR_LABELS: Record<string, string> = {
   invalid_request: 'The request was invalid',
   forbidden: 'You do not have permission for this action',
   libvirt_connection: 'Could not connect to libvirt on the host',
-  machined_connection: 'Could not connect to systemd-machined on the host',
   internal_error: 'An internal server error occurred',
   unauthorized: 'Authentication required or your session expired',
 }
 
 const ERROR_CODE_RE =
-  /\((operation_failed|not_found|invalid_request|forbidden|libvirt_connection|machined_connection|internal_error|unauthorized)\)\s*$/i
+  /\((operation_failed|not_found|invalid_request|forbidden|libvirt_connection|internal_error|unauthorized)\)\s*$/i
 
 /** Human label for a stable API error code. */
 export function friendlyErrorCode(code: string): string {

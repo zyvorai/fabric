@@ -10,10 +10,6 @@ const API_ERROR_LABELS: &[(&str, &str)] = &[
     ("not_found", "The requested resource was not found"),
     ("invalid_request", "The request was invalid"),
     ("forbidden", "You do not have permission for this action"),
-    (
-        "machined_connection",
-        "Could not connect to systemd-machined on the host",
-    ),
     ("internal_error", "An internal server error occurred"),
     (
         "unauthorized",

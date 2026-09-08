@@ -84,11 +84,10 @@ all with no systemd dependency of its own.
 
 ### Does Zyvor Fabric still use systemd-machined or systemd-vmspawn?
 
-No -- neither is a dependency anymore. `zyvor-fabric-vm-driver` (the crate
-that used to build `systemd-vmspawn` command lines) now only builds VM
-*images* via `mkosi`, an unrelated offline OS-image-building tool. The
-`machinectl-driver`/`machined-dbus` crates that implemented D-Bus/`machinectl`
-based VM lifecycle are deleted entirely.
+No. Both are fully removed. VM lifecycle is FluxVM only (`driver.fluxvm_url`).
+The old `/api/machines` / machinectl UI is gone — use **Virtual Machines**
+(`/app/vms`) and `/api/vms`. The `machinectl-driver` / `machined-dbus` crates
+were deleted.
 
 ### Why are there 48 crates?
 

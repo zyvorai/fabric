@@ -489,57 +489,7 @@ export const systemApi = {
     apiPut<unknown>('/system/rate-limits', body),
 };
 
-// ---- Machine (machinectl/machined) ----------------------------------------
-
-export const machineApi = {
-  list: () => apiGet<unknown[]>('/machines'),
-  // Machine images
-  listImages: () => apiGet<unknown[]>('/machines/images'),
-  pullRawImage: (body: unknown) =>
-    apiPost<unknown>('/machines/images/pull-raw', body),
-  pullTarImage: (body: unknown) =>
-    apiPost<unknown>('/machines/images/pull-tar', body),
-  importRawImage: (body: unknown) =>
-    apiPost<unknown>('/machines/images/import-raw', body),
-  importTarImage: (body: unknown) =>
-    apiPost<unknown>('/machines/images/import-tar', body),
-  cleanImages: () => apiPost<unknown>('/machines/images/clean'),
-  cloneImage: (name: string, body: unknown) =>
-    apiPost<unknown>(`/machines/images/${name}/clone`, body),
-  renameImage: (name: string, body: unknown) =>
-    apiPost<unknown>(`/machines/images/${name}/rename`, body),
-  setImageReadOnly: (name: string, body: unknown) =>
-    apiPost<unknown>(`/machines/images/${name}/read-only`, body),
-  exportRawImage: (name: string) =>
-    apiPost<unknown>(`/machines/images/${name}/export-raw`),
-  exportTarImage: (name: string) =>
-    apiPost<unknown>(`/machines/images/${name}/export-tar`),
-  removeImage: (name: string) =>
-    apiDelete(`/machines/images/${name}`),
-  // Machine operations
-  show: (name: string) =>
-    apiGet<unknown>(`/machines/${name}/properties`),
-  poweroff: (name: string) =>
-    apiPost<unknown>(`/machines/${name}/poweroff`),
-  reboot: (name: string) =>
-    apiPost<unknown>(`/machines/${name}/reboot`),
-  terminate: (name: string) =>
-    apiPost<unknown>(`/machines/${name}/terminate`),
-  enable: (name: string) =>
-    apiPost<unknown>(`/machines/${name}/enable`),
-  disable: (name: string) =>
-    apiPost<unknown>(`/machines/${name}/disable`),
-  shell: (name: string, body: unknown) =>
-    apiPost<unknown>(`/machines/${name}/shell`, body),
-  sshInfo: (name: string) =>
-    apiGet<unknown>(`/machines/${name}/ssh`),
-  copyTo: (name: string, body: unknown) =>
-    apiPost<unknown>(`/machines/${name}/copy-to`, body),
-  copyFrom: (name: string, body: unknown) =>
-    apiPost<unknown>(`/machines/${name}/copy-from`, body),
-  bind: (name: string, body: unknown) =>
-    apiPost<unknown>(`/machines/${name}/bind`, body),
-};
+// ---- Machine API removed (systemd-machined / machinectl gone; use /api/vms) ----
 
 // ---- Backups --------------------------------------------------------------
 

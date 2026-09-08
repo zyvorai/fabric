@@ -6,7 +6,6 @@ import { useParams, useNavigate, Link } from 'react-router'
 import { getVM, getMetrics, deleteVM, addPortForward, removePortForward, getVMLogs, VM, VMMetrics, VMLogEntry } from '../api/vm'
 import { listSnapshots, createSnapshotWithRetry, deleteSnapshot, revertSnapshot, VMSnapshot } from '../api/snapshots'
 import { listAuditLogs, AuditLog } from '../api/audit'
-import { getMachineProperties } from '../api/machines'
 import {
   Play, Square, RotateCw, Trash2, Info, Activity, HardDrive,
   Network, Camera, Terminal, Cpu, MemoryStick, Pause, Copy, Wifi,
@@ -525,45 +524,7 @@ function MetricStat({ label, value, color }: { label: string; value: string; col
 }
 
 function DisksTab({ vm }: { vm: VM }) {
-  const [properties, setProperties] = useState<Record<string, string> | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      try {
-        const props = await getMachineProperties(vm.name)
-        if (!cancelled) setProperties(props)
-      } catch (err) {
-        if (!cancelled) setError(formatUserError(err))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [vm.name])
-
-  if (loading) {
-    return (
-      <div className="zf-panel p-8 text-center">
-        <Loader2 className="w-6 h-6 text-[var(--zf-muted)] mx-auto mb-2 animate-spin" />
-        <p className="text-[var(--zf-muted)] text-sm">Loading disk information...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="zf-panel p-8 text-center">
-        <AlertCircle className="w-6 h-6 text-[var(--zf-danger)] mx-auto mb-2" />
-        <p className="text-[var(--zf-danger)] text-sm">{error}</p>
-      </div>
-    )
-  }
-
-  const rootImage = properties?.['RootDirectory'] || properties?.['RootImage'] || vm.image
+  const rootImage = vm.image
   const format = rootImage?.endsWith('.raw') ? 'raw' : rootImage?.endsWith('.qcow2') ? 'qcow2' : 'image'
 
   const disks: { name: string; path: string; size: string; format: string; bus: string }[] = []
@@ -572,7 +533,7 @@ function DisksTab({ vm }: { vm: VM }) {
     disks.push({
       name: 'vda',
       path: rootImage,
-      size: properties?.['DiskSize'] || '--',
+      size: '--',
       format,
       bus: 'virtio',
     })
@@ -583,9 +544,6 @@ function DisksTab({ vm }: { vm: VM }) {
       <div className="zf-panel p-8 text-center">
         <HardDrive className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
         <p className="text-[var(--zf-muted)] text-sm">No disk information available</p>
-        {vm.image && (
-          <p className="text-[var(--zf-muted)] text-xs mt-2 font-mono">{vm.image}</p>
-        )}
       </div>
     )
   }
@@ -623,53 +581,7 @@ function DisksTab({ vm }: { vm: VM }) {
 }
 
 function NetworkTab({ vm, onUpdated, onOpenDataplane }: { vm: VM; onUpdated: () => void; onOpenDataplane: () => void }) {
-  const [properties, setProperties] = useState<Record<string, string> | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      try {
-        const props = await getMachineProperties(vm.name)
-        if (!cancelled) setProperties(props)
-      } catch (err) {
-        if (!cancelled) setError(formatUserError(err))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [vm.name])
-
-  if (loading) {
-    return (
-      <div className="zf-panel p-8 text-center">
-        <Loader2 className="w-6 h-6 text-[var(--zf-muted)] mx-auto mb-2 animate-spin" />
-        <p className="text-[var(--zf-muted)] text-sm">Loading network information...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    // Only live interface info (driver properties) failed to load -- the
-    // VM's own stored config (port forwards) is independent of that and
-    // should still be manageable, e.g. for a never-started VM with no
-    // FluxVM-side instance yet to query properties from.
-    return (
-      <div className="space-y-6">
-        <div className="zf-panel p-8 text-center">
-          <AlertCircle className="w-6 h-6 text-[var(--zf-danger)] mx-auto mb-2" />
-          <p className="text-[var(--zf-danger)] text-sm">{error}</p>
-        </div>
-        <PortForwardsSection vm={vm} onUpdated={onUpdated} />
-        <DataplaneTeaser onOpen={onOpenDataplane} />
-      </div>
-    )
-  }
-
-  return <NetworkTabContent vm={vm} properties={properties} onUpdated={onUpdated} onOpenDataplane={onOpenDataplane} />
+  return <NetworkTabContent vm={vm} onUpdated={onUpdated} onOpenDataplane={onOpenDataplane} />
 }
 
 function DataplaneTeaser({ onOpen }: { onOpen: () => void }) {
@@ -693,12 +605,10 @@ function DataplaneTeaser({ onOpen }: { onOpen: () => void }) {
 
 function NetworkTabContent({
   vm,
-  properties,
   onUpdated,
   onOpenDataplane,
 }: {
   vm: VM
-  properties: Record<string, string> | null
   onUpdated: () => void
   onOpenDataplane: () => void
 }) {
@@ -712,17 +622,15 @@ function NetworkTabContent({
 
   const interfaces: NetworkInterface[] = []
 
-  const ipAddr = properties?.['IPAddress'] || vm.ip || ''
-  const macAddr = properties?.['MACAddress'] || properties?.['HardwareAddress'] || ''
-  const netIface = properties?.['NetworkInterface'] || 'eth0'
-  const operState = properties?.['OperationalState'] || (vm.state === 'running' ? 'up' : 'down')
+  const ipAddr = vm.ip || ''
+  const operState = vm.state === 'running' ? 'up' : 'down'
 
-  if (ipAddr || macAddr || vm.state === 'running') {
+  if (ipAddr || vm.state === 'running' || vm.network_tap) {
     interfaces.push({
-      name: netIface,
-      mac: macAddr || '--',
+      name: 'eth0',
+      mac: '--',
       ip: ipAddr || '--',
-      model: properties?.['NetworkModel'] || 'virtio-net',
+      model: 'virtio-net',
       state: operState,
     })
   }
@@ -731,7 +639,7 @@ function NetworkTabContent({
     <div className="zf-panel p-8 text-center">
       <Network className="w-10 h-10 text-[var(--zf-muted)] mx-auto mb-3" />
       <p className="text-[var(--zf-muted)] text-sm">No network information available</p>
-      <p className="text-[var(--zf-muted)] text-xs mt-2">VM is not running or has no network interfaces configured</p>
+      <p className="text-[var(--zf-muted)] text-xs mt-2">VM is not running or has no guest IP recorded</p>
     </div>
   ) : (
     <div className="zf-panel overflow-hidden">

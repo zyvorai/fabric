@@ -49,7 +49,6 @@ const SiteRecovery = lazy(() => import('./pages/SiteRecovery'))
 const ContentLibrary = lazy(() => import('./pages/ContentLibrary'))
 const LifecycleManager = lazy(() => import('./pages/LifecycleManager'))
 const Certificates = lazy(() => import('./pages/Certificates'))
-const Machines = lazy(() => import('./pages/Machines'))
 const Migrations = lazy(() => import('./pages/Migrations'))
 const Profiles = lazy(() => import('./pages/Profiles'))
 const Snapshots = lazy(() => import('./pages/Snapshots'))
@@ -159,7 +158,6 @@ function ConsoleRoutes() {
             <Route path="replication" element={<Replication />} />
             <Route path="site-recovery" element={<SiteRecovery />} />
             <Route path="migrations" element={<Migrations />} />
-            <Route path="machines" element={<Machines />} />
             <Route path="profiles" element={<Profiles />} />
             <Route path="snapshots" element={<Snapshots />} />
             <Route path="content-library" element={<ContentLibrary />} />

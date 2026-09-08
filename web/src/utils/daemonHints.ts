@@ -12,18 +12,6 @@ export function hintsForError(err: unknown, domain?: 'vm' | 'storage' | 'network
   const msg = formatUserError(err).toLowerCase()
   const hints: string[] = []
 
-  if (
-    msg.includes('machined') ||
-    msg.includes('systemd-machined') ||
-    msg.includes('machine service')
-  ) {
-    hints.push(
-      'Check systemd-machined: systemctl status systemd-machined',
-      `Verify D-Bus access for the ${DAEMON} service user`,
-      `Review ${DAEMON} logs for driver connection errors`,
-    )
-  }
-
   if (domain === 'storage' || msg.includes('storage') || msg.includes('pool') || msg.includes('volume')) {
     hints.push(
       'List storage pools under Storage or Storage Pools',
@@ -55,7 +43,7 @@ export function hintsForError(err: unknown, domain?: 'vm' | 'storage' | 'network
   if (domain === 'vm' || msg.includes('not found') || msg.includes('vm ')) {
     hints.push(
       `Refresh the VM list — the guest may have been removed outside ${FABRIC}`,
-      'Check machined registration: machinectl list',
+      'Confirm FluxVM is reachable and the VM exists under Virtual Machines',
     )
   }
 

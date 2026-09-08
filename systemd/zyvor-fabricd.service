@@ -1,7 +1,7 @@
 [Unit]
 Description=zyvor-fabricd - Virtual Machine Management Daemon
 Documentation=https://github.com/zyvorai/fabric
-After=network-online.target systemd-machined.service systemd-networkd.service
+After=network-online.target systemd-networkd.service
 Wants=network-online.target
 
 [Service]
@@ -25,8 +25,6 @@ Group=root
 ReadWritePaths=/var/lib/zyvor-fabricd
 ReadWritePaths=/etc/zyvor-fabricd
 ReadWritePaths=/etc/systemd/network
-ReadWritePaths=/run/systemd/machines
-ReadWritePaths=-/run/systemd/nspawn
 ReadWritePaths=/tmp
 # /var/lib/fluxvm: VM disks FluxVM actually manages (see
 # VMDriver::get_disk_path) -- snapshot/checkpoint/resize/clone/fork/

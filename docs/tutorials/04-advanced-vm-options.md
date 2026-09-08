@@ -176,23 +176,21 @@ curl -s -X POST "$FABRIC_HOST/api/vms/advanced-demo/start" \
 |--------|--------|----------------------------------------|
 | `uuid` | string | Machine UUID (standard UUID format)    |
 
-#### systemd Integration
+#### Legacy systemd Integration fields (no-op)
 
-These fields describe `systemd-vmspawn`/`systemd-machined` concepts that
-FluxVM has no equivalent for. They're accepted (not rejected like the
-fields in the note above) but currently silently no-op'd rather than
-applied -- included here for completeness of the request shape, not as
-something that presently takes effect.
+These fields are historical systemd-vmspawn / systemd-machined options. Fabric
+no longer uses machined — they are accepted for request-shape compatibility
+but silently ignored. Prefer FluxVM / Virtual Machines APIs.
 
 | Field            | Type     | Description                             |
 |-----------------|----------|-----------------------------------------|
-| `slice`         | string   | systemd slice (e.g., `"vm.slice"`)      |
-| `properties`    | string[] | Unit properties for resource control    |
-| `register`      | bool     | Register with systemd-machined          |
-| `forward_journal`| string  | Forward VM journal to host              |
-| `pass_ssh_key`  | bool     | Generate and pass SSH key to VM         |
-| `ssh_key_type`  | string   | `"ed25519"`, `"ecdsa"`, or `"rsa"`      |
-| `notify_ready`  | bool     | Wait for ready notification from VM     |
+| `slice`         | string   | Ignored (was systemd slice)             |
+| `properties`    | string[] | Ignored (was unit properties)           |
+| `register`      | bool     | Ignored (was systemd-machined register) |
+| `forward_journal`| string  | Ignored                                 |
+| `pass_ssh_key`  | bool     | Ignored                                 |
+| `ssh_key_type`  | string   | Ignored                                 |
+| `notify_ready`  | bool     | Ignored                                 |
 
 #### User Namespacing
 

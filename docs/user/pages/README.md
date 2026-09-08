@@ -20,7 +20,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Datacenters](core/datacenters.md) | Datacenters — the physical inventory tree: datacenters, the clusters inside each one, and the hosts registered to each cluster, with live CPU/memory usage and VM counts per host. |
 | [Favorites](core/favorites.md) | Favorites — a personal, starred shortlist of VMs pulled from your full VM list, so the machines you use most are one click away instead of buried in a longer list. |
 | [Dashboard](core/home.md) | Dashboard — the fabric at a glance: how many VMs exist and in what state, live CPU/memory trends, and whether each backend subsystem is actually reachable. |
-| [Machines](core/machines.md) | Machines — a lower-level view of the VM driver's running instances and the raw disk images it can boot, with direct shell access into a running instance. |
+| [Machines](core/machines.md) | **Removed** — use [Virtual Machines](core/vms.md) / FluxVM (`/app/vms`). |
 | [Profiles](core/profiles.md) | Profiles (shown in the UI as Instance Types) — a library of VM sizing presets (vCPUs, memory, disk, and optionally network bandwidth) you can pick instead of hand-tuning resources every time you create a VM. |
 | [Settings](core/settings.md) | Settings — Core product and console preferences. |
 | [VM Browser](core/vm-browser.md) | VM Browser — a lightweight, read-only grid of every VM, for quickly scanning or searching without the bulk-action tooling of the full [Virtual Machines](core/vms.md) list. |

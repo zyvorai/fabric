@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Removed
+- **machinectl / systemd-machined surface** — deleted `/api/machines` and the
+  Machines UI (`/app/machines`); systemd unit no longer waits on
+  `systemd-machined`; deploy/selftest/ctl checks dropped; migration target
+  start uses `zyvorctl` (not `machinectl`); HA Level-2 machinectl fence
+  removed. Use FluxVM-backed **Virtual Machines** (`/app/vms`, `/api/vms`).
+
 ### Added
 - FluxVM CEP endpoints + MicroVM metrics in Fabric: `GET /api/dataplane/endpoints`
   (`identity_source`), Edge Dataplane **Endpoints** tab,

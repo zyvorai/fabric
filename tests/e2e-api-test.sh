@@ -460,12 +460,6 @@ section "Autoscale"
 api GET /api/autoscale "" 200 "GET /api/autoscale (list policies)"
 api GET /api/autoscale/events "" 200 "GET /api/autoscale/events (list)"
 
-# ─── Machines (machinectl) ────────────────────────────────────────────────────
-
-section "Machines (machinectl - requires systemd-machined)"
-api GET /api/machines "" 500 "GET /api/machines (requires systemd-machined)"
-api GET /api/machines/images "" 500 "GET /api/machines/images (requires systemd-machined)"
-
 # ─── Events ───────────────────────────────────────────────────────────────────
 
 section "Events"

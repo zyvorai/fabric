@@ -28,8 +28,8 @@ pub enum VMAction {
 }
 
 /// Run a `Start`/`Stop`/`Restart` schedule action through the active VM
-/// driver (machinectl/D-Bus or FluxVM, per `driver.backend`) instead of
-/// shelling directly to systemd-vmspawn/machinectl. `Snapshot` isn't a
+/// driver (FluxVM) instead of
+/// shelling directly to a hypervisor CLI. `Snapshot` isn't a
 /// driver action — callers handle it separately (qemu-img against the
 /// VM's disk file).
 pub async fn run_vm_action(

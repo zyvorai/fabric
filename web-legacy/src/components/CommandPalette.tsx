@@ -18,7 +18,6 @@ const commands: Command[] = [
   { id: 'dashboard', label: 'Dashboard', category: 'Core', view: 'dashboard', keywords: ['home', 'overview'] },
   { id: 'favoriteVMs', label: 'Favorites', category: 'Core', view: 'favoriteVMs', keywords: ['starred'] },
   { id: 'vmList', label: 'VMs', category: 'Core', view: 'vmList', keywords: ['virtual machines', 'list'] },
-  { id: 'machines', label: 'Machines', category: 'Core', view: 'machines', keywords: ['hosts'] },
   { id: 'profiles', label: 'Profiles', category: 'Core', view: 'profiles' },
   { id: 'datacenters', label: 'Datacenters', category: 'Core', view: 'datacenters' },
   { id: 'vmBrowser', label: 'VM Browser', category: 'Core', view: 'vmBrowser' },

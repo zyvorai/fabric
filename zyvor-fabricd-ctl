@@ -275,7 +275,6 @@ cmd_deps() {
 
     # ── System services ──
     step "Enabling system services"
-    systemctl enable --now systemd-machined.service 2>/dev/null && ok "systemd-machined enabled" || warn "systemd-machined not available"
     systemctl enable --now systemd-networkd.service 2>/dev/null && ok "systemd-networkd enabled" || warn "systemd-networkd not available"
     systemctl enable --now systemd-resolved.service 2>/dev/null && ok "systemd-resolved enabled" || warn "systemd-resolved not available"
 
@@ -889,7 +888,7 @@ cmd_doctor() {
     fi
 
     # Check services
-    for svc in systemd-machined systemd-networkd; do
+    for svc in systemd-networkd; do
         if systemctl is-active --quiet "$svc" 2>/dev/null; then
             ok "$svc is running"
         else
@@ -1049,7 +1048,6 @@ cmd_demo() {
         "POST   /api/vms/:name/snapshots    Create snapshot"
         "POST   /api/vms/:name/disk/resize  Resize disk"
         "POST   /api/vms/apply              Declarative VM spec"
-        "GET    /api/machines               List machined containers"
         "GET    /api/storage/pools          List storage pools"
         "GET    /api/affinity-rules         List affinity rules"
         "GET    /api/system/capacity        System capacity"

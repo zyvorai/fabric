@@ -89,17 +89,6 @@ if command -v systemctl &>/dev/null; then
     else
         warn "zyvor-fabricd.service: not installed (fine — it's optional)"
     fi
-
-
-    # Only relevant to the "machinectl" driver backend — the "fluxvm"
-    # backend has no systemd-machined dependency at all.
-    if systemctl is-active systemd-machined &>/dev/null; then
-        pass "systemd-machined: running"
-        MACHINE_COUNT=$(machinectl list --no-legend 2>/dev/null | wc -l || echo "0")
-        pass "Machines registered (machinectl backend): $MACHINE_COUNT"
-    else
-        warn "systemd-machined: not running (fine if driver.backend = \"fluxvm\")"
-    fi
 else
     section "Systemd (optional)"
     warn "systemctl not found — zyvor-fabricd doesn't require it, checking via HTTP instead"
@@ -152,7 +141,7 @@ if ! $QUICK && curl -sf -o /dev/null "http://localhost:${API_PORT}/health" 2>/de
     if curl -sf -o /dev/null "${FLUXVM_URL}/healthz" 2>/dev/null; then
         pass "FluxVM at ${FLUXVM_URL}: healthy"
     else
-        warn "FluxVM at ${FLUXVM_URL}: not reachable (fine if driver.backend = \"machinectl\")"
+        warn "FluxVM at ${FLUXVM_URL}: not reachable (required for VM lifecycle)"
     fi
 elif ! $QUICK; then
     section "API Health"

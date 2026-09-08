@@ -55,7 +55,6 @@ See [Authentication](authentication.md) for the full login flow and token detail
 | Backups | `/api/backups` | 10+ | Create, list, restore, policies, jobs |
 | Networking | `/api/networkd` | 30+ | Bridges, VLANs, bonds, taps, port forwarding |
 | Storage | `/api/storage` | 10+ | Local, NFS, LVM, ZFS, Ceph pools |
-| Machined | `/api/machines` | 12 | Machine lifecycle, shell, SSH, file transfer |
 | Events | `/api/events` | 2 | SSE stream and event history |
 | System | `/api/system` | 10+ | CPU topology, NUMA, hugepages, memory |
 | Cloud-init | `/api/vms/:name/cloud-init` | 1 | Generate cloud-init ISO |

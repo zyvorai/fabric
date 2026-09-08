@@ -25,11 +25,6 @@ const UNIT_EXPLANATIONS: Record<string, { description: string; type: string; doc
     type: 'Service',
     docs: 'Provides DNS resolution, LLMNR, and mDNS. Manages /etc/resolv.conf.',
   },
-  'systemd-machined.service': {
-    description: 'Virtual machine and container registration manager.',
-    type: 'Service',
-    docs: 'Tracks running VMs and containers. Used by machinectl and systemd-vmspawn.',
-  },
   'firewalld.service': {
     description: 'Dynamic firewall daemon.',
     type: 'Service',
@@ -42,13 +37,9 @@ const COMMAND_EXPLANATIONS: Record<string, { description: string; usage: string 
     description: 'Control the systemd system and service manager.',
     usage: 'systemctl [start|stop|restart|status|enable|disable] <unit>',
   },
-  'machinectl': {
-    description: 'Control the systemd machine manager.',
-    usage: 'machinectl [list|show|start|poweroff|login|shell] <machine>',
-  },
-  'systemd-vmspawn': {
-    description: 'Spawn a virtual machine using systemd-machined.',
-    usage: 'systemd-vmspawn --image=<image> [--cpus=N] [--ram=SIZE]',
+  'zyvorctl': {
+    description: 'Zyvor Fabric CLI for VM lifecycle (FluxVM-backed).',
+    usage: 'zyvorctl [list|start|stop|create] <vm>',
   },
   'journalctl': {
     description: 'Query the systemd journal.',
@@ -110,13 +101,13 @@ export default function Explain() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             className="w-full pl-10 pr-4 py-3 bg-slate-900/50 border border-slate-700/50 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
-            placeholder="e.g. sshd.service, systemctl, machinectl..."
+            placeholder="e.g. sshd.service, systemctl, zyvorctl..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
         </div>
         <div className="flex gap-2 mt-3 flex-wrap">
-          {['sshd.service', 'systemd-machined.service', 'systemctl', 'machinectl', 'systemd-vmspawn'].map((ex) => (
+          {['sshd.service', 'systemd-networkd.service', 'systemctl', 'zyvorctl', 'networkctl'].map((ex) => (
             <button
               key={ex}
               onClick={() => setInput(ex)}

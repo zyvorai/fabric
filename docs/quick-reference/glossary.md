@@ -198,11 +198,8 @@ flexible disk partitioning. Zyvor Fabric supports LVM and LVM-thin storage pools
 
 ## M
 
-**machinectl**: A systemd command-line tool for inspecting and controlling
-registered machines (containers and VMs).
-
-**Machined (systemd-machined)**: A systemd service that manages the registration
-of locally running virtual machines and containers.
+**machinectl / Machined (systemd-machined)**: **Removed** from Fabric. VM
+lifecycle is FluxVM only — use Virtual Machines (`/app/vms`) and `/api/vms`.
 
 **macvtap**: A Linux network device that combines the functionality of macvlan
 and TAP devices for efficient VM networking.
@@ -374,14 +371,13 @@ server to client over HTTP. Zyvor Fabric uses SSE for VM state change notificati
 **State Store**: The `state-store` crate providing persistent JSON file storage
 with an in-memory cache.
 
-**systemd-machined**: See "Machined".
+**systemd-machined**: Removed from Fabric — see "machinectl / Machined". Use FluxVM / Virtual Machines.
 
 **systemd-networkd**: A systemd service that manages network configuration on
 Linux. Zyvor Fabric does not depend on it -- host networking (bridges, VLANs,
 bonds, VXLAN, etc.) is applied directly via netlink calls.
 
-**systemd-vmspawn**: A systemd tool for spawning and managing virtual machines
-using QEMU/KVM with tight systemd integration.
+**systemd-vmspawn**: Historical systemd VM spawn tool. Not used by Fabric; FluxVM owns VM lifecycle.
 
 ## T
 

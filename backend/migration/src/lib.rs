@@ -158,14 +158,9 @@ impl MigrationManager {
     /// Perform live synchronization using iterative rsync + final cutover.
     ///
     /// The source (local) VM's pause-for-final-sync goes through the
-    /// active `VmDriver` (machinectl or FluxVM, whichever this host is
-    /// configured for). Starting the VM on the *target* node still shells
-    /// `ssh <target> machinectl start ...` directly — a local
-    /// `Arc<dyn VmDriver>` only ever talks to this host's own D-Bus/
-    /// FluxVM instance, not a remote one, so backend-aware cross-host
-    /// VM control would need either an HTTP call to the target's own
-    /// zyvor-fabricd API or an SSH-executed `zyvorctl`, neither of which
-    /// this crate currently has the cluster/fleet context to do safely.
+    /// active FluxVM `VmDriver`. Starting the VM on the *target* node shells
+    /// `ssh <target> zyvorctl start <vm>` — a local `Arc<dyn VmDriver>` only
+    /// talks to this host's FluxVM, not a remote one.
     async fn live_sync(&self, config: &MigrationConfig) -> Result<()> {
         tracing::info!("Starting live synchronization for VM '{}'", config.vm_name);
 
@@ -222,20 +217,24 @@ impl MigrationManager {
             return Err(anyhow::anyhow!("Final sync failed: {}", stderr));
         }
 
-        // Start VM on target node
+        // Start VM on target via zyvorctl (machinectl removed; FluxVM/Fabric API)
         tracing::info!(
-            "Starting VM '{}' on target node {}",
+            "Starting VM '{}' on target node {} via zyvorctl",
             config.vm_name,
             config.target_node
         );
         let output = Command::new("ssh")
             .arg(&config.target_node)
-            .args(["machinectl", "start", "--runner=vmspawn", &config.vm_name])
+            .args(["zyvorctl", "start", &config.vm_name])
             .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("Failed to start VM on target: {}", stderr));
+            return Err(anyhow::anyhow!(
+                "Failed to start VM on target via zyvorctl: {}. \
+                 Start the target via FluxVM/Fabric API; machinectl was removed.",
+                stderr
+            ));
         }
 
         tracing::info!(

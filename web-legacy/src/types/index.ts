@@ -184,25 +184,7 @@ export interface QoSPolicy {
   priority?: number;
 }
 
-// Machine Types (systemd-machined)
-export interface Machine {
-  name: string;
-  class: string;
-  service: string;
-  os?: string;
-  leader?: number;
-  state?: string;
-  addresses?: string[];
-}
-
-export interface MachineImage {
-  name: string;
-  type: string;
-  size: number;
-  created: string;
-  read_only: boolean;
-  usage?: number;
-}
+// Machine Types removed (machined surface gone)
 
 // System Types
 export interface ProcessInfo {

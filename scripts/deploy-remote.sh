@@ -171,12 +171,9 @@ run() {
     if ! command -v systemctl &>/dev/null; then warn "no systemctl"; exit 1; fi
     printf '\n⚙️  Systemd units\n'
     unit_line zyvor-fabricd.service
-    unit_line systemd-machined.service
-    local vd md
+    local vd
     vd=$(systemctl is-active zyvor-fabricd 2>/dev/null || true)
-    md=$(systemctl is-active systemd-machined 2>/dev/null || true)
     [[ "$vd" == active ]] && ok "zyvor-fabricd active" || warn "zyvor-fabricd not active ($vd)"
-    [[ "$md" == active ]] && ok "systemd-machined active" || warn "systemd-machined not active ($md)"
     printf '\n📋 systemctl status zyvor-fabricd\n'
     systemctl status zyvor-fabricd --no-pager 2>/dev/null || warn "cannot read zyvor-fabricd status"
     printf '\n💚 %s\n' "$HEALTH_URL"
@@ -450,7 +447,7 @@ done
 fi
 
 if ! $QUICK; then
-    phase "$install_step" "$TOTAL_STEPS" "Install system dependencies" "Rust toolchain · qemu · machined · build headers"
+    phase "$install_step" "$TOTAL_STEPS" "Install system dependencies" "Rust toolchain · qemu · build headers"
     ssh_r_bash "$REMOTE" "
 set -euo pipefail
 SUDO='${SUDO}'
@@ -692,7 +689,6 @@ fabric_save_deploy_last "$REPO" "$HOST" "$USER" "$MODE_SAVE"
 
 deploy_ui_highlight "📋 Post-deploy checklist"
 deploy_ui_checklist "zyvor-fabricd" "$(ssh_r_bash "$REMOTE" 'systemctl is-active zyvor-fabricd 2>/dev/null || echo unknown' | tr -d '\r')"
-deploy_ui_checklist "machined" "$(ssh_r_bash "$REMOTE" 'systemctl is-active systemd-machined 2>/dev/null || echo unknown' | tr -d '\r')"
 deploy_ui_checklist "health" "$(curl -skf --connect-timeout 5 "https://${HOST}:${API_PORT}/health" >/dev/null && echo 200 || echo fail)"
 
 deploy_ui_celebrate "Ship it!"

@@ -6,7 +6,6 @@ import { Code2, Send, ChevronRight } from 'lucide-react';
 
 const PRESETS = [
   { method: 'GET', url: '/api/vms', label: 'List VMs' },
-  { method: 'GET', url: '/api/machines', label: 'List Machines' },
   { method: 'GET', url: '/api/storage/pools', label: 'Storage Pools' },
   { method: 'GET', url: '/api/networkd/links', label: 'Network Links' },
   { method: 'GET', url: '/api/networkd/bridges', label: 'Network Bridges' },

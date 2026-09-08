@@ -64,16 +64,6 @@ check _ssh "
     fi
 "
 
-check _ssh "
-    if systemctl is-active systemd-machined &>/dev/null; then
-        echo '  ✅ systemd-machined: running'
-        true
-    else
-        echo '  ⚠️  systemd-machined: not running'
-        true
-    fi
-"
-
 # ── Binary check ──
 echo ""
 echo "  ── Binaries ──"
