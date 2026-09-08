@@ -115,7 +115,8 @@ fn from_group(g: &SecurityGroup) -> client::SecurityGroup {
 
 fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
     use zyvor_fabric_driver_core::{
-        NetworkServiceAlgorithm, NetworkServiceBackend, NetworkServiceMode, NetworkServiceProtocol,
+        NetworkServiceAlgorithm, NetworkServiceBackend, NetworkServiceExposure,
+        NetworkServiceMode, NetworkServiceProtocol,
     };
     NetworkServiceSpec {
         name: s.name,
@@ -132,6 +133,11 @@ fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
             client::NetworkServiceMode::Nat => NetworkServiceMode::Nat,
             client::NetworkServiceMode::Dsr => NetworkServiceMode::Dsr,
         },
+        exposure: match s.exposure {
+            client::NetworkServiceExposure::EastWest => NetworkServiceExposure::EastWest,
+            client::NetworkServiceExposure::NorthSouth => NetworkServiceExposure::NorthSouth,
+            client::NetworkServiceExposure::Both => NetworkServiceExposure::Both,
+        },
         backends: s
             .backends
             .into_iter()
@@ -143,11 +149,14 @@ fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
             })
             .collect(),
         maglev_table_size: s.maglev_table_size,
+        snat_address: s.snat_address,
     }
 }
 
 fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
-    use zyvor_fabric_driver_core::{NetworkServiceMode, NetworkServiceProtocol};
+    use zyvor_fabric_driver_core::{
+        NetworkServiceExposure, NetworkServiceMode, NetworkServiceProtocol,
+    };
     client::NetworkServiceSpec {
         name: s.name.clone(),
         vip: s.vip.clone(),
@@ -161,6 +170,11 @@ fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
             NetworkServiceMode::Nat => client::NetworkServiceMode::Nat,
             NetworkServiceMode::Dsr => client::NetworkServiceMode::Dsr,
         },
+        exposure: match s.exposure {
+            NetworkServiceExposure::EastWest => client::NetworkServiceExposure::EastWest,
+            NetworkServiceExposure::NorthSouth => client::NetworkServiceExposure::NorthSouth,
+            NetworkServiceExposure::Both => client::NetworkServiceExposure::Both,
+        },
         backends: s
             .backends
             .iter()
@@ -172,16 +186,29 @@ fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
             })
             .collect(),
         maglev_table_size: s.maglev_table_size,
+        snat_address: s.snat_address.clone(),
     }
 }
 
 fn to_service_status(s: client::NetworkServiceStatus) -> NetworkServiceStatus {
+    use zyvor_fabric_driver_core::{NetworkServiceExposure, NetworkServiceMode};
     NetworkServiceStatus {
         schema_version: s.schema_version,
         service_id: s.service_id,
         name: s.name,
         active_backends: s.active_backends,
         maglev_table_size: s.maglev_table_size,
+        family: s.family,
+        mode: s.mode.map(|m| match m {
+            client::NetworkServiceMode::Nat => NetworkServiceMode::Nat,
+            client::NetworkServiceMode::Dsr => NetworkServiceMode::Dsr,
+        }),
+        exposure: s.exposure.map(|e| match e {
+            client::NetworkServiceExposure::EastWest => NetworkServiceExposure::EastWest,
+            client::NetworkServiceExposure::NorthSouth => NetworkServiceExposure::NorthSouth,
+            client::NetworkServiceExposure::Both => NetworkServiceExposure::Both,
+        }),
+        snat_address: s.snat_address,
     }
 }
 

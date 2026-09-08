@@ -198,6 +198,8 @@ export function deleteDataplaneGroup(name: string): Promise<void> {
 export type NetworkServiceProtocol = 'tcp' | 'udp'
 export type NetworkServiceMode = 'nat' | 'dsr'
 
+export type NetworkServiceExposure = 'east-west' | 'north-south' | 'both'
+
 export interface NetworkServiceBackend {
   address: string
   port: number
@@ -212,8 +214,10 @@ export interface NetworkServiceSpec {
   protocol: NetworkServiceProtocol
   algorithm?: 'maglev'
   mode?: NetworkServiceMode
+  exposure?: NetworkServiceExposure
   backends: NetworkServiceBackend[]
   maglev_table_size?: number | null
+  snat_address?: string | null
 }
 
 export interface NetworkServiceStatus {
@@ -222,6 +226,25 @@ export interface NetworkServiceStatus {
   name: string
   active_backends: number
   maglev_table_size: number
+  family?: string
+  mode?: NetworkServiceMode
+  exposure?: NetworkServiceExposure
+  snat_address?: string | null
+}
+
+export interface HostServiceInterfaceStatus {
+  interface: string
+  tc_program_pinned: boolean
+  xdp_requested: boolean
+  xdp_program_pinned: boolean
+  pin_dir: string
+}
+
+export interface HostServiceStatus {
+  schema_version: number
+  north_south_interfaces: string[]
+  xdp_acceleration: boolean
+  interfaces: HostServiceInterfaceStatus[]
 }
 
 export function listDataplaneServices(): Promise<{ items: NetworkServiceSpec[] }> {
@@ -236,6 +259,14 @@ export function upsertDataplaneService(
 
 export function deleteDataplaneService(name: string): Promise<void> {
   return apiDelete(`/api/dataplane/services/${encodeURIComponent(name)}`)
+}
+
+export function getDataplaneServicesStatus(): Promise<HostServiceStatus> {
+  return apiGet('/api/dataplane/services/status')
+}
+
+export function getDataplaneServicesStats(): Promise<{ interfaces?: unknown }> {
+  return apiGet('/api/dataplane/services/stats')
 }
 
 export function listDataplaneCnp(): Promise<{ items: unknown[] }> {
