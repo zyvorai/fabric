@@ -455,11 +455,13 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/dataplane/services/policies",
-            get(api::vm_dataplane::list_service_policies).post(api::vm_dataplane::upsert_service_policy),
+            get(api::vm_dataplane::list_service_policies)
+                .post(api::vm_dataplane::upsert_service_policy),
         )
         .route(
             "/dataplane/services/{name}/policy",
-            get(api::vm_dataplane::get_service_policy).delete(api::vm_dataplane::delete_service_policy),
+            get(api::vm_dataplane::get_service_policy)
+                .delete(api::vm_dataplane::delete_service_policy),
         )
         .route(
             "/dataplane/services/{name}/l7/envoy",

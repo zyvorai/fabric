@@ -1046,8 +1046,15 @@ pub async fn upsert_service_policy(
     let client = service_lb::policy::FluxVmPolicyHttpClient::new()
         .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "policy client", e))?;
     let report = service_lb::policy::PolicyOrchestrator::new(client)
-        .apply(&spec, &nodes).await
-        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "distributed service policy apply", e))?;
+        .apply(&spec, &nodes)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::BAD_GATEWAY,
+                "distributed service policy apply",
+                e,
+            )
+        })?;
     Ok(Json(report))
 }
 
@@ -1060,8 +1067,15 @@ pub async fn delete_service_policy(
     let client = service_lb::policy::FluxVmPolicyHttpClient::new()
         .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "policy client", e))?;
     let report = service_lb::policy::PolicyOrchestrator::new(client)
-        .delete(&name, &nodes).await
-        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "distributed service policy delete", e))?;
+        .delete(&name, &nodes)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::BAD_GATEWAY,
+                "distributed service policy delete",
+                e,
+            )
+        })?;
     Ok(Json(report))
 }
 

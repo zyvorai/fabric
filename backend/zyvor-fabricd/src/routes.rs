@@ -1349,7 +1349,9 @@ async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
         let output = tokio::process::Command::new("cp")
             .args([
                 "--reflink=auto",
-                source.to_str().ok_or_else(|| "invalid source path".to_string())?,
+                source
+                    .to_str()
+                    .ok_or_else(|| "invalid source path".to_string())?,
                 &target,
             ])
             .output()
@@ -1363,13 +1365,7 @@ async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
 
     let size_gib = if vm.disk > 0 { vm.disk } else { 20 };
     let output = tokio::process::Command::new("qemu-img")
-        .args([
-            "create",
-            "-f",
-            "qcow2",
-            &target,
-            &format!("{size_gib}G"),
-        ])
+        .args(["create", "-f", "qcow2", &target, &format!("{size_gib}G")])
         .output()
         .await
         .map_err(|e| e.to_string())?;
