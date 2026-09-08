@@ -65,6 +65,10 @@ VIP `advertise` intent, and Fabric `EdgeLease` / conntrack replication helpers.
 Additional proxies: `/api/dataplane/services/{status,stats,health,advertisements}`,
 `POST …/health/reconcile`, `POST …/conntrack/gc`.
 
+Operator docs: [ebpf-service-fabric.md](ebpf-service-fabric.md) ·
+FluxVM [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) ·
+Examples: [examples/service-fabric-v3/](examples/service-fabric-v3/).
+
 ## Standalone FluxVM fleet mode
 
 `fluxvm-agent` stays useful as a lightweight standalone multi-host option. It

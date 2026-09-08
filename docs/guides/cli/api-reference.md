@@ -13,6 +13,7 @@ Complete reference for the Zyvor Fabric REST API, organized by functional catego
 - [Backups](#backups)
 - [Networking](#networking)
 - [VM edge dataplane (Network Fabric)](#vm-edge-dataplane-network-fabric)
+- [Service Fabric (Maglev VIP LB)](#service-fabric-schema-v3-maglev-vip-lb)
 - [Storage](#storage)
 - [Machines (VM driver)](#machines-vm-driver)
 - [Events](#events)
@@ -1113,11 +1114,30 @@ FluxVM TC/eBPF edge proxied by Fabric. Orthogonal to host SDN
 | GET | `/api/dataplane/ipcache` | guest IP → identity |
 | POST | `/api/dataplane/refresh-dns` | re-resolve FQDNs |
 
+### Service Fabric schema v3 (Maglev VIP LB)
+
+Orthogonal Maglev VIP plane. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
+
+| Method | Path | Role |
+|--------|------|------|
+| GET/POST | `/api/dataplane/services` | list / upsert Maglev service |
+| GET/DELETE | `/api/dataplane/services/{name}` | get / delete |
+| GET | `/api/dataplane/services/status` | host `schema_version`, interfaces, XDP |
+| GET | `/api/dataplane/services/stats` | counters |
+| GET | `/api/dataplane/services/health` | backend health report |
+| POST | `/api/dataplane/services/health/reconcile` | run TCP probes |
+| POST | `/api/dataplane/services/conntrack/gc` | expire affinity / NAT |
+| GET | `/api/dataplane/services/advertisements` | VIP advertise snapshot |
+
 ```bash
 curl -sk https://127.0.0.1:9095/api/dataplane/health \
   -H "Authorization: Bearer $TOKEN" | jq
 curl -sk https://127.0.0.1:9095/api/vms/NAME/dataplane/status \
   -H "Authorization: Bearer $TOKEN" | jq
+curl -sk https://127.0.0.1:9095/api/dataplane/services/status \
+  -H "Authorization: Bearer $TOKEN" | jq
+zyvorctl dataplane service list
+zyvorctl dataplane service apply --file docs/examples/service-fabric-v3/ha-draining-service.json
 ```
 
 Tutorials: [09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).

@@ -12,3 +12,6 @@ After v3 lifecycle/HA is verified on a real multi-node testbed, the next coheren
 8. Incremental/streamed conntrack replication instead of snapshot fan-out for very high connection counts.
 
 Do not move cluster election, BGP session ownership, tenant/service discovery or HA policy into FluxVM.
+
+Current: [ebpf-service-fabric.md](ebpf-service-fabric.md) · FluxVM [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md).
+Archives: [phase-2](service-fabric-phase-2.md) · [phase-3](service-fabric-phase3.md).

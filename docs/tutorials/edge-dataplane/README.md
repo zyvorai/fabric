@@ -18,10 +18,12 @@ proxied by Zyvor Fabric. These are **not** Fabric SDN Net Security
 Parent walkthrough (single long form): [Tutorial 09](../09-edge-dataplane.md).
 
 Operator reference: [fluxvm-dataplane.md](../../guides/vm-drivers/fluxvm-dataplane.md) ·
+[Service Fabric v3](../../ebpf-service-fabric.md) ·
 User: [dataplane.md](../../user/pages/infrastructure/dataplane.md) ·
 [edge-dataplane.md](../../user/pages/infrastructure/edge-dataplane.md).
 
-Kernel / BPF source of truth: [FluxVM Network Fabric](https://github.com/zyvorai/fluxvm/blob/main/docs/network-fabric.md).
+Kernel / BPF source of truth: [FluxVM Network Fabric](https://github.com/zyvorai/fluxvm/blob/main/docs/network-fabric.md) ·
+[Service Fabric](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md).
 
 ## Shared prerequisites
 

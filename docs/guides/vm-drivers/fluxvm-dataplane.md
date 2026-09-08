@@ -86,6 +86,24 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/dataplane/ipcache` | `GET /v1/network/ipcache` | Guest IP → identity |
 | `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` | Re-resolve FQDN allowlists |
 
+### Service Fabric schema v3 (Maglev VIP LB)
+
+Orthogonal to per-VM policy. Fabric fans out through `service-lb`; FluxVM owns
+programs/maps. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
+
+| Fabric | FluxVM | Role |
+| --- | --- | --- |
+| `GET/POST /api/dataplane/services` | `/v1/network/services` | List / upsert Maglev service |
+| `GET/DELETE /api/dataplane/services/{name}` | `/v1/network/services/{name}` | Get / delete |
+| `GET /api/dataplane/services/status` | `/v1/network/services/status` | Host schema / interfaces / XDP |
+| `GET /api/dataplane/services/stats` | `/v1/network/services/stats` | Counters |
+| `GET /api/dataplane/services/health` | `/v1/network/services/health` | Backend health |
+| `POST …/health/reconcile` | `POST …/health/reconcile` | TCP probes |
+| `POST …/conntrack/gc` | `POST …/conntrack/gc` | Affinity / NAT GC |
+| `GET …/advertisements` | `GET …/advertisements` | VIP advertise snapshot |
+
+CLI: `zyvorctl dataplane service …`. Console: **Edge Dataplane → Services**.
+
 Observe pack (explain, dry-run Guard, templates): [dataplane-observe-pack.md](../../dataplane-observe-pack.md).
 
 Capability probe (dashboard health card):
@@ -247,7 +265,9 @@ sudo cat /run/fluxvm/ebpf/vms/*/iface /run/fluxvm/ebpf/vms/*/schema_version
 ## Related docs
 
 - [FluxVM driver](fluxvm.md) — full driver surface
+- [Service Fabric v3](../../ebpf-service-fabric.md) — Maglev VIP LB / leases / health
 - [Networking](../../networking.md) — Fabric SDN + bridges + this plane
 - [Web UI](../../web-ui.md) — console surfaces
 - [User: VM Dataplane](../../user/pages/infrastructure/dataplane.md)
-- FluxVM [network-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/network-fabric.md) · [ebpf-cilium.md](https://github.com/zyvorai/fluxvm/blob/main/docs/ebpf-cilium.md)
+- [User: Edge Dataplane](../../user/pages/infrastructure/edge-dataplane.md)
+- FluxVM [network-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/network-fabric.md) · [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) · [ebpf-cilium.md](https://github.com/zyvorai/fluxvm/blob/main/docs/ebpf-cilium.md)

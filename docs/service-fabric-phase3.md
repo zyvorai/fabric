@@ -1,36 +1,22 @@
-# Service Fabric Phase 3 candidates
+# Service Fabric phase 3 — shipped as v3
 
-The cumulative v2 kit intentionally stops after dual-stack DSR/SNAT/XDP and distributed rollout. The next coherent set should focus on connection lifecycle and cloud-network integration rather than adding unrelated BPF hooks.
+The phase-3 candidates below landed as **Service Fabric schema v3**
+([ebpf-service-fabric.md](ebpf-service-fabric.md)). This page is retained as an
+archive so older links keep working.
 
-## P0
+## Shipped (P0)
 
-1. **Forward conntrack/backend pinning**
-   - Preserve the selected backend for established NAT flows across backend/Maglev changes.
-   - TCP-state-aware timeout classes; UDP idle timeout.
-   - Explicit conntrack GC/pressure metrics.
+1. **Forward conntrack/backend pinning** — Maglev affinity maps; TCP/UDP timeouts; GC/pressure.
+2. **Backend health + graceful drain** — `ready` / `draining` / `unhealthy`, drain deadlines, TCP active health.
+3. **VIP advertisement** — FluxVM atomic snapshot; Fabric `advertise` + lease-gated ECMP/BGP intent.
+4. **HA service state** — `EdgeLease`, `withdraw_node()`, optional whitelisted conntrack export/import.
 
-2. **Backend health + graceful drain**
-   - active/passive probes;
-   - `ready`, `draining`, `unhealthy` state;
-   - stop new selection while retaining established-flow affinity;
-   - drain deadlines and forced removal.
+## Still open (was P1 → phase 4)
 
-3. **VIP advertisement**
-   - Fabric BGP intent; FluxVM node-local advertisement agent or integration boundary;
-   - ECMP anycast VIPs across service-edge nodes;
-   - withdraw VIP before node drain/fencing.
+5. EDT bandwidth scheduling per service/identity.
+6. Socket-level acceleration where the host owns sockets.
+7. L7 redirect contract to Envoy.
+8. OTLP/Hubble-grade service flow events and explicit drop reasons.
+9. BPF host-routing fast path / `bpf_redirect_neigh` where supported.
 
-4. **HA service state**
-   - node loss/reconciliation semantics;
-   - service edge leases/fencing;
-   - optional conntrack state replication only where needed.
-
-## P1
-
-5. **EDT bandwidth scheduling per service/identity**.
-6. **Socket-level acceleration where the host owns sockets**; do not force it onto guest sockets.
-7. **L7 redirect contract to Envoy for HTTP/gRPC policy/telemetry**.
-8. **OTLP/Hubble-grade service flow events and explicit drop reasons**.
-9. **BPF host-routing fast path / `bpf_redirect_neigh` where kernel support is sufficient**.
-
-The ownership split remains unchanged: Fabric defines/distributes intent; FluxVM owns node-local dataplane execution.
+See [service-fabric-phase4.md](service-fabric-phase4.md).

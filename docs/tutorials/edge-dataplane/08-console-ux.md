@@ -27,6 +27,7 @@ Route: `/app/edge-dataplane` (nav under **Infrastructure**, beside Net Security)
 | Tab | Use |
 |-----|-----|
 | Health | Cluster readiness / notes |
+| Services | Maglev VIP upsert/delete; schema v3 badge; health reconcile; ads; conntrack GC |
 | Groups | Create quick group / delete |
 | CNP | Paste JSON apply / delete |
 | Identities | Reserved + group table |
@@ -34,8 +35,9 @@ Route: `/app/edge-dataplane` (nav under **Infrastructure**, beside Net Security)
 | Ipcache | Guest IP → identity |
 | (header) Refresh DNS | `POST /api/dataplane/refresh-dns` |
 
-Copy on the page reminds operators this is the **VM edge**, not Fabric SDN
-Net Security.
+Copy on the page reminds operators this is the **VM edge** / Service Fabric plane,
+not Fabric SDN Net Security. Maglev detail:
+[ebpf-service-fabric.md](../../ebpf-service-fabric.md).
 
 ## Automated UX API check
 

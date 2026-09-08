@@ -65,6 +65,7 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | Bind-mount replacement (virtiofs) | `VMStartOptions.bind_mounts` (create-time only) | `CreateVmRequest.shared_folders` — one `virtiofsd` per share, auto-mounted in-guest via a generated cloud-init `/etc/fstab` entry |
 | Image catalog CRUD, incl. read-only flag + orphaned-download cleanup | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export/read-only/clean |
 | **Network Fabric schema v4 (VM edge dataplane)** | `VmDataplaneDriver` | `/v1/vms/{id}/network/{policy,status,stats,flows,effective}` + `/v1/network/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` — proxied as Fabric `/api/vms/{name}/dataplane/*` and `/api/dataplane/*` |
+| **Service Fabric schema v3 (Maglev VIP LB)** | `service-lb` + FluxVM services API | `/v1/network/services…` — proxied as `/api/dataplane/services…` (status/health/ads/GC); see [ebpf-service-fabric.md](../../ebpf-service-fabric.md) |
 
 ### Fabric API and CLI for the dataplane
 
@@ -79,6 +80,7 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | `GET/POST/DELETE /api/dataplane/cnp[/{name}]` | `/v1/network/cnp…` |
 | `GET /api/dataplane/{identities,observe,health,ipcache}` | matching `/v1/network/…` |
 | `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` |
+| `GET/POST/DELETE /api/dataplane/services…` | `/v1/network/services…` (+ health/ads/GC) |
 
 ```bash
 # HTTPS labs — URL + JWT (self-signed accepted when URL is https://)
@@ -92,6 +94,9 @@ zyvorctl dataplane effective <name>
 zyvorctl dataplane stats <name>
 zyvorctl dataplane flows <name> --limit 100
 zyvorctl dataplane health
+zyvorctl dataplane service list
+zyvorctl dataplane service status
+zyvorctl dataplane service health
 zyvorctl dataplane group list
 zyvorctl dataplane cnp list
 zyvorctl dataplane observe
