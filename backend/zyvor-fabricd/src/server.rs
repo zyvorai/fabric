@@ -805,6 +805,22 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/migrations/{id}/cancel",
             post(api::migration::cancel_migration),
         )
+        .route(
+            "/runtime/capabilities",
+            get(api::migration::runtime_capabilities),
+        )
+        .route(
+            "/vms/{name}/migration/native/start",
+            post(api::migration::start_native_migration),
+        )
+        .route(
+            "/vms/{name}/migration/native/status",
+            get(api::migration::native_migration_status),
+        )
+        .route(
+            "/vms/{name}/migration/native/cancel",
+            post(api::migration::cancel_native_migration),
+        )
         .route("/images/upload", post(api::ux_extensions::upload_image))
         .route("/images/convert", post(api::ux_extensions::start_convert))
         .route(
