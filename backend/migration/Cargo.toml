@@ -11,3 +11,4 @@ serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 zyvor-fabric-driver-core = { path = "../crates/driver-core" }
+zyvor-fabric-fluxvm-client = { path = "../crates/fluxvm-client" } # ZYVOR_RUNTIME_BOUNDARY_V1

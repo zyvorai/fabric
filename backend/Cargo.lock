@@ -1801,7 +1801,8 @@ dependencies = [
  "tokio",
  "tracing",
  "zyvor-fabric-driver-core",
-]
+ "zyvor-fabric-fluxvm-client",
+] # ZYVOR_RUNTIME_BOUNDARY_V1
 
 [[package]]
 name = "mime"
