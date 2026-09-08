@@ -8,8 +8,11 @@ HOST="${1:-http://127.0.0.1:9095}"
 USER="${FABRIC_USER:-sus}"
 PASS="${FABRIC_PASS:-max}"
 
+CURL_OPTS=(-sS)
+[[ "$HOST" == https://* ]] && CURL_OPTS+=(-k)
+
 login() {
-  curl -sf -X POST "${HOST}/api/auth/login" \
+  curl "${CURL_OPTS[@]}" -f -X POST "${HOST}/api/auth/login" \
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"${USER}\",\"password\":\"${PASS}\"}" \
     | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])'
@@ -105,7 +108,7 @@ ENDPOINTS=(
 
 FAIL=0
 for path in "${ENDPOINTS[@]}"; do
-  code="$(curl -s -o /tmp/audit-body.txt -w '%{http_code}' "${AUTH[@]}" "${HOST}${path}" 2>/dev/null || echo '000')"
+  code="$(curl "${CURL_OPTS[@]}" -o /tmp/audit-body.txt -w '%{http_code}' "${AUTH[@]}" "${HOST}${path}" 2>/dev/null || echo '000')"
   body="$(cat /tmp/audit-body.txt 2>/dev/null || true)"
   if [[ "$code" == "000" ]]; then
     echo "HTTP_ERROR $path"
