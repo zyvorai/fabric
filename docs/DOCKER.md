@@ -26,7 +26,7 @@ These are genuine host-level requirements, not something either container's tool
 Compose mounts [`configs/fluxvm-dataplane.toml`](../configs/fluxvm-dataplane.toml) as
 `/etc/fluxvm.toml`, mounts host `/sys/fs/bpf`, and raises memlock so
 `sandbox.dataplane.mode = "ebpf"` can attach. After first green attach
-(`schema_version=3`), set `required = true` for fail-closed. Operator guide:
+(`schema_version=4`), set `required = true` for fail-closed. Operator guide:
 [guides/vm-drivers/fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md).
 
 ## Build

@@ -101,8 +101,10 @@ programs/maps. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric
 | `POST …/health/reconcile` | `POST …/health/reconcile` | TCP probes |
 | `POST …/conntrack/gc` | `POST …/conntrack/gc` | Affinity / NAT GC |
 | `GET …/advertisements` | `GET …/advertisements` | VIP advertise snapshot |
+| `GET …/flows` | `GET …/flows` | FluxScope service flows |
+| `POST …/telemetry/export` | `POST …/telemetry/export` | OTLP/HTTP JSON export |
 
-CLI: `zyvorctl dataplane service …`. Console: **Edge Dataplane → Services**.
+CLI: `zyvorctl dataplane service …` (incl. `flows` / `export-telemetry`). Console: **Edge Dataplane → Services**.
 
 Observe pack (explain, dry-run Guard, templates): [dataplane-observe-pack.md](../../dataplane-observe-pack.md).
 

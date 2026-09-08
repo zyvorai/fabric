@@ -56,14 +56,16 @@ Fabric exposes the source-side contract on the control plane:
 
 CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`.
 
-## Service Fabric fan-out (v3)
+## Service Fabric fan-out (v4)
 
-`POST/DELETE /api/dataplane/services` go through `service-lb` with schema **v3**:
+`POST/DELETE /api/dataplane/services` go through `service-lb` with schema **v4**:
 conntrack affinity, ready/draining/unhealthy backends, optional TCP health checks,
-VIP `advertise` intent, and Fabric `EdgeLease` / conntrack replication helpers.
+VIP `advertise` intent, Fabric `EdgeLease` / conntrack replication helpers, plus
+`max_egress_mbps`, `flow_sample_rate`, and `host_routing`. FRR/BIRD/File adapters
+own BGP sessions; FluxVM only publishes local ads.
 
-Additional proxies: `/api/dataplane/services/{status,stats,health,advertisements}`,
-`POST …/health/reconcile`, `POST …/conntrack/gc`.
+Additional proxies: `/api/dataplane/services/{status,stats,health,advertisements,flows}`,
+`POST …/health/reconcile`, `POST …/conntrack/gc`, `POST …/telemetry/export`.
 
 Operator docs: [ebpf-service-fabric.md](ebpf-service-fabric.md) ·
 FluxVM [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) ·
