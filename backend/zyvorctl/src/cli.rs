@@ -246,6 +246,16 @@ enum DataplaneServiceCmd {
     Gc,
     /// VIP advertisement snapshot
     Advertisements,
+    /// FluxScope service flows
+    Flows {
+        #[arg(long, default_value_t = 256)]
+        limit: u32,
+    },
+    /// Export service flows via OTLP/HTTP JSON
+    ExportTelemetry {
+        #[arg(long, default_value_t = 1024)]
+        limit: u32,
+    },
     /// Create/update from a JSON file (NetworkServiceSpec shape)
     Apply {
         #[arg(short, long)]
@@ -1300,6 +1310,25 @@ impl Cli {
                     DataplaneServiceCmd::Advertisements => {
                         let val = api_get(&client, "/dataplane/services/advertisements").await?;
                         print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Flows { limit } => {
+                        let val = api_get(
+                            &client,
+                            &format!("/dataplane/services/flows?limit={}", limit),
+                        )
+                        .await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::ExportTelemetry { limit } => {
+                        let val = api_post_empty(
+                            &client,
+                            &format!("/dataplane/services/telemetry/export?limit={}", limit),
+                        )
+                        .await?;
+                        println!("Exported dataplane service telemetry");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
                     }
                     DataplaneServiceCmd::Apply { file } => {
                         let service = load_config_file(&file)?;

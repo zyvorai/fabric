@@ -446,6 +446,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::vm_dataplane::services_advertisements),
         )
         .route(
+            "/dataplane/services/flows",
+            get(api::vm_dataplane::services_flows),
+        )
+        .route(
+            "/dataplane/services/telemetry/export",
+            post(api::vm_dataplane::services_telemetry_export),
+        )
+        .route(
             "/dataplane/services/{name}",
             get(api::vm_dataplane::get_service).delete(api::vm_dataplane::delete_service),
         )

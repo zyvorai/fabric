@@ -1,4 +1,4 @@
-# Fabric ↔ FluxVM Service Fabric v3
+# Fabric ↔ FluxVM Service Fabric v4
 
 Fabric owns **distributed** service intent; FluxVM owns **node-local** TC/XDP
 execution and maps. Fabric never invokes `bpftool`, `tc`, `ip`, or writes
@@ -7,9 +7,10 @@ execution and maps. Fabric never invokes `bpftool`, `tc`, `ip`, or writes
 FluxVM reference: [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) ·
 Boundary: [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md) ·
 Examples: [examples/service-fabric-v3/](examples/service-fabric-v3/) ·
-Next: [service-fabric-phase4.md](service-fabric-phase4.md).
+Shipped scope: [service-fabric-phase4.md](service-fabric-phase4.md) ·
+Next: [service-fabric-phase5.md](service-fabric-phase5.md).
 
-## Fabric v3 responsibilities
+## Fabric v4 responsibilities
 
 - define dual-stack NAT/DSR service intent;
 - select service-edge nodes;
@@ -19,7 +20,9 @@ Next: [service-fabric-phase4.md](service-fabric-phase4.md).
 - turn active leases plus FluxVM local readiness snapshots into ECMP/BGP VIP intent;
 - snapshot prior node state and roll back partial fan-out;
 - optionally replicate FluxVM's whitelisted service conntrack state to standby edges;
-- prepare DSR VIP ownership/direct-return routing on backends.
+- prepare DSR VIP ownership/direct-return routing on backends;
+- carry `max_egress_mbps`, `flow_sample_rate`, and `host_routing` end to end;
+- apply VIP ads via FRR (`vtysh`), BIRD (`birdc`), or atomic File JSON adapters.
 
 ## Lease model
 
@@ -50,9 +53,12 @@ Multiple valid leases intentionally represent ECMP/anycast service edges.
 | `POST` | `/api/dataplane/services/health/reconcile` | Run TCP probes |
 | `POST` | `/api/dataplane/services/conntrack/gc` | Expire affinity / reverse NAT |
 | `GET` | `/api/dataplane/services/advertisements` | VIP advertise snapshot |
+| `GET` | `/api/dataplane/services/flows` | FluxScope service flows |
+| `POST` | `/api/dataplane/services/telemetry/export` | OTLP/HTTP JSON export |
 
-Upsert body mirrors FluxVM schema v3 (see
-[ha-draining-service.json](examples/service-fabric-v3/ha-draining-service.json)).
+Upsert body mirrors FluxVM schema v4 (v3 fields plus `max_egress_mbps`,
+`flow_sample_rate`, `host_routing`). See
+[ha-draining-service.json](examples/service-fabric-v3/ha-draining-service.json).
 
 ## CLI
 
@@ -64,6 +70,8 @@ zyvorctl dataplane service health
 zyvorctl dataplane service reconcile
 zyvorctl dataplane service gc
 zyvorctl dataplane service advertisements
+zyvorctl dataplane service flows
+zyvorctl dataplane service export-telemetry
 zyvorctl dataplane service delete payments
 ```
 
@@ -74,12 +82,13 @@ zyvorctl dataplane service delete payments
 - Maglev service CRUD with mode / exposure / SNAT / advertise / backend `state`;
 - host Service Fabric schema badge;
 - health report + reconcile;
-- advertisements JSON + conntrack GC.
+- advertisements JSON + conntrack GC;
+- flow sample / host-routing fields on the service model.
 
 ## Ownership reminder
 
 | Plane | Owner |
 |-------|--------|
-| Service intent, leases, fan-out, BGP/ECMP policy | Fabric (`service-lb`) |
-| TC/XDP programs, Maglev tables, fct/nat maps, health execution, ads file | FluxVM |
+| Service intent, leases, fan-out, BGP/ECMP policy + FRR/BIRD/File adapters | Fabric (`service-lb`) |
+| TC/XDP programs, Maglev tables, fct/nat/edt/sflows maps, health, ads file | FluxVM |
 | Per-VM L3/L4 policy (Network Fabric schema v4) | FluxVM (orthogonal) |

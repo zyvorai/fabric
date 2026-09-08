@@ -166,6 +166,9 @@ fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
             healthy_threshold: h.healthy_threshold,
         }),
         advertise: s.advertise,
+        max_egress_mbps: s.max_egress_mbps,
+        flow_sample_rate: s.flow_sample_rate,
+        host_routing: s.host_routing,
     }
 }
 
@@ -222,6 +225,9 @@ fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
                 healthy_threshold: h.healthy_threshold,
             }),
         advertise: s.advertise,
+        max_egress_mbps: s.max_egress_mbps,
+        flow_sample_rate: s.flow_sample_rate,
+        host_routing: s.host_routing,
     }
 }
 

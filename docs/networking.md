@@ -19,10 +19,10 @@ CNP, effective policy, health/ipcache/FQDN refresh).
 | Cluster UX | **Infrastructure → Edge Dataplane** (`/app/edge-dataplane`) |
 | Dashboard | **VM dataplane** capability (`GET /api/capabilities` → `vm_dataplane`) |
 | Per-VM REST | `/api/vms/{name}/dataplane/{status,policy,effective,stats,flows}` |
-| Cluster REST | `/api/dataplane/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` + `/api/dataplane/services…` (Service Fabric v3) |
+| Cluster REST | `/api/dataplane/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` + `/api/dataplane/services…` (Service Fabric v4) |
 | CLI | `zyvorctl dataplane …` (`ZYVOR_FABRIC_URL` + `ZYVOR_FABRIC_TOKEN` on HTTPS) |
 | Policy ports | Must be `tcp/PORT` or `udp/PORT` (also `icmp/0` / `icmp6/0`) |
-| Maglev VIP LB | [Service Fabric v3](ebpf-service-fabric.md) · Edge Dataplane → **Services** |
+| Maglev VIP LB | [Service Fabric v4](ebpf-service-fabric.md) · Edge Dataplane → **Services** |
 | vs other VMMs | [README comparison](../README.md#why-fabric--network-fabric-is-ahead-of-other-vmms) |
 
 Full enablement, troubleshooting, and lab UX checklist:

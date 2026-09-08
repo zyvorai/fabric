@@ -1114,7 +1114,7 @@ FluxVM TC/eBPF edge proxied by Fabric. Orthogonal to host SDN
 | GET | `/api/dataplane/ipcache` | guest IP → identity |
 | POST | `/api/dataplane/refresh-dns` | re-resolve FQDNs |
 
-### Service Fabric schema v3 (Maglev VIP LB)
+### Service Fabric schema v4 (Maglev VIP LB)
 
 Orthogonal Maglev VIP plane. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
 

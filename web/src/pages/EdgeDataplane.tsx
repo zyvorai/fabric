@@ -64,6 +64,9 @@ const SAMPLE_SERVICE = `{
   "mode": "nat",
   "exposure": "east-west",
   "advertise": false,
+  "max_egress_mbps": 5000,
+  "flow_sample_rate": 100,
+  "host_routing": true,
   "maglev_table_size": 4093,
   "backends": [
     {"address": "10.40.1.21", "port": 8443, "weight": 2, "enabled": true, "state": "ready"},
@@ -80,6 +83,9 @@ const SAMPLE_SERVICE_NS = `{
   "exposure": "north-south",
   "snat_address": "203.0.113.10",
   "advertise": false,
+  "max_egress_mbps": 2000,
+  "flow_sample_rate": 50,
+  "host_routing": false,
   "health_check": {
     "kind": "tcp",
     "timeout_ms": 500,

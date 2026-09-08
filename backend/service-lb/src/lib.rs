@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! Fabric orchestration for FluxVM Service Fabric v3.
+//! Fabric orchestration for FluxVM Service Fabric v4.
 //!
 //! Fabric owns service intent, node selection, rollout and rollback. FluxVM
 //! owns every TC/XDP program and BPF map. This crate never writes bpffs or
@@ -12,7 +12,11 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
+    fs,
+    io::Write,
     net::IpAddr,
+    path::{Path, PathBuf},
+    process::Command,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -129,6 +133,12 @@ pub struct ServiceSpec {
     pub health_check: Option<ServiceHealthCheck>,
     #[serde(default)]
     pub advertise: bool,
+    #[serde(default)]
+    pub max_egress_mbps: Option<u32>,
+    #[serde(default)]
+    pub flow_sample_rate: u32,
+    #[serde(default)]
+    pub host_routing: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -277,6 +287,12 @@ pub fn validate_spec(spec: &ServiceSpec) -> Result<()> {
     }
     if spec.advertise && !spec.exposure.north_south() {
         bail!("advertise=true requires north-south or both exposure");
+    }
+    if spec.max_egress_mbps == Some(0) || spec.max_egress_mbps.is_some_and(|v| v > 1_000_000) {
+        bail!("max_egress_mbps must be in 1..=1000000 when set");
+    }
+    if spec.flow_sample_rate > 1_000_000_000 {
+        bail!("flow_sample_rate must be <= 1000000000");
     }
     if let Some(size) = spec.maglev_table_size {
         if ![251, 509, 1021, 2039, 4093, 8191, 16381].contains(&size) {
@@ -482,9 +498,9 @@ where
         if spec.exposure.north_south() {
             for node in nodes {
                 let status = self.client.get_status(node).await?;
-                if status.schema_version < 3 {
+                if status.schema_version < 4 {
                     bail!(
-                        "node '{}' exposes service schema {}, need v3 for lifecycle/HA service intent",
+                        "node '{}' exposes service schema {}, need v4 for EDT/flow/host-routing intent",
                         node.name,
                         status.schema_version
                     );
@@ -573,8 +589,8 @@ where
         if spec.exposure.north_south() {
             for node in nodes {
                 let status = self.client.get_status(node).await?;
-                if status.schema_version < 3 || status.north_south_interfaces.is_empty() {
-                    bail!("node '{}' is not a Service Fabric v3 edge", node.name);
+                if status.schema_version < 4 || status.north_south_interfaces.is_empty() {
+                    bail!("node '{}' is not a Service Fabric v4 edge", node.name);
                 }
             }
         }
@@ -766,6 +782,209 @@ pub fn bgp_vip_intent(
     })
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum BgpAdapterKind {
+    Frr,
+    Bird,
+    File,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BgpAdapterConfig {
+    pub kind: BgpAdapterKind,
+    #[serde(default = "default_vtysh")]
+    pub frr_vtysh: PathBuf,
+    #[serde(default)]
+    pub local_asn: u32,
+    #[serde(default = "default_birdc")]
+    pub birdc: PathBuf,
+    #[serde(default = "default_bird_include")]
+    pub bird_include: PathBuf,
+    #[serde(default = "default_intent_path")]
+    pub file_path: PathBuf,
+}
+
+fn default_vtysh() -> PathBuf {
+    "/usr/bin/vtysh".into()
+}
+fn default_birdc() -> PathBuf {
+    "/usr/sbin/birdc".into()
+}
+fn default_bird_include() -> PathBuf {
+    "/run/zyvor/fabric-bird-routes.conf".into()
+}
+fn default_intent_path() -> PathBuf {
+    "/run/zyvor/bgp-service-intent.json".into()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BgpApplyReport {
+    pub adapter: BgpAdapterKind,
+    pub advertised: Vec<String>,
+    pub withdrawn: Vec<String>,
+}
+
+fn host_prefix(ip: IpAddr) -> String {
+    format!("{ip}/{}", if ip.is_ipv4() { 32 } else { 128 })
+}
+
+fn intent_prefixes(intent: &BgpVipIntent) -> Vec<String> {
+    if intent.edge_nodes.is_empty() {
+        Vec::new()
+    } else {
+        vec![host_prefix(intent.vip)]
+    }
+}
+
+fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+    let parent = path.parent().context("BGP output path has no parent")?;
+    fs::create_dir_all(parent)?;
+    let tmp = path.with_extension("tmp");
+    {
+        let mut f = fs::File::create(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+    }
+    fs::rename(&tmp, path)?;
+    fs::File::open(parent)?.sync_all()?;
+    Ok(())
+}
+
+pub fn render_frr_commands(
+    local_asn: u32,
+    desired: &BgpVipIntent,
+    previous: Option<&BgpVipIntent>,
+) -> Result<Vec<String>> {
+    if local_asn == 0 {
+        bail!("FRR local_asn must be non-zero");
+    }
+    let wanted: HashSet<String> = intent_prefixes(desired).into_iter().collect();
+    let before: HashSet<String> = previous
+        .map(intent_prefixes)
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    let mut commands = vec![
+        "configure terminal".to_string(),
+        format!("router bgp {local_asn}"),
+    ];
+    for family in [4u8, 6u8] {
+        let afi = if family == 4 {
+            "ipv4 unicast"
+        } else {
+            "ipv6 unicast"
+        };
+        let changed = wanted.iter().chain(before.iter()).any(|p| {
+            p.split('/')
+                .next()
+                .and_then(|ip| ip.parse::<IpAddr>().ok())
+                .is_some_and(|ip| {
+                    if family == 4 {
+                        ip.is_ipv4()
+                    } else {
+                        ip.is_ipv6()
+                    }
+                })
+        });
+        if !changed {
+            continue;
+        }
+        commands.push(format!("address-family {afi}"));
+        let mut withdrawn: Vec<_> = before.difference(&wanted).cloned().collect();
+        withdrawn.sort();
+        let mut advertised: Vec<_> = wanted.difference(&before).cloned().collect();
+        advertised.sort();
+        for prefix in withdrawn {
+            let ip: IpAddr = prefix.split('/').next().unwrap().parse()?;
+            if (family == 4 && ip.is_ipv4()) || (family == 6 && ip.is_ipv6()) {
+                commands.push(format!("no network {prefix}"));
+            }
+        }
+        for prefix in advertised {
+            let ip: IpAddr = prefix.split('/').next().unwrap().parse()?;
+            if (family == 4 && ip.is_ipv4()) || (family == 6 && ip.is_ipv6()) {
+                commands.push(format!("network {prefix}"));
+            }
+        }
+        commands.push("exit-address-family".into());
+    }
+    commands.push("end".into());
+    Ok(commands)
+}
+
+pub fn render_bird_routes(intent: &BgpVipIntent) -> String {
+    // Intended to be included inside an operator-owned BIRD `protocol static`
+    // block. Fabric owns only these route statements, not the BGP session.
+    let mut routes = intent_prefixes(intent);
+    routes.sort();
+    let mut out = String::from("# generated by Zyvor Fabric Service Fabric v4\n");
+    for prefix in routes {
+        out.push_str(&format!("route {prefix} blackhole;\n"));
+    }
+    out
+}
+
+pub fn reconcile_bgp(
+    cfg: &BgpAdapterConfig,
+    desired: &BgpVipIntent,
+    previous: Option<&BgpVipIntent>,
+) -> Result<BgpApplyReport> {
+    let wanted: HashSet<String> = intent_prefixes(desired).into_iter().collect();
+    let before: HashSet<String> = previous
+        .map(intent_prefixes)
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    let mut advertised: Vec<_> = wanted.difference(&before).cloned().collect();
+    advertised.sort();
+    let mut withdrawn: Vec<_> = before.difference(&wanted).cloned().collect();
+    withdrawn.sort();
+    match cfg.kind {
+        BgpAdapterKind::File => {
+            atomic_write(&cfg.file_path, &serde_json::to_vec_pretty(desired)?)?;
+        }
+        BgpAdapterKind::Bird => {
+            atomic_write(&cfg.bird_include, render_bird_routes(desired).as_bytes())?;
+            let out = Command::new(&cfg.birdc)
+                .arg("configure")
+                .output()
+                .with_context(|| format!("running {} configure", cfg.birdc.display()))?;
+            if !out.status.success() {
+                bail!(
+                    "birdc configure failed: {}",
+                    String::from_utf8_lossy(&out.stderr).trim()
+                );
+            }
+        }
+        BgpAdapterKind::Frr => {
+            // One vtysh process receives the whole configuration transaction;
+            // mode changes such as `configure terminal` and `router bgp` are
+            // therefore preserved across commands. Arguments are passed
+            // directly -- never through a shell.
+            let commands = render_frr_commands(cfg.local_asn, desired, previous)?;
+            let mut cmd = Command::new(&cfg.frr_vtysh);
+            for command in &commands {
+                cmd.arg("-c").arg(command);
+            }
+            let out = cmd.output().with_context(|| {
+                format!("running FRR transaction via {}", cfg.frr_vtysh.display())
+            })?;
+            if !out.status.success() {
+                bail!(
+                    "FRR transaction failed: {}",
+                    String::from_utf8_lossy(&out.stderr).trim()
+                );
+            }
+        }
+    }
+    Ok(BgpApplyReport {
+        adapter: cfg.kind,
+        advertised,
+        withdrawn,
+    })
+}
+
 fn validate_name(name: &str) -> Result<()> {
     if name.is_empty()
         || name.len() > 63
@@ -813,7 +1032,7 @@ mod tests {
                 .get(&node.name)
                 .cloned()
                 .unwrap_or(HostServiceStatus {
-                    schema_version: 3,
+                    schema_version: 4,
                     north_south_interfaces: vec!["eno1".into()],
                     xdp_acceleration: true,
                     interfaces: Vec::new(),
@@ -828,7 +1047,7 @@ mod tests {
                 .get(&node.name)
                 .cloned()
                 .unwrap_or(AdvertisementSnapshot {
-                    schema_version: 3,
+                    schema_version: 4,
                     generation: 1,
                     items: vec![VipAdvertisement {
                         service: "payments".into(),
@@ -874,7 +1093,7 @@ mod tests {
                 .get(&(node.name.clone(), name.into()))
                 .cloned()
                 .unwrap_or(ConntrackSnapshot {
-                    schema_version: 3,
+                    schema_version: 4,
                     service: name.into(),
                     service_id: 1,
                     created_unix_ms: 1,
@@ -932,6 +1151,9 @@ mod tests {
             snat_address: None,
             health_check: None,
             advertise: false,
+            max_egress_mbps: None,
+            flow_sample_rate: 0,
+            host_routing: false,
         }
     }
 
@@ -972,7 +1194,7 @@ mod tests {
         client.status.lock().await.insert(
             "b".into(),
             HostServiceStatus {
-                schema_version: 3,
+                schema_version: 4,
                 north_south_interfaces: Vec::new(),
                 xdp_acceleration: false,
                 interfaces: Vec::new(),
@@ -1110,7 +1332,7 @@ mod tests {
         client.advertisements.lock().await.insert(
             "b".into(),
             AdvertisementSnapshot {
-                schema_version: 3,
+                schema_version: 4,
                 generation: 2,
                 items: vec![VipAdvertisement {
                     service: "payments".into(),
@@ -1140,5 +1362,33 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(intent.edge_nodes, vec!["a"]);
+    }
+
+    #[test]
+    fn frr_renderer_adds_and_withdraws_without_shell() {
+        let mut s = service(443);
+        s.vip = "10.40.0.100".parse().unwrap();
+        s.exposure = ServiceExposure::NorthSouth;
+        s.snat_address = Some("192.0.2.10".parse().unwrap());
+        let mut old = bgp_vip_intent(
+            &s,
+            &[EdgeLease {
+                service: "payments".into(),
+                node: "a".into(),
+                epoch: 1,
+                expires_unix_ms: 200,
+            }],
+            100,
+        )
+        .unwrap();
+        let new = BgpVipIntent {
+            edge_nodes: Vec::new(),
+            lease_epoch: 2,
+            ..old.clone()
+        };
+        let cmds = render_frr_commands(65001, &new, Some(&old)).unwrap();
+        assert!(cmds.iter().any(|c| c == "no network 10.40.0.100/32"));
+        old.edge_nodes.clear();
+        assert!(render_bird_routes(&old).contains("generated by Zyvor"));
     }
 }
