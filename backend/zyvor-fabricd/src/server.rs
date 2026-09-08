@@ -454,6 +454,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(api::vm_dataplane::services_telemetry_export),
         )
         .route(
+            "/dataplane/services/{name}/conntrack/delta",
+            get(api::vm_dataplane::services_conntrack_delta),
+        )
+        .route(
+            "/dataplane/services/{name}/conntrack/delta/import",
+            post(api::vm_dataplane::services_conntrack_delta_import),
+        )
+        .route(
+            "/dataplane/services/{name}/conntrack/delta/ack",
+            post(api::vm_dataplane::services_conntrack_delta_ack),
+        )
+        .route(
             "/dataplane/services/{name}",
             get(api::vm_dataplane::get_service).delete(api::vm_dataplane::delete_service),
         )

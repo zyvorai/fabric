@@ -234,7 +234,7 @@ enum DataplaneServiceCmd {
     Get {
         name: String,
     },
-    /// Host Maglev/service dataplane status (schema v3)
+    /// Host Maglev/service dataplane status (schema v4)
     Status,
     /// Host Maglev/service counters
     Stats,
@@ -255,6 +255,14 @@ enum DataplaneServiceCmd {
     ExportTelemetry {
         #[arg(long, default_value_t = 1024)]
         limit: u32,
+    },
+    /// Export HA conntrack/NAT delta batch
+    Delta {
+        name: String,
+        #[arg(long, default_value_t = 0)]
+        after_seq: u64,
+        #[arg(long, default_value_t = 1024)]
+        max_entries: u32,
     },
     /// Create/update from a JSON file (NetworkServiceSpec shape)
     Apply {
@@ -1329,6 +1337,21 @@ impl Cli {
                         if !matches!(fmt, OutputFormat::Table) {
                             print_value(&val, fmt);
                         }
+                    }
+                    DataplaneServiceCmd::Delta {
+                        name,
+                        after_seq,
+                        max_entries,
+                    } => {
+                        let val = api_get(
+                            &client,
+                            &format!(
+                                "/dataplane/services/{}/conntrack/delta?after_seq={}&max_entries={}",
+                                name, after_seq, max_entries
+                            ),
+                        )
+                        .await?;
+                        print_value(&val, fmt);
                     }
                     DataplaneServiceCmd::Apply { file } => {
                         let service = load_config_file(&file)?;
