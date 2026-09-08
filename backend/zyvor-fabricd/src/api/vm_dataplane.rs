@@ -558,6 +558,55 @@ pub async fn services_telemetry_export(
     .await
 }
 
+/// GET /api/dataplane/services/:name/conntrack/delta — HA delta export (v5).
+pub async fn services_conntrack_delta(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let after = q.get("after_seq").cloned().unwrap_or_else(|| "0".into());
+    let max = q
+        .get("max_entries")
+        .cloned()
+        .unwrap_or_else(|| "1024".into());
+    fluxvm_json_get(
+        &state,
+        &format!("/v1/network/services/{name}/conntrack/delta?after_seq={after}&max_entries={max}"),
+    )
+    .await
+}
+
+/// POST /api/dataplane/services/:name/conntrack/delta/import — apply HA delta batch.
+pub async fn services_conntrack_delta_import(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_post_json(
+        &state,
+        &format!("/v1/network/services/{name}/conntrack/delta/import"),
+        &body,
+    )
+    .await
+}
+
+/// POST /api/dataplane/services/:name/conntrack/delta/ack — advance source journal watermark.
+pub async fn services_conntrack_delta_ack(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_post_json(
+        &state,
+        &format!("/v1/network/services/{name}/conntrack/delta/ack"),
+        &body,
+    )
+    .await
+}
+
 async fn fluxvm_json_get(
     state: &AppState,
     path: &str,
@@ -620,6 +669,39 @@ async fn fluxvm_json_post_empty(
         .await
         .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM {path} JSON"), e))?;
     Ok(Json(body))
+}
+
+async fn fluxvm_json_post_json(
+    state: &AppState,
+    path: &str,
+    body: &serde_json::Value,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let url = format!(
+        "{}{}",
+        state.config.driver.fluxvm_url.trim_end_matches('/'),
+        path
+    );
+    let mut req = reqwest::Client::new().post(&url).json(body);
+    if let Some(token) = state.config.driver.fluxvm_token.as_deref() {
+        req = req.bearer_auth(token);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM POST {path}"), e))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("FluxVM {path} HTTP {status}: {text}") })),
+        ));
+    }
+    let out = resp
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM {path} JSON"), e))?;
+    Ok(Json(out))
 }
 
 fn service_nodes(state: &AppState) -> Vec<service_lb::NodeTarget> {
