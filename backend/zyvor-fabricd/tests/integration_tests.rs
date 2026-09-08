@@ -816,13 +816,8 @@ async fn test_vm_metrics() {
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    // Unlike the old machinectl backend (which read a local cgroup file and
-    // returned zeroed metrics if it didn't exist), the FluxVM backend
-    // resolves the name over its REST API — a nonexistent VM (or, as here,
-    // no FluxVM instance reachable at all in this test environment)
-    // surfaces as a real error rather than a silent fake-success zero
-    // reading.
-    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    // VM must exist in Fabric's store; FluxVM resolution happens only after that.
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
 // ─── Plugins ────────────────────────────────────────────────────────────────

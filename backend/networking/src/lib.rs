@@ -89,7 +89,7 @@ impl NetworkdManager {
     /// client on the bridge's own interface all apply immediately (no
     /// reload step).
     pub fn apply_bridge(&self, cfg: &BridgeConfig) -> Result<()> {
-        block_on_netlink(netlink::create_bridge(&cfg.name))?;
+        block_on_netlink(netlink::ensure_bridge(&cfg.name))?;
         let result: Result<()> = (|| {
             self.apply_common_link_settings(
                 &cfg.name,

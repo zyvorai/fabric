@@ -162,7 +162,7 @@ section "Storage Pools"
 api GET /api/storage/pools "" 200 "GET /api/storage/pools (list)"
 api GET /api/storage/pools/nonexistent "" 404 "GET /api/storage/pools/nonexistent (not found)"
 
-api POST /api/storage/pools/local '{"name":"e2e-pool","path":"/tmp/e2e-pool","auto_start":true}' 200 "POST /api/storage/pools/local (create)"
+api POST /api/storage/pools/local '{"name":"e2e-pool","path":"/var/lib/zyvor-fabricd/e2e-pool","auto_start":true}' 200 "POST /api/storage/pools/local (create)"
 api GET /api/storage/pools/e2e-pool "" 200 "GET /api/storage/pools/:name"
 api DELETE /api/storage/pools/e2e-pool "" 204 "DELETE /api/storage/pools/:name"
 
@@ -374,7 +374,7 @@ api GET /api/networkd/taps "" 200 "GET /api/networkd/taps (list)"
 api GET /api/networkd/bonds "" 200 "GET /api/networkd/bonds (list)"
 api GET /api/networkd/network-files "" 200 "GET /api/networkd/network-files (list)"
 api GET /api/networkd/link-files "" 200 "GET /api/networkd/link-files (list)"
-api GET /api/networkd/links "" 500 "GET /api/networkd/links (requires systemd-networkd)"
+api GET /api/networkd/links "" 200 "GET /api/networkd/links (list)"
 api GET /api/networkd/port-forwards "" 200 "GET /api/networkd/port-forwards (list)"
 api GET /api/networkd/files "" 200 "GET /api/networkd/files (list)"
 

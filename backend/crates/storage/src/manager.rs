@@ -55,6 +55,7 @@ pub struct StorageManager {
 
 impl StorageManager {
     pub fn new(state_dir: &Path) -> Result<Self, StorageError> {
+        fs::create_dir_all(state_dir)?;
         let state_file = state_dir.join("storage_pools.json");
 
         let manager = Self {

@@ -1004,12 +1004,20 @@ impl Cli {
         match self.command {
             // ── VM Management ────────────────────────────────────────────
             Commands::List => {
-                let vms: Vec<VM> = client
+                #[derive(serde::Deserialize)]
+                struct VmListResponse {
+                    items: Vec<VM>,
+                }
+                let resp: VmListResponse = client
                     .get(format!("{}/vms", api_base()))
                     .send()
                     .await?
+                    .error_for_status()
+                    .context("list VMs")?
                     .json()
-                    .await?;
+                    .await
+                    .context("decode VM list")?;
+                let vms = resp.items;
 
                 match fmt {
                     OutputFormat::Table => {

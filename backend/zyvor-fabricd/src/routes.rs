@@ -267,6 +267,10 @@ pub async fn create_vm(
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
     }
 
+    if let Err(e) = provision_vm_disk(&state, &vm).await {
+        tracing::warn!("Failed to provision disk for VM '{}': {}", vm.name, e);
+    }
+
     // Allocate security identity if VM has labels
     if let Some(ref labels) = vm.labels {
         if !labels.is_empty() {
@@ -1152,13 +1156,19 @@ pub async fn clone_vm(
     // named after its own disk file.
     let src_path = match state.driver.get_disk_path(&source_name).await {
         Ok(p) => p.display().to_string(),
-        Err(e) => {
-            return json_error(
-                StatusCode::NOT_FOUND,
-                format!("No disk image found for source VM '{}': {}", source_name, e),
-            )
-            .into_response();
-        }
+        Err(driver_err) => match crate::validation::find_vm_image(&source_name) {
+            Some(p) => p,
+            None => {
+                return json_error(
+                    StatusCode::NOT_FOUND,
+                    format!(
+                        "No disk image found for source VM '{}': {}",
+                        source_name, driver_err
+                    ),
+                )
+                .into_response();
+            }
+        },
     };
 
     // Build target path using proper Path API
@@ -1274,10 +1284,99 @@ pub async fn get_metrics(
     if let Err((status, msg)) = validate_vm_name(&name) {
         return json_error(status, msg).into_response();
     }
+    match state.store.get_vm(&name) {
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+        Ok(Some(_)) => {}
+    }
     match state.driver.get_metrics(&name).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => {
+            // Metadata-only / stopped VMs not yet registered in FluxVM have no cgroup stats.
+            tracing::debug!("metrics unavailable for '{}': {}", name, e);
+            (
+                StatusCode::OK,
+                Json(vm_model::VMMetrics {
+                    cpu_usage: 0.0,
+                    memory_usage: 0,
+                    disk_usage: 0,
+                    network_rx: 0,
+                    network_tx: 0,
+                }),
+            )
+                .into_response()
+        }
     }
+}
+
+fn resolve_image_source(state: &AppState, image: &str) -> std::path::PathBuf {
+    let path = std::path::Path::new(image);
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    let from_config = std::path::PathBuf::from(&state.config.storage.image_path).join(image);
+    if from_config.exists() {
+        return from_config;
+    }
+    for prefix in [
+        "/var/lib/zyvor-fabricd/images",
+        "/var/lib/fluxvm/images",
+        "/var/lib/machines",
+    ] {
+        let candidate = std::path::PathBuf::from(prefix).join(image);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    from_config
+}
+
+async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
+    let target = crate::validation::find_vm_image_or_default(&vm.name);
+    if std::path::Path::new(&target).exists() {
+        return Ok(());
+    }
+    if let Some(parent) = std::path::Path::new(&target).parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    let source = resolve_image_source(state, &vm.image);
+    if source.exists() {
+        let output = tokio::process::Command::new("cp")
+            .args([
+                "--reflink=auto",
+                source.to_str().ok_or_else(|| "invalid source path".to_string())?,
+                &target,
+            ])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        }
+        return Ok(());
+    }
+
+    let size_gib = if vm.disk > 0 { vm.disk } else { 20 };
+    let output = tokio::process::Command::new("qemu-img")
+        .args([
+            "create",
+            "-f",
+            "qcow2",
+            &target,
+            &format!("{size_gib}G"),
+        ])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+    Ok(())
 }
 
 /// Pulls `ssh_authorized_keys` out of arbitrary cloud-config YAML -- either

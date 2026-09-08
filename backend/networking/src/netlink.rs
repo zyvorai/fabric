@@ -285,6 +285,15 @@ pub async fn create_bridge(name: &str) -> Result<()> {
         .with_context(|| format!("failed to create bridge '{name}' after {MAX_ATTEMPTS} attempts"))
 }
 
+/// Create a bridge only when it does not already exist (idempotent apply/update).
+pub async fn ensure_bridge(name: &str) -> Result<()> {
+    let handle = connect().await?;
+    if link_index_by_name(&handle, name).await.is_ok() {
+        return Ok(());
+    }
+    create_bridge(name).await
+}
+
 /// Create an 802.1Q VLAN sub-interface on `parent` (`ip link add <name> link
 /// <parent> type vlan id <vlan_id>`).
 pub async fn create_vlan(parent: &str, vlan_id: u16, name: &str) -> Result<()> {

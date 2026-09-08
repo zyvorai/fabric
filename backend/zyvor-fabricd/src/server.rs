@@ -106,8 +106,8 @@ pub struct Server {
 
 impl Server {
     pub async fn new(store: StateStore, config: Config) -> Result<Self> {
-        // Initialize storage manager
-        let storage_path = std::path::PathBuf::from("/var/lib/zyvor-fabricd/storage");
+        // Initialize storage manager (pool metadata persisted under data dir)
+        let storage_path = std::path::PathBuf::from(&config.storage.path).join("storage");
         let storage_manager = StorageManager::new(&storage_path)
             .map_err(|e| anyhow::anyhow!("Failed to initialize storage manager: {}", e))?;
 
