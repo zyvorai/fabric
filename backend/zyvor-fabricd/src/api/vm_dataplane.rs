@@ -432,27 +432,19 @@ pub async fn upsert_service(
         nodes = ?report.applied_nodes,
         "Upserted Maglev service via service-lb"
     );
-    // Return status from the primary (local) FluxVM node for UI counters.
-    let saved = state.driver.dataplane_get_service(&service.name).await.ok();
-    let active = saved
-        .as_ref()
-        .map(|s| s.backends.iter().filter(|b| b.enabled).count())
-        .unwrap_or_else(|| service.backends.iter().filter(|b| b.enabled).count());
-    Ok(Json(NetworkServiceStatus {
-        schema_version: 3,
-        service_id: 0,
-        name: service.name.clone(),
-        active_backends: active,
-        maglev_table_size: service.maglev_table_size.unwrap_or(4093),
-        family: Some(if service.vip.contains(':') {
-            "ipv6".into()
-        } else {
-            "ipv4".into()
-        }),
-        mode: Some(service.mode),
-        exposure: Some(service.exposure),
-        snat_address: service.snat_address,
-    }))
+    // Authoritative status from the local FluxVM node (idempotent re-upsert).
+    let status = state
+        .driver
+        .dataplane_upsert_service(&service)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::BAD_GATEWAY,
+                &format!("Service '{}' applied but status refresh failed", service.name),
+                e,
+            )
+        })?;
+    Ok(Json(status))
 }
 
 /// DELETE /api/dataplane/services/:name
@@ -481,7 +473,7 @@ pub async fn delete_service(
     Ok(Json(DeletedResponse { deleted: name }))
 }
 
-/// GET /api/dataplane/services/status — FluxVM host service dataplane status (schema v3).
+/// GET /api/dataplane/services/status — FluxVM host service dataplane status (schema v4).
 pub async fn services_host_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
@@ -537,6 +529,34 @@ pub async fn services_advertisements(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     fluxvm_json_get(&state, "/v1/network/services/advertisements").await
+}
+
+/// GET /api/dataplane/services/flows — FluxScope service flow records (schema v4).
+pub async fn services_flows(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let limit = q.get("limit").cloned().unwrap_or_else(|| "256".into());
+    fluxvm_json_get(
+        &state,
+        &format!("/v1/network/services/flows?limit={limit}"),
+    )
+    .await
+}
+
+/// POST /api/dataplane/services/telemetry/export — OTLP/HTTP JSON export.
+pub async fn services_telemetry_export(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let limit = q.get("limit").cloned().unwrap_or_else(|| "1024".into());
+    fluxvm_json_post_empty(
+        &state,
+        &format!("/v1/network/services/telemetry/export?limit={limit}"),
+    )
+    .await
 }
 
 async fn fluxvm_json_get(
@@ -702,6 +722,9 @@ fn to_service_lb_spec(
         snat_address,
         health_check,
         advertise: service.advertise,
+        max_egress_mbps: service.max_egress_mbps,
+        flow_sample_rate: service.flow_sample_rate,
+        host_routing: service.host_routing,
     })
 }
 

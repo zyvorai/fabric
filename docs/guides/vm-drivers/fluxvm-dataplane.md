@@ -86,7 +86,7 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/dataplane/ipcache` | `GET /v1/network/ipcache` | Guest IP → identity |
 | `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` | Re-resolve FQDN allowlists |
 
-### Service Fabric schema v3 (Maglev VIP LB)
+### Service Fabric schema v4 (Maglev VIP LB)
 
 Orthogonal to per-VM policy. Fabric fans out through `service-lb`; FluxVM owns
 programs/maps. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
@@ -265,7 +265,7 @@ sudo cat /run/fluxvm/ebpf/vms/*/iface /run/fluxvm/ebpf/vms/*/schema_version
 ## Related docs
 
 - [FluxVM driver](fluxvm.md) — full driver surface
-- [Service Fabric v3](../../ebpf-service-fabric.md) — Maglev VIP LB / leases / health
+- [Service Fabric v4](../../ebpf-service-fabric.md) — Maglev VIP LB / leases / health / EDT / flows
 - [Networking](../../networking.md) — Fabric SDN + bridges + this plane
 - [Web UI](../../web-ui.md) — console surfaces
 - [User: VM Dataplane](../../user/pages/infrastructure/dataplane.md)

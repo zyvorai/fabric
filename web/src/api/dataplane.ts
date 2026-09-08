@@ -230,6 +230,9 @@ export interface NetworkServiceSpec {
   snat_address?: string | null
   health_check?: NetworkServiceHealthCheck | null
   advertise?: boolean
+  max_egress_mbps?: number | null
+  flow_sample_rate?: number
+  host_routing?: boolean
 }
 
 export interface NetworkServiceStatus {
@@ -295,6 +298,14 @@ export function gcDataplaneServicesConntrack(): Promise<unknown> {
 
 export function getDataplaneServicesAdvertisements(): Promise<unknown> {
   return apiGet('/api/dataplane/services/advertisements')
+}
+
+export function getDataplaneServicesFlows(limit = 256): Promise<{ items?: unknown[] }> {
+  return apiGet(`/api/dataplane/services/flows?limit=${limit}`)
+}
+
+export function exportDataplaneServicesTelemetry(limit = 1024): Promise<unknown> {
+  return apiPost(`/api/dataplane/services/telemetry/export?limit=${limit}`, {})
 }
 
 export function listDataplaneCnp(): Promise<{ items: unknown[] }> {

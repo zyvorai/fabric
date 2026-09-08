@@ -18,7 +18,7 @@ proxied by Zyvor Fabric. These are **not** Fabric SDN Net Security
 Parent walkthrough (single long form): [Tutorial 09](../09-edge-dataplane.md).
 
 Operator reference: [fluxvm-dataplane.md](../../guides/vm-drivers/fluxvm-dataplane.md) ·
-[Service Fabric v3](../../ebpf-service-fabric.md) ·
+[Service Fabric v4](../../ebpf-service-fabric.md) ·
 User: [dataplane.md](../../user/pages/infrastructure/dataplane.md) ·
 [edge-dataplane.md](../../user/pages/infrastructure/edge-dataplane.md).
 

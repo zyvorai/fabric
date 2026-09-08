@@ -24,7 +24,7 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
   (Status / Policy / Effective / Stats / Flows), **Infrastructure → Edge Dataplane**
   (`/app/edge-dataplane`), plus Dashboard **VM dataplane** capability card; see
   [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md)
-- **Service Fabric (schema v3)** — Edge Dataplane → **Services** tab for Maglev VIP
+- **Service Fabric (schema v4)** — Edge Dataplane → **Services** tab for Maglev VIP
   LB (drain/health/ads/GC); see [ebpf-service-fabric.md](ebpf-service-fabric.md)
 - Command palette (`Ctrl+K` / `Cmd+K`) and `g` sequence shortcuts
 - Toast notifications and structured API error banners

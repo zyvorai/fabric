@@ -648,6 +648,12 @@ pub struct NetworkServiceSpec {
     pub health_check: Option<NetworkServiceHealthCheck>,
     #[serde(default)]
     pub advertise: bool,
+    #[serde(default)]
+    pub max_egress_mbps: Option<u32>,
+    #[serde(default)]
+    pub flow_sample_rate: u32,
+    #[serde(default)]
+    pub host_routing: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

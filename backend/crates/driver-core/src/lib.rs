@@ -494,6 +494,15 @@ pub struct NetworkServiceSpec {
     pub health_check: Option<NetworkServiceHealthCheck>,
     #[serde(default)]
     pub advertise: bool,
+    /// Per-service EDT pacing (Mbps). Requires FluxVM `edt_enabled` + interfaces.
+    #[serde(default)]
+    pub max_egress_mbps: Option<u32>,
+    /// Sample 1/N service flows into FluxScope (`0` disables).
+    #[serde(default)]
+    pub flow_sample_rate: u32,
+    /// Opt-in FIB host-routing fast path after NAT (fallback to host stack).
+    #[serde(default)]
+    pub host_routing: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
