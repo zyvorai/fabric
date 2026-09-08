@@ -52,7 +52,9 @@ pub fn render_hubble_json(val: &serde_json::Value, output: &str) -> String {
         );
         let dst = format!(
             "{}:{}",
-            ip.get("destination").and_then(|v| v.as_str()).unwrap_or("?"),
+            ip.get("destination")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?"),
             l4.get("destination_port")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0)
@@ -68,7 +70,11 @@ pub fn render_hubble_json(val: &serde_json::Value, output: &str) -> String {
                 let name = hop.get("name").and_then(|v| v.as_str()).unwrap_or("?");
                 let role = hop.get("role").and_then(|v| v.as_str()).unwrap_or("");
                 let detail = hop.get("detail").and_then(|v| v.as_str()).unwrap_or("");
-                let branch = if i + 1 == hops.len() { "└─" } else { "├─" };
+                let branch = if i + 1 == hops.len() {
+                    "└─"
+                } else {
+                    "├─"
+                };
                 out.push_str(&format!("  {branch} [{i}] {name} ({role})  {detail}\n"));
             }
         }

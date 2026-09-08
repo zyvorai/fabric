@@ -53,12 +53,22 @@ fn flavor_json(f: &crate::store::Flavor, detail: bool) -> Value {
 }
 
 async fn flavors(State(cloud): State<Cloud>) -> Json<Value> {
-    let list: Vec<Value> = cloud.flavors().await.iter().map(|f| flavor_json(f, false)).collect();
+    let list: Vec<Value> = cloud
+        .flavors()
+        .await
+        .iter()
+        .map(|f| flavor_json(f, false))
+        .collect();
     Json(json!({"flavors": list}))
 }
 
 async fn flavors_detail(State(cloud): State<Cloud>) -> Json<Value> {
-    let list: Vec<Value> = cloud.flavors().await.iter().map(|f| flavor_json(f, true)).collect();
+    let list: Vec<Value> = cloud
+        .flavors()
+        .await
+        .iter()
+        .map(|f| flavor_json(f, true))
+        .collect();
     Json(json!({"flavors": list}))
 }
 
@@ -84,7 +94,11 @@ fn server_json(s: &crate::store::Server, detail: bool) -> Value {
         v["user_id"] = json!("user-admin");
         v["created"] = json!(s.created);
         v["updated"] = json!(s.updated);
-        v["OS-EXT-STS:vm_state"] = json!(if s.status == "ACTIVE" { "active" } else { "stopped" });
+        v["OS-EXT-STS:vm_state"] = json!(if s.status == "ACTIVE" {
+            "active"
+        } else {
+            "stopped"
+        });
         v["OS-EXT-STS:power_state"] = json!(if s.status == "ACTIVE" { 1 } else { 4 });
         v["metadata"] = json!({"fabric": "true"});
     }
@@ -92,12 +106,22 @@ fn server_json(s: &crate::store::Server, detail: bool) -> Value {
 }
 
 async fn list_servers(State(cloud): State<Cloud>) -> Json<Value> {
-    let list: Vec<Value> = cloud.list_servers().await.iter().map(|s| server_json(s, false)).collect();
+    let list: Vec<Value> = cloud
+        .list_servers()
+        .await
+        .iter()
+        .map(|s| server_json(s, false))
+        .collect();
     Json(json!({"servers": list}))
 }
 
 async fn list_servers_detail(State(cloud): State<Cloud>) -> Json<Value> {
-    let list: Vec<Value> = cloud.list_servers().await.iter().map(|s| server_json(s, true)).collect();
+    let list: Vec<Value> = cloud
+        .list_servers()
+        .await
+        .iter()
+        .map(|s| server_json(s, true))
+        .collect();
     Json(json!({"servers": list}))
 }
 

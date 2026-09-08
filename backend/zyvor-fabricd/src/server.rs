@@ -2293,10 +2293,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .nest("/api", all_api_routes)
         .nest("/scim/v2", scim_routes)
         .nest("/ws", ws_routes)
-        .nest("/identity", openstack_compat::identity_router(os_cloud.clone()))
-        .nest("/compute", openstack_compat::compute_router(os_cloud.clone()))
+        .nest(
+            "/identity",
+            openstack_compat::identity_router(os_cloud.clone()),
+        )
+        .nest(
+            "/compute",
+            openstack_compat::compute_router(os_cloud.clone()),
+        )
         .nest("/image", openstack_compat::image_router(os_cloud.clone()))
-        .nest("/network", openstack_compat::network_router(os_cloud.clone()))
+        .nest(
+            "/network",
+            openstack_compat::network_router(os_cloud.clone()),
+        )
         .nest("/volume", openstack_compat::volume_router(os_cloud))
         .merge(readyz_routes)
         .route("/health", get(|| async { "OK" }))

@@ -125,7 +125,10 @@ async fn issue_token(State(cloud): State<Cloud>, Json(body): Json<AuthDoc>) -> R
     let mut res = Json(payload).into_response();
     res.headers_mut().insert(
         "x-subject-token",
-        token.id.parse().unwrap_or(axum::http::HeaderValue::from_static("invalid")),
+        token
+            .id
+            .parse()
+            .unwrap_or(axum::http::HeaderValue::from_static("invalid")),
     );
     *res.status_mut() = StatusCode::CREATED;
     res
@@ -139,13 +142,21 @@ async fn validate_token(State(cloud): State<Cloud>, headers: HeaderMap) -> impl 
         .unwrap_or("");
     match cloud.token(subject).await {
         Some(token) => Json(token_body(&cloud, &token)).into_response(),
-        None => (StatusCode::UNAUTHORIZED, Json(json!({"error": {"code": 401, "title": "Unauthorized"}}))).into_response(),
+        None => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": {"code": 401, "title": "Unauthorized"}})),
+        )
+            .into_response(),
     }
 }
 
 async fn catalog(State(cloud): State<Cloud>, headers: HeaderMap) -> impl IntoResponse {
     if cloud.token(auth_token(&headers)).await.is_none() {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"code": 401}}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": {"code": 401}})),
+        )
+            .into_response();
     }
     Json(json!({"catalog": crate::catalog::catalog(&cloud.public_url)})).into_response()
 }

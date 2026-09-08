@@ -171,8 +171,8 @@ fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
 
 fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
     use zyvor_fabric_driver_core::{
-        NetworkBackendState, NetworkHealthCheckKind, NetworkServiceExposure,
-        NetworkServiceMode, NetworkServiceProtocol,
+        NetworkBackendState, NetworkHealthCheckKind, NetworkServiceExposure, NetworkServiceMode,
+        NetworkServiceProtocol,
     };
     client::NetworkServiceSpec {
         name: s.name.clone(),
@@ -210,14 +210,17 @@ fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
             .collect(),
         maglev_table_size: s.maglev_table_size,
         snat_address: s.snat_address.clone(),
-        health_check: s.health_check.as_ref().map(|h| client::NetworkServiceHealthCheck {
-            kind: match h.kind {
-                NetworkHealthCheckKind::Tcp => client::NetworkHealthCheckKind::Tcp,
-            },
-            timeout_ms: h.timeout_ms,
-            unhealthy_threshold: h.unhealthy_threshold,
-            healthy_threshold: h.healthy_threshold,
-        }),
+        health_check: s
+            .health_check
+            .as_ref()
+            .map(|h| client::NetworkServiceHealthCheck {
+                kind: match h.kind {
+                    NetworkHealthCheckKind::Tcp => client::NetworkHealthCheckKind::Tcp,
+                },
+                timeout_ms: h.timeout_ms,
+                unhealthy_threshold: h.unhealthy_threshold,
+                healthy_threshold: h.healthy_threshold,
+            }),
         advertise: s.advertise,
     }
 }

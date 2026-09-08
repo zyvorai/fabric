@@ -329,17 +329,17 @@ fn port_token(proto: &str, dport: u16) -> String {
 }
 
 /// L3/L4 explain against declared VM-edge policy (not group-merged).
-pub fn explain(policy: &VmNetworkPolicy, dest_ip: &str, dest_port: u16, proto: &str) -> ExplainResult {
+pub fn explain(
+    policy: &VmNetworkPolicy,
+    dest_ip: &str,
+    dest_port: u16,
+    proto: &str,
+) -> ExplainResult {
     let mode = EnforcementMode::from_policy(policy);
     let proto = proto.to_ascii_lowercase();
     let token = port_token(&proto, dest_port);
 
-    if is_management_cidr(dest_ip)
-        && policy
-            .deny_cidrs
-            .iter()
-            .any(|c| cidr_contains(c, dest_ip))
-    {
+    if is_management_cidr(dest_ip) && policy.deny_cidrs.iter().any(|c| cidr_contains(c, dest_ip)) {
         return ExplainResult {
             verdict: "DROPPED".into(),
             reason: DropReason::ManagementLockout,
@@ -365,7 +365,10 @@ pub fn explain(policy: &VmNetworkPolicy, dest_ip: &str, dest_port: u16, proto: &
     let port_ok = policy.allow_ports.is_empty()
         || proto == "icmp"
         || proto == "any"
-        || policy.allow_ports.iter().any(|p| p.eq_ignore_ascii_case(&token));
+        || policy
+            .allow_ports
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(&token));
 
     let (verdict, reason, would_drop) = if matched_deny.is_some() {
         ("DROPPED", DropReason::PolicyDenied, true)
@@ -373,7 +376,9 @@ pub fn explain(policy: &VmNetworkPolicy, dest_ip: &str, dest_port: u16, proto: &
         ("DROPPED", DropReason::DefaultDeny, true)
     } else if !port_ok && !policy.default_allow {
         ("DROPPED", DropReason::PortDenied, true)
-    } else if !policy.default_allow && policy.allow_cidrs.is_empty() && policy.allow_ports.is_empty()
+    } else if !policy.default_allow
+        && policy.allow_cidrs.is_empty()
+        && policy.allow_ports.is_empty()
     {
         ("DROPPED", DropReason::DefaultDeny, true)
     } else {

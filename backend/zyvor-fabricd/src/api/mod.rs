@@ -30,9 +30,9 @@ pub mod storage;
 pub mod system;
 pub mod templates;
 pub mod vm_advanced;
+pub mod vm_dataplane;
 pub mod volumes;
 pub mod zones;
-pub mod vm_dataplane;
 
 // Phase 2 API modules for enterprise features
 pub mod certificates;
@@ -73,12 +73,12 @@ pub mod db_migrations;
 pub mod export;
 pub mod external_auth;
 pub mod logs;
+pub mod openstack;
 pub mod resource_policy;
 pub mod scim;
 pub mod secrets;
 pub mod vm_power;
 pub mod webhook_retry;
-pub mod openstack;
 
 // Phase 3 infrastructure modules
 pub mod compliance;

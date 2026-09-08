@@ -83,15 +83,18 @@ pub async fn list_vms(
     // Cap limit to prevent abuse
     let limit = limit.min(1000);
 
-    let tenant_filter = match crate::tenant_scope::apply_list_tenant_filter(&claims, pagination.tenant) {
-        Ok(t) => t,
-        Err((status, msg)) => return json_error(status, msg).into_response(),
-    };
+    let tenant_filter =
+        match crate::tenant_scope::apply_list_tenant_filter(&claims, pagination.tenant) {
+            Ok(t) => t,
+            Err((status, msg)) => return json_error(status, msg).into_response(),
+        };
 
     match state.store.list_vms_paginated(offset, limit) {
         Ok((mut vms, mut total)) => {
             if let Some(ref tenant) = tenant_filter {
-                vms.retain(|vm| crate::tenant_scope::vm_tenant(vm).as_deref() == Some(tenant.as_str()));
+                vms.retain(|vm| {
+                    crate::tenant_scope::vm_tenant(vm).as_deref() == Some(tenant.as_str())
+                });
                 total = vms.len();
             }
             (

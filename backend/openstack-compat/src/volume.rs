@@ -68,7 +68,10 @@ async fn create(
         .unwrap_or_else(|| "proj-admin".into());
     let name = body.volume.name.unwrap_or_else(|| "volume".into());
     let vol = cloud.create_volume(name, body.volume.size, project).await;
-    (StatusCode::ACCEPTED, Json(json!({"volume": vol_json(&vol)})))
+    (
+        StatusCode::ACCEPTED,
+        Json(json!({"volume": vol_json(&vol)})),
+    )
 }
 
 async fn get_one(

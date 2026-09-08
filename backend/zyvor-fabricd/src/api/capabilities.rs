@@ -126,7 +126,12 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> impl axum::response::
     use serde_json::json;
 
     let store_ok = state.store.list_vms_paginated(0, 1).is_ok();
-    let fluxvm_url = state.config.driver.fluxvm_url.trim_end_matches('/').to_string();
+    let fluxvm_url = state
+        .config
+        .driver
+        .fluxvm_url
+        .trim_end_matches('/')
+        .to_string();
     let fluxvm_ready_url = format!("{fluxvm_url}/readyz");
     let (fluxvm_ok, fluxvm_body) = match state.http_client.get(&fluxvm_ready_url).send().await {
         Ok(resp) if resp.status().is_success() => {
@@ -213,9 +218,7 @@ async fn probe_vm_dataplane(state: &AppState) -> SubsystemStatus {
                 };
                 SubsystemStatus {
                     phase: SubsystemPhase::Live,
-                    detail: Some(format!(
-                        "mode={mode} · attached · schema={schema}{upgrade}"
-                    )),
+                    detail: Some(format!("mode={mode} · attached · schema={schema}{upgrade}")),
                 }
             } else {
                 SubsystemStatus {
@@ -235,10 +238,7 @@ async fn probe_vm_dataplane(state: &AppState) -> SubsystemStatus {
             );
             SubsystemStatus {
                 phase: SubsystemPhase::Unreachable,
-                detail: Some(format!(
-                    "Dataplane probe failed on '{}': {e}",
-                    sample.name
-                )),
+                detail: Some(format!("Dataplane probe failed on '{}': {e}", sample.name)),
             }
         }
     }

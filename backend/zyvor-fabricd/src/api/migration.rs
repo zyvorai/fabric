@@ -447,8 +447,10 @@ fn runtime_mgr(
 pub async fn runtime_capabilities(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<zyvor_fabric_fluxvm_client::RuntimeCapabilities>, (StatusCode, Json<serde_json::Value>)>
-{
+) -> Result<
+    Json<zyvor_fabric_fluxvm_client::RuntimeCapabilities>,
+    (StatusCode, Json<serde_json::Value>),
+> {
     let mgr = runtime_mgr(&state)?;
     let caps = mgr.capabilities().await.map_err(|e| {
         (
@@ -524,7 +526,9 @@ fn parse_mode(
     raw: Option<&str>,
 ) -> Result<zyvor_fabric_fluxvm_client::MigrationMode, (StatusCode, Json<serde_json::Value>)> {
     match raw.unwrap_or("pre-copy").to_ascii_lowercase().as_str() {
-        "pre-copy" | "precopy" | "pre_copy" => Ok(zyvor_fabric_fluxvm_client::MigrationMode::PreCopy),
+        "pre-copy" | "precopy" | "pre_copy" => {
+            Ok(zyvor_fabric_fluxvm_client::MigrationMode::PreCopy)
+        }
         "post-copy" | "postcopy" | "post_copy" => {
             Ok(zyvor_fabric_fluxvm_client::MigrationMode::PostCopy)
         }
