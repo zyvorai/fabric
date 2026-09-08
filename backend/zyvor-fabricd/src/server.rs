@@ -472,6 +472,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::vm_dataplane::service_envoy_contract),
         )
         .route(
+            "/dataplane/remote-identities",
+            get(api::vm_dataplane::list_remote_identities)
+                .post(api::vm_dataplane::upsert_remote_identity),
+        )
+        .route(
+            "/dataplane/remote-identities/reconcile",
+            post(api::vm_dataplane::reconcile_remote_identities),
+        )
+        .route(
+            "/dataplane/remote-identities/{route_domain}/{identity_id}",
+            delete(api::vm_dataplane::delete_remote_identity),
+        )
+        .route(
             "/dataplane/services/{name}/conntrack/delta",
             get(api::vm_dataplane::services_conntrack_delta),
         )

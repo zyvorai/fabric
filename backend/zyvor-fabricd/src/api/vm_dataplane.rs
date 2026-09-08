@@ -21,6 +21,7 @@ use zyvor_fabric_driver_core::{
 use crate::server::AppState;
 use crate::validation::validate_vm_name;
 use security::{RequireAdmin, RequireRead};
+use service_lb::remote_identity::RemoteIpcacheClient;
 
 #[derive(Debug, Deserialize)]
 pub struct FlowsQuery {
@@ -1055,6 +1056,45 @@ pub async fn upsert_service_policy(
     let nodes = service_nodes(&state);
     let client = service_lb::policy::FluxVmPolicyHttpClient::new()
         .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "policy client", e))?;
+    // Soft merge: fan any directory identities referenced by the policy into
+    // node ipcache (cross-domain rows still publish if listed; callers that
+    // need route_domain fencing use the library apply_with_remote_directory).
+    let directory = remote_identity_directory(&state);
+    let needed: std::collections::HashSet<u32> = spec
+        .allow_identities
+        .iter()
+        .chain(spec.deny_identities.iter())
+        .copied()
+        .collect();
+    if !needed.is_empty() {
+        if let Ok(items) = directory.list(None, None) {
+            let remotes: Vec<_> = items
+                .into_iter()
+                .filter(|r| needed.contains(&r.identity_id))
+                .collect();
+            if !remotes.is_empty() {
+                let remote = service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new()
+                    .map_err(|e| {
+                        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote ipcache client", e)
+                    })?;
+                for node in &nodes {
+                    for entry in &remotes {
+                        remote
+                            .upsert_remote(node, entry.identity_id, &entry.cidrs)
+                            .await
+                            .map_err(|e| {
+                                map_driver_err(
+                                    StatusCode::BAD_GATEWAY,
+                                    "remote identity fan-out",
+                                    e,
+                                )
+                            })?;
+                    }
+                    let _ = remote.reconcile_policies(node).await;
+                }
+            }
+        }
+    }
     let report = service_lb::policy::PolicyOrchestrator::new(client)
         .apply(&spec, &nodes)
         .await
@@ -1095,4 +1135,103 @@ pub async fn service_envoy_contract(
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     fluxvm_json_get(&state, &format!("/v1/network/services/{name}/l7/envoy")).await
+}
+
+fn remote_identity_directory(state: &AppState) -> service_lb::remote_identity::RemoteIdentityDirectory {
+    let path = std::path::PathBuf::from(&state.config.storage.path)
+        .join("service-fabric")
+        .join("remote-identities.json");
+    service_lb::remote_identity::RemoteIdentityDirectory::new(path)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RemoteIdentityListQuery {
+    pub site_id: Option<String>,
+    pub route_domain: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RemoteIdentityReconcileBody {
+    pub site_id: Option<String>,
+    pub route_domain: Option<String>,
+    pub service: Option<String>,
+}
+
+/// GET /api/dataplane/remote-identities
+pub async fn list_remote_identities(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<RemoteIdentityListQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let dir = remote_identity_directory(&state);
+    let items = dir
+        .list(q.site_id.as_deref(), q.route_domain.as_deref())
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote identities", e))?;
+    Ok(Json(serde_json::json!({ "items": items })))
+}
+
+/// POST /api/dataplane/remote-identities — upsert into Fabric directory (no fan-out).
+pub async fn upsert_remote_identity(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(mut identity): Json<service_lb::remote_identity::RemoteIdentity>,
+) -> Result<Json<service_lb::remote_identity::RemoteIdentity>, (StatusCode, Json<serde_json::Value>)>
+{
+    if identity.updated_unix_ms == 0 {
+        identity.updated_unix_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+    }
+    let dir = remote_identity_directory(&state);
+    let stored = dir
+        .upsert(identity)
+        .map_err(|e| map_driver_err(StatusCode::BAD_REQUEST, "remote identity", e))?;
+    Ok(Json(stored))
+}
+
+/// DELETE /api/dataplane/remote-identities/{route_domain}/{identity_id}
+/// Removes directory entry and unfans remote ipcache on FluxVM nodes.
+pub async fn delete_remote_identity(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path((route_domain, identity_id)): Path<(String, u32)>,
+) -> Result<Json<service_lb::remote_identity::RemoteReconcileReport>, (StatusCode, Json<serde_json::Value>)>
+{
+    let nodes = service_nodes(&state);
+    let dir = remote_identity_directory(&state);
+    let client = service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote ipcache client", e))?;
+    let orch = service_lb::remote_identity::RemoteIdentityOrchestrator::new(dir, client);
+    let report = orch
+        .delete_and_unfan(&route_domain, identity_id, &nodes, None, &[], None, 0)
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "remote identity delete", e))?;
+    Ok(Json(report))
+}
+
+/// POST /api/dataplane/remote-identities/reconcile — fan directory → FluxVM ipcache.
+pub async fn reconcile_remote_identities(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<RemoteIdentityReconcileBody>,
+) -> Result<Json<service_lb::remote_identity::RemoteReconcileReport>, (StatusCode, Json<serde_json::Value>)>
+{
+    let nodes = service_nodes(&state);
+    let dir = remote_identity_directory(&state);
+    let client = service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote ipcache client", e))?;
+    let orch = service_lb::remote_identity::RemoteIdentityOrchestrator::new(dir, client);
+    let report = orch
+        .reconcile(
+            body.route_domain.as_deref(),
+            body.site_id.as_deref(),
+            &nodes,
+            &[],
+            body.service.as_deref(),
+            0,
+        )
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "remote identity reconcile", e))?;
+    Ok(Json(report))
 }

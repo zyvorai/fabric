@@ -24,8 +24,11 @@ Everything from v5, plus:
 - transactional multi-node **identity / L7 service policy** fan-out (snapshot +
   rollback on partial apply);
 - optional **site/route-domain** fencing for anycast VIP advertise and
-  site-scoped policy fan-out (minimal; full ClusterMesh identity sync remains
-  open — see [phase6](service-fabric-phase6.md));
+  site-scoped policy fan-out (minimal);
+- **ClusterMesh-like identity directory (minimal)** — Fabric catalog +
+  reconcile into FluxVM remote ipcache so cross-site `allow_identities` can
+  resolve; full mesh datapath remains out of scope (see
+  [phase6](service-fabric-phase6.md));
 - proxy of FluxVM policy and Envoy contract endpoints;
 - HA mutation-queue drain remains on FluxVM; Fabric still drives sequence/ack
   delta replication and full-snapshot fallback.
@@ -50,6 +53,9 @@ Everything from v5, plus:
 | `GET/POST` | `/api/dataplane/services/policies` | List / upsert identity+L7 policy |
 | `GET/DELETE` | `/api/dataplane/services/{name}/policy` | Get / delete policy |
 | `GET` | `/api/dataplane/services/{name}/l7/envoy` | Envoy redirect contract metadata |
+| `GET/POST` | `/api/dataplane/remote-identities` | List / upsert remote identity directory |
+| `POST` | `/api/dataplane/remote-identities/reconcile` | Fan directory → FluxVM remote ipcache |
+| `DELETE` | `/api/dataplane/remote-identities/{route_domain}/{identity_id}` | Delete + unfan |
 
 Policy JSON uses `service`, `default_action`, `allow_identities` /
 `deny_identities`, `audit_only`, optional `l7` (not `name` / `default`).

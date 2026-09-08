@@ -4,8 +4,17 @@
 //! Distributed Service Fabric v6+ identity/L7 policy orchestration.
 //! Fabric owns fan-out and rollback; FluxVM owns the local compiler/BPF maps.
 //! Optional site_id / route_domain scoping fences multi-site policy apply.
+//! Remote identity directory merge lets cross-site allow_identities resolve
+//! via ClusterMesh-like CIDR fan-out into node ipcache (fail-closed if still
+//! unresolved after local+remote merge).
 
-use crate::{domain_key, EdgeLease, NodeTarget, ServiceSpec};
+use crate::{
+    domain_key,
+    remote_identity::{
+        resolve_policy_identities, RemoteIdentityDirectory, RemoteIpcacheClient,
+    },
+    EdgeLease, NodeTarget, ServiceSpec,
+};
 use anyhow::{bail, Context, Result};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -309,9 +318,10 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
     /// Unresolved remote identities: FluxVM compiles allow/deny lists against
     /// the node-local ipcache. Identities that cannot be resolved on a node
     /// remain fail-closed there (`unresolved_identities` on
-    /// [`ServicePolicyStatus`]); Fabric does not invent cross-site identity
-    /// sync or ClusterMesh datapath. Callers must treat unresolved entries as
-    /// deny until the remote identity is present in that node's ipcache.
+    /// [`ServicePolicyStatus`]). When a [`RemoteIdentityDirectory`] is supplied
+    /// via [`Self::apply_with_remote_directory`], Fabric merges same-domain
+    /// remote CIDRs into target node ipcache first; cross-domain directory
+    /// entries are ignored. Full mesh datapath remains out of scope.
     pub async fn apply_with_site(
         &self,
         spec: &ServicePolicySpec,
@@ -357,6 +367,64 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
             applied_nodes: applied.into_iter().map(|n| n.name).collect(),
             rolled_back_nodes: Vec::new(),
         })
+    }
+
+    /// Apply policy after merging same-domain remote identities into node ipcache.
+    ///
+    /// Resolution: `local_identity_ids ∪ same-domain remote directory`.
+    /// When `require_resolved` is true, Fabric fails closed if any allow/deny
+    /// identity is still unresolved after that merge. When false, Fabric still
+    /// fans matching remote CIDRs and leaves residual gaps to FluxVM's
+    /// node-local fail-closed compile (`unresolved_identities`).
+    pub async fn apply_with_remote_directory<R: RemoteIpcacheClient>(
+        &self,
+        spec: &ServicePolicySpec,
+        nodes: &[NodeTarget],
+        site_id: Option<&str>,
+        route_domain: Option<&str>,
+        leases: &[EdgeLease],
+        now_unix_ms: u64,
+        directory: &RemoteIdentityDirectory,
+        remote_client: &R,
+        local_identity_ids: &HashSet<u32>,
+        require_resolved: bool,
+    ) -> Result<PolicyApplyReport> {
+        validate_policy(spec)?;
+        let report = resolve_policy_identities(
+            &spec.allow_identities,
+            &spec.deny_identities,
+            route_domain,
+            directory,
+            local_identity_ids,
+        )?;
+        if require_resolved && !report.unresolved.is_empty() {
+            bail!(
+                "policy '{}' has unresolved identities after local+remote merge: {:?}",
+                spec.service,
+                report.unresolved
+            );
+        }
+        let targets =
+            policy_fanout_nodes(&spec.service, nodes, site_id, route_domain, leases, now_unix_ms);
+        if targets.is_empty() {
+            bail!("policy apply has no nodes in the owning site/route-domain");
+        }
+        for node in &targets {
+            for entry in &report.remote_entries {
+                remote_client
+                    .upsert_remote(node, entry.identity_id, &entry.cidrs)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "fan remote identity {} onto node {}",
+                            entry.identity_id, node.name
+                        )
+                    })?;
+            }
+            let _ = remote_client.reconcile_policies(node).await;
+        }
+        self.apply_with_site(spec, nodes, site_id, route_domain, leases, now_unix_ms)
+            .await
     }
 
     /// Convenience: scope policy fan-out from a [`ServiceSpec`]'s site fields.
@@ -630,5 +698,121 @@ mod tests {
         let state = fake.state.lock().unwrap();
         assert!(state.contains_key("a|web"));
         assert!(!state.contains_key("b|web"));
+    }
+
+    #[tokio::test]
+    async fn policy_apply_merges_same_domain_remote_and_fail_closed() {
+        use crate::remote_identity::{RemoteIdentity, RemoteIdentityDirectory, RemoteIpcacheClient};
+        use async_trait::async_trait;
+        use std::collections::BTreeMap;
+        use tempfile::tempdir;
+
+        #[derive(Clone, Default)]
+        struct FakeRemote {
+            cidrs: Arc<Mutex<BTreeMap<String, Vec<String>>>>,
+        }
+        #[async_trait]
+        impl RemoteIpcacheClient for FakeRemote {
+            async fn upsert_remote(
+                &self,
+                node: &NodeTarget,
+                identity: u32,
+                cidrs: &[String],
+            ) -> Result<()> {
+                self.cidrs
+                    .lock()
+                    .unwrap()
+                    .insert(format!("{}|{identity}", node.name), cidrs.to_vec());
+                Ok(())
+            }
+            async fn delete_remote(&self, _: &NodeTarget, _: u32) -> Result<()> {
+                Ok(())
+            }
+        }
+
+        let dir = tempdir().unwrap();
+        let store = RemoteIdentityDirectory::new(dir.path().join("r.json"));
+        store
+            .upsert(RemoteIdentity {
+                identity_id: 99,
+                site_id: "site-a".into(),
+                route_domain: "rd-1".into(),
+                cidrs: vec!["10.9.9.9/32".into()],
+                labels: BTreeMap::new(),
+                updated_unix_ms: 1,
+            })
+            .unwrap();
+
+        let fake = Fake::default();
+        let remote = FakeRemote::default();
+        let orch = PolicyOrchestrator::new(fake.clone());
+        let nodes = vec![NodeTarget {
+            name: "a".into(),
+            base_url: "http://a".into(),
+            token: None,
+        }];
+        let policy = ServicePolicySpec {
+            service: "web".into(),
+            enabled: true,
+            default_action: PolicyDefaultAction::Deny,
+            allow_identities: vec![99],
+            deny_identities: vec![],
+            audit_only: false,
+            l7: None,
+        };
+        orch.apply_with_remote_directory(
+            &policy,
+            &nodes,
+            None,
+            Some("rd-1"),
+            &[EdgeLease {
+                service: "web".into(),
+                node: "a".into(),
+                epoch: 1,
+                expires_unix_ms: 999,
+                site_id: None,
+                route_domain: Some("rd-1".into()),
+            }],
+            100,
+            &store,
+            &remote,
+            &HashSet::new(),
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            remote.cidrs.lock().unwrap().get("a|99").cloned().unwrap(),
+            vec!["10.9.9.9/32".to_string()]
+        );
+
+        // Cross-domain-only: identity 99 is not in rd-2 → fail-closed when required.
+        let policy2 = ServicePolicySpec {
+            allow_identities: vec![99],
+            ..policy.clone()
+        };
+        let err = orch
+            .apply_with_remote_directory(
+                &policy2,
+                &nodes,
+                None,
+                Some("rd-2"),
+                &[EdgeLease {
+                    service: "web".into(),
+                    node: "a".into(),
+                    epoch: 1,
+                    expires_unix_ms: 999,
+                    site_id: None,
+                    route_domain: Some("rd-2".into()),
+                }],
+                100,
+                &store,
+                &remote,
+                &HashSet::new(),
+                true,
+            )
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("unresolved"));
     }
 }

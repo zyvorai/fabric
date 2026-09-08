@@ -10,6 +10,7 @@
 //! This crate never writes bpffs or invokes `tc`, `ip`, or `bpftool` directly.
 
 pub mod policy;
+pub mod remote_identity;
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -1496,8 +1497,10 @@ fn intent_prefixes(intent: &BgpVipIntent) -> Vec<String> {
     }
 }
 
-fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
-    let parent = path.parent().context("BGP output path has no parent")?;
+pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+    let parent = path
+        .parent()
+        .context("atomic write path has no parent")?;
     fs::create_dir_all(parent)?;
     let tmp = path.with_extension("tmp");
     {
