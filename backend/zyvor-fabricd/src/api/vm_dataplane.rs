@@ -67,7 +67,11 @@ pub struct DeletedResponse {
     pub deleted: String,
 }
 
-fn map_driver_err(status: StatusCode, ctx: &str, e: impl std::fmt::Display) -> (StatusCode, Json<serde_json::Value>) {
+fn map_driver_err(
+    status: StatusCode,
+    ctx: &str,
+    e: impl std::fmt::Display,
+) -> (StatusCode, Json<serde_json::Value>) {
     crate::api_error::json_error(status, format!("{ctx}: {e}"))
 }
 
@@ -79,7 +83,11 @@ pub async fn dataplane_status(
 ) -> Result<Json<DataplaneStatus>, (StatusCode, Json<serde_json::Value>)> {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let status = state.driver.dataplane_status(&name).await.map_err(|e| {
-        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane status for VM '{name}'"), e)
+        map_driver_err(
+            StatusCode::NOT_FOUND,
+            &format!("Dataplane status for VM '{name}'"),
+            e,
+        )
     })?;
     Ok(Json(status))
 }
@@ -96,7 +104,11 @@ pub async fn get_dataplane_policy(
         .get_dataplane_policy(&name)
         .await
         .map_err(|e| {
-            map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Dataplane policy for VM '{name}'"),
+                e,
+            )
         })?;
     Ok(Json(policy))
 }
@@ -138,7 +150,11 @@ pub async fn dataplane_policy_control(
         .get_dataplane_policy(&name)
         .await
         .map_err(|e| {
-            map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Dataplane policy for VM '{name}'"),
+                e,
+            )
         })?;
     let next = zyvor_fabric_driver_core::policy_control::apply_control(current, &req)
         .map_err(|m| crate::api_error::json_error(StatusCode::BAD_REQUEST, m))?;
@@ -175,9 +191,17 @@ pub async fn dataplane_explain(
     (StatusCode, Json<serde_json::Value>),
 > {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
-    let policy = state.driver.get_dataplane_policy(&name).await.map_err(|e| {
-        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
-    })?;
+    let policy = state
+        .driver
+        .get_dataplane_policy(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Dataplane policy for VM '{name}'"),
+                e,
+            )
+        })?;
     Ok(Json(zyvor_fabric_driver_core::policy_control::explain(
         &policy,
         &q.dest,
@@ -197,17 +221,25 @@ pub async fn dataplane_dry_run(
     (StatusCode, Json<serde_json::Value>),
 > {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
-    let policy = state.driver.get_dataplane_policy(&name).await.map_err(|e| {
-        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane policy for VM '{name}'"), e)
-    })?;
+    let policy = state
+        .driver
+        .get_dataplane_policy(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Dataplane policy for VM '{name}'"),
+                e,
+            )
+        })?;
     let flows = state
         .driver
         .dataplane_flows(&name, q.limit)
         .await
         .unwrap_or_default();
-    Ok(Json(zyvor_fabric_driver_core::policy_control::dry_run_guard(
-        &policy, &flows,
-    )))
+    Ok(Json(
+        zyvor_fabric_driver_core::policy_control::dry_run_guard(&policy, &flows),
+    ))
 }
 
 /// GET /api/dataplane/templates
@@ -225,7 +257,11 @@ pub async fn dataplane_stats(
 ) -> Result<Json<DataplaneStats>, (StatusCode, Json<serde_json::Value>)> {
     validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let stats = state.driver.dataplane_stats(&name).await.map_err(|e| {
-        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane stats for VM '{name}'"), e)
+        map_driver_err(
+            StatusCode::NOT_FOUND,
+            &format!("Dataplane stats for VM '{name}'"),
+            e,
+        )
     })?;
     Ok(Json(stats))
 }
@@ -243,7 +279,11 @@ pub async fn dataplane_flows(
         .dataplane_flows(&name, q.limit)
         .await
         .map_err(|e| {
-            map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane flows for VM '{name}'"), e)
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Dataplane flows for VM '{name}'"),
+                e,
+            )
         })?;
     Ok(Json(FlowListResponse { items }))
 }
@@ -270,9 +310,11 @@ pub async fn list_groups(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<GroupListResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let items = state.driver.dataplane_list_groups().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane groups", e)
-    })?;
+    let items = state
+        .driver
+        .dataplane_list_groups()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane groups", e))?;
     Ok(Json(GroupListResponse { items }))
 }
 
@@ -283,7 +325,11 @@ pub async fn get_group(
     Path(name): Path<String>,
 ) -> Result<Json<SecurityGroup>, (StatusCode, Json<serde_json::Value>)> {
     let group = state.driver.dataplane_get_group(&name).await.map_err(|e| {
-        map_driver_err(StatusCode::NOT_FOUND, &format!("Dataplane group '{name}'"), e)
+        map_driver_err(
+            StatusCode::NOT_FOUND,
+            &format!("Dataplane group '{name}'"),
+            e,
+        )
     })?;
     Ok(Json(group))
 }
@@ -315,13 +361,17 @@ pub async fn delete_group(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<DeletedResponse>, (StatusCode, Json<serde_json::Value>)> {
-    state.driver.dataplane_delete_group(&name).await.map_err(|e| {
-        map_driver_err(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("Failed to delete dataplane group '{name}'"),
-            e,
-        )
-    })?;
+    state
+        .driver
+        .dataplane_delete_group(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to delete dataplane group '{name}'"),
+                e,
+            )
+        })?;
     Ok(Json(DeletedResponse { deleted: name }))
 }
 
@@ -330,9 +380,11 @@ pub async fn list_services(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ServiceListResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let items = state.driver.dataplane_list_services().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane services", e)
-    })?;
+    let items = state
+        .driver
+        .dataplane_list_services()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane services", e))?;
     Ok(Json(ServiceListResponse { items }))
 }
 
@@ -364,15 +416,10 @@ pub async fn upsert_service(
 ) -> Result<Json<NetworkServiceStatus>, (StatusCode, Json<serde_json::Value>)> {
     let spec = to_service_lb_spec(&service)?;
     let nodes = service_nodes(&state);
-    let orch = service_lb::ServiceOrchestrator::new(
-        service_lb::FluxVmHttpClient::new().map_err(|e| {
-            map_driver_err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "service-lb client",
-                e,
-            )
-        })?,
-    );
+    let orch =
+        service_lb::ServiceOrchestrator::new(service_lb::FluxVmHttpClient::new().map_err(|e| {
+            map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e)
+        })?);
     let report = orch.apply(&spec, &nodes).await.map_err(|e| {
         map_driver_err(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -386,17 +433,13 @@ pub async fn upsert_service(
         "Upserted Maglev service via service-lb"
     );
     // Return status from the primary (local) FluxVM node for UI counters.
-    let saved = state
-        .driver
-        .dataplane_get_service(&service.name)
-        .await
-        .ok();
+    let saved = state.driver.dataplane_get_service(&service.name).await.ok();
     let active = saved
         .as_ref()
         .map(|s| s.backends.iter().filter(|b| b.enabled).count())
         .unwrap_or_else(|| service.backends.iter().filter(|b| b.enabled).count());
     Ok(Json(NetworkServiceStatus {
-        schema_version: 2,
+        schema_version: 3,
         service_id: 0,
         name: service.name.clone(),
         active_backends: active,
@@ -419,15 +462,10 @@ pub async fn delete_service(
     Path(name): Path<String>,
 ) -> Result<Json<DeletedResponse>, (StatusCode, Json<serde_json::Value>)> {
     let nodes = service_nodes(&state);
-    let orch = service_lb::ServiceOrchestrator::new(
-        service_lb::FluxVmHttpClient::new().map_err(|e| {
-            map_driver_err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "service-lb client",
-                e,
-            )
-        })?,
-    );
+    let orch =
+        service_lb::ServiceOrchestrator::new(service_lb::FluxVmHttpClient::new().map_err(|e| {
+            map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e)
+        })?);
     let report = orch.delete(&name, &nodes).await.map_err(|e| {
         map_driver_err(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -443,21 +481,21 @@ pub async fn delete_service(
     Ok(Json(DeletedResponse { deleted: name }))
 }
 
-/// GET /api/dataplane/services/status — FluxVM host service dataplane status (schema v2).
+/// GET /api/dataplane/services/status — FluxVM host service dataplane status (schema v3).
 pub async fn services_host_status(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let nodes = service_nodes(&state);
-    let client = service_lb::FluxVmHttpClient::new().map_err(|e| {
-        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e)
-    })?;
+    let client = service_lb::FluxVmHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e))?;
     use service_lb::ServiceNodeClient;
     // Primary node status is enough for the console; multi-node topology is
     // visible via each node's FluxVM URL when configured.
-    let status = client.get_status(&nodes[0]).await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service host status", e)
-    })?;
+    let status = client
+        .get_status(&nodes[0])
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service host status", e))?;
     Ok(Json(serde_json::to_value(status).unwrap_or_default()))
 }
 
@@ -466,28 +504,102 @@ pub async fn services_host_stats(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, "/v1/network/services/stats").await
+}
+
+/// GET /api/dataplane/services/health — backend health report (schema v3).
+pub async fn services_health(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, "/v1/network/services/health").await
+}
+
+/// POST /api/dataplane/services/health/reconcile — run active health probes.
+pub async fn services_health_reconcile(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_post_empty(&state, "/v1/network/services/health/reconcile").await
+}
+
+/// POST /api/dataplane/services/conntrack/gc — expire forward/reverse state.
+pub async fn services_conntrack_gc(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_post_empty(&state, "/v1/network/services/conntrack/gc").await
+}
+
+/// GET /api/dataplane/services/advertisements — VIP advertise snapshot.
+pub async fn services_advertisements(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, "/v1/network/services/advertisements").await
+}
+
+async fn fluxvm_json_get(
+    state: &AppState,
+    path: &str,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let url = format!(
-        "{}/v1/network/services/stats",
-        state.config.driver.fluxvm_url.trim_end_matches('/')
+        "{}{}",
+        state.config.driver.fluxvm_url.trim_end_matches('/'),
+        path
     );
     let mut req = reqwest::Client::new().get(&url);
     if let Some(token) = state.config.driver.fluxvm_token.as_deref() {
         req = req.bearer_auth(token);
     }
-    let resp = req.send().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service stats", e)
-    })?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM GET {path}"), e))?;
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         return Err((
             StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({ "error": format!("FluxVM service stats HTTP {status}: {body}") })),
+            Json(serde_json::json!({ "error": format!("FluxVM {path} HTTP {status}: {body}") })),
         ));
     }
-    let body = resp.json::<serde_json::Value>().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service stats JSON", e)
-    })?;
+    let body = resp
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM {path} JSON"), e))?;
+    Ok(Json(body))
+}
+
+async fn fluxvm_json_post_empty(
+    state: &AppState,
+    path: &str,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let url = format!(
+        "{}{}",
+        state.config.driver.fluxvm_url.trim_end_matches('/'),
+        path
+    );
+    let mut req = reqwest::Client::new().post(&url);
+    if let Some(token) = state.config.driver.fluxvm_token.as_deref() {
+        req = req.bearer_auth(token);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM POST {path}"), e))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("FluxVM {path} HTTP {status}: {body}") })),
+        ));
+    }
+    let body = resp
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, &format!("FluxVM {path} JSON"), e))?;
     Ok(Json(body))
 }
 
@@ -501,7 +613,10 @@ fn service_nodes(state: &AppState) -> Vec<service_lb::NodeTarget> {
         nodes.push(service_lb::NodeTarget {
             name: n.name.clone(),
             base_url: n.url.clone(),
-            token: n.token.clone().or_else(|| state.config.driver.fluxvm_token.clone()),
+            token: n
+                .token
+                .clone()
+                .or_else(|| state.config.driver.fluxvm_token.clone()),
         });
     }
     nodes
@@ -510,10 +625,11 @@ fn service_nodes(state: &AppState) -> Vec<service_lb::NodeTarget> {
 fn to_service_lb_spec(
     service: &NetworkServiceSpec,
 ) -> Result<service_lb::ServiceSpec, (StatusCode, Json<serde_json::Value>)> {
-    use std::net::IpAddr;
     use service_lb::{
-        ServiceAlgorithm, ServiceBackend, ServiceExposure, ServiceMode, ServiceProtocol,
+        BackendState, HealthCheckKind, ServiceAlgorithm, ServiceBackend, ServiceExposure,
+        ServiceHealthCheck, ServiceMode, ServiceProtocol,
     };
+    use std::net::IpAddr;
 
     let bad = |msg: String| {
         (
@@ -546,6 +662,14 @@ fn to_service_lb_spec(
         ),
         None => None,
     };
+    let health_check = service.health_check.as_ref().map(|h| ServiceHealthCheck {
+        kind: match h.kind {
+            zyvor_fabric_driver_core::NetworkHealthCheckKind::Tcp => HealthCheckKind::Tcp,
+        },
+        timeout_ms: h.timeout_ms,
+        unhealthy_threshold: h.unhealthy_threshold,
+        healthy_threshold: h.healthy_threshold,
+    });
     let mut backends = Vec::with_capacity(service.backends.len());
     for b in &service.backends {
         let address: IpAddr = b
@@ -557,6 +681,12 @@ fn to_service_lb_spec(
             port: b.port,
             weight: b.weight,
             enabled: b.enabled,
+            state: match b.state {
+                zyvor_fabric_driver_core::NetworkBackendState::Ready => BackendState::Ready,
+                zyvor_fabric_driver_core::NetworkBackendState::Draining => BackendState::Draining,
+                zyvor_fabric_driver_core::NetworkBackendState::Unhealthy => BackendState::Unhealthy,
+            },
+            drain_until_unix_ms: b.drain_until_unix_ms,
         });
     }
     Ok(service_lb::ServiceSpec {
@@ -570,6 +700,8 @@ fn to_service_lb_spec(
         backends,
         maglev_table_size: service.maglev_table_size,
         snat_address,
+        health_check,
+        advertise: service.advertise,
     })
 }
 
@@ -578,9 +710,11 @@ pub async fn list_cnp(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let body = state.driver.dataplane_list_cnp().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane CNP list", e)
-    })?;
+    let body = state
+        .driver
+        .dataplane_list_cnp()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane CNP list", e))?;
     Ok(Json(body))
 }
 
@@ -603,7 +737,11 @@ pub async fn apply_cnp(
     Json(doc): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let body = state.driver.dataplane_apply_cnp(&doc).await.map_err(|e| {
-        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "Failed to apply dataplane CNP", e)
+        map_driver_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to apply dataplane CNP",
+            e,
+        )
     })?;
     tracing::info!("Applied edge dataplane CNP");
     Ok(Json(body))
@@ -615,13 +753,17 @@ pub async fn delete_cnp(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<DeletedResponse>, (StatusCode, Json<serde_json::Value>)> {
-    state.driver.dataplane_delete_cnp(&name).await.map_err(|e| {
-        map_driver_err(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("Failed to delete dataplane CNP '{name}'"),
-            e,
-        )
-    })?;
+    state
+        .driver
+        .dataplane_delete_cnp(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to delete dataplane CNP '{name}'"),
+                e,
+            )
+        })?;
     Ok(Json(DeletedResponse { deleted: name }))
 }
 
@@ -630,9 +772,11 @@ pub async fn list_identities(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<IdentityListResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let items = state.driver.dataplane_list_identities().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane identities", e)
-    })?;
+    let items = state
+        .driver
+        .dataplane_list_identities()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane identities", e))?;
     Ok(Json(IdentityListResponse { items }))
 }
 
@@ -641,9 +785,11 @@ pub async fn list_endpoints(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<EndpointListResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let items = state.driver.dataplane_list_endpoints().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane endpoints", e)
-    })?;
+    let items = state
+        .driver
+        .dataplane_list_endpoints()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane endpoints", e))?;
     Ok(Json(EndpointListResponse { items }))
 }
 
@@ -661,7 +807,10 @@ pub async fn microvm_metrics(
         .unwrap_or("http://127.0.0.1:9108/metrics");
     if url.is_empty() || url == "off" {
         return Ok((
-            [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "text/plain; charset=utf-8",
+            )],
             "# microvm metrics disabled\n",
         )
             .into_response());
@@ -677,7 +826,10 @@ pub async fn microvm_metrics(
                 .await
                 .unwrap_or_else(|_| "# empty metrics body\n".into());
             Ok((
-                [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "text/plain; version=0.0.4",
+                )],
                 body,
             )
                 .into_response())
@@ -700,9 +852,11 @@ pub async fn observe(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let body = state.driver.dataplane_observe().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane observe", e)
-    })?;
+    let body = state
+        .driver
+        .dataplane_observe()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane observe", e))?;
     Ok(Json(body))
 }
 
@@ -725,9 +879,11 @@ pub async fn health(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<DataplaneHealth>, (StatusCode, Json<serde_json::Value>)> {
-    let body = state.driver.dataplane_health().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane health", e)
-    })?;
+    let body = state
+        .driver
+        .dataplane_health()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane health", e))?;
     Ok(Json(body))
 }
 
@@ -736,9 +892,11 @@ pub async fn ipcache(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<IpcacheListResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let items = state.driver.dataplane_ipcache().await.map_err(|e| {
-        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane ipcache", e)
-    })?;
+    let items = state
+        .driver
+        .dataplane_ipcache()
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane ipcache", e))?;
     Ok(Json(IpcacheListResponse { items }))
 }
 
@@ -748,7 +906,11 @@ pub async fn refresh_dns(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<RefreshDnsResponse>, (StatusCode, Json<serde_json::Value>)> {
     let refreshed = state.driver.dataplane_refresh_dns().await.map_err(|e| {
-        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "Dataplane refresh-dns", e)
+        map_driver_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Dataplane refresh-dns",
+            e,
+        )
     })?;
     Ok(Json(RefreshDnsResponse { refreshed }))
 }

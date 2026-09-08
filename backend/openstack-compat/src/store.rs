@@ -221,12 +221,10 @@ impl Cloud {
 
     pub async fn get_server(&self, id: &str) -> Option<Server> {
         let g = self.inner.read().await;
-        g.servers.get(id).cloned().or_else(|| {
-            g.servers
-                .values()
-                .find(|s| s.name == id)
-                .cloned()
-        })
+        g.servers
+            .get(id)
+            .cloned()
+            .or_else(|| g.servers.values().find(|s| s.name == id).cloned())
     }
 
     pub async fn create_server(
@@ -269,7 +267,12 @@ impl Cloud {
             status: "ACTIVE".into(),
             project_id: server.project_id.clone(),
         };
-        port.mac_address = format!("fa:16:3e:{:02x}:{:02x}:{:02x}", id.as_bytes()[0], id.as_bytes()[1], id.as_bytes()[2]);
+        port.mac_address = format!(
+            "fa:16:3e:{:02x}:{:02x}:{:02x}",
+            id.as_bytes()[0],
+            id.as_bytes()[1],
+            id.as_bytes()[2]
+        );
         let mut g = self.inner.write().await;
         g.ports.insert(port.id.clone(), port);
         g.servers.insert(id, server.clone());
@@ -446,10 +449,40 @@ impl Cloud {
 
 fn default_flavors() -> Vec<Flavor> {
     vec![
-        Flavor { id: "1".into(), name: "m1.tiny".into(), vcpus: 1, ram: 512, disk: 1 },
-        Flavor { id: "2".into(), name: "m1.small".into(), vcpus: 1, ram: 2048, disk: 20 },
-        Flavor { id: "3".into(), name: "m1.medium".into(), vcpus: 2, ram: 4096, disk: 40 },
-        Flavor { id: "4".into(), name: "m1.large".into(), vcpus: 4, ram: 8192, disk: 80 },
-        Flavor { id: "5".into(), name: "m1.xlarge".into(), vcpus: 8, ram: 16384, disk: 160 },
+        Flavor {
+            id: "1".into(),
+            name: "m1.tiny".into(),
+            vcpus: 1,
+            ram: 512,
+            disk: 1,
+        },
+        Flavor {
+            id: "2".into(),
+            name: "m1.small".into(),
+            vcpus: 1,
+            ram: 2048,
+            disk: 20,
+        },
+        Flavor {
+            id: "3".into(),
+            name: "m1.medium".into(),
+            vcpus: 2,
+            ram: 4096,
+            disk: 40,
+        },
+        Flavor {
+            id: "4".into(),
+            name: "m1.large".into(),
+            vcpus: 4,
+            ram: 8192,
+            disk: 80,
+        },
+        Flavor {
+            id: "5".into(),
+            name: "m1.xlarge".into(),
+            vcpus: 8,
+            ram: 16384,
+            disk: 160,
+        },
     ]
 }

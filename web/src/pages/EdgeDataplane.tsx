@@ -20,6 +20,10 @@ import {
   getDataplaneHubbleFlows,
   getDataplaneObserve,
   getDataplaneServicesStatus,
+  getDataplaneServicesHealth,
+  getDataplaneServicesAdvertisements,
+  reconcileDataplaneServicesHealth,
+  gcDataplaneServicesConntrack,
   listDataplaneCnp,
   listDataplaneEndpoints,
   listDataplaneGroups,
@@ -59,10 +63,11 @@ const SAMPLE_SERVICE = `{
   "algorithm": "maglev",
   "mode": "nat",
   "exposure": "east-west",
+  "advertise": false,
   "maglev_table_size": 4093,
   "backends": [
-    {"address": "10.40.1.21", "port": 8443, "weight": 2, "enabled": true},
-    {"address": "10.40.1.22", "port": 8443, "weight": 1, "enabled": true}
+    {"address": "10.40.1.21", "port": 8443, "weight": 2, "enabled": true, "state": "ready"},
+    {"address": "10.40.1.22", "port": 8443, "weight": 1, "enabled": true, "state": "ready"}
   ]
 }`
 
@@ -74,8 +79,16 @@ const SAMPLE_SERVICE_NS = `{
   "mode": "nat",
   "exposure": "north-south",
   "snat_address": "203.0.113.10",
+  "advertise": false,
+  "health_check": {
+    "kind": "tcp",
+    "timeout_ms": 500,
+    "unhealthy_threshold": 3,
+    "healthy_threshold": 2
+  },
   "backends": [
-    {"address": "10.40.1.21", "port": 8080, "weight": 1, "enabled": true}
+    {"address": "10.40.1.21", "port": 8080, "weight": 1, "enabled": true, "state": "ready"},
+    {"address": "10.40.2.21", "port": 8080, "weight": 1, "enabled": true, "state": "draining", "drain_until_unix_ms": 1788850000000}
   ]
 }`
 
@@ -104,6 +117,8 @@ export default function EdgeDataplane() {
   const [groups, setGroups] = useState<SecurityGroup[]>([])
   const [services, setServices] = useState<NetworkServiceSpec[]>([])
   const [serviceHostStatus, setServiceHostStatus] = useState<HostServiceStatus | null>(null)
+  const [serviceHealth, setServiceHealth] = useState<unknown>(null)
+  const [serviceAds, setServiceAds] = useState<unknown>(null)
   const [cnps, setCnps] = useState<unknown[]>([])
   const [identities, setIdentities] = useState<IdentityInfo[]>([])
   const [endpoints, setEndpoints] = useState<CiliumEndpointView[]>([])
@@ -119,11 +134,13 @@ export default function EdgeDataplane() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [h, g, svc, svcStatus, c, ids, eps, obs, ipc, hubble] = await Promise.all([
+      const [h, g, svc, svcStatus, svcHealth, svcAds, c, ids, eps, obs, ipc, hubble] = await Promise.all([
         getDataplaneHealth(),
         listDataplaneGroups().catch(() => ({ items: [] as SecurityGroup[] })),
         listDataplaneServices().catch(() => ({ items: [] as NetworkServiceSpec[] })),
         getDataplaneServicesStatus().catch(() => null),
+        getDataplaneServicesHealth().catch(() => null),
+        getDataplaneServicesAdvertisements().catch(() => null),
         listDataplaneCnp().catch(() => ({ items: [] as unknown[] })),
         listDataplaneIdentities().catch(() => ({ items: [] as IdentityInfo[] })),
         listDataplaneEndpoints().catch(() => ({ items: [] as CiliumEndpointView[] })),
@@ -135,6 +152,8 @@ export default function EdgeDataplane() {
       setGroups(g.items ?? [])
       setServices(svc.items ?? [])
       setServiceHostStatus(svcStatus)
+      setServiceHealth(svcHealth)
+      setServiceAds(svcAds)
       setCnps(c.items ?? [])
       setIdentities(ids.items ?? [])
       setEndpoints(eps.items ?? [])
@@ -409,6 +428,51 @@ export default function EdgeDataplane() {
                   ? serviceHostStatus.north_south_interfaces.join(', ')
                   : 'none (east-west / VM-edge only)'}
               </p>
+              {canWrite && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="text-xs px-2 py-1 rounded border border-[#d2d2d7]"
+                    onClick={() => {
+                      setBusy(true)
+                      void reconcileDataplaneServicesHealth()
+                        .then((v) => {
+                          setServiceHealth(v)
+                          toast.success('Health reconciled')
+                        })
+                        .catch((e) => toastFailure(toast, 'Health reconcile failed', e))
+                        .finally(() => setBusy(false))
+                    }}
+                  >
+                    Reconcile health
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="text-xs px-2 py-1 rounded border border-[#d2d2d7]"
+                    onClick={() => {
+                      setBusy(true)
+                      void gcDataplaneServicesConntrack()
+                        .then(() => toast.success('Conntrack GC complete'))
+                        .catch((e) => toastFailure(toast, 'Conntrack GC failed', e))
+                        .finally(() => setBusy(false))
+                    }}
+                  >
+                    Conntrack GC
+                  </button>
+                </div>
+              )}
+              {serviceHealth != null && (
+                <pre className="mt-2 max-h-40 overflow-auto text-[11px] font-mono text-[#6e6e73] bg-[#f5f5f7] p-2 rounded">
+                  {JSON.stringify(serviceHealth, null, 2)}
+                </pre>
+              )}
+              {serviceAds != null && (
+                <pre className="mt-2 max-h-40 overflow-auto text-[11px] font-mono text-[#6e6e73] bg-[#f5f5f7] p-2 rounded">
+                  {JSON.stringify(serviceAds, null, 2)}
+                </pre>
+              )}
             </div>
           )}
           {canWrite && (
@@ -426,7 +490,7 @@ export default function EdgeDataplane() {
                   className="text-xs px-2 py-1 rounded border border-[#d2d2d7]"
                   onClick={() => setServiceJson(SAMPLE_SERVICE_NS)}
                 >
-                  North-south NAT sample
+                  North-south + drain sample
                 </button>
               </div>
               <TerminalTextarea
@@ -444,10 +508,10 @@ export default function EdgeDataplane() {
                 <Plus className="w-3.5 h-3.5" /> Apply Maglev service
               </button>
               <p className="text-xs text-[#6e6e73]">
-                Service Fabric v2: dual-stack VIP, Maglev, NAT/DSR, optional SNAT.
-                North-south NAT requires <code>snat_address</code> and a FluxVM
-                <code> north_south_interfaces</code> config. DSR needs backend VIP ownership
-                prepared by Fabric (not FluxVM).
+                Service Fabric v3: conntrack affinity, ready/draining/unhealthy backends,
+                optional TCP health checks, and VIP advertise intent for Fabric edge leases.
+                North-south NAT still needs <code>snat_address</code> and FluxVM
+                <code> north_south_interfaces</code>.
               </p>
             </div>
           )}
@@ -458,9 +522,9 @@ export default function EdgeDataplane() {
                   <th className="px-3 py-2 font-medium">Name</th>
                   <th className="px-3 py-2 font-medium">VIP</th>
                   <th className="px-3 py-2 font-medium">Port</th>
-                  <th className="px-3 py-2 font-medium">Proto</th>
                   <th className="px-3 py-2 font-medium">Mode</th>
                   <th className="px-3 py-2 font-medium">Exposure</th>
+                  <th className="px-3 py-2 font-medium">Advertise</th>
                   <th className="px-3 py-2 font-medium">Backends</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
@@ -478,12 +542,13 @@ export default function EdgeDataplane() {
                     <td className="px-3 py-2 font-medium text-[#1d1d1f]">{s.name}</td>
                     <td className="px-3 py-2 font-mono text-xs">{s.vip}</td>
                     <td className="px-3 py-2 font-mono text-xs">{s.port}</td>
-                    <td className="px-3 py-2 uppercase text-xs">{s.protocol}</td>
                     <td className="px-3 py-2 uppercase text-xs">{s.mode ?? 'nat'}</td>
                     <td className="px-3 py-2 text-xs">{s.exposure ?? 'east-west'}</td>
+                    <td className="px-3 py-2 text-xs">{s.advertise ? 'yes' : 'no'}</td>
                     <td className="px-3 py-2 font-mono text-xs">
-                      {(s.backends ?? []).filter((b) => b.enabled !== false).length}/
-                      {(s.backends ?? []).length}
+                      {(s.backends ?? [])
+                        .map((b) => `${b.state ?? 'ready'}`)
+                        .join(', ') || '—'}
                       {s.snat_address ? ` · snat ${s.snat_address}` : ''}
                     </td>
                     <td className="px-3 py-2 text-right">

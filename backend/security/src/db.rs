@@ -92,8 +92,9 @@ impl UserDb {
 
     pub fn get_by_username(&self, username: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
-        let mut stmt = conn
-            .prepare("SELECT id, username, password_hash, role, tenant FROM users WHERE username = ?1")?;
+        let mut stmt = conn.prepare(
+            "SELECT id, username, password_hash, role, tenant FROM users WHERE username = ?1",
+        )?;
 
         let result = stmt.query_row(params![username], |row| {
             let id: String = row.get(0)?;

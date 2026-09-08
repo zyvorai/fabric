@@ -81,9 +81,7 @@ pub fn apply_create_tenant(
             if body != claim_tenant {
                 return Err((
                     StatusCode::FORBIDDEN,
-                    format!(
-                        "token tenant '{claim_tenant}' cannot create VM for tenant '{body}'"
-                    ),
+                    format!("token tenant '{claim_tenant}' cannot create VM for tenant '{body}'"),
                 ));
             }
         }

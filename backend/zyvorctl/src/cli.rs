@@ -231,41 +231,61 @@ enum DataplaneCmd {
 #[derive(Subcommand)]
 enum DataplaneServiceCmd {
     List,
-    Get { name: String },
-    /// Host Maglev/service dataplane status (schema v2)
+    Get {
+        name: String,
+    },
+    /// Host Maglev/service dataplane status (schema v3)
     Status,
     /// Host Maglev/service counters
     Stats,
+    /// Backend health report
+    Health,
+    /// Run active health reconcile
+    Reconcile,
+    /// Expire conntrack / reverse-NAT state
+    Gc,
+    /// VIP advertisement snapshot
+    Advertisements,
     /// Create/update from a JSON file (NetworkServiceSpec shape)
     Apply {
         #[arg(short, long)]
         file: String,
     },
-    Delete { name: String },
+    Delete {
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
 enum DataplaneGroupCmd {
     List,
-    Get { name: String },
+    Get {
+        name: String,
+    },
     /// Create/update from a JSON file (SecurityGroup shape)
     Create {
         #[arg(short, long)]
         file: String,
     },
-    Delete { name: String },
+    Delete {
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
 enum DataplaneCnpCmd {
     List,
-    Get { name: String },
+    Get {
+        name: String,
+    },
     /// Apply a CNP JSON document
     Apply {
         #[arg(short, long)]
         file: String,
     },
-    Delete { name: String },
+    Delete {
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -648,8 +668,12 @@ enum RuntimeMigrateCmd {
         #[arg(long)]
         multifd_channels: Option<u8>,
     },
-    Status { name: String },
-    Cancel { name: String },
+    Status {
+        name: String,
+    },
+    Cancel {
+        name: String,
+    },
 }
 
 // ─── Table row types ─────────────────────────────────────────────────────────
@@ -873,7 +897,10 @@ async fn dataplane_control(
 
 async fn api_post_empty(client: &Client, path: &str) -> Result<serde_json::Value> {
     tracing::debug!("POST {}{} (empty body)", api_base(), path);
-    let res = client.post(format!("{}{}", api_base(), path)).send().await?;
+    let res = client
+        .post(format!("{}{}", api_base(), path))
+        .send()
+        .await?;
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
@@ -920,7 +947,10 @@ async fn api_delete(client: &Client, path: &str) -> Result<()> {
 
 async fn api_post_void(client: &Client, path: &str) -> Result<()> {
     tracing::debug!("POST {}{} (void)", api_base(), path);
-    let res = client.post(format!("{}{}", api_base(), path)).send().await?;
+    let res = client
+        .post(format!("{}{}", api_base(), path))
+        .send()
+        .await?;
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
@@ -935,8 +965,8 @@ impl Cli {
     pub async fn run(self) -> Result<()> {
         let base = api_base();
         let mut headers = reqwest::header::HeaderMap::new();
-        if let Ok(token) = std::env::var("ZYVOR_FABRIC_TOKEN")
-            .or_else(|_| std::env::var("FABRIC_TOKEN"))
+        if let Ok(token) =
+            std::env::var("ZYVOR_FABRIC_TOKEN").or_else(|_| std::env::var("FABRIC_TOKEN"))
         {
             let value = format!("Bearer {token}");
             headers.insert(
@@ -1101,8 +1131,7 @@ impl Cli {
 
             Commands::Dataplane(cmd) => match cmd {
                 DataplaneCmd::Status { name } => {
-                    let val =
-                        api_get(&client, &format!("/vms/{}/dataplane/status", name)).await?;
+                    let val = api_get(&client, &format!("/vms/{}/dataplane/status", name)).await?;
                     print_value(&val, fmt);
                 }
                 DataplaneCmd::Policy(pol) => match pol {
@@ -1113,12 +1142,9 @@ impl Cli {
                     }
                     DataplanePolicyCmd::Set { name, file } => {
                         let policy = load_config_file(&file)?;
-                        let val = api_post(
-                            &client,
-                            &format!("/vms/{}/dataplane/policy", name),
-                            &policy,
-                        )
-                        .await?;
+                        let val =
+                            api_post(&client, &format!("/vms/{}/dataplane/policy", name), &policy)
+                                .await?;
                         println!("Updated dataplane policy for '{}'", name);
                         if !matches!(fmt, OutputFormat::Table) {
                             print_value(&val, fmt);
@@ -1159,8 +1185,7 @@ impl Cli {
                     }
                 },
                 DataplaneCmd::Stats { name } => {
-                    let val =
-                        api_get(&client, &format!("/vms/{}/dataplane/stats", name)).await?;
+                    let val = api_get(&client, &format!("/vms/{}/dataplane/stats", name)).await?;
                     print_value(&val, fmt);
                 }
                 DataplaneCmd::Flows { name, limit } => {
@@ -1217,13 +1242,10 @@ impl Cli {
                     print_value(&val, fmt);
                 }
                 DataplaneCmd::Hubble { style, limit } => {
-                    let val =
-                        api_get(&client, &format!("/dataplane/hubble/flows?limit={}", limit))
-                            .await?;
+                    let val = api_get(&client, &format!("/dataplane/hubble/flows?limit={}", limit))
+                        .await?;
                     // Global `-o json` also forces JSON (same as --style json).
-                    if matches!(fmt, OutputFormat::Json)
-                        || style.eq_ignore_ascii_case("json")
-                    {
+                    if matches!(fmt, OutputFormat::Json) || style.eq_ignore_ascii_case("json") {
                         print_value(&val, OutputFormat::Json);
                     } else {
                         println!("{}", crate::packetflow::render_hubble_json(&val, &style));
@@ -1253,6 +1275,30 @@ impl Cli {
                     }
                     DataplaneServiceCmd::Stats => {
                         let val = api_get(&client, "/dataplane/services/stats").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Health => {
+                        let val = api_get(&client, "/dataplane/services/health").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Reconcile => {
+                        let val =
+                            api_post_empty(&client, "/dataplane/services/health/reconcile").await?;
+                        println!("Reconciled dataplane service health");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    DataplaneServiceCmd::Gc => {
+                        let val =
+                            api_post_empty(&client, "/dataplane/services/conntrack/gc").await?;
+                        println!("Garbage-collected service conntrack");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    DataplaneServiceCmd::Advertisements => {
+                        let val = api_get(&client, "/dataplane/services/advertisements").await?;
                         print_value(&val, fmt);
                     }
                     DataplaneServiceCmd::Apply { file } => {
@@ -1924,11 +1970,9 @@ impl Cli {
                         }
                     }
                     RuntimeMigrateCmd::Status { name } => {
-                        let val = api_get(
-                            &client,
-                            &format!("/vms/{}/migration/native/status", name),
-                        )
-                        .await?;
+                        let val =
+                            api_get(&client, &format!("/vms/{}/migration/native/status", name))
+                                .await?;
                         print_value(&val, fmt);
                     }
                     RuntimeMigrateCmd::Cancel { name } => {

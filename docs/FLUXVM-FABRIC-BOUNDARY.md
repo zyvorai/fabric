@@ -56,22 +56,14 @@ Fabric exposes the source-side contract on the control plane:
 
 CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`.
 
-## Service Fabric fan-out (v2)
+## Service Fabric fan-out (v3)
 
-`POST/DELETE /api/dataplane/services` go through the `service-lb` crate with the
-FluxVM **Service Fabric v2** wire model (dual-stack VIP, Maglev, NAT/DSR,
-east-west / north-south / both, optional SNAT).
+`POST/DELETE /api/dataplane/services` go through `service-lb` with schema **v3**:
+conntrack affinity, ready/draining/unhealthy backends, optional TCP health checks,
+VIP `advertise` intent, and Fabric `EdgeLease` / conntrack replication helpers.
 
-By default Fabric applies Maglev intent only to `driver.fluxvm_url`. Optional
-`driver.fluxvm_nodes` entries (`name`, `url`, `token`) fan the same intent to
-additional FluxVM nodes with snapshot/rollback on mid-fanout failure.
-
-North-south services preflight each node for schema ≥ 2 and a configured
-`sandbox.dataplane.service.north_south_interfaces` list before any mutation.
-`GET /api/dataplane/services/status` and `/stats` proxy FluxVM host status and
-counters. Edge Dataplane → Services tab edits this surface.
-
-See also `docs/ebpf-service-fabric.md` and FluxVM `docs/service-fabric.md`.
+Additional proxies: `/api/dataplane/services/{status,stats,health,advertisements}`,
+`POST …/health/reconcile`, `POST …/conntrack/gc`.
 
 ## Standalone FluxVM fleet mode
 

@@ -29,8 +29,8 @@ pub fn generate_secret(username: &str, issuer: &str) -> Result<(String, String)>
 
 /// Verify a TOTP code against a stored secret.
 pub fn verify_code(secret_base32: &str, code: &str) -> Result<bool> {
-    let secret = Secret::try_from_base32(secret_base32)
-        .map_err(|e| anyhow!("invalid totp secret: {e}"))?;
+    let secret =
+        Secret::try_from_base32(secret_base32).map_err(|e| anyhow!("invalid totp secret: {e}"))?;
     let totp = Builder::new()
         .with_algorithm(Algorithm::SHA1)
         .with_digits(6)

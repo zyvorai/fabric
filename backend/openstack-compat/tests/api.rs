@@ -10,7 +10,13 @@ use openstack_compat::router;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-async fn call(app: axum::Router, method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> (StatusCode, Value) {
+async fn call(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    token: Option<&str>,
+    body: Option<Value>,
+) -> (StatusCode, Value) {
     let mut builder = Request::builder().method(method).uri(uri);
     if let Some(t) = token {
         builder = builder.header("x-auth-token", t);
@@ -19,7 +25,10 @@ async fn call(app: axum::Router, method: &str, uri: &str, token: Option<&str>, b
         builder = builder.header("content-type", "application/json");
     }
     let req = builder
-        .body(body.map(|v| Body::from(v.to_string())).unwrap_or_else(Body::empty))
+        .body(
+            body.map(|v| Body::from(v.to_string()))
+                .unwrap_or_else(Body::empty),
+        )
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
     let status = res.status();
@@ -27,7 +36,8 @@ async fn call(app: axum::Router, method: &str, uri: &str, token: Option<&str>, b
     let json = if bytes.is_empty() {
         Value::Null
     } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::String(String::from_utf8_lossy(&bytes).into()))
+        serde_json::from_slice(&bytes)
+            .unwrap_or(Value::String(String::from_utf8_lossy(&bytes).into()))
     };
     (status, json)
 }
@@ -58,15 +68,30 @@ async fn keystone_issues_token_and_catalog() {
 
     let (st, cat) = call(app, "GET", "/identity/v3/auth/catalog", Some(&token), None).await;
     assert_eq!(st, StatusCode::OK);
-    assert!(cat["catalog"].as_array().unwrap().iter().any(|s| s["type"] == "compute"));
+    assert!(cat["catalog"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s["type"] == "compute"));
 }
 
 #[tokio::test]
 async fn nova_server_lifecycle_like_openstack() {
     let app = router("http://127.0.0.1:8080");
-    let (st, flavors) = call(app.clone(), "GET", "/compute/v2.1/flavors/detail", None, None).await;
+    let (st, flavors) = call(
+        app.clone(),
+        "GET",
+        "/compute/v2.1/flavors/detail",
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
-    assert!(flavors["flavors"].as_array().unwrap().iter().any(|f| f["name"] == "m1.tiny"));
+    assert!(flavors["flavors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|f| f["name"] == "m1.tiny"));
 
     let (st, created) = call(
         app.clone(),
@@ -80,7 +105,14 @@ async fn nova_server_lifecycle_like_openstack() {
     let id = created["server"]["id"].as_str().unwrap().to_string();
     assert_eq!(created["server"]["status"], "ACTIVE");
 
-    let (st, got) = call(app.clone(), "GET", &format!("/compute/v2.1/servers/{id}"), None, None).await;
+    let (st, got) = call(
+        app.clone(),
+        "GET",
+        &format!("/compute/v2.1/servers/{id}"),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(got["server"]["name"], "web-1");
 
@@ -93,10 +125,24 @@ async fn nova_server_lifecycle_like_openstack() {
     )
     .await;
     assert_eq!(st, StatusCode::ACCEPTED);
-    let (_, got) = call(app.clone(), "GET", &format!("/compute/v2.1/servers/{id}"), None, None).await;
+    let (_, got) = call(
+        app.clone(),
+        "GET",
+        &format!("/compute/v2.1/servers/{id}"),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(got["server"]["status"], "SHUTOFF");
 
-    let (st, _) = call(app.clone(), "DELETE", &format!("/compute/v2.1/servers/{id}"), None, None).await;
+    let (st, _) = call(
+        app.clone(),
+        "DELETE",
+        &format!("/compute/v2.1/servers/{id}"),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st, StatusCode::NO_CONTENT);
 }
 
@@ -105,7 +151,11 @@ async fn glance_neutron_cinder_roundtrip() {
     let app = router("http://127.0.0.1:8080");
     let (st, imgs) = call(app.clone(), "GET", "/image/v2/images", None, None).await;
     assert_eq!(st, StatusCode::OK);
-    assert!(imgs["images"].as_array().unwrap().iter().any(|i| i["name"] == "cirros"));
+    assert!(imgs["images"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|i| i["name"] == "cirros"));
 
     let (st, net) = call(
         app.clone(),

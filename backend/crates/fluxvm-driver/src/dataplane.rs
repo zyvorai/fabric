@@ -115,7 +115,8 @@ fn from_group(g: &SecurityGroup) -> client::SecurityGroup {
 
 fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
     use zyvor_fabric_driver_core::{
-        NetworkServiceAlgorithm, NetworkServiceBackend, NetworkServiceExposure,
+        NetworkBackendState, NetworkHealthCheckKind, NetworkServiceAlgorithm,
+        NetworkServiceBackend, NetworkServiceExposure, NetworkServiceHealthCheck,
         NetworkServiceMode, NetworkServiceProtocol,
     };
     NetworkServiceSpec {
@@ -146,16 +147,32 @@ fn to_service(s: client::NetworkServiceSpec) -> NetworkServiceSpec {
                 port: b.port,
                 weight: b.weight,
                 enabled: b.enabled,
+                state: match b.state {
+                    client::NetworkBackendState::Ready => NetworkBackendState::Ready,
+                    client::NetworkBackendState::Draining => NetworkBackendState::Draining,
+                    client::NetworkBackendState::Unhealthy => NetworkBackendState::Unhealthy,
+                },
+                drain_until_unix_ms: b.drain_until_unix_ms,
             })
             .collect(),
         maglev_table_size: s.maglev_table_size,
         snat_address: s.snat_address,
+        health_check: s.health_check.map(|h| NetworkServiceHealthCheck {
+            kind: match h.kind {
+                client::NetworkHealthCheckKind::Tcp => NetworkHealthCheckKind::Tcp,
+            },
+            timeout_ms: h.timeout_ms,
+            unhealthy_threshold: h.unhealthy_threshold,
+            healthy_threshold: h.healthy_threshold,
+        }),
+        advertise: s.advertise,
     }
 }
 
 fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
     use zyvor_fabric_driver_core::{
-        NetworkServiceExposure, NetworkServiceMode, NetworkServiceProtocol,
+        NetworkBackendState, NetworkHealthCheckKind, NetworkServiceExposure, NetworkServiceMode,
+        NetworkServiceProtocol,
     };
     client::NetworkServiceSpec {
         name: s.name.clone(),
@@ -183,10 +200,28 @@ fn from_service(s: &NetworkServiceSpec) -> client::NetworkServiceSpec {
                 port: b.port,
                 weight: b.weight,
                 enabled: b.enabled,
+                state: match b.state {
+                    NetworkBackendState::Ready => client::NetworkBackendState::Ready,
+                    NetworkBackendState::Draining => client::NetworkBackendState::Draining,
+                    NetworkBackendState::Unhealthy => client::NetworkBackendState::Unhealthy,
+                },
+                drain_until_unix_ms: b.drain_until_unix_ms,
             })
             .collect(),
         maglev_table_size: s.maglev_table_size,
         snat_address: s.snat_address.clone(),
+        health_check: s
+            .health_check
+            .as_ref()
+            .map(|h| client::NetworkServiceHealthCheck {
+                kind: match h.kind {
+                    NetworkHealthCheckKind::Tcp => client::NetworkHealthCheckKind::Tcp,
+                },
+                timeout_ms: h.timeout_ms,
+                unhealthy_threshold: h.unhealthy_threshold,
+                healthy_threshold: h.healthy_threshold,
+            }),
+        advertise: s.advertise,
     }
 }
 
