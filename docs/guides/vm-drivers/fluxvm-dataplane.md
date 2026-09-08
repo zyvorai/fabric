@@ -86,7 +86,7 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/dataplane/ipcache` | `GET /v1/network/ipcache` | Guest IP → identity |
 | `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` | Re-resolve FQDN allowlists |
 
-### Service Fabric schema v4 (Maglev VIP LB)
+### Service Fabric v5 (BPF schema 4 — Maglev VIP LB)
 
 Orthogonal to per-VM policy. Fabric fans out through `service-lb`; FluxVM owns
 programs/maps. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
@@ -103,8 +103,11 @@ programs/maps. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric
 | `GET …/advertisements` | `GET …/advertisements` | VIP advertise snapshot |
 | `GET …/flows` | `GET …/flows` | FluxScope service flows |
 | `POST …/telemetry/export` | `POST …/telemetry/export` | OTLP/HTTP JSON export |
+| `GET …/{name}/conntrack/delta` | `GET …/{name}/conntrack/delta` | HA delta export |
+| `POST …/{name}/conntrack/delta/import` | `POST …/{name}/conntrack/delta/import` | Apply HA delta batch |
+| `POST …/{name}/conntrack/delta/ack` | `POST …/{name}/conntrack/delta/ack` | Advance source watermark |
 
-CLI: `zyvorctl dataplane service …` (incl. `flows` / `export-telemetry`). Console: **Edge Dataplane → Services**.
+CLI: `zyvorctl dataplane service …` (incl. `flows` / `export-telemetry` / `delta`). Console: **Edge Dataplane → Services**.
 
 Observe pack (explain, dry-run Guard, templates): [dataplane-observe-pack.md](../../dataplane-observe-pack.md).
 
@@ -267,7 +270,7 @@ sudo cat /run/fluxvm/ebpf/vms/*/iface /run/fluxvm/ebpf/vms/*/schema_version
 ## Related docs
 
 - [FluxVM driver](fluxvm.md) — full driver surface
-- [Service Fabric v4](../../ebpf-service-fabric.md) — Maglev VIP LB / leases / health / EDT / flows
+- [Service Fabric v5 (BPF schema 4)](../../ebpf-service-fabric.md) — Maglev VIP LB / leases / HA deltas / health / EDT / flows
 - [Networking](../../networking.md) — Fabric SDN + bridges + this plane
 - [Web UI](../../web-ui.md) — console surfaces
 - [User: VM Dataplane](../../user/pages/infrastructure/dataplane.md)

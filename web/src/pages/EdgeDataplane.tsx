@@ -514,9 +514,10 @@ export default function EdgeDataplane() {
                 <Plus className="w-3.5 h-3.5" /> Apply Maglev service
               </button>
               <p className="text-xs text-[#6e6e73]">
-                Service Fabric v4: conntrack affinity, ready/draining/unhealthy backends,
+                Service Fabric v5: conntrack affinity, ready/draining/unhealthy backends,
                 optional TCP health checks, VIP advertise intent, EDT pacing,
-                FluxScope sampling, and opt-in host-routing. North-south NAT still needs
+                FluxScope sampling, opt-in host-routing, and HA delta journal replication
+                (sequence/ack with full-snapshot fallback). North-south NAT still needs
                 <code>snat_address</code> and FluxVM <code>north_south_interfaces</code>.
               </p>
             </div>
