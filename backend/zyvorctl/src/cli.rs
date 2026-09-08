@@ -232,6 +232,10 @@ enum DataplaneCmd {
 enum DataplaneServiceCmd {
     List,
     Get { name: String },
+    /// Host Maglev/service dataplane status (schema v2)
+    Status,
+    /// Host Maglev/service counters
+    Stats,
     /// Create/update from a JSON file (NetworkServiceSpec shape)
     Apply {
         #[arg(short, long)]
@@ -1241,6 +1245,14 @@ impl Cli {
                     DataplaneServiceCmd::Get { name } => {
                         let val =
                             api_get(&client, &format!("/dataplane/services/{}", name)).await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Status => {
+                        let val = api_get(&client, "/dataplane/services/status").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Stats => {
+                        let val = api_get(&client, "/dataplane/services/stats").await?;
                         print_value(&val, fmt);
                     }
                     DataplaneServiceCmd::Apply { file } => {

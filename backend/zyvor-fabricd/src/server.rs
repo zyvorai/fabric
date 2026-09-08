@@ -422,6 +422,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::vm_dataplane::list_services).post(api::vm_dataplane::upsert_service),
         )
         .route(
+            "/dataplane/services/status",
+            get(api::vm_dataplane::services_host_status),
+        )
+        .route(
+            "/dataplane/services/stats",
+            get(api::vm_dataplane::services_host_stats),
+        )
+        .route(
             "/dataplane/services/{name}",
             get(api::vm_dataplane::get_service).delete(api::vm_dataplane::delete_service),
         )

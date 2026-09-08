@@ -396,11 +396,19 @@ pub async fn upsert_service(
         .map(|s| s.backends.iter().filter(|b| b.enabled).count())
         .unwrap_or_else(|| service.backends.iter().filter(|b| b.enabled).count());
     Ok(Json(NetworkServiceStatus {
-        schema_version: 1,
+        schema_version: 2,
         service_id: 0,
-        name: service.name,
+        name: service.name.clone(),
         active_backends: active,
         maglev_table_size: service.maglev_table_size.unwrap_or(4093),
+        family: Some(if service.vip.contains(':') {
+            "ipv6".into()
+        } else {
+            "ipv4".into()
+        }),
+        mode: Some(service.mode),
+        exposure: Some(service.exposure),
+        snat_address: service.snat_address,
     }))
 }
 
@@ -435,6 +443,54 @@ pub async fn delete_service(
     Ok(Json(DeletedResponse { deleted: name }))
 }
 
+/// GET /api/dataplane/services/status — FluxVM host service dataplane status (schema v2).
+pub async fn services_host_status(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let nodes = service_nodes(&state);
+    let client = service_lb::FluxVmHttpClient::new().map_err(|e| {
+        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e)
+    })?;
+    use service_lb::ServiceNodeClient;
+    // Primary node status is enough for the console; multi-node topology is
+    // visible via each node's FluxVM URL when configured.
+    let status = client.get_status(&nodes[0]).await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service host status", e)
+    })?;
+    Ok(Json(serde_json::to_value(status).unwrap_or_default()))
+}
+
+/// GET /api/dataplane/services/stats — FluxVM host service counters.
+pub async fn services_host_stats(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let url = format!(
+        "{}/v1/network/services/stats",
+        state.config.driver.fluxvm_url.trim_end_matches('/')
+    );
+    let mut req = reqwest::Client::new().get(&url);
+    if let Some(token) = state.config.driver.fluxvm_token.as_deref() {
+        req = req.bearer_auth(token);
+    }
+    let resp = req.send().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service stats", e)
+    })?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("FluxVM service stats HTTP {status}: {body}") })),
+        ));
+    }
+    let body = resp.json::<serde_json::Value>().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "FluxVM service stats JSON", e)
+    })?;
+    Ok(Json(body))
+}
+
 fn service_nodes(state: &AppState) -> Vec<service_lb::NodeTarget> {
     let mut nodes = vec![service_lb::NodeTarget {
         name: "local".into(),
@@ -454,15 +510,22 @@ fn service_nodes(state: &AppState) -> Vec<service_lb::NodeTarget> {
 fn to_service_lb_spec(
     service: &NetworkServiceSpec,
 ) -> Result<service_lb::ServiceSpec, (StatusCode, Json<serde_json::Value>)> {
-    use std::net::Ipv4Addr;
-    use service_lb::{ServiceAlgorithm, ServiceBackend, ServiceMode, ServiceProtocol};
+    use std::net::IpAddr;
+    use service_lb::{
+        ServiceAlgorithm, ServiceBackend, ServiceExposure, ServiceMode, ServiceProtocol,
+    };
 
-    let vip: Ipv4Addr = service.vip.parse().map_err(|_| {
+    let bad = |msg: String| {
         (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": format!("invalid VIP '{}'", service.vip) })),
+            Json(serde_json::json!({ "error": msg })),
         )
-    })?;
+    };
+
+    let vip: IpAddr = service
+        .vip
+        .parse()
+        .map_err(|_| bad(format!("invalid VIP '{}'", service.vip)))?;
     let protocol = match service.protocol {
         zyvor_fabric_driver_core::NetworkServiceProtocol::Tcp => ServiceProtocol::Tcp,
         zyvor_fabric_driver_core::NetworkServiceProtocol::Udp => ServiceProtocol::Udp,
@@ -471,16 +534,24 @@ fn to_service_lb_spec(
         zyvor_fabric_driver_core::NetworkServiceMode::Nat => ServiceMode::Nat,
         zyvor_fabric_driver_core::NetworkServiceMode::Dsr => ServiceMode::Dsr,
     };
+    let exposure = match service.exposure {
+        zyvor_fabric_driver_core::NetworkServiceExposure::EastWest => ServiceExposure::EastWest,
+        zyvor_fabric_driver_core::NetworkServiceExposure::NorthSouth => ServiceExposure::NorthSouth,
+        zyvor_fabric_driver_core::NetworkServiceExposure::Both => ServiceExposure::Both,
+    };
+    let snat_address = match &service.snat_address {
+        Some(raw) => Some(
+            raw.parse::<IpAddr>()
+                .map_err(|_| bad(format!("invalid SNAT address '{raw}'")))?,
+        ),
+        None => None,
+    };
     let mut backends = Vec::with_capacity(service.backends.len());
     for b in &service.backends {
-        let address: Ipv4Addr = b.address.parse().map_err(|_| {
-            (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({
-                    "error": format!("invalid backend address '{}'", b.address)
-                })),
-            )
-        })?;
+        let address: IpAddr = b
+            .address
+            .parse()
+            .map_err(|_| bad(format!("invalid backend address '{}'", b.address)))?;
         backends.push(ServiceBackend {
             address,
             port: b.port,
@@ -495,8 +566,10 @@ fn to_service_lb_spec(
         protocol,
         algorithm: ServiceAlgorithm::Maglev,
         mode,
+        exposure,
         backends,
         maglev_table_size: service.maglev_table_size,
+        snat_address,
     })
 }
 

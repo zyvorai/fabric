@@ -402,6 +402,15 @@ pub enum NetworkServiceMode {
     Dsr,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum NetworkServiceExposure {
+    #[default]
+    EastWest,
+    NorthSouth,
+    Both,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NetworkServiceBackend {
     pub address: String,
@@ -430,9 +439,14 @@ pub struct NetworkServiceSpec {
     #[serde(default)]
     pub mode: NetworkServiceMode,
     #[serde(default)]
+    pub exposure: NetworkServiceExposure,
+    #[serde(default)]
     pub backends: Vec<NetworkServiceBackend>,
     #[serde(default)]
     pub maglev_table_size: Option<u32>,
+    /// Required for north-south NAT so replies return through FluxVM reverse NAT.
+    #[serde(default)]
+    pub snat_address: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -442,6 +456,14 @@ pub struct NetworkServiceStatus {
     pub name: String,
     pub active_backends: usize,
     pub maglev_table_size: u32,
+    #[serde(default)]
+    pub family: Option<String>,
+    #[serde(default)]
+    pub mode: Option<NetworkServiceMode>,
+    #[serde(default)]
+    pub exposure: Option<NetworkServiceExposure>,
+    #[serde(default)]
+    pub snat_address: Option<String>,
 }
 
 /// Cluster dataplane health from FluxVM `GET /v1/network/health`.

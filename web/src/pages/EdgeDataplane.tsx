@@ -9,6 +9,7 @@ import {
   IdentityInfo,
   IpcacheEntry,
   NetworkServiceSpec,
+  HostServiceStatus,
   SecurityGroup,
   applyDataplaneCnp,
   deleteDataplaneCnp,
@@ -18,6 +19,7 @@ import {
   getDataplaneHealth,
   getDataplaneHubbleFlows,
   getDataplaneObserve,
+  getDataplaneServicesStatus,
   listDataplaneCnp,
   listDataplaneEndpoints,
   listDataplaneGroups,
@@ -56,10 +58,24 @@ const SAMPLE_SERVICE = `{
   "protocol": "tcp",
   "algorithm": "maglev",
   "mode": "nat",
+  "exposure": "east-west",
   "maglev_table_size": 4093,
   "backends": [
     {"address": "10.40.1.21", "port": 8443, "weight": 2, "enabled": true},
     {"address": "10.40.1.22", "port": 8443, "weight": 1, "enabled": true}
+  ]
+}`
+
+const SAMPLE_SERVICE_NS = `{
+  "name": "edge-http",
+  "vip": "203.0.113.50",
+  "port": 80,
+  "protocol": "tcp",
+  "mode": "nat",
+  "exposure": "north-south",
+  "snat_address": "203.0.113.10",
+  "backends": [
+    {"address": "10.40.1.21", "port": 8080, "weight": 1, "enabled": true}
   ]
 }`
 
@@ -87,6 +103,7 @@ export default function EdgeDataplane() {
   const [health, setHealth] = useState<DataplaneHealth | null>(null)
   const [groups, setGroups] = useState<SecurityGroup[]>([])
   const [services, setServices] = useState<NetworkServiceSpec[]>([])
+  const [serviceHostStatus, setServiceHostStatus] = useState<HostServiceStatus | null>(null)
   const [cnps, setCnps] = useState<unknown[]>([])
   const [identities, setIdentities] = useState<IdentityInfo[]>([])
   const [endpoints, setEndpoints] = useState<CiliumEndpointView[]>([])
@@ -102,10 +119,11 @@ export default function EdgeDataplane() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [h, g, svc, c, ids, eps, obs, ipc, hubble] = await Promise.all([
+      const [h, g, svc, svcStatus, c, ids, eps, obs, ipc, hubble] = await Promise.all([
         getDataplaneHealth(),
         listDataplaneGroups().catch(() => ({ items: [] as SecurityGroup[] })),
         listDataplaneServices().catch(() => ({ items: [] as NetworkServiceSpec[] })),
+        getDataplaneServicesStatus().catch(() => null),
         listDataplaneCnp().catch(() => ({ items: [] as unknown[] })),
         listDataplaneIdentities().catch(() => ({ items: [] as IdentityInfo[] })),
         listDataplaneEndpoints().catch(() => ({ items: [] as CiliumEndpointView[] })),
@@ -116,6 +134,7 @@ export default function EdgeDataplane() {
       setHealth(h)
       setGroups(g.items ?? [])
       setServices(svc.items ?? [])
+      setServiceHostStatus(svcStatus)
       setCnps(c.items ?? [])
       setIdentities(ids.items ?? [])
       setEndpoints(eps.items ?? [])
@@ -378,8 +397,38 @@ export default function EdgeDataplane() {
 
       {tab === 'services' && (
         <div className="space-y-4">
+          {serviceHostStatus && (
+            <div className="bg-white rounded-xl border border-[#d2d2d7] p-4 text-sm space-y-1">
+              <p className="font-medium text-[#1d1d1f]">
+                Service Fabric schema v{serviceHostStatus.schema_version}
+                {serviceHostStatus.xdp_acceleration ? ' · XDP acceleration on' : ''}
+              </p>
+              <p className="text-[#6e6e73]">
+                North-south interfaces:{' '}
+                {serviceHostStatus.north_south_interfaces.length > 0
+                  ? serviceHostStatus.north_south_interfaces.join(', ')
+                  : 'none (east-west / VM-edge only)'}
+              </p>
+            </div>
+          )}
           {canWrite && (
             <div className="space-y-2">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="text-xs px-2 py-1 rounded border border-[#d2d2d7]"
+                  onClick={() => setServiceJson(SAMPLE_SERVICE)}
+                >
+                  East-west sample
+                </button>
+                <button
+                  type="button"
+                  className="text-xs px-2 py-1 rounded border border-[#d2d2d7]"
+                  onClick={() => setServiceJson(SAMPLE_SERVICE_NS)}
+                >
+                  North-south NAT sample
+                </button>
+              </div>
               <TerminalTextarea
                 className="min-h-[180px] font-mono text-xs"
                 value={serviceJson}
@@ -395,8 +444,10 @@ export default function EdgeDataplane() {
                 <Plus className="w-3.5 h-3.5" /> Apply Maglev service
               </button>
               <p className="text-xs text-[#6e6e73]">
-                East-west VIP DNAT on the VM edge (TC 49140). Use a routed service CIDR VIP —
-                not the guest L2 prefix. Mode <code>dsr</code> is rejected until Phase 2.
+                Service Fabric v2: dual-stack VIP, Maglev, NAT/DSR, optional SNAT.
+                North-south NAT requires <code>snat_address</code> and a FluxVM
+                <code> north_south_interfaces</code> config. DSR needs backend VIP ownership
+                prepared by Fabric (not FluxVM).
               </p>
             </div>
           )}
@@ -409,6 +460,7 @@ export default function EdgeDataplane() {
                   <th className="px-3 py-2 font-medium">Port</th>
                   <th className="px-3 py-2 font-medium">Proto</th>
                   <th className="px-3 py-2 font-medium">Mode</th>
+                  <th className="px-3 py-2 font-medium">Exposure</th>
                   <th className="px-3 py-2 font-medium">Backends</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
@@ -416,7 +468,7 @@ export default function EdgeDataplane() {
               <tbody>
                 {services.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-4 text-[#6e6e73]">
+                    <td colSpan={8} className="px-3 py-4 text-[#6e6e73]">
                       No Maglev services yet.
                     </td>
                   </tr>
@@ -428,9 +480,11 @@ export default function EdgeDataplane() {
                     <td className="px-3 py-2 font-mono text-xs">{s.port}</td>
                     <td className="px-3 py-2 uppercase text-xs">{s.protocol}</td>
                     <td className="px-3 py-2 uppercase text-xs">{s.mode ?? 'nat'}</td>
+                    <td className="px-3 py-2 text-xs">{s.exposure ?? 'east-west'}</td>
                     <td className="px-3 py-2 font-mono text-xs">
                       {(s.backends ?? []).filter((b) => b.enabled !== false).length}/
                       {(s.backends ?? []).length}
+                      {s.snat_address ? ` · snat ${s.snat_address}` : ''}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {canWrite && (

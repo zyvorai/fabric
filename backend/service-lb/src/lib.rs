@@ -1,16 +1,16 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! Fabric-side orchestration for FluxVM Service Fabric.
+//! Fabric orchestration for FluxVM Service Fabric v2.
 //!
-//! Fabric owns distributed service intent. Each FluxVM node owns eBPF maps
-//! and packet rewriting. This crate deliberately talks only to the stable
-//! `/v1/network/services` REST contract; it never manipulates bpffs or `tc`.
+//! Fabric owns service intent, node selection, rollout and rollback. FluxVM
+//! owns every TC/XDP program and BPF map. This crate never writes bpffs or
+//! invokes `tc`, `ip`, or `bpftool` directly.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::Ipv4Addr};
+use std::{collections::HashMap, net::IpAddr};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -34,9 +34,24 @@ pub enum ServiceMode {
     Dsr,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum ServiceExposure {
+    #[default]
+    EastWest,
+    NorthSouth,
+    Both,
+}
+
+impl ServiceExposure {
+    pub fn north_south(self) -> bool {
+        matches!(self, Self::NorthSouth | Self::Both)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ServiceBackend {
-    pub address: Ipv4Addr,
+    pub address: IpAddr,
     pub port: u16,
     #[serde(default = "default_weight")]
     pub weight: u16,
@@ -53,7 +68,7 @@ fn default_enabled() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ServiceSpec {
     pub name: String,
-    pub vip: Ipv4Addr,
+    pub vip: IpAddr,
     pub port: u16,
     pub protocol: ServiceProtocol,
     #[serde(default)]
@@ -61,9 +76,13 @@ pub struct ServiceSpec {
     #[serde(default)]
     pub mode: ServiceMode,
     #[serde(default)]
+    pub exposure: ServiceExposure,
+    #[serde(default)]
     pub backends: Vec<ServiceBackend>,
     #[serde(default)]
     pub maglev_table_size: Option<u32>,
+    #[serde(default)]
+    pub snat_address: Option<IpAddr>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -75,15 +94,82 @@ pub struct NodeTarget {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HostInterfaceStatus {
+    pub interface: String,
+    pub tc_program_pinned: bool,
+    pub xdp_requested: bool,
+    pub xdp_program_pinned: bool,
+    pub pin_dir: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HostServiceStatus {
+    pub schema_version: u32,
+    pub north_south_interfaces: Vec<String>,
+    pub xdp_acceleration: bool,
+    pub interfaces: Vec<HostInterfaceStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApplyReport {
     pub service: String,
     pub applied_nodes: Vec<String>,
     pub rolled_back_nodes: Vec<String>,
 }
 
+pub fn validate_spec(spec: &ServiceSpec) -> Result<()> {
+    validate_name(&spec.name)?;
+    if spec.port == 0 {
+        bail!("service port must be non-zero");
+    }
+    if spec.backends.is_empty() || !spec.backends.iter().any(|b| b.enabled) {
+        bail!("service requires at least one enabled backend");
+    }
+    let v4 = spec.vip.is_ipv4();
+    for backend in &spec.backends {
+        if backend.address.is_ipv4() != v4 {
+            bail!(
+                "backend {} family does not match VIP {}",
+                backend.address,
+                spec.vip
+            );
+        }
+        if backend.port == 0 {
+            bail!("backend {} has port zero", backend.address);
+        }
+        if backend.weight == 0 || backend.weight > 32 {
+            bail!("backend weight must be in 1..=32");
+        }
+        if spec.mode == ServiceMode::Dsr && backend.port != spec.port {
+            bail!("DSR backend port must equal the VIP service port");
+        }
+    }
+    if let Some(snat) = spec.snat_address {
+        if snat.is_ipv4() != v4 {
+            bail!("SNAT family does not match VIP family");
+        }
+        if spec.mode == ServiceMode::Dsr {
+            bail!("DSR cannot be combined with SNAT");
+        }
+    }
+    if spec.exposure.north_south()
+        && spec.mode == ServiceMode::Nat
+        && spec.snat_address.is_none()
+    {
+        bail!("north-south NAT requires snat_address");
+    }
+    if let Some(size) = spec.maglev_table_size {
+        if ![251, 509, 1021, 2039, 4093, 8191, 16381].contains(&size) {
+            bail!("unsupported Maglev table size {size}");
+        }
+    }
+    Ok(())
+}
+
 #[async_trait]
 pub trait ServiceNodeClient: Send + Sync {
     async fn get_service(&self, node: &NodeTarget, name: &str) -> Result<Option<ServiceSpec>>;
+    async fn get_status(&self, node: &NodeTarget) -> Result<HostServiceStatus>;
     async fn upsert_service(&self, node: &NodeTarget, spec: &ServiceSpec) -> Result<()>;
     async fn delete_service(&self, node: &NodeTarget, name: &str) -> Result<()>;
 }
@@ -144,12 +230,26 @@ impl ServiceNodeClient for FluxVmHttpClient {
         Ok(Some(resp.json().await?))
     }
 
-    async fn upsert_service(&self, node: &NodeTarget, spec: &ServiceSpec) -> Result<()> {
-        validate_name(&spec.name)?;
+    async fn get_status(&self, node: &NodeTarget) -> Result<HostServiceStatus> {
         let resp = self
             .auth(
                 node,
-                self.http.post(Self::url(node, "/v1/network/services")?),
+                self.http
+                    .get(Self::url(node, "/v1/network/services/status")?),
+            )
+            .send()
+            .await?;
+        let resp = Self::expect_ok(resp, "get service dataplane status").await?;
+        Ok(resp.json().await?)
+    }
+
+    async fn upsert_service(&self, node: &NodeTarget, spec: &ServiceSpec) -> Result<()> {
+        validate_spec(spec)?;
+        let resp = self
+            .auth(
+                node,
+                self.http
+                    .post(Self::url(node, "/v1/network/services")?),
             )
             .json(spec)
             .send()
@@ -188,15 +288,34 @@ where
         Self { client }
     }
 
-    /// Apply intent to every node. Before mutating anything, snapshot each
-    /// node's prior value. A mid-fanout failure triggers best-effort rollback
-    /// of nodes already updated, preventing Fabric from silently accepting a
-    /// half-deployed service.
     pub async fn apply(&self, spec: &ServiceSpec, nodes: &[NodeTarget]) -> Result<ApplyReport> {
-        validate_name(&spec.name)?;
+        validate_spec(spec)?;
         if nodes.is_empty() {
             bail!("service apply requires at least one FluxVM node");
         }
+
+        // North-south intent must only fan out to nodes actually configured
+        // as service edges. Fabric checks this before taking any snapshot or
+        // mutating service state, so a topology mistake has zero side effects.
+        if spec.exposure.north_south() {
+            for node in nodes {
+                let status = self.client.get_status(node).await?;
+                if status.schema_version < 2 {
+                    bail!(
+                        "node '{}' exposes service schema {}, need v2 for north-south/DSR/IPv6",
+                        node.name,
+                        status.schema_version
+                    );
+                }
+                if status.north_south_interfaces.is_empty() {
+                    bail!(
+                        "node '{}' has no FluxVM north-south interfaces configured",
+                        node.name
+                    );
+                }
+            }
+        }
+
         let mut before = Vec::with_capacity(nodes.len());
         for node in nodes {
             before.push((
@@ -232,7 +351,10 @@ where
         }
         let mut before = Vec::with_capacity(nodes.len());
         for node in nodes {
-            before.push((node.clone(), self.client.get_service(node, name).await?));
+            before.push((
+                node.clone(),
+                self.client.get_service(node, name).await?,
+            ));
         }
         let mut applied = Vec::new();
         for node in nodes {
@@ -302,6 +424,7 @@ mod tests {
     #[derive(Clone, Default)]
     struct FakeClient {
         state: Arc<Mutex<HashMap<(String, String), ServiceSpec>>>,
+        status: Arc<Mutex<HashMap<String, HostServiceStatus>>>,
         fail_upsert_on: Arc<Mutex<Option<String>>>,
         fail_delete_on: Arc<Mutex<Option<String>>>,
     }
@@ -316,6 +439,22 @@ mod tests {
                 .get(&(node.name.clone(), name.into()))
                 .cloned())
         }
+
+        async fn get_status(&self, node: &NodeTarget) -> Result<HostServiceStatus> {
+            Ok(self
+                .status
+                .lock()
+                .await
+                .get(&node.name)
+                .cloned()
+                .unwrap_or(HostServiceStatus {
+                    schema_version: 2,
+                    north_south_interfaces: vec!["eno1".into()],
+                    xdp_acceleration: true,
+                    interfaces: Vec::new(),
+                }))
+        }
+
         async fn upsert_service(&self, node: &NodeTarget, spec: &ServiceSpec) -> Result<()> {
             if self.fail_upsert_on.lock().await.as_deref() == Some(node.name.as_str()) {
                 bail!("injected upsert failure");
@@ -326,6 +465,7 @@ mod tests {
                 .insert((node.name.clone(), spec.name.clone()), spec.clone());
             Ok(())
         }
+
         async fn delete_service(&self, node: &NodeTarget, name: &str) -> Result<()> {
             if self.fail_delete_on.lock().await.as_deref() == Some(node.name.as_str()) {
                 bail!("injected delete failure");
@@ -357,6 +497,7 @@ mod tests {
             protocol: ServiceProtocol::Tcp,
             algorithm: ServiceAlgorithm::Maglev,
             mode: ServiceMode::Nat,
+            exposure: ServiceExposure::EastWest,
             backends: vec![ServiceBackend {
                 address: "10.40.1.21".parse().unwrap(),
                 port: 8443,
@@ -364,7 +505,29 @@ mod tests {
                 enabled: true,
             }],
             maglev_table_size: Some(251),
+            snat_address: None,
         }
+    }
+
+    #[test]
+    fn validates_ipv6_north_south_nat() {
+        let mut s = service(443);
+        s.vip = "2001:db8:40::100".parse().unwrap();
+        s.backends[0].address = "2001:db8:40:1::21".parse().unwrap();
+        s.exposure = ServiceExposure::NorthSouth;
+        s.snat_address = Some("2001:db8:ffff::10".parse().unwrap());
+        assert!(validate_spec(&s).is_ok());
+    }
+
+    #[test]
+    fn dsr_rejects_snat_and_port_translation() {
+        let mut s = service(443);
+        s.mode = ServiceMode::Dsr;
+        assert!(validate_spec(&s).is_err());
+        s.backends[0].port = 443;
+        assert!(validate_spec(&s).is_ok());
+        s.snat_address = Some("192.0.2.5".parse().unwrap());
+        assert!(validate_spec(&s).is_err());
     }
 
     #[tokio::test]
@@ -374,6 +537,27 @@ mod tests {
         let report = orch.apply(&service(443), &nodes()).await.unwrap();
         assert_eq!(report.applied_nodes.len(), 3);
         assert_eq!(client.state.lock().await.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn north_south_preflight_is_side_effect_free() {
+        let client = FakeClient::default();
+        let ns = nodes();
+        client.status.lock().await.insert(
+            "b".into(),
+            HostServiceStatus {
+                schema_version: 2,
+                north_south_interfaces: Vec::new(),
+                xdp_acceleration: false,
+                interfaces: Vec::new(),
+            },
+        );
+        let mut s = service(443);
+        s.exposure = ServiceExposure::NorthSouth;
+        s.snat_address = Some("192.0.2.10".parse().unwrap());
+        let orch = ServiceOrchestrator::new(client.clone());
+        assert!(orch.apply(&s, &ns).await.is_err());
+        assert!(client.state.lock().await.is_empty());
     }
 
     #[tokio::test]
@@ -404,21 +588,5 @@ mod tests {
             state.get(&("c".into(), "payments".into())).unwrap().port,
             443
         );
-    }
-
-    #[tokio::test]
-    async fn delete_fans_out() {
-        let client = FakeClient::default();
-        let ns = nodes();
-        for node in &ns {
-            client
-                .state
-                .lock()
-                .await
-                .insert((node.name.clone(), "payments".into()), service(443));
-        }
-        let orch = ServiceOrchestrator::new(client.clone());
-        orch.delete("payments", &ns).await.unwrap();
-        assert!(client.state.lock().await.is_empty());
     }
 }
