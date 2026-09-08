@@ -48,6 +48,8 @@ pub enum BackendKind {
     Qemu,
     CloudHypervisor,
     Firecracker,
+    /// In-tree FluxVM hypervisor (agent-sandbox execution track).
+    FluxVm,
     /// Resolved to a concrete backend server-side; never appears on a
     /// stored `VmRecord`, only ever sent on a `CreateVmRequest`.
     Auto,
@@ -307,6 +309,90 @@ pub struct VmPressure {
 #[derive(Debug, Deserialize)]
 struct VmListResponse {
     items: Vec<VmRecord>,
+}
+
+// ZYVOR_RUNTIME_BOUNDARY_V1: typed mirror of FluxVM's node-local migration contract.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum MigrationMode {
+    #[default]
+    PreCopy,
+    PostCopy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MigrationStartRequest {
+    pub destination: String,
+    #[serde(default)]
+    pub mode: MigrationMode,
+    #[serde(default)]
+    pub bandwidth_mbps: Option<u64>,
+    #[serde(default)]
+    pub max_downtime_ms: Option<u64>,
+    #[serde(default)]
+    pub multifd_channels: Option<u8>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum MigrationPhase {
+    None,
+    Setup,
+    Active,
+    PostcopyActive,
+    Completed,
+    Failed,
+    Cancelled,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MigrationStatus {
+    pub phase: MigrationPhase,
+    pub status: String,
+    #[serde(default)]
+    pub ram_transferred: Option<u64>,
+    #[serde(default)]
+    pub ram_remaining: Option<u64>,
+    #[serde(default)]
+    pub ram_total: Option<u64>,
+    #[serde(default)]
+    pub total_time_ms: Option<u64>,
+    #[serde(default)]
+    pub downtime_ms: Option<u64>,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeMigrationCapability {
+    pub backend: BackendKind,
+    pub live: bool,
+    pub pre_copy: bool,
+    pub post_copy: bool,
+    pub multifd: bool,
+    pub requires_shared_storage: bool,
+    pub transports: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeSnapshotCapability {
+    pub backend: BackendKind,
+    pub memory: bool,
+    pub disk: bool,
+    pub portable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeCapabilities {
+    pub api_version: String,
+    pub scope: String,
+    pub orchestration_owner: String,
+    pub migration: Vec<RuntimeMigrationCapability>,
+    pub snapshot: Vec<RuntimeSnapshotCapability>,
 }
 
 /// A warm pool: `size` VMs pre-booted from `template`, then paused, ready
@@ -721,6 +807,54 @@ impl FluxVmClient {
             Ok(v) => v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
             Err(_) => false,
         }
+    }
+
+    /// FluxVM's stable node-local feature contract. Fabric uses this instead
+    /// of assuming that every runtime/version supports every operation.
+    pub async fn runtime_capabilities(&self) -> Result<RuntimeCapabilities> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/runtime/capabilities")?))
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    pub async fn start_migration(
+        &self,
+        id: Uuid,
+        request: &MigrationStartRequest,
+    ) -> Result<MigrationStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/migration/start"))?),
+            )
+            .json(request)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    pub async fn migration_status(&self, id: Uuid) -> Result<MigrationStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/migration/status"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    pub async fn cancel_migration(&self, id: Uuid) -> Result<MigrationStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/migration/cancel"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
     }
 
     pub async fn create_vm(&self, req: &CreateVmRequest) -> Result<VmRecord> {
@@ -1400,10 +1534,7 @@ impl FluxVmClient {
     /// `GET /v1/network/cnp/{name}`
     pub async fn get_cnp(&self, name: &str) -> Result<serde_json::Value> {
         let resp = self
-            .authed(
-                self.http
-                    .get(self.url(&format!("/v1/network/cnp/{name}"))?),
-            )
+            .authed(self.http.get(self.url(&format!("/v1/network/cnp/{name}"))?))
             .send()
             .await?;
         Self::parse(resp).await
@@ -1657,5 +1788,49 @@ impl tokio::io::AsyncWrite for ConsoleWs {
         self.stream
             .poll_close_unpin(cx)
             .map_err(std::io::Error::other)
+    }
+}
+
+#[cfg(test)]
+mod runtime_boundary_contract_tests {
+    use super::*;
+
+    #[test]
+    fn decodes_fluxvm_runtime_capabilities_v1() {
+        let caps: RuntimeCapabilities = serde_json::from_value(serde_json::json!({
+            "apiVersion": "runtime.fluxvm.zyvor.io/v1",
+            "scope": "node-local",
+            "orchestrationOwner": "zyvor-fabric",
+            "migration": [{
+                "backend": "qemu",
+                "live": true,
+                "preCopy": true,
+                "postCopy": true,
+                "multifd": true,
+                "requiresSharedStorage": true,
+                "transports": ["tcp", "unix"]
+            }],
+            "snapshot": []
+        }))
+        .unwrap();
+        assert_eq!(caps.scope, "node-local");
+        assert_eq!(caps.migration[0].backend, BackendKind::Qemu);
+        assert!(caps.migration[0].requires_shared_storage);
+    }
+
+    #[test]
+    fn decodes_postcopy_status() {
+        let status: MigrationStatus = serde_json::from_value(serde_json::json!({
+            "phase": "postcopy-active",
+            "status": "postcopy-active",
+            "ram_transferred": 100,
+            "ram_remaining": 20,
+            "ram_total": 120,
+            "total_time_ms": 50,
+            "downtime_ms": 2,
+            "error": null
+        }))
+        .unwrap();
+        assert_eq!(status.phase, MigrationPhase::PostcopyActive);
     }
 }

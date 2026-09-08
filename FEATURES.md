@@ -99,7 +99,9 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 
 ## Live Migration
 
-- Cross-host VM migration
+- Cross-host orchestration belongs to Fabric; FluxVM owns VMM transport.
+- **Runtime contract v1** adds typed FluxVM source-side QEMU pre-copy/post-copy/multifd primitives and capability discovery.
+- Target-receiver preparation and full HA cutover remain pre-GA; the obsolete rsync + `machinectl` live path is disabled. <!-- ZYVOR_RUNTIME_BOUNDARY_V1 -->
 
 ## Security
 

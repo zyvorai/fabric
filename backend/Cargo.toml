@@ -22,6 +22,7 @@ members = [
     "predictive-drs",
     "distributed-storage",
     "fault-tolerance",
+    "migration", # ZYVOR_RUNTIME_BOUNDARY_V1: compile/test migration orchestration in workspace CI
     "backup",
     "replication",
 

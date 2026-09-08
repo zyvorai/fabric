@@ -8,6 +8,10 @@ use std::process::Command;
 use std::sync::Arc;
 use zyvor_fabric_driver_core::VmDriver;
 
+// ZYVOR_RUNTIME_BOUNDARY_V1
+pub mod runtime;
+pub use runtime::{progress_percent, NativeMigrationOptions, RuntimeMigrationManager};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationConfig {
     pub vm_name: String,
@@ -58,6 +62,11 @@ impl MigrationManager {
 
     /// Start VM migration
     pub async fn migrate_vm(&self, config: &MigrationConfig) -> Result<MigrationStatus> {
+        if config.live {
+            anyhow::bail!(
+                "legacy rsync/machinectl live migration is disabled under the FluxVM runtime boundary; use RuntimeMigrationManager with a prepared FluxVM target"
+            );
+        }
         tracing::info!(
             "Starting {} migration of VM {} from {} to {}",
             if config.live { "live" } else { "offline" },
@@ -161,88 +170,10 @@ impl MigrationManager {
     /// active FluxVM `VmDriver`. Starting the VM on the *target* node shells
     /// `ssh <target> zyvorctl start <vm>` — a local `Arc<dyn VmDriver>` only
     /// talks to this host's FluxVM, not a remote one.
-    async fn live_sync(&self, config: &MigrationConfig) -> Result<()> {
-        tracing::info!("Starting live synchronization for VM '{}'", config.vm_name);
-
-        let source_path = format!("/var/lib/zyvor-fabricd/vms/{}/", config.vm_name);
-        let target_path = format!(
-            "{}:/var/lib/zyvor-fabricd/vms/{}/",
-            config.target_node, config.vm_name
-        );
-
-        // Iterative rsync: sync changed blocks while VM is still running
-        // This minimizes downtime by pre-copying most data
-        for iteration in 1..=3 {
-            tracing::info!(
-                "Live sync iteration {}/3 for VM '{}'",
-                iteration,
-                config.vm_name
-            );
-
-            let mut cmd = Command::new("rsync");
-            cmd.args(["-avz", "--inplace", "--no-whole-file"]);
-            if let Some(bw) = config.bandwidth_mbps {
-                cmd.arg(format!("--bwlimit={}", bw * 1024));
-            }
-            cmd.arg(&source_path).arg(&target_path);
-
-            let output = cmd.output()?;
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                tracing::warn!("rsync iteration {} warning: {}", iteration, stderr);
-            }
-
-            // Brief pause between iterations to let dirty pages accumulate
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        }
-
-        // Final cutover: pause VM, do final sync, start on target
-        tracing::info!("Pausing VM '{}' for final sync", config.vm_name);
-
-        if let Err(e) = self.driver.poweroff(&config.vm_name).await {
-            tracing::warn!(
-                "Failed to stop source VM '{}' for final sync: {e:#}",
-                config.vm_name
-            );
-        }
-
-        // Final rsync pass (very fast — only changed blocks since last iteration)
-        let mut cmd = Command::new("rsync");
-        cmd.args(["-avz", "--inplace", "--no-whole-file", "--delete"]);
-        cmd.arg(&source_path).arg(&target_path);
-        let output = cmd.output()?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("Final sync failed: {}", stderr));
-        }
-
-        // Start VM on target via zyvorctl (machinectl removed; FluxVM/Fabric API)
-        tracing::info!(
-            "Starting VM '{}' on target node {} via zyvorctl",
-            config.vm_name,
-            config.target_node
-        );
-        let output = Command::new("ssh")
-            .arg(&config.target_node)
-            .args(["zyvorctl", "start", &config.vm_name])
-            .output()?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!(
-                "Failed to start VM on target via zyvorctl: {}. \
-                 Start the target via FluxVM/Fabric API; machinectl was removed.",
-                stderr
-            ));
-        }
-
-        tracing::info!(
-            "Live migration of VM '{}' completed — now running on {}",
-            config.vm_name,
-            config.target_node
-        );
-        Ok(())
+    async fn live_sync(&self, _config: &MigrationConfig) -> Result<()> {
+        anyhow::bail!(
+            "legacy live_sync is intentionally disabled: FluxVM owns VMM migration transport; Fabric owns orchestration. Use RuntimeMigrationManager after the target runtime is prepared"
+        )
     }
 
     /// Cancel ongoing migration
