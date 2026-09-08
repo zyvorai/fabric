@@ -56,18 +56,20 @@ Fabric exposes the source-side contract on the control plane:
 
 CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`.
 
-## Service Fabric fan-out (v5)
+## Service Fabric fan-out (v6)
 
 `POST/DELETE /api/dataplane/services` go through `service-lb` with Service Fabric
-**v5** (BPF schema **4** ABI): conntrack affinity, ready/draining/unhealthy backends,
-optional TCP health checks, VIP `advertise` intent, Fabric `EdgeLease` / durable lease
-controller, sequence/ack HA delta replication (full-snapshot fallback on gaps), plus
-`max_egress_mbps`, `flow_sample_rate`, and `host_routing`. FRR/BIRD/File adapters
-own BGP sessions; FluxVM only publishes local ads.
+**v6** (BPF schema **4** ABI / FluxVM program generation **6**): conntrack affinity,
+ready/draining/unhealthy backends, optional TCP health checks, VIP `advertise`
+intent, Fabric `EdgeLease` / durable lease controller, sequence/ack HA delta
+replication (full-snapshot fallback on gaps), `max_egress_mbps`, `flow_sample_rate`,
+`host_routing`, plus **identity/L7 service policy** transactions. FRR/BIRD/File
+adapters own BGP sessions; FluxVM only publishes local ads.
 
 Additional proxies: `/api/dataplane/services/{status,stats,health,advertisements,flows}`,
 `POST …/health/reconcile`, `POST …/conntrack/gc`, `POST …/telemetry/export`,
-`GET/POST …/conntrack/delta` (+ `/import`, `/ack`).
+`GET/POST …/conntrack/delta` (+ `/import`, `/ack`),
+`GET/POST …/policies`, `GET/DELETE …/{name}/policy`, `GET …/{name}/l7/envoy`.
 
 FluxVM must expose north-south service TC (`north_south_interfaces`) before HA deltas
 or VIP advertisements are meaningful; north-south NAT services need `snat_address`.

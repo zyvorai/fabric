@@ -1,26 +1,29 @@
-# Fabric ↔ FluxVM Service Fabric v5
+# Fabric ↔ FluxVM Service Fabric v6
 
 Fabric owns **distributed** service intent; FluxVM owns **node-local** TC/XDP
 execution and maps. Fabric never invokes `bpftool`, `tc`, `ip`, or writes
 `/sys/fs/bpf` (including Cilium private maps).
 
-The **BPF ABI remains schema 4**. v5 adds state-plane/HA semantics around that ABI.
+The **BPF ABI remains schema 4**. **v6** adds identity/L7 service policy and an
+HA mutation queue around that ABI, with **program generation 6** on FluxVM.
+v5 durable leases and sequence/ack HA deltas remain.
 
 FluxVM reference: [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) ·
 Boundary: [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md) ·
 Examples: [examples/service-fabric-v3/](examples/service-fabric-v3/) ·
+FluxVM v6 examples: [service-fabric-v6](https://github.com/zyvorai/fluxvm/tree/main/examples/service-fabric-v6) ·
 Shipped: [phase4](service-fabric-phase4.md) · [phase5](service-fabric-phase5.md) ·
-Next: [phase6](service-fabric-phase6.md).
+[phase6](service-fabric-phase6.md).
 
-## Fabric v5 responsibilities
+## Fabric v6 responsibilities
 
-Everything from v4, plus:
+Everything from v5, plus:
 
-- durable edge leases with epoch high-water marks (no ABA reuse);
-- withdraw-before-release replacement sequencing;
-- state-before-advertise staging for replacements;
-- sequence/ack HA delta replication with full-snapshot fallback on gaps;
-- source journal ack advances only to the **minimum** target cursor.
+- transactional multi-node **identity / L7 service policy** fan-out (snapshot +
+  rollback on partial apply);
+- proxy of FluxVM policy and Envoy contract endpoints;
+- HA mutation-queue drain remains on FluxVM; Fabric still drives sequence/ack
+  delta replication and full-snapshot fallback.
 
 ## Fabric REST (proxied)
 
@@ -39,6 +42,12 @@ Everything from v4, plus:
 | `GET` | `/api/dataplane/services/{name}/conntrack/delta` | HA delta export |
 | `POST` | `/api/dataplane/services/{name}/conntrack/delta/import` | Apply HA delta |
 | `POST` | `/api/dataplane/services/{name}/conntrack/delta/ack` | Advance source watermark |
+| `GET/POST` | `/api/dataplane/services/policies` | List / upsert identity+L7 policy |
+| `GET/DELETE` | `/api/dataplane/services/{name}/policy` | Get / delete policy |
+| `GET` | `/api/dataplane/services/{name}/l7/envoy` | Envoy redirect contract metadata |
+
+Policy JSON uses `service`, `default_action`, `allow_identities` /
+`deny_identities`, `audit_only`, optional `l7` (not `name` / `default`).
 
 ## CLI
 
@@ -72,6 +81,7 @@ TC programs itself.
 
 | Plane | Owner |
 |-------|--------|
-| Service intent, leases, fan-out, BGP/ECMP, HA replication cursors | Fabric (`service-lb`) |
-| TC/XDP programs, Maglev tables, fct/nat/edt/sflows, delta journal | FluxVM |
+| Service intent, leases, fan-out, BGP/ECMP, HA replication cursors, policy transactions | Fabric (`service-lb`) |
+| TC/XDP programs, Maglev tables, fct/nat/edt/sflows, policy maps, HA queue, delta journal | FluxVM |
 | Per-VM L3/L4 policy (Network Fabric schema v4) | FluxVM (orthogonal) |
+| HTTP/gRPC parsing for L7 enforce | Envoy (eBPF only redirects) |

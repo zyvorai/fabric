@@ -4,7 +4,7 @@
 
 Cluster-wide console for FluxVM Network Fabric **schema v4** (security groups,
 CNP, identities, observe, Hubble-style packet flow, health, ipcache, FQDN refresh)
-and **Service Fabric v5 (BPF schema 4)** Maglev VIP services (affinity, drain/health,
+and **Service Fabric v6 (BPF schema 4)** Maglev VIP services (affinity, drain/health,
 advertisements, conntrack GC, HA delta replication, EDT pacing, FluxScope flows, host-routing).
 
 This is the **VM edge / service** control plane proxied by Fabric
@@ -54,7 +54,7 @@ Write actions require admin/write role. Soft banner appears when the
 ## Related pages
 
 - [VM Dataplane](dataplane.md) — per-VM tab
-- [Service Fabric v5 (BPF schema 4)](../../../ebpf-service-fabric.md) — ownership, API, leases, HA deltas
+- [Service Fabric v6 (BPF schema 4)](../../../ebpf-service-fabric.md) — ownership, API, leases, HA deltas, identity/L7 policy
 - [Net Security](network-security.md) — host SDN (orthogonal)
 - Tutorials: [edge-dataplane/](../../../tutorials/edge-dataplane/README.md)
 - Operator: [fluxvm-dataplane.md](../../../guides/vm-drivers/fluxvm-dataplane.md)

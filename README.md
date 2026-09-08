@@ -227,7 +227,7 @@ Fabric exposes FluxVM **Network Fabric schema v4** (TC/eBPF VM-edge dataplane) a
 |-------|------|----------|
 | **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · Security → Network Policies |
 | **VM edge (Network Fabric schema v4)** | Per-VM allowlists, Mbps/PPS, stats/flows on the TAP/netns edge | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** tab · `zyvorctl dataplane …` |
-| **Service Fabric v5** (BPF schema 4) | Maglev VIP LB + EDT/FluxScope/host-routing + durable leases + HA deltas | `/api/dataplane/services…` · Edge Dataplane → **Services** · [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
+| **Service Fabric v6** (BPF schema 4 / gen 6) | Maglev VIP LB + EDT/FluxScope/host-routing + leases + HA deltas + identity/L7 policy | `/api/dataplane/services…` · Edge Dataplane → **Services** · [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
 
 ```mermaid
 flowchart LR
@@ -519,7 +519,7 @@ Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com
 | **Fabric Doctor (preflight)** | [docs/FABRIC_DOCTOR.md](docs/FABRIC_DOCTOR.md) · [tools/fabric-doctor](tools/fabric-doctor/) |
 | FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) |
 | **VM edge dataplane (Network Fabric schema v4)** | [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) |
-| **Service Fabric v5 (Maglev VIP LB)** | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
+| **Service Fabric v6 (Maglev VIP LB)** | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
 | Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
 | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |

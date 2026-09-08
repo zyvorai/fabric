@@ -86,10 +86,11 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/dataplane/ipcache` | `GET /v1/network/ipcache` | Guest IP → identity |
 | `POST /api/dataplane/refresh-dns` | `POST /v1/network/refresh-dns` | Re-resolve FQDN allowlists |
 
-### Service Fabric v5 (BPF schema 4 — Maglev VIP LB)
+### Service Fabric v6 (BPF schema 4 — Maglev VIP LB)
 
 Orthogonal to per-VM policy. Fabric fans out through `service-lb`; FluxVM owns
-programs/maps. Full contract: [ebpf-service-fabric.md](../../ebpf-service-fabric.md).
+programs/maps (program generation 6). Full contract:
+[ebpf-service-fabric.md](../../ebpf-service-fabric.md).
 
 **Maglev + VM edge:** after VIP DNAT, FluxVM service TC returns `TC_ACT_OK` and stops
 the clsact chain — Maglev-forwarded flows do not need backend ports in VM
@@ -115,6 +116,9 @@ endpoints below; FluxVM must have north-south TC pinned for them to return data.
 | `GET …/{name}/conntrack/delta` | `GET …/{name}/conntrack/delta` | HA delta export |
 | `POST …/{name}/conntrack/delta/import` | `POST …/{name}/conntrack/delta/import` | Apply HA delta batch |
 | `POST …/{name}/conntrack/delta/ack` | `POST …/{name}/conntrack/delta/ack` | Advance source watermark |
+| `GET/POST …/policies` | `/v1/network/services/policies` | Identity + L7 policy |
+| `GET/DELETE …/{name}/policy` | `/v1/network/services/{name}/policy` | Get / delete policy |
+| `GET …/{name}/l7/envoy` | `/v1/network/services/{name}/l7/envoy` | Envoy redirect contract |
 
 CLI: `zyvorctl dataplane service …` (incl. `flows` / `export-telemetry` / `delta`). Console: **Edge Dataplane → Services**.
 
@@ -287,7 +291,7 @@ sudo cat /run/fluxvm/ebpf/vms/*/iface /run/fluxvm/ebpf/vms/*/schema_version
 ## Related docs
 
 - [FluxVM driver](fluxvm.md) — full driver surface
-- [Service Fabric v5 (BPF schema 4)](../../ebpf-service-fabric.md) — Maglev VIP LB / leases / HA deltas / health / EDT / flows
+- [Service Fabric v6 (BPF schema 4)](../../ebpf-service-fabric.md) — Maglev VIP LB / leases / HA / policy / health / EDT / flows
 - [Networking](../../networking.md) — Fabric SDN + bridges + this plane
 - [Web UI](../../web-ui.md) — console surfaces
 - [User: VM Dataplane](../../user/pages/infrastructure/dataplane.md)

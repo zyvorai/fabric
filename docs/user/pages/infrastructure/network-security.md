@@ -4,7 +4,7 @@
 
 Net Security — the advanced SDN and security control plane: network policies scoped to security identities, host firewall profiles/zones/VM assignments, exposed services, QoS traffic shaping, DNS zones/policies, WireGuard VPN tunnels and networks, traffic mirroring, NAT rules/pools/gateways, and bandwidth monitoring with alerts.
 
-For everyday per-VM networking mode and port forwards, see [Network](network.md). For **per-VM TC/eBPF edge** allowlists, groups/CNP, Mbps/PPS, and flows (FluxVM Network Fabric schema v4), see [VM Dataplane](dataplane.md) and [Edge Dataplane](edge-dataplane.md) — that plane is orthogonal and does not replace these host policies. Maglev VIP load balancing is Service Fabric v5 (BPF schema 4) on the same Edge Dataplane **Services** tab ([ebpf-service-fabric.md](../../../ebpf-service-fabric.md)).
+For everyday per-VM networking mode and port forwards, see [Network](network.md). For **per-VM TC/eBPF edge** allowlists, groups/CNP, Mbps/PPS, and flows (FluxVM Network Fabric schema v4), see [VM Dataplane](dataplane.md) and [Edge Dataplane](edge-dataplane.md) — that plane is orthogonal and does not replace these host policies. Maglev VIP load balancing is Service Fabric v6 (BPF schema 4) on the same Edge Dataplane **Services** tab ([ebpf-service-fabric.md](../../../ebpf-service-fabric.md)).
 
 ## When to use it
 

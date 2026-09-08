@@ -24,8 +24,8 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
   (Status / Policy / Effective / Stats / Flows), **Infrastructure → Edge Dataplane**
   (`/app/edge-dataplane`), plus Dashboard **VM dataplane** capability card; see
   [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md)
-- **Service Fabric v5 (BPF schema 4)** — Edge Dataplane → **Services** tab for Maglev VIP
-  LB (drain/health/ads/GC/flows/EDT/HA deltas); see [ebpf-service-fabric.md](ebpf-service-fabric.md)
+- **Service Fabric v6 (BPF schema 4 / gen 6)** — Edge Dataplane → **Services** tab for Maglev VIP
+  LB (drain/health/ads/GC/flows/EDT/HA deltas/policy); see [ebpf-service-fabric.md](ebpf-service-fabric.md)
 - Command palette (`Ctrl+K` / `Cmd+K`) and `g` sequence shortcuts
 - Toast notifications and structured API error banners
 - Light Apple visual system (SF Pro / system UI font; no dark/steel/aurora themes)
@@ -40,7 +40,7 @@ Human UI is **web only**. CLI (`zyvorctl`), Kubernetes operator, and Terraform r
 |----------|------|
 | `/app` | Capability card **VM dataplane** — Live when FluxVM eBPF is attached (`schema=4`) |
 | `/app/vms/:name` → **Dataplane** | Status, policy (v4 fields), **Effective**, stats, flows |
-| `/app/edge-dataplane` | Health · **Services** (Maglev v5) · Groups · CNP · Identities · Observe · Ipcache · **Refresh DNS** (best-effort) |
+| `/app/edge-dataplane` | Health · **Services** (Maglev v6) · Groups · CNP · Identities · Observe · Ipcache · **Refresh DNS** (best-effort) |
 | `/app/vms/:name` → **Network** | Teaser button **Open Dataplane** |
 
 Policy ports must be entered as `tcp/443` / `udp/53`. Bridged (`network_tap`)

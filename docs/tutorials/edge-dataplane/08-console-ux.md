@@ -28,7 +28,7 @@ Route: `/app/edge-dataplane` (nav under **Infrastructure**, beside Net Security)
 | Tab | Use |
 |-----|-----|
 | Health | Cluster readiness / notes |
-| Services | Maglev VIP upsert/delete; Service Fabric v5 (BPF schema 4) badge; health reconcile; ads; conntrack GC; HA deltas |
+| Services | Maglev VIP upsert/delete; Service Fabric v6 (BPF schema 4) badge; health reconcile; ads; conntrack GC; HA deltas; identity/L7 policy |
 | Groups | Create quick group / delete |
 | CNP | Paste JSON apply / delete |
 | Identities | Reserved + group table |
