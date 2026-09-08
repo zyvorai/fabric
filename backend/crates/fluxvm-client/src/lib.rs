@@ -534,6 +534,76 @@ struct GroupListResponse {
     items: Vec<SecurityGroup>,
 }
 
+/// Maglev/eBPF Service Fabric VIP (FluxVM `/v1/network/services`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkServiceProtocol {
+    Tcp,
+    Udp,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkServiceAlgorithm {
+    #[default]
+    Maglev,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkServiceMode {
+    #[default]
+    Nat,
+    Dsr,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkServiceBackend {
+    pub address: String,
+    pub port: u16,
+    #[serde(default = "default_service_weight")]
+    pub weight: u16,
+    #[serde(default = "default_service_enabled")]
+    pub enabled: bool,
+}
+
+fn default_service_weight() -> u16 {
+    1
+}
+fn default_service_enabled() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkServiceSpec {
+    pub name: String,
+    pub vip: String,
+    pub port: u16,
+    pub protocol: NetworkServiceProtocol,
+    #[serde(default)]
+    pub algorithm: NetworkServiceAlgorithm,
+    #[serde(default)]
+    pub mode: NetworkServiceMode,
+    #[serde(default)]
+    pub backends: Vec<NetworkServiceBackend>,
+    #[serde(default)]
+    pub maglev_table_size: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkServiceStatus {
+    pub schema_version: u32,
+    pub service_id: u32,
+    pub name: String,
+    pub active_backends: usize,
+    pub maglev_table_size: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct NetworkServiceListResponse {
+    items: Vec<NetworkServiceSpec>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DataplaneHealth {
     pub mode: String,
@@ -1514,6 +1584,54 @@ impl FluxVmClient {
             .authed(
                 self.http
                     .delete(self.url(&format!("/v1/network/groups/{name}"))?),
+            )
+            .send()
+            .await?;
+        let _: DeletedResponse = Self::parse(resp).await?;
+        Ok(())
+    }
+
+    /// `GET /v1/network/services` — Maglev/eBPF Service Fabric catalog.
+    pub async fn list_network_services(&self) -> Result<Vec<NetworkServiceSpec>> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/network/services")?))
+            .send()
+            .await?;
+        let body: NetworkServiceListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/network/services/{name}`
+    pub async fn get_network_service(&self, name: &str) -> Result<NetworkServiceSpec> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/network/services/{name}"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/network/services`
+    pub async fn upsert_network_service(
+        &self,
+        service: &NetworkServiceSpec,
+    ) -> Result<NetworkServiceStatus> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/network/services")?))
+            .json(service)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `DELETE /v1/network/services/{name}`
+    pub async fn delete_network_service(&self, name: &str) -> Result<()> {
+        let resp = self
+            .authed(
+                self.http
+                    .delete(self.url(&format!("/v1/network/services/{name}"))?),
             )
             .send()
             .await?;

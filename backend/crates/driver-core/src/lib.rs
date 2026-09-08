@@ -379,6 +379,71 @@ pub struct SecurityGroup {
     pub description: String,
 }
 
+/// Maglev/eBPF Service Fabric VIP (FluxVM `/v1/network/services`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkServiceProtocol {
+    Tcp,
+    Udp,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkServiceAlgorithm {
+    #[default]
+    Maglev,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkServiceMode {
+    #[default]
+    Nat,
+    Dsr,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkServiceBackend {
+    pub address: String,
+    pub port: u16,
+    #[serde(default = "default_svc_weight")]
+    pub weight: u16,
+    #[serde(default = "default_svc_enabled")]
+    pub enabled: bool,
+}
+
+fn default_svc_weight() -> u16 {
+    1
+}
+fn default_svc_enabled() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkServiceSpec {
+    pub name: String,
+    pub vip: String,
+    pub port: u16,
+    pub protocol: NetworkServiceProtocol,
+    #[serde(default)]
+    pub algorithm: NetworkServiceAlgorithm,
+    #[serde(default)]
+    pub mode: NetworkServiceMode,
+    #[serde(default)]
+    pub backends: Vec<NetworkServiceBackend>,
+    #[serde(default)]
+    pub maglev_table_size: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkServiceStatus {
+    pub schema_version: u32,
+    pub service_id: u32,
+    pub name: String,
+    pub active_backends: usize,
+    pub maglev_table_size: u32,
+}
+
 /// Cluster dataplane health from FluxVM `GET /v1/network/health`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DataplaneHealth {
@@ -504,6 +569,22 @@ pub trait VmDataplaneDriver: Send + Sync {
     }
     async fn dataplane_delete_group(&self, _name: &str) -> Result<()> {
         anyhow::bail!("edge dataplane groups not supported by this backend")
+    }
+
+    async fn dataplane_list_services(&self) -> Result<Vec<NetworkServiceSpec>> {
+        anyhow::bail!("edge dataplane services not supported by this backend")
+    }
+    async fn dataplane_get_service(&self, _name: &str) -> Result<NetworkServiceSpec> {
+        anyhow::bail!("edge dataplane services not supported by this backend")
+    }
+    async fn dataplane_upsert_service(
+        &self,
+        _service: &NetworkServiceSpec,
+    ) -> Result<NetworkServiceStatus> {
+        anyhow::bail!("edge dataplane services not supported by this backend")
+    }
+    async fn dataplane_delete_service(&self, _name: &str) -> Result<()> {
+        anyhow::bail!("edge dataplane services not supported by this backend")
     }
 
     async fn dataplane_list_cnp(&self) -> Result<serde_json::Value> {

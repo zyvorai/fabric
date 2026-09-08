@@ -213,12 +213,27 @@ enum DataplaneCmd {
     Identities,
     /// CiliumEndpoint-*shaped* VM views (`identity_source`)
     Endpoints,
+    /// Maglev/eBPF Service Fabric VIPs (FluxVM edge — not Fabric SDN)
+    #[command(subcommand)]
+    Service(DataplaneServiceCmd),
     /// Security groups (FluxVM edge — not Fabric SDN)
     #[command(subcommand)]
     Group(DataplaneGroupCmd),
     /// CNP documents compiled onto security groups
     #[command(subcommand)]
     Cnp(DataplaneCnpCmd),
+}
+
+#[derive(Subcommand)]
+enum DataplaneServiceCmd {
+    List,
+    Get { name: String },
+    /// Create/update from a JSON file (NetworkServiceSpec shape)
+    Apply {
+        #[arg(short, long)]
+        file: String,
+    },
+    Delete { name: String },
 }
 
 #[derive(Subcommand)]
@@ -1184,6 +1199,29 @@ impl Cli {
                     let val = api_get(&client, "/dataplane/endpoints").await?;
                     print_value(&val, fmt);
                 }
+                DataplaneCmd::Service(s) => match s {
+                    DataplaneServiceCmd::List => {
+                        let val = api_get(&client, "/dataplane/services").await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Get { name } => {
+                        let val =
+                            api_get(&client, &format!("/dataplane/services/{}", name)).await?;
+                        print_value(&val, fmt);
+                    }
+                    DataplaneServiceCmd::Apply { file } => {
+                        let service = load_config_file(&file)?;
+                        let val = api_post(&client, "/dataplane/services", &service).await?;
+                        println!("Upserted dataplane service");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    DataplaneServiceCmd::Delete { name } => {
+                        api_delete(&client, &format!("/dataplane/services/{}", name)).await?;
+                        println!("Deleted dataplane service '{}'", name);
+                    }
+                },
                 DataplaneCmd::Group(g) => match g {
                     DataplaneGroupCmd::List => {
                         let val = api_get(&client, "/dataplane/groups").await?;

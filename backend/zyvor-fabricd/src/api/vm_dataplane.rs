@@ -15,7 +15,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 use zyvor_fabric_driver_core::{
     CiliumEndpointView, DataplaneHealth, DataplaneStats, DataplaneStatus, FlowRecord, IdentityInfo,
-    IpcacheEntry, SecurityGroup, VmNetworkPolicy,
+    IpcacheEntry, NetworkServiceSpec, NetworkServiceStatus, SecurityGroup, VmNetworkPolicy,
 };
 
 use crate::server::AppState;
@@ -35,6 +35,11 @@ pub struct FlowListResponse {
 #[derive(Debug, serde::Serialize)]
 pub struct GroupListResponse {
     pub items: Vec<SecurityGroup>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ServiceListResponse {
+    pub items: Vec<NetworkServiceSpec>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -317,6 +322,78 @@ pub async fn delete_group(
             e,
         )
     })?;
+    Ok(Json(DeletedResponse { deleted: name }))
+}
+
+/// GET /api/dataplane/services — Maglev/eBPF Service Fabric (not SDN `/api/services`).
+pub async fn list_services(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ServiceListResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let items = state.driver.dataplane_list_services().await.map_err(|e| {
+        map_driver_err(StatusCode::BAD_GATEWAY, "Dataplane services", e)
+    })?;
+    Ok(Json(ServiceListResponse { items }))
+}
+
+/// GET /api/dataplane/services/:name
+pub async fn get_service(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<NetworkServiceSpec>, (StatusCode, Json<serde_json::Value>)> {
+    let service = state
+        .driver
+        .dataplane_get_service(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Dataplane service '{name}'"),
+                e,
+            )
+        })?;
+    Ok(Json(service))
+}
+
+/// POST /api/dataplane/services
+pub async fn upsert_service(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(service): Json<NetworkServiceSpec>,
+) -> Result<Json<NetworkServiceStatus>, (StatusCode, Json<serde_json::Value>)> {
+    let saved = state
+        .driver
+        .dataplane_upsert_service(&service)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to upsert dataplane service '{}'", service.name),
+                e,
+            )
+        })?;
+    tracing::info!("Upserted edge dataplane service '{}'", saved.name);
+    Ok(Json(saved))
+}
+
+/// DELETE /api/dataplane/services/:name
+pub async fn delete_service(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<DeletedResponse>, (StatusCode, Json<serde_json::Value>)> {
+    state
+        .driver
+        .dataplane_delete_service(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to delete dataplane service '{name}'"),
+                e,
+            )
+        })?;
     Ok(Json(DeletedResponse { deleted: name }))
 }
 
