@@ -10,6 +10,7 @@
 //! This crate never writes bpffs or invokes `tc`, `ip`, or `bpftool` directly.
 
 pub mod policy;
+pub mod remote_backend;
 pub mod remote_identity;
 
 use anyhow::{bail, Context, Result};

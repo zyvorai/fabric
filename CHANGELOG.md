@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **Service Fabric full mesh datapath v1 (remote backends)** — durable
+  `RemoteBackend` catalog + `/api/dataplane/remote-backends` CRUD/reconcile;
+  merges same-domain Ready peer backends into FluxVM Maglev service upserts
+  on owning-domain nodes (local backends preserved; tunnels still N/A).
 - **Service Fabric remote identity directory (minimal ClusterMesh)** — durable
   `RemoteIdentity` catalog + `/api/dataplane/remote-identities` CRUD/reconcile;
   fans CIDRs into FluxVM `POST /v1/network/ipcache/remote` on owning-domain nodes;

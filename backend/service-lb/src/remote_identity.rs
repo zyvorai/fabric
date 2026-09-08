@@ -6,7 +6,8 @@
 //! Fabric owns publish/pull of peer identities keyed by
 //! `(route_domain, identity_id)`. Reconcile fans CIDRs into FluxVM remote
 //! ipcache on target nodes so service policy compile can resolve cross-site
-//! `allow_identities` / `deny_identities`. Full mesh datapath is out of scope.
+//! `allow_identities` / `deny_identities`. Remote backend mesh lives in
+//! [`crate::remote_backend`].
 
 use crate::{domain_key, EdgeLease, NodeTarget};
 use anyhow::{bail, Context, Result};

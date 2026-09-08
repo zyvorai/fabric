@@ -1235,3 +1235,121 @@ pub async fn reconcile_remote_identities(
         .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "remote identity reconcile", e))?;
     Ok(Json(report))
 }
+
+fn remote_backend_directory(state: &AppState) -> service_lb::remote_backend::RemoteBackendDirectory {
+    let path = std::path::PathBuf::from(&state.config.storage.path)
+        .join("service-fabric")
+        .join("remote-backends.json");
+    service_lb::remote_backend::RemoteBackendDirectory::new(path)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RemoteBackendListQuery {
+    pub service: Option<String>,
+    pub site_id: Option<String>,
+    pub route_domain: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RemoteBackendReconcileBody {
+    pub service: Option<String>,
+    pub site_id: Option<String>,
+    pub route_domain: Option<String>,
+}
+
+/// GET /api/dataplane/remote-backends
+pub async fn list_remote_backends(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<RemoteBackendListQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let dir = remote_backend_directory(&state);
+    let items = dir
+        .list(
+            q.service.as_deref(),
+            q.site_id.as_deref(),
+            q.route_domain.as_deref(),
+        )
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote backends", e))?;
+    Ok(Json(serde_json::json!({ "items": items })))
+}
+
+/// POST /api/dataplane/remote-backends — upsert into Fabric catalog (no fan-out).
+pub async fn upsert_remote_backend(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(mut backend): Json<service_lb::remote_backend::RemoteBackend>,
+) -> Result<Json<service_lb::remote_backend::RemoteBackend>, (StatusCode, Json<serde_json::Value>)>
+{
+    if backend.updated_unix_ms == 0 {
+        backend.updated_unix_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+    }
+    let dir = remote_backend_directory(&state);
+    let stored = dir
+        .upsert(backend)
+        .map_err(|e| map_driver_err(StatusCode::BAD_REQUEST, "remote backend", e))?;
+    Ok(Json(stored))
+}
+
+/// DELETE /api/dataplane/remote-backends/{route_domain}/{service}/{address}/{port}
+/// Removes catalog entry and re-reconciles the service onto FluxVM nodes.
+pub async fn delete_remote_backend(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path((route_domain, service, address, port)): Path<(String, String, String, u16)>,
+) -> Result<
+    Json<service_lb::remote_backend::RemoteBackendReconcileReport>,
+    (StatusCode, Json<serde_json::Value>),
+> {
+    let nodes = service_nodes(&state);
+    let dir = remote_backend_directory(&state);
+    let client = service_lb::FluxVmHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e))?;
+    let orch = service_lb::remote_backend::RemoteBackendOrchestrator::new(dir, client);
+    let report = orch
+        .delete_and_reconcile(
+            &route_domain,
+            &service,
+            &address,
+            port,
+            &nodes,
+            None,
+            &[],
+            0,
+            true,
+        )
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "remote backend delete", e))?;
+    Ok(Json(report))
+}
+
+/// POST /api/dataplane/remote-backends/reconcile — merge Ready remotes into Maglev upserts.
+pub async fn reconcile_remote_backends(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<RemoteBackendReconcileBody>,
+) -> Result<
+    Json<service_lb::remote_backend::RemoteBackendReconcileReport>,
+    (StatusCode, Json<serde_json::Value>),
+> {
+    let nodes = service_nodes(&state);
+    let dir = remote_backend_directory(&state);
+    let client = service_lb::FluxVmHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e))?;
+    let orch = service_lb::remote_backend::RemoteBackendOrchestrator::new(dir, client);
+    let report = orch
+        .reconcile(
+            body.service.as_deref(),
+            body.site_id.as_deref(),
+            body.route_domain.as_deref(),
+            &nodes,
+            &[],
+            0,
+        )
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "remote backend reconcile", e))?;
+    Ok(Json(report))
+}

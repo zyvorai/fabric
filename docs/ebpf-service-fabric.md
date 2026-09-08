@@ -27,8 +27,10 @@ Everything from v5, plus:
   site-scoped policy fan-out (minimal);
 - **ClusterMesh-like identity directory (minimal)** — Fabric catalog +
   reconcile into FluxVM remote ipcache so cross-site `allow_identities` can
-  resolve; full mesh datapath remains out of scope (see
-  [phase6](service-fabric-phase6.md));
+  resolve (see [phase6](service-fabric-phase6.md));
+- **Full mesh datapath v1 (remote backends)** — Fabric catalog + reconcile
+  merges peer-site Ready endpoints into Maglev service upserts (no
+  Geneve/VXLAN tunnels; L3/anycast + remote backends);
 - proxy of FluxVM policy and Envoy contract endpoints;
 - HA mutation-queue drain remains on FluxVM; Fabric still drives sequence/ack
   delta replication and full-snapshot fallback.
@@ -56,6 +58,9 @@ Everything from v5, plus:
 | `GET/POST` | `/api/dataplane/remote-identities` | List / upsert remote identity directory |
 | `POST` | `/api/dataplane/remote-identities/reconcile` | Fan directory → FluxVM remote ipcache |
 | `DELETE` | `/api/dataplane/remote-identities/{route_domain}/{identity_id}` | Delete + unfan |
+| `GET/POST` | `/api/dataplane/remote-backends` | List / upsert remote backend catalog |
+| `POST` | `/api/dataplane/remote-backends/reconcile` | Merge Ready remotes → Maglev service upsert |
+| `DELETE` | `/api/dataplane/remote-backends/{route_domain}/{service}/{address}/{port}` | Delete + re-reconcile |
 
 Policy JSON uses `service`, `default_action`, `allow_identities` /
 `deny_identities`, `audit_only`, optional `l7` (not `name` / `default`).

@@ -485,6 +485,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             delete(api::vm_dataplane::delete_remote_identity),
         )
         .route(
+            "/dataplane/remote-backends",
+            get(api::vm_dataplane::list_remote_backends)
+                .post(api::vm_dataplane::upsert_remote_backend),
+        )
+        .route(
+            "/dataplane/remote-backends/reconcile",
+            post(api::vm_dataplane::reconcile_remote_backends),
+        )
+        .route(
+            "/dataplane/remote-backends/{route_domain}/{service}/{address}/{port}",
+            delete(api::vm_dataplane::delete_remote_backend),
+        )
+        .route(
             "/dataplane/services/{name}/conntrack/delta",
             get(api::vm_dataplane::services_conntrack_delta),
         )
