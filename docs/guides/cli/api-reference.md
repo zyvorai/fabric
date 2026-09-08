@@ -13,7 +13,7 @@ Complete reference for the Zyvor Fabric REST API, organized by functional catego
 - [Backups](#backups)
 - [Networking](#networking)
 - [VM edge dataplane (Network Fabric)](#vm-edge-dataplane-network-fabric)
-- [Service Fabric (Maglev VIP LB)](#service-fabric-schema-v3-maglev-vip-lb)
+- [Service Fabric (Maglev VIP LB)](#service-fabric-schema-v4-maglev-vip-lb)
 - [Storage](#storage)
 - [Machines (VM driver)](#machines-vm-driver)
 - [Events](#events)
@@ -1128,6 +1128,8 @@ Orthogonal Maglev VIP plane. Full contract: [ebpf-service-fabric.md](../../ebpf-
 | POST | `/api/dataplane/services/health/reconcile` | run TCP probes |
 | POST | `/api/dataplane/services/conntrack/gc` | expire affinity / NAT |
 | GET | `/api/dataplane/services/advertisements` | VIP advertise snapshot |
+| GET | `/api/dataplane/services/flows` | FluxScope service flows |
+| POST | `/api/dataplane/services/telemetry/export` | OTLP/HTTP JSON export |
 
 ```bash
 curl -sk https://127.0.0.1:9095/api/dataplane/health \
@@ -1138,6 +1140,7 @@ curl -sk https://127.0.0.1:9095/api/dataplane/services/status \
   -H "Authorization: Bearer $TOKEN" | jq
 zyvorctl dataplane service list
 zyvorctl dataplane service apply --file docs/examples/service-fabric-v3/ha-draining-service.json
+zyvorctl dataplane service flows
 ```
 
 Tutorials: [09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).

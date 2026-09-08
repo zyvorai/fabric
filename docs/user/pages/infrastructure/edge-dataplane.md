@@ -5,7 +5,7 @@
 Cluster-wide console for FluxVM Network Fabric **schema v4** (security groups,
 CNP, identities, observe, Hubble-style packet flow, health, ipcache, FQDN refresh)
 and **Service Fabric schema v4** Maglev VIP services (affinity, drain/health,
-advertisements, conntrack GC).
+advertisements, conntrack GC, EDT pacing, FluxScope flows, host-routing).
 
 This is the **VM edge / service** control plane proxied by Fabric
 (`/api/dataplane/*`). It does **not** replace [Net Security](network-security.md)
@@ -19,9 +19,10 @@ Per-VM Status / Policy / Effective / Stats / Flows stay on the VM detail
 
 - Create or delete shared security groups used by many VMs
 - Apply or remove CNP-shaped documents (compiled onto groups)
-- Upsert Maglev VIP services (east-west / north-south, NAT/DSR, drain/health)
+- Upsert Maglev VIP services (east-west / north-south, NAT/DSR, drain/health,
+  optional `max_egress_mbps` / `flow_sample_rate` / `host_routing`)
 - Check dataplane health after upgrades (`ok`, BPF object, bpffs)
-- Inspect Service Fabric host schema, backend health, VIP advertisements
+- Inspect Service Fabric host schema, backend health, VIP advertisements, flows
 - Inspect reserved + group identities and observe endpoints
 - Re-resolve FQDN allowlists after DNS changes
 

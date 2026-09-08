@@ -83,7 +83,7 @@ zyvorctl dataplane service delete payments
 - host Service Fabric schema badge;
 - health report + reconcile;
 - advertisements JSON + conntrack GC;
-- flow sample / host-routing fields on the service model.
+- flow sample / host-routing / EDT fields on the service model.
 
 ## Ownership reminder
 
