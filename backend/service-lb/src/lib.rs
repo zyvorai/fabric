@@ -8,6 +8,8 @@
 //! sequence/ack HA delta replication while retaining v4 routing adapters.
 //! This crate never writes bpffs or invokes `tc`, `ip`, or `bpftool` directly.
 
+pub mod policy;
+
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

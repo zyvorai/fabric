@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- **Service Fabric v6** — transactional multi-node service identity/L7 policy APIs proxied to FluxVM.
+
 ### Removed
 - **machinectl / systemd-machined surface** — deleted `/api/machines` and the
   Machines UI (`/app/machines`); systemd unit no longer waits on

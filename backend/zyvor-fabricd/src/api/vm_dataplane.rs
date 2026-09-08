@@ -1018,3 +1018,71 @@ pub async fn refresh_dns(
     })?;
     Ok(Json(RefreshDnsResponse { refreshed }))
 }
+
+// ZYVOR_SERVICE_FABRIC_V6_POLICY_API
+pub async fn list_service_policies(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, "/v1/network/services/policies").await
+}
+
+pub async fn get_service_policy(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, &format!("/v1/network/services/{name}/policy")).await
+}
+
+pub async fn upsert_service_policy(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(spec): Json<service_lb::policy::ServicePolicySpec>,
+) -> Result<Json<service_lb::policy::PolicyApplyReport>, (StatusCode, Json<serde_json::Value>)> {
+    service_lb::policy::validate_policy(&spec)
+        .map_err(|e| map_driver_err(StatusCode::BAD_REQUEST, "service policy", e))?;
+    let nodes = service_nodes(&state);
+    let client = service_lb::policy::FluxVmPolicyHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "policy client", e))?;
+    let report = service_lb::policy::PolicyOrchestrator::new(client)
+        .apply(&spec, &nodes)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::BAD_GATEWAY,
+                "distributed service policy apply",
+                e,
+            )
+        })?;
+    Ok(Json(report))
+}
+
+pub async fn delete_service_policy(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<service_lb::policy::PolicyApplyReport>, (StatusCode, Json<serde_json::Value>)> {
+    let nodes = service_nodes(&state);
+    let client = service_lb::policy::FluxVmPolicyHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "policy client", e))?;
+    let report = service_lb::policy::PolicyOrchestrator::new(client)
+        .delete(&name, &nodes)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::BAD_GATEWAY,
+                "distributed service policy delete",
+                e,
+            )
+        })?;
+    Ok(Json(report))
+}
+
+pub async fn service_envoy_contract(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    fluxvm_json_get(&state, &format!("/v1/network/services/{name}/l7/envoy")).await
+}

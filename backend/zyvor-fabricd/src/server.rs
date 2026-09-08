@@ -454,6 +454,20 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(api::vm_dataplane::services_telemetry_export),
         )
         .route(
+            "/dataplane/services/policies",
+            get(api::vm_dataplane::list_service_policies)
+                .post(api::vm_dataplane::upsert_service_policy),
+        )
+        .route(
+            "/dataplane/services/{name}/policy",
+            get(api::vm_dataplane::get_service_policy)
+                .delete(api::vm_dataplane::delete_service_policy),
+        )
+        .route(
+            "/dataplane/services/{name}/l7/envoy",
+            get(api::vm_dataplane::service_envoy_contract),
+        )
+        .route(
             "/dataplane/services/{name}/conntrack/delta",
             get(api::vm_dataplane::services_conntrack_delta),
         )
