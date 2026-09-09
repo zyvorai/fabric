@@ -9,6 +9,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // rustls 0.23 requires an explicit process-level CryptoProvider when more
+    // than one backend (aws-lc-rs via jsonwebtoken, ring via axum-server TLS)
+    // is linked. Install aws-lc-rs before any TLS acceptor is constructed.
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("failed to install rustls aws-lc-rs CryptoProvider");
+
     // Initialize tracing with ZYVOR_FABRICD_LOG_LEVEL or RUST_LOG support
     // Priority: ZYVOR_FABRICD_LOG_LEVEL > RUST_LOG > default (info)
     //
