@@ -90,4 +90,10 @@ if [[ $EC -ne 0 && -z "${FABRIC_TOKEN:-}" ]]; then
   FABRIC_PASSWORD='Admin@321' ./scripts/test-edge-dataplane-e2e.sh
 fi
 
+if [[ "${SKIP_WIREGUARD_SF:-}" != "1" ]]; then
+  echo "########## Fabric: WireGuard + Service Fabric underlay ##########"
+  chmod +x scripts/test-wireguard-service-fabric.sh 2>/dev/null || true
+  ./scripts/test-wireguard-service-fabric.sh
+fi
+
 echo "########## Fabric lab verify: ALL GREEN ##########"

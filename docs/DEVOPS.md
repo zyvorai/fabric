@@ -22,7 +22,7 @@ Canonical JSON: [contracts/fabric-fluxvm-readyz.json](contracts/fabric-fluxvm-re
 
 1. **PR** — contract unit tests + `scripts/test-devops-gate.sh` + proven-infra suites.
 2. **Lab** — bare-metal / compose; `scripts/test-lab-verify.sh` (devops + proven-infra + edge e2e).
-3. **Prod** — snapshot (`scripts/upgrade-rollback.sh snapshot`) → install N+1 → `verify` → keep snapshot.
+3. **Prod** — snapshot (`scripts/upgrade-rollback.sh snapshot`) → install N+1 → **`scripts/test-production-readiness.sh`** (read-only; requires `FABRIC_TOKEN`) → keep snapshot. Optional mutate: `RUN_MUTATING=1`.
 
 Pair FluxVM upgrades with [fluxvm `scripts/upgrade-snapshot.sh`](https://github.com/zyvorai/fluxvm) on the same change window.
 
@@ -33,8 +33,12 @@ Lab `zyvor-fabricd` usually serves **HTTPS with a self-signed cert**.
 `https://127.0.0.1:9095` then `http://127.0.0.1:9095`.
 
 ```bash
-# Full post-deploy gate (stdin closed for nested tools)
+# Full post-deploy lab gate (stdin closed for nested tools)
 ./scripts/test-lab-verify.sh
+
+# Production readiness (read-only; requires real token — no Admin@321 fallback)
+FABRIC_URL=https://127.0.0.1:9095 FLUXVM_URL=http://127.0.0.1:7788 \
+  FABRIC_TOKEN=… ./scripts/test-production-readiness.sh
 
 # Live probe only
 unset FABRIC_URL

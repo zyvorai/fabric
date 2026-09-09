@@ -88,7 +88,7 @@ reconcile → Maglev and identity policy use those L3 paths.
 
 ## Remaining candidates
 
-1. Stricter multi-queue RSS affinity proofs (pin flows, assert queue mapping) — under-load PPS + best-effort multi-queue RX shipped.
+1. Stricter multi-queue RSS affinity proofs (pin flows, assert queue mapping) — under-load PPS + best-effort multi-queue RX shipped; `fluxvm/scripts/test-service-fabric-rss-affinity.sh` asserts ≥2 active RX queues when ethtool counters + channels≥2 are available (soft-skips on dummy). Production gate: `scripts/test-production-readiness.sh`.
 
 Lab Mpps/CPU ceilings: FluxVM `SLO_LAB=1` / `scripts/test-service-fabric-lab.sh`
 (`SLO_MPPS_MIN=0.05`, `SLO_PKT_MPPS_MIN=0.10`, `SLO_CPU_MAX_PERCENT=85`).

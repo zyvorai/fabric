@@ -33,6 +33,8 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | Helm | `helm upgrade --install … ./charts/zyvor-fabric` | [KUBERNETES.md](KUBERNETES.md#c-helm) |
 | Docker / Podman | `make docker-up` | [DOCKER.md](DOCKER.md) |
 | Operator (CRDs) | `operator/charts/zyvor-fabricd-operator` | [operator/README.md](../operator/README.md) |
+| **Prod readiness** | `FABRIC_TOKEN=… ./scripts/test-production-readiness.sh` | [production.md](deployment/production.md) · [DEVOPS.md](DEVOPS.md) |
+| Lab verify | `./scripts/test-lab-verify.sh` | [DEVOPS.md](DEVOPS.md) |
 
 Lab K8s ports: **30095** (NodePort UI/API), **9095** (hostNetwork), **7788** (FluxVM localhost).
 

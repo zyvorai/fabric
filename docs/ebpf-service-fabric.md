@@ -166,6 +166,12 @@ Host package: `wireguard-tools`. Broader VPN Mesh examples:
 WireGuard does **not** replace Maglev, BGP anycast, or remote-backend reconcile; it
 only encrypts and carries the L3 path those features assume.
 
+Lab e2e (handshake, idempotent sync, remote-backends + remote-identities over
+`AllowedIPs`): [`scripts/test-wireguard-service-fabric.sh`](../scripts/test-wireguard-service-fabric.sh).
+
+Production readiness (read-only): [`scripts/test-production-readiness.sh`](../scripts/test-production-readiness.sh)
+with `FABRIC_TOKEN` (opt-in mutate via `RUN_MUTATING=1`).
+
 ## Ownership reminder
 
 | Plane | Owner |

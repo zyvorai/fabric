@@ -512,6 +512,19 @@ curl -sf https://127.0.0.1:9095/health          # liveness
 curl -sf https://127.0.0.1:9095/readyz | jq .   # readiness (store + FluxVM)
 ```
 
+**Production readiness script** (read-only; doctor + devops + dataplane/VPN list APIs):
+
+```bash
+FABRIC_URL=https://127.0.0.1:9095 \
+FLUXVM_URL=http://127.0.0.1:7788 \
+FABRIC_TOKEN=<admin-or-ops-jwt> \
+  ./scripts/test-production-readiness.sh
+```
+
+Mutating WireGuard / edge e2e only with `RUN_MUTATING=1`. Pair with FluxVM
+[`scripts/test-production-readiness.sh`](https://github.com/zyvorai/fluxvm/blob/main/scripts/test-production-readiness.sh)
+on each dataplane host.
+
 Use `/health` for process-up probes and `/readyz` for load-balancer / Kubernetes
 readiness (DaemonSet templates already probe `/readyz`; FluxVM uses `/healthz` +
 `/readyz`). See also [monitoring.md](../guides/operations/monitoring.md).

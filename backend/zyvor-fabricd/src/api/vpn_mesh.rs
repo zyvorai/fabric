@@ -582,6 +582,13 @@ pub async fn reconcile_vpn(state: &AppState) -> anyhow::Result<()> {
 
     let vms = build_vm_snapshots(state);
 
+    // All Fabric-owned iface names (including disabled) — stale removal must
+    // not touch unmanaged host WireGuard (e.g. Cilium).
+    let mut managed_names: Vec<String> = tunnels
+        .iter()
+        .map(|t| t.interface_name.clone())
+        .collect();
+
     let enabled_tunnels: Vec<VpnTunnel> = tunnels.into_iter().filter(|t| t.enabled).collect();
     let enabled_networks: Vec<VpnNetwork> = networks.into_iter().filter(|n| n.enabled).collect();
 
@@ -590,7 +597,16 @@ pub async fn reconcile_vpn(state: &AppState) -> anyhow::Result<()> {
         .compiler
         .compile_all(&enabled_tunnels, &enabled_networks, &vms);
 
-    state.vpn_mesh.enforcer.sync_all(&interfaces)?;
+    for iface in &interfaces {
+        if !managed_names.iter().any(|n| n == &iface.interface_name) {
+            managed_names.push(iface.interface_name.clone());
+        }
+    }
+
+    state
+        .vpn_mesh
+        .enforcer
+        .sync_all(&interfaces, &managed_names)?;
 
     tracing::info!(
         "Reconciled {} tunnels + {} networks → {} WireGuard interfaces",

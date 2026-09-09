@@ -42,13 +42,28 @@ impl WireguardEnforcer {
     }
 
     /// Full sync: create/update every interface in `interfaces`, tear down
-    /// any managed interface no longer in the list.
-    pub fn sync_all(&self, interfaces: &[CompiledWgInterface]) -> Result<()> {
+    /// Fabric-managed interfaces that are no longer active.
+    ///
+    /// `managed_names` is the set of interface names Fabric owns (enabled +
+    /// disabled tunnels / network-compiled ifaces). Only those are eligible
+    /// for stale removal — unmanaged host WireGuard (e.g. Cilium `cilium_wg0`)
+    /// is left alone. When `managed_names` is empty, falls back to treating
+    /// `interfaces` as the managed set (live unit-test compatibility).
+    pub fn sync_all(
+        &self,
+        interfaces: &[CompiledWgInterface],
+        managed_names: &[String],
+    ) -> Result<()> {
         let active_names: Vec<&str> = interfaces
             .iter()
             .map(|i| i.interface_name.as_str())
             .collect();
-        self.remove_stale(&active_names)?;
+        let managed: Vec<&str> = if managed_names.is_empty() {
+            active_names.clone()
+        } else {
+            managed_names.iter().map(String::as_str).collect()
+        };
+        self.remove_stale(&active_names, &managed)?;
 
         for iface in interfaces {
             self.apply_interface(iface)?;
@@ -81,10 +96,10 @@ impl WireguardEnforcer {
 
         self.wg_set(iface)?;
 
-        // Idempotent: `ip addr add` on an address the interface already has
-        // returns EEXIST, which is expected on every sync after the first.
+        // Idempotent: re-sync after the first apply. Kernel/rtnetlink phrasing
+        // varies ("File exists", "Address already assigned", EEXIST / os error 17).
         if let Err(e) = block_on_netlink(networking::netlink::set_addr(name, &iface.address)) {
-            if !e.to_string().contains("File exists") {
+            if !is_addr_already_present(&e) {
                 return Err(e).with_context(|| format!("failed to set address on '{name}'"));
             }
         }
@@ -160,8 +175,8 @@ impl WireguardEnforcer {
         Ok(())
     }
 
-    fn remove_stale(&self, active_names: &[&str]) -> Result<()> {
-        let managed = block_on_netlink(async {
+    fn remove_stale(&self, active_names: &[&str], managed_names: &[&str]) -> Result<()> {
+        let on_host = block_on_netlink(async {
             let ifaces = networking::netlink::list_interfaces().await?;
             Ok::<Vec<String>, anyhow::Error>(
                 ifaces
@@ -171,7 +186,11 @@ impl WireguardEnforcer {
                     .collect(),
             )
         })?;
-        for name in managed {
+        for name in on_host {
+            if !managed_names.contains(&name.as_str()) {
+                // Unmanaged host overlay (Cilium, operator-owned wg*) — keep.
+                continue;
+            }
             if !active_names.contains(&name.as_str()) {
                 if let Err(e) = self.remove_interface(&name) {
                     tracing::warn!("Failed to remove stale WireGuard interface {}: {}", name, e);
@@ -180,6 +199,23 @@ impl WireguardEnforcer {
         }
         Ok(())
     }
+}
+
+/// True when adding an address failed because it is already present.
+fn is_addr_already_present(err: &anyhow::Error) -> bool {
+    for cause in err.chain() {
+        let msg = cause.to_string().to_ascii_lowercase();
+        if msg.contains("file exists")
+            || msg.contains("address already assigned")
+            || msg.contains("already assigned")
+            || msg.contains("already exists")
+            || msg.contains("eexist")
+            || msg.contains("os error 17")
+        {
+            return true;
+        }
+    }
+    false
 }
 
 impl Default for WireguardEnforcer {
@@ -333,7 +369,9 @@ mod tests {
         let mut iface = make_interface("zftwg0", vec![peer]);
         iface.private_key_ref = real_private_key;
 
-        enforcer.sync_all(&[iface]).unwrap();
+        enforcer
+            .sync_all(&[iface.clone()], &[iface.interface_name.clone()])
+            .unwrap();
 
         let output = std::process::Command::new("wg")
             .args(["show", "zftwg0"])
@@ -346,8 +384,33 @@ mod tests {
         );
         assert!(shown.contains(&real_peer_pubkey));
 
+        // Second sync must be idempotent (address already assigned).
+        enforcer
+            .sync_all(&[iface.clone()], &[iface.interface_name.clone()])
+            .unwrap();
+
+        assert!(is_addr_already_present(&anyhow::anyhow!(
+            "failed to add address 10.250.252.1/24 to 'zftwg0': Address already assigned."
+        )));
+
         enforcer.remove_interface("zftwg0").unwrap();
         let seen = rt.block_on(networking::netlink::list_interfaces()).unwrap();
         assert!(!seen.iter().any(|i| i.name == "zftwg0"));
+    }
+
+    #[test]
+    fn test_is_addr_already_present_variants() {
+        assert!(is_addr_already_present(&anyhow::anyhow!("File exists")));
+        assert!(is_addr_already_present(&anyhow::anyhow!(
+            "ipv4: Address already assigned."
+        )));
+        assert!(is_addr_already_present(&anyhow::anyhow!("EEXIST")));
+        assert!(is_addr_already_present(&anyhow::anyhow!("os error 17")));
+        // Outer context must not hide nested netlink EEXIST (anyhow::to_string
+        // is only the top layer).
+        let nested = anyhow::anyhow!("Received a netlink error message File exists (os error 17)")
+            .context("failed to add address 10.0.0.1/24 to 'zftwg0'");
+        assert!(is_addr_already_present(&nested));
+        assert!(!is_addr_already_present(&anyhow::anyhow!("permission denied")));
     }
 }

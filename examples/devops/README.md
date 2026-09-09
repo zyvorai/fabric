@@ -19,6 +19,8 @@ export FLUXVM_URL=http://127.0.0.1:7788
 bash scripts/devops-gate.sh
 # or full lab pack:
 #   ./scripts/test-lab-verify.sh
+# production readiness (read-only; requires FABRIC_TOKEN):
+#   FABRIC_TOKEN=… ./scripts/test-production-readiness.sh
 zyvorctl apply -f examples/devops/apply-vm.yaml
 ```
 
