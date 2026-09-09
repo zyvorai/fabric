@@ -31,7 +31,9 @@ Everything from v5, plus:
 - **Full mesh datapath lifecycle v2 (remote backends)** — Fabric catalog +
   reconcile merges peer-site Ready and active Draining endpoints into Maglev
   service upserts (weighted drain handoff + optional VIP match; no
-  Geneve/VXLAN tunnels; L3/anycast + remote backends);
+  Geneve/VXLAN/WireGuard-in-BPF tunnels; L3/anycast + remote backends; use
+  Fabric VPN Mesh WireGuard as the encrypted underlay — see
+  [WireGuard underlay](#wireguard-underlay-for-multi-site-service-fabric));
 - proxy of FluxVM policy and Envoy contract endpoints;
 - HA mutation-queue drain remains on FluxVM; Fabric still drives sequence/ack
   delta replication and full-snapshot fallback.
@@ -95,11 +97,81 @@ both; north-south **NAT** also requires `snat_address` so backend replies return
 through FluxVM. Fabric proxies these FluxVM endpoints unchanged; it does not attach
 TC programs itself.
 
+## WireGuard underlay for multi-site Service Fabric
+
+WireGuard is **Fabric VPN Mesh** (Net Security → VPN), not a Maglev/eBPF tunnel.
+FluxVM Service Fabric stays L3/anycast + remote backends; it does **not**
+encapsulate in `fluxvm_service*.bpf.o` (no Geneve/VXLAN/WireGuard in BPF).
+
+Use WireGuard as the **encrypted site-to-site underlay**. After peer
+`AllowedIPs` make remote backend CIDRs reachable, publish those endpoints via
+remote-backends / remote-identities and reconcile.
+
+```mermaid
+flowchart LR
+  subgraph siteA [Site_A]
+    FA[Fabric_FluxVM]
+    WA[wg0]
+    FA --> WA
+  end
+  subgraph siteB [Site_B]
+    FB[Fabric_FluxVM]
+    WB[wg0]
+    FB --> WB
+  end
+  WA <-->|UDP_51820| WB
+  FA -.->|remote_backends_over_AllowedIPs| FB
+```
+
+### Console
+
+1. **Infrastructure → Net Security → VPN**
+2. Create a tunnel or VPN network (`full_mesh` / `hub_spoke` / `point_to_point`), or
+   **Sync** → **Adopt** an existing host `wg*` interface
+3. Confirm `wg show` handshake/transfer; peer `AllowedIPs` cover backend ranges
+
+See [network-security.md](user/pages/infrastructure/network-security.md).
+
+### API (sketch)
+
+```bash
+# Point-to-point site link (keys via private_key_ref / peer public_key)
+curl -sk -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "name": "site-link",
+    "interface_name": "wg0",
+    "listen_port": 51820,
+    "address": "10.10.0.1/24",
+    "private_key_ref": "vault:wg/site-link",
+    "peers": [{
+      "public_key": "<peer-pubkey>",
+      "endpoint": "<peer-public-ip>:51820",
+      "allowed_ips": ["10.10.0.2/32", "10.88.0.0/16"],
+      "persistent_keepalive": 25
+    }]
+  }' \
+  "https://$FABRIC:9095/api/vpn-tunnels"
+```
+
+Host package: `wireguard-tools`. Broader VPN Mesh examples:
+[networking.md](networking.md#vpn-mesh).
+
+### After the tunnel is up
+
+1. Tag Maglev services with `site_id` / `route_domain`.
+2. `POST /api/dataplane/remote-backends` with peer addresses reachable over WG.
+3. `POST /api/dataplane/remote-backends/reconcile` — Maglev merges Ready / active Draining remotes.
+4. Optionally `POST /api/dataplane/remote-identities` + reconcile for cross-site policy IDs.
+
+WireGuard does **not** replace Maglev, BGP anycast, or remote-backend reconcile; it
+only encrypts and carries the L3 path those features assume.
+
 ## Ownership reminder
 
 | Plane | Owner |
 |-------|--------|
-| Service intent, leases, fan-out, BGP/ECMP, HA replication cursors, policy transactions | Fabric (`service-lb`) |
+| Service intent, leases, fan-out, BGP/ECMP, HA replication cursors, policy transactions, remote identity/backend catalogs | Fabric (`service-lb`) |
+| WireGuard VPN Mesh (host overlays, peers, topologies) | Fabric (`vpn-mesh` / Net Security VPN) |
 | TC/XDP programs, Maglev tables, fct/nat/edt/sflows, policy maps, HA queue, delta journal | FluxVM |
 | Per-VM L3/L4 policy (Network Fabric schema v4) | FluxVM (orthogonal) |
 | HTTP/gRPC parsing for L7 enforce | Envoy (eBPF only redirects) |

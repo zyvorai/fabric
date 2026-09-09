@@ -22,7 +22,7 @@ minimal multi-site fencing, a ClusterMesh-like remote identity directory, and
 | Site-scoped identity policy fan-out | shipped (minimal) |
 | **ClusterMesh-like identity directory (minimal)** | shipped |
 | **Full mesh datapath (remote backends)** | shipped (lifecycle v2) |
-| Geneve / VXLAN service tunnels | N/A (L3/anycast + remote backends) |
+| Geneve / VXLAN / WireGuard-in-BPF service tunnels | N/A (L3/anycast + remote backends; WG is VPN Mesh underlay) |
 
 Operator doc: [ebpf-service-fabric.md](ebpf-service-fabric.md) · FluxVM:
 [service-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/service-fabric.md) ·
@@ -72,9 +72,19 @@ drain_until_unix_ms?, labels{}, updated_unix_ms }`.
 - Cross-domain remotes are ignored (same fencing as identities).
 - Delete removes all VIP catalog rows for `(route_domain, service, address, port)`
   and re-reconciles so the backend drops from the next Maglev upsert.
-- **Tunnels still N/A** — datapath is L3/anycast VIP + remote endpoint merge, not
-  Geneve/VXLAN overlays. Lifecycle v2 (weighted drain + multi-VIP) is shipped;
-  Geneve/VXLAN remain out of scope.
+- **Tunnels still N/A inside Maglev BPF** — datapath is L3/anycast VIP + remote
+  endpoint merge, not Geneve/VXLAN overlays. For encrypted site links use Fabric
+  **WireGuard VPN Mesh** as the underlay, then publish remotes over `AllowedIPs`
+  (see [ebpf-service-fabric.md](ebpf-service-fabric.md#wireguard-underlay-for-multi-site-service-fabric)).
+  Lifecycle v2 (weighted drain + multi-VIP) is shipped.
+
+### WireGuard underlay (VPN Mesh)
+
+WireGuard is orthogonal host overlay networking (`/api/vpn-tunnels`,
+`/api/vpn-networks`, Net Security → VPN). It does not change Service Fabric schema
+or BPF program generation. Typical multi-site flow: bring up `wg0` with peer
+`AllowedIPs` covering remote backend CIDRs → `remote-backends` / `remote-identities`
+reconcile → Maglev and identity policy use those L3 paths.
 
 ## Remaining candidates
 
