@@ -512,7 +512,15 @@ curl -sf https://127.0.0.1:9095/health          # liveness
 curl -sf https://127.0.0.1:9095/readyz | jq .   # readiness (store + FluxVM)
 ```
 
-**Production readiness script** (read-only; doctor + devops + dataplane/VPN list APIs):
+**Easiest install** — ship FluxVM + Fabric together:
+
+```bash
+./scripts/ship sus@HOST
+# or first install:
+./scripts/ship sus@HOST --full
+```
+
+**Production readiness script** (read-only; doctor + devops + dataplane/VPN list APIs) — also run automatically by `ship`:
 
 ```bash
 FABRIC_URL=https://127.0.0.1:9095 \
@@ -523,7 +531,7 @@ FABRIC_TOKEN=<admin-or-ops-jwt> \
 
 Mutating WireGuard / edge e2e only with `RUN_MUTATING=1`. Pair with FluxVM
 [`scripts/test-production-readiness.sh`](https://github.com/zyvorai/fluxvm/blob/main/scripts/test-production-readiness.sh)
-on each dataplane host.
+on each dataplane host. Prod ship: `FABRIC_ADMIN_PASSWORD=… ./scripts/ship sus@HOST --prod`.
 
 Use `/health` for process-up probes and `/readyz` for load-balancer / Kubernetes
 readiness (DaemonSet templates already probe `/readyz`; FluxVM uses `/healthz` +

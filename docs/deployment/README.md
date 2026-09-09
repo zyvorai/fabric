@@ -12,7 +12,13 @@ workstations to production clusters.
 | [Production Deployment](production.md)            | Full production deployment guide covering system requirements, installation, configuration, security hardening, backup, and monitoring. |
 | [Systemd Service Configuration](systemd-service.md) | Detailed systemd unit file with socket activation, resource limits, sandboxing, and journald integration. |
 
-After install, run the read-only prod gate:
+After install, the easiest path is:
+
+```bash
+./scripts/ship sus@HOST
+```
+
+Read-only prod gate only:
 
 ```bash
 FABRIC_URL=https://127.0.0.1:9095 FLUXVM_URL=http://127.0.0.1:7788 \

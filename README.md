@@ -49,6 +49,7 @@ zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 
 | Goal | Path |
 |------|------|
+| **Ship stack (easiest)** | `./scripts/ship USER@HOST` |
 | Local eval with containers | `make docker-up` → [docs/DOCKER.md](docs/DOCKER.md) |
 | Bare-metal remote host | `./scripts/deploy remote USER@HOST` |
 | **Kubernetes (k3s lab / Helm)** | [`./scripts/deploy k8s USER@HOST`](#run-on-kubernetes) → [docs/KUBERNETES.md](docs/KUBERNETES.md) |
@@ -86,7 +87,19 @@ Four first-class ways to run Fabric. Pick one:
 └─────────────────┴──────────────────┴──────────────────┴─────────────────┘
 ```
 
-### Bare metal (systemd)
+### Bare metal (systemd) — easiest path
+
+Ship **FluxVM + Fabric** in one command (from the Fabric repo, with sibling `../fluxvm`):
+
+```bash
+./scripts/ship sus@HOST              # lab quick redeploy + readiness
+./scripts/ship sus@HOST --full       # first install (deps + firewall)
+FABRIC_ADMIN_PASSWORD='…' ./scripts/ship sus@HOST --prod
+```
+
+Same from FluxVM: `./scripts/ship sus@HOST` (execs sibling Fabric `scripts/ship`).
+
+Advanced (Fabric only):
 
 ```bash
 ./scripts/deploy remote sus@HOST
