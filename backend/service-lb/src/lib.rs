@@ -636,6 +636,8 @@ pub fn validate_spec(spec: &ServiceSpec) -> Result<()> {
 #[async_trait]
 pub trait ServiceNodeClient: Send + Sync {
     async fn get_service(&self, node: &NodeTarget, name: &str) -> Result<Option<ServiceSpec>>;
+    /// List Maglev service specs on a node (`GET /v1/network/services`).
+    async fn list_services(&self, node: &NodeTarget) -> Result<Vec<ServiceSpec>>;
     async fn get_status(&self, node: &NodeTarget) -> Result<HostServiceStatus>;
     async fn get_advertisements(&self, node: &NodeTarget) -> Result<AdvertisementSnapshot>;
     async fn upsert_service(&self, node: &NodeTarget, spec: &ServiceSpec) -> Result<()>;
@@ -728,6 +730,23 @@ impl ServiceNodeClient for FluxVmHttpClient {
         }
         let resp = Self::expect_ok(resp, "get service").await?;
         Ok(Some(resp.json().await?))
+    }
+
+    async fn list_services(&self, node: &NodeTarget) -> Result<Vec<ServiceSpec>> {
+        let resp = self
+            .auth(
+                node,
+                self.http
+                    .get(Self::url(node, "/v1/network/services")?),
+            )
+            .send()
+            .await?;
+        let resp = Self::expect_ok(resp, "list services").await?;
+        #[derive(Deserialize)]
+        struct ListReply {
+            items: Vec<ServiceSpec>,
+        }
+        Ok(resp.json::<ListReply>().await?.items)
     }
 
     async fn get_status(&self, node: &NodeTarget) -> Result<HostServiceStatus> {
@@ -1685,6 +1704,22 @@ mod tests {
                 .await
                 .get(&(node.name.clone(), name.into()))
                 .cloned())
+        }
+
+        async fn list_services(&self, node: &NodeTarget) -> Result<Vec<ServiceSpec>> {
+            let guard = self.state.lock().await;
+            let mut out: Vec<_> = guard
+                .iter()
+                .filter_map(|((n, _), spec)| {
+                    if n == &node.name {
+                        Some(spec.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            out.sort_by(|a, b| a.name.cmp(&b.name));
+            Ok(out)
         }
 
         async fn get_status(&self, node: &NodeTarget) -> Result<HostServiceStatus> {

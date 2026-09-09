@@ -5,7 +5,7 @@
 BPF **schema 4** is unchanged. FluxVM **program generation 8** covers
 connect{4,6} + affinity, map-tier ELFs, and pressure/offload status. Fabric adds
 minimal multi-site fencing, a ClusterMesh-like remote identity directory, and
-**full mesh datapath v1** via remote backends (no Geneve/VXLAN tunnels).
+**full mesh datapath lifecycle v2** via remote backends (no Geneve/VXLAN tunnels).
 
 | Item | Status |
 |------|--------|
@@ -21,7 +21,7 @@ minimal multi-site fencing, a ClusterMesh-like remote identity directory, and
 | Multi-site anycast fencing (`site_id` / `route_domain`) | shipped (minimal) |
 | Site-scoped identity policy fan-out | shipped (minimal) |
 | **ClusterMesh-like identity directory (minimal)** | shipped |
-| **Full mesh datapath (remote backends)** | shipped (v1) |
+| **Full mesh datapath (remote backends)** | shipped (lifecycle v2) |
 | Geneve / VXLAN service tunnels | N/A (L3/anycast + remote backends) |
 
 Operator doc: [ebpf-service-fabric.md](ebpf-service-fabric.md) · FluxVM:
@@ -49,29 +49,36 @@ Fabric owns a durable remote identity catalog keyed by `(route_domain, identity_
   `deny_identities` into node ipcache before fan-out. Same-domain resolve helpers
   ignore cross-domain rows; residual gaps stay fail-closed on FluxVM compile.
 
-### Full mesh datapath v1 (remote backends)
+### Full mesh datapath lifecycle v2 (remote backends)
 
 Fabric owns a durable remote backend catalog keyed by
-`(route_domain, service, address:port)` under
+`(route_domain, service, vip_or_*, address:port)` under
 `{storage}/service-fabric/remote-backends.json`:
 
-`RemoteBackend { service, site_id, route_domain, address, port, weight, state, labels{}, updated_unix_ms }`.
+`RemoteBackend { service, site_id, route_domain, vip?, address, port, weight, state,
+drain_until_unix_ms?, labels{}, updated_unix_ms }`.
 
 - Sites publish/pull via Fabric REST (`/api/dataplane/remote-backends…`).
-- `reconcile` merges same-domain **Ready** remotes into existing FluxVM Maglev
-  service upserts on owning-domain nodes (local backends preserved; colliding
-  `(address, port)` never clobbers local). Draining/Unhealthy remotes are not
-  injected (Maglev already excludes non-Ready).
+- `reconcile` merges same-domain **Ready** and active **Draining** remotes into
+  existing FluxVM Maglev service upserts on owning-domain nodes (local backends
+  preserved; colliding `(address, port)` never clobbers local). Unhealthy remotes
+  are skipped. Expired drains (`now > drain_until_unix_ms`) are skipped when
+  reconcile passes a non-zero clock.
+- **Weighted drain handoff** — `POST …/drain` sets `state=Draining`, optional lower
+  Maglev `weight`, and `drain_until_unix_ms` (default now+5m), then reconciles.
+- **Multi-VIP** — optional `vip` matches Maglev specs by VIP (one Maglev service
+  name per VIP; remotes carry matching `vip` for safety). Without `vip`, match by
+  service name (back-compat). Reconcile lists node services to discover VIP targets.
 - Cross-domain remotes are ignored (same fencing as identities).
-- Delete removes the catalog row and re-reconciles so the backend drops from the
-  next Maglev upsert.
+- Delete removes all VIP catalog rows for `(route_domain, service, address, port)`
+  and re-reconciles so the backend drops from the next Maglev upsert.
 - **Tunnels still N/A** — datapath is L3/anycast VIP + remote endpoint merge, not
-  Geneve/VXLAN overlays.
+  Geneve/VXLAN overlays. Lifecycle v2 (weighted drain + multi-VIP) is shipped;
+  Geneve/VXLAN remain out of scope.
 
 ## Remaining candidates
 
 1. Stricter multi-queue RSS affinity proofs (pin flows, assert queue mapping) — under-load PPS + best-effort multi-queue RX shipped.
 2. Higher lab Mpps/CPU ceilings beyond the universal CI floor (`SLO_MPPS_MIN=0.01`).
-3. Richer remote-backend lifecycle (weighted drain handoff, multi-VIP, optional tunnel datapath) if operators need more than L3/anycast mesh.
 
 Ownership remains unchanged: FluxVM owns local packet/runtime mechanics; Fabric owns distributed leases, routing, discovery, multi-site policy/HA, remote identity directory, and remote backend mesh.

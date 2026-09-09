@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **Service Fabric remote-backend lifecycle v2** — weighted drain handoff
+  (`POST …/remote-backends/…/drain`), optional `vip` multi-VIP Maglev match,
+  inject Ready + active Draining remotes (expired drains skipped),
+  `list_services` reconcile path; Geneve/VXLAN tunnels still N/A.
 - **Service Fabric full mesh datapath v1 (remote backends)** — durable
   `RemoteBackend` catalog + `/api/dataplane/remote-backends` CRUD/reconcile;
   merges same-domain Ready peer backends into FluxVM Maglev service upserts

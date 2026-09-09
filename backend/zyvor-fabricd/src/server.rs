@@ -494,6 +494,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(api::vm_dataplane::reconcile_remote_backends),
         )
         .route(
+            "/dataplane/remote-backends/{route_domain}/{service}/{address}/{port}/drain",
+            post(api::vm_dataplane::drain_remote_backend),
+        )
+        .route(
             "/dataplane/remote-backends/{route_domain}/{service}/{address}/{port}",
             delete(api::vm_dataplane::delete_remote_backend),
         )

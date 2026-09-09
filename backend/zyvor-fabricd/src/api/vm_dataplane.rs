@@ -1257,6 +1257,19 @@ pub struct RemoteBackendReconcileBody {
     pub route_domain: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RemoteBackendDrainBody {
+    pub drain_until_unix_ms: Option<u64>,
+    pub weight: Option<u32>,
+}
+
+fn now_unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
 /// GET /api/dataplane/remote-backends
 pub async fn list_remote_backends(
     RequireRead(_claims): RequireRead,
@@ -1282,16 +1295,51 @@ pub async fn upsert_remote_backend(
 ) -> Result<Json<service_lb::remote_backend::RemoteBackend>, (StatusCode, Json<serde_json::Value>)>
 {
     if backend.updated_unix_ms == 0 {
-        backend.updated_unix_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
+        backend.updated_unix_ms = now_unix_ms();
     }
     let dir = remote_backend_directory(&state);
     let stored = dir
         .upsert(backend)
         .map_err(|e| map_driver_err(StatusCode::BAD_REQUEST, "remote backend", e))?;
     Ok(Json(stored))
+}
+
+/// POST /api/dataplane/remote-backends/{route_domain}/{service}/{address}/{port}/drain
+/// Weighted drain handoff: catalog → Draining, then reconcile onto FluxVM nodes.
+pub async fn drain_remote_backend(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path((route_domain, service, address, port)): Path<(String, String, String, u16)>,
+    Json(body): Json<RemoteBackendDrainBody>,
+) -> Result<
+    Json<service_lb::remote_backend::RemoteBackendReconcileReport>,
+    (StatusCode, Json<serde_json::Value>),
+> {
+    let now = now_unix_ms();
+    let drain_until = body
+        .drain_until_unix_ms
+        .unwrap_or_else(|| now.saturating_add(300_000));
+    let nodes = service_nodes(&state);
+    let dir = remote_backend_directory(&state);
+    let client = service_lb::FluxVmHttpClient::new()
+        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "service-lb client", e))?;
+    let orch = service_lb::remote_backend::RemoteBackendOrchestrator::new(dir, client);
+    let report = orch
+        .drain_and_reconcile(
+            &route_domain,
+            &service,
+            &address,
+            port,
+            drain_until,
+            body.weight,
+            &nodes,
+            None,
+            &[],
+            now,
+        )
+        .await
+        .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "remote backend drain", e))?;
+    Ok(Json(report))
 }
 
 /// DELETE /api/dataplane/remote-backends/{route_domain}/{service}/{address}/{port}
@@ -1304,6 +1352,7 @@ pub async fn delete_remote_backend(
     Json<service_lb::remote_backend::RemoteBackendReconcileReport>,
     (StatusCode, Json<serde_json::Value>),
 > {
+    let now = now_unix_ms();
     let nodes = service_nodes(&state);
     let dir = remote_backend_directory(&state);
     let client = service_lb::FluxVmHttpClient::new()
@@ -1318,7 +1367,7 @@ pub async fn delete_remote_backend(
             &nodes,
             None,
             &[],
-            0,
+            now,
             true,
         )
         .await
@@ -1326,7 +1375,7 @@ pub async fn delete_remote_backend(
     Ok(Json(report))
 }
 
-/// POST /api/dataplane/remote-backends/reconcile — merge Ready remotes into Maglev upserts.
+/// POST /api/dataplane/remote-backends/reconcile — merge Ready + active Draining remotes into Maglev upserts.
 pub async fn reconcile_remote_backends(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
@@ -1335,6 +1384,7 @@ pub async fn reconcile_remote_backends(
     Json<service_lb::remote_backend::RemoteBackendReconcileReport>,
     (StatusCode, Json<serde_json::Value>),
 > {
+    let now = now_unix_ms();
     let nodes = service_nodes(&state);
     let dir = remote_backend_directory(&state);
     let client = service_lb::FluxVmHttpClient::new()
@@ -1347,7 +1397,7 @@ pub async fn reconcile_remote_backends(
             body.route_domain.as_deref(),
             &nodes,
             &[],
-            0,
+            now,
         )
         .await
         .map_err(|e| map_driver_err(StatusCode::BAD_GATEWAY, "remote backend reconcile", e))?;
