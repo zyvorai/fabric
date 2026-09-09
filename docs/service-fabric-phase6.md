@@ -79,6 +79,8 @@ drain_until_unix_ms?, labels{}, updated_unix_ms }`.
 ## Remaining candidates
 
 1. Stricter multi-queue RSS affinity proofs (pin flows, assert queue mapping) — under-load PPS + best-effort multi-queue RX shipped.
-2. Higher lab Mpps/CPU ceilings beyond the universal CI floor (`SLO_MPPS_MIN=0.01`).
+
+Lab Mpps/CPU ceilings: FluxVM `SLO_LAB=1` / `scripts/test-service-fabric-lab.sh`
+(`SLO_MPPS_MIN=0.05`, `SLO_PKT_MPPS_MIN=0.10`, `SLO_CPU_MAX_PERCENT=85`).
 
 Ownership remains unchanged: FluxVM owns local packet/runtime mechanics; Fabric owns distributed leases, routing, discovery, multi-site policy/HA, remote identity directory, and remote backend mesh.
