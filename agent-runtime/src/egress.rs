@@ -53,53 +53,104 @@ async fn proxy_inner(
         .store
         .get_agent_version(&session.agent, &session.agent_version)
         .await
-        .map_err(|_| (StatusCode::FORBIDDEN, "pinned agent deployment no longer exists".into()))?;
+        .map_err(|_| {
+            (
+                StatusCode::FORBIDDEN,
+                "pinned agent deployment no longer exists".into(),
+            )
+        })?;
 
     let url = Url::parse(&request.url)
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("invalid egress URL: {e}")))?;
     if !matches!(url.scheme(), "http" | "https") {
-        return Err((StatusCode::BAD_REQUEST, "only http and https egress is supported".into()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "only http and https egress is supported".into(),
+        ));
     }
     let host = url
         .host_str()
         .ok_or((StatusCode::BAD_REQUEST, "egress URL has no host".into()))?;
-    if !agent.manifest.egress_allow_hosts.iter().any(|h| host_matches(h, host)) {
-        return Err((StatusCode::FORBIDDEN, format!("host {host} is not in this agent's egress allowlist")));
+    if !agent
+        .manifest
+        .egress_allow_hosts
+        .iter()
+        .any(|h| host_matches(h, host))
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            format!("host {host} is not in this agent's egress allowlist"),
+        ));
     }
 
-    if !agent.manifest.allow_private_networks {
-        reject_private_destination(host, url.port_or_known_default().unwrap_or(443)).await?;
-    }
+    let port = url.port_or_known_default().unwrap_or(443);
+    // Resolve once, validate, and pin the connection to that exact address
+    // (rather than letting reqwest resolve the hostname a second,
+    // independent time when it actually connects): otherwise an attacker
+    // controlling DNS for `host` could return a public IP for this check
+    // and a private/link-local one moments later for the real connection
+    // (DNS rebinding), bypassing the allow_private_networks gate entirely.
+    let pinned =
+        resolve_and_validate_destination(host, port, agent.manifest.allow_private_networks).await?;
 
     let method = request
         .method
         .parse::<reqwest::Method>()
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid HTTP method".into()))?;
-    let mut upstream = state.egress_http.request(method.clone(), url.clone());
+    let request_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(120))
+        .resolve(host, pinned)
+        .build()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to construct pinned egress client: {e}"),
+            )
+        })?;
+    let mut upstream = request_client.request(method.clone(), url.clone());
     for (name, value) in request.headers {
         if is_hop_or_secret_header(&name) || state.credentials.is_injection_header(&name) {
             continue;
         }
-        let header_name = reqwest::header::HeaderName::from_bytes(name.as_bytes())
-            .map_err(|_| (StatusCode::BAD_REQUEST, format!("invalid request header name: {name}")))?;
-        let header_value = reqwest::header::HeaderValue::from_str(&value)
-            .map_err(|_| (StatusCode::BAD_REQUEST, format!("invalid request header value for {name}")))?;
+        let header_name =
+            reqwest::header::HeaderName::from_bytes(name.as_bytes()).map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    format!("invalid request header name: {name}"),
+                )
+            })?;
+        let header_value = reqwest::header::HeaderValue::from_str(&value).map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                format!("invalid request header value for {name}"),
+            )
+        })?;
         upstream = upstream.header(header_name, header_value);
     }
 
     if let Some(name) = request.credential.as_deref() {
         if !agent.manifest.credentials.iter().any(|c| c == name) {
-            return Err((StatusCode::FORBIDDEN, format!("credential '{name}' is not granted to this agent")));
+            return Err((
+                StatusCode::FORBIDDEN,
+                format!("credential '{name}' is not granted to this agent"),
+            ));
         }
         if url.scheme() != "https" {
-            return Err((StatusCode::FORBIDDEN, "credentials are injected only into HTTPS requests".into()));
+            return Err((
+                StatusCode::FORBIDDEN,
+                "credentials are injected only into HTTPS requests".into(),
+            ));
         }
         let (descriptor, secret) = state
             .credentials
             .resolve(name)
             .map_err(|e| (StatusCode::BAD_GATEWAY, e.to_string()))?;
         if !host_matches(&descriptor.host, host) {
-            return Err((StatusCode::FORBIDDEN, format!("credential '{name}' cannot be used for host {host}")));
+            return Err((
+                StatusCode::FORBIDDEN,
+                format!("credential '{name}' cannot be used for host {host}"),
+            ));
         }
         let port = url.port_or_known_default().unwrap_or(443);
         if !credential_allows_request(descriptor, &method, url.path(), port) {
@@ -113,9 +164,18 @@ async fn proxy_inner(
             ));
         }
         let header_name = reqwest::header::HeaderName::from_bytes(descriptor.header.as_bytes())
-            .map_err(|_| (StatusCode::BAD_GATEWAY, "configured credential header is invalid".into()))?;
-        let header_value = reqwest::header::HeaderValue::from_str(&secret)
-            .map_err(|_| (StatusCode::BAD_GATEWAY, "configured credential value cannot be represented as an HTTP header".into()))?;
+            .map_err(|_| {
+                (
+                    StatusCode::BAD_GATEWAY,
+                    "configured credential header is invalid".into(),
+                )
+            })?;
+        let header_value = reqwest::header::HeaderValue::from_str(&secret).map_err(|_| {
+            (
+                StatusCode::BAD_GATEWAY,
+                "configured credential value cannot be represented as an HTTP header".into(),
+            )
+        })?;
         upstream = upstream.header(header_name, header_value);
     }
 
@@ -124,15 +184,20 @@ async fn proxy_inner(
             .decode(encoded.as_bytes())
             .map_err(|_| (StatusCode::BAD_REQUEST, "body_base64 is invalid".into()))?;
         if body.len() > 16 * 1024 * 1024 {
-            return Err((StatusCode::PAYLOAD_TOO_LARGE, "egress body exceeds 16 MiB".into()));
+            return Err((
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "egress body exceeds 16 MiB".into(),
+            ));
         }
         upstream = upstream.body(body);
     }
 
-    let response = upstream
-        .send()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("egress upstream failed: {e}")))?;
+    let response = upstream.send().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("egress upstream failed: {e}"),
+        )
+    })?;
     let status = response.status().as_u16();
     let mut out_headers = BTreeMap::new();
     for (name, value) in response.headers() {
@@ -142,12 +207,17 @@ async fn proxy_inner(
             }
         }
     }
-    let body = response
-        .bytes()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("reading upstream body: {e}")))?;
+    let body = response.bytes().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("reading upstream body: {e}"),
+        )
+    })?;
     if body.len() > 16 * 1024 * 1024 {
-        return Err((StatusCode::BAD_GATEWAY, "upstream response exceeds 16 MiB".into()));
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            "upstream response exceeds 16 MiB".into(),
+        ));
     }
 
     tracing::info!(session = %id, agent = %session.agent, %host, credential = ?request.credential, status, "agent egress");
@@ -158,27 +228,62 @@ async fn proxy_inner(
     }))
 }
 
-
-async fn reject_private_destination(host: &str, port: u16) -> Result<(), (StatusCode, String)> {
-    let addresses = tokio::net::lookup_host((host, port))
+/// Resolves `host`, rejects it if any returned address is blocked (unless
+/// `allow_private_networks` opts an agent out of that check), and returns
+/// the first address to pin the actual connection to. The caller must
+/// connect only to this exact address for this request -- resolving `host`
+/// again later would reopen the DNS-rebinding gap this function exists to
+/// close.
+async fn resolve_and_validate_destination(
+    host: &str,
+    port: u16,
+    allow_private_networks: bool,
+) -> Result<std::net::SocketAddr, (StatusCode, String)> {
+    let addresses: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host, port))
         .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("DNS lookup failed for {host}: {e}")))?;
-    let mut saw = false;
-    for address in addresses {
-        saw = true;
-        let ip = address.ip();
-        let blocked = match ip {
-            std::net::IpAddr::V4(v4) => v4.is_private() || v4.is_loopback() || v4.is_link_local() || v4.is_multicast() || v4.is_unspecified(),
-            std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unique_local() || v6.is_unicast_link_local() || v6.is_multicast() || v6.is_unspecified(),
-        };
-        if blocked {
-            return Err((StatusCode::FORBIDDEN, format!("destination {host} resolves to blocked private/link-local address {ip}")));
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("DNS lookup failed for {host}: {e}"),
+            )
+        })?
+        .collect();
+    let Some(first) = addresses.first().copied() else {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("DNS lookup returned no addresses for {host}"),
+        ));
+    };
+    if !allow_private_networks {
+        for address in &addresses {
+            let ip = address.ip();
+            let blocked = match ip {
+                std::net::IpAddr::V4(v4) => {
+                    v4.is_private()
+                        || v4.is_loopback()
+                        || v4.is_link_local()
+                        || v4.is_multicast()
+                        || v4.is_unspecified()
+                }
+                std::net::IpAddr::V6(v6) => {
+                    v6.is_loopback()
+                        || v6.is_unique_local()
+                        || v6.is_unicast_link_local()
+                        || v6.is_multicast()
+                        || v6.is_unspecified()
+                }
+            };
+            if blocked {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    format!(
+                        "destination {host} resolves to blocked private/link-local address {ip}"
+                    ),
+                ));
+            }
         }
     }
-    if !saw {
-        return Err((StatusCode::BAD_GATEWAY, format!("DNS lookup returned no addresses for {host}")));
-    }
-    Ok(())
+    Ok(first)
 }
 
 fn header<'a>(headers: &'a HeaderMap, name: &str) -> Result<&'a str, (StatusCode, String)> {
@@ -192,14 +297,23 @@ fn header<'a>(headers: &'a HeaderMap, name: &str) -> Result<&'a str, (StatusCode
 fn is_hop_or_secret_header(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
-        "host" | "authorization" | "proxy-authorization" | "content-length" | "connection" | "transfer-encoding"
+        "host"
+            | "authorization"
+            | "proxy-authorization"
+            | "content-length"
+            | "connection"
+            | "transfer-encoding"
     )
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() { return false; }
+    if a.len() != b.len() {
+        return false;
+    }
     let mut diff = 0u8;
-    for (&x, &y) in a.iter().zip(b) { diff |= x ^ y; }
+    for (&x, &y) in a.iter().zip(b) {
+        diff |= x ^ y;
+    }
     diff == 0
 }
 

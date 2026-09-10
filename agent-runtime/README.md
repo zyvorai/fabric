@@ -109,12 +109,13 @@ Configuration:
 | `ZYVOR_AGENT_FLUXVM_URL` | `http://127.0.0.1:7788` | FluxVM API |
 | `ZYVOR_AGENT_FLUXVM_TOKEN` | unset | FluxVM bearer token |
 | `ZYVOR_AGENT_API_TOKEN` | unset | public Agent Runtime bearer token |
+| `ZYVOR_AGENT_ALLOW_NO_AUTH` | unset | explicit opt-out to start without `ZYVOR_AGENT_API_TOKEN` |
 | `ZYVOR_AGENT_CREDENTIALS_FILE` | unset | descriptor JSON above |
 | `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` | derived | host address visible from sandbox |
 | `ZYVOR_AGENT_SYNC_INTERVAL_MS` | `300` | guest event sync interval |
 | `ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS` | `1000` | scan interval for safe waiting-session auto-hibernate |
 
-For production, set `ZYVOR_AGENT_API_TOKEN`, bind the public API behind TLS, firewall port 18082 so only sandbox networks can reach it, and use FluxVM's dataplane/network policy to restrict direct guest egress.
+The Agent Runtime refuses to start unless `ZYVOR_AGENT_API_TOKEN` is set, or `ZYVOR_AGENT_ALLOW_NO_AUTH=1` is set to explicitly opt out (only appropriate when something else already restricts access to the API, e.g. a local-only dev loopback bind). For production, also bind the public API behind TLS, firewall port 18082 so only sandbox networks can reach it, and use FluxVM's dataplane/network policy to restrict direct guest egress.
 
 ## Write an agent
 

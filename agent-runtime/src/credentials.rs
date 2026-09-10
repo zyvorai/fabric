@@ -33,7 +33,9 @@ pub struct CredentialVault {
 
 impl CredentialVault {
     pub async fn load(path: Option<&Path>) -> Result<Self> {
-        let Some(path) = path else { return Ok(Self::default()); };
+        let Some(path) = path else {
+            return Ok(Self::default());
+        };
         let raw = tokio::fs::read(path)
             .await
             .with_context(|| format!("reading credentials descriptor file {}", path.display()))?;
@@ -50,13 +52,15 @@ impl CredentialVault {
     }
 
     pub fn is_injection_header(&self, header: &str) -> bool {
-        self.descriptors.values().any(|d| d.header.eq_ignore_ascii_case(header))
+        self.descriptors
+            .values()
+            .any(|d| d.header.eq_ignore_ascii_case(header))
     }
 
     pub fn resolve(&self, name: &str) -> Result<(&CredentialDescriptor, String)> {
-        let descriptor = self
-            .descriptor(name)
-            .with_context(|| format!("credential '{name}' is not configured on this Fabric host"))?;
+        let descriptor = self.descriptor(name).with_context(|| {
+            format!("credential '{name}' is not configured on this Fabric host")
+        })?;
         let value = std::env::var(&descriptor.env)
             .with_context(|| format!("host environment variable {} is not set", descriptor.env))?;
         if value.is_empty() {
@@ -67,7 +71,11 @@ impl CredentialVault {
 }
 
 fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
-    if name.is_empty() || d.host.trim().is_empty() || d.header.trim().is_empty() || d.env.trim().is_empty() {
+    if name.is_empty()
+        || d.host.trim().is_empty()
+        || d.header.trim().is_empty()
+        || d.env.trim().is_empty()
+    {
         bail!("credential descriptors require non-empty name, host, header and env");
     }
     if d.header.eq_ignore_ascii_case("host") || d.header.eq_ignore_ascii_case("content-length") {
@@ -76,13 +84,14 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
     reqwest::header::HeaderName::from_bytes(d.header.as_bytes())
         .with_context(|| format!("credential '{name}' has an invalid HTTP header name"))?;
     for method in &d.allowed_methods {
-        reqwest::Method::from_bytes(method.as_bytes())
-            .with_context(|| format!("credential '{name}' has invalid allowed method '{method}'"))?;
+        reqwest::Method::from_bytes(method.as_bytes()).with_context(|| {
+            format!("credential '{name}' has invalid allowed method '{method}'")
+        })?;
     }
     if d.path_prefixes.iter().any(|p| !p.starts_with('/')) {
         bail!("credential '{name}' path_prefixes must start with '/'");
     }
-    if d.allowed_ports.iter().any(|p| *p == 0) {
+    if d.allowed_ports.contains(&0) {
         bail!("credential '{name}' allowed_ports may not contain 0");
     }
     Ok(())
@@ -100,13 +109,20 @@ pub fn credential_allows_request(
             .iter()
             .any(|m| m.eq_ignore_ascii_case(method.as_str()));
     let path_ok = descriptor.path_prefixes.is_empty()
-        || descriptor.path_prefixes.iter().any(|prefix| path.starts_with(prefix));
+        || descriptor
+            .path_prefixes
+            .iter()
+            .any(|prefix| path.starts_with(prefix));
     let port_ok = port == 443 || descriptor.allowed_ports.contains(&port);
     method_ok && path_ok && port_ok
 }
 
 pub fn host_matches(pattern: &str, host: &str) -> bool {
-    let pattern = pattern.trim().trim_start_matches('.').trim_end_matches('.').to_ascii_lowercase();
+    let pattern = pattern
+        .trim()
+        .trim_start_matches('.')
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
     let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
     host == pattern || host.ends_with(&format!(".{pattern}"))
 }
@@ -133,10 +149,35 @@ mod tests {
             path_prefixes: vec!["/v1/".into()],
             allowed_ports: vec![8443],
         };
-        assert!(credential_allows_request(&d, &reqwest::Method::POST, "/v1/run", 443));
-        assert!(credential_allows_request(&d, &reqwest::Method::POST, "/v1/run", 8443));
-        assert!(!credential_allows_request(&d, &reqwest::Method::GET, "/v1/run", 443));
-        assert!(!credential_allows_request(&d, &reqwest::Method::POST, "/admin", 443));
-        assert!(!credential_allows_request(&d, &reqwest::Method::POST, "/v1/run", 9443));
+        assert!(credential_allows_request(
+            &d,
+            &reqwest::Method::POST,
+            "/v1/run",
+            443
+        ));
+        assert!(credential_allows_request(
+            &d,
+            &reqwest::Method::POST,
+            "/v1/run",
+            8443
+        ));
+        assert!(!credential_allows_request(
+            &d,
+            &reqwest::Method::GET,
+            "/v1/run",
+            443
+        ));
+        assert!(!credential_allows_request(
+            &d,
+            &reqwest::Method::POST,
+            "/admin",
+            443
+        ));
+        assert!(!credential_allows_request(
+            &d,
+            &reqwest::Method::POST,
+            "/v1/run",
+            9443
+        ));
     }
 }

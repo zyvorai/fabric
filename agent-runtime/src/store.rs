@@ -1,9 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::model::{
-    AgentRecord, DeployAgentRequest, SessionEvent, SessionRecord, SessionStatus,
-};
+use crate::model::{AgentRecord, DeployAgentRequest, SessionEvent, SessionRecord, SessionStatus};
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use chrono::Utc;
@@ -111,7 +109,11 @@ impl Store {
         )
         .await?;
         atomic_write(
-            &self.root.join("agents").join(&req.name).join("current.json"),
+            &self
+                .root
+                .join("agents")
+                .join(&req.name)
+                .join("current.json"),
             &serde_json::to_vec_pretty(&record)?,
         )
         .await?;
@@ -178,7 +180,7 @@ impl Store {
 
     pub async fn list_sessions(&self) -> Vec<SessionRecord> {
         let mut out: Vec<_> = self.sessions.read().await.values().cloned().collect();
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|a| std::cmp::Reverse(a.created_at));
         out
     }
 
@@ -368,7 +370,8 @@ mod tests {
         let store = Store::open(&root).await.unwrap();
         let request = DeployAgentRequest {
             name: "research".into(),
-            bundle_base64: base64::engine::general_purpose::STANDARD.encode("export default () => 1"),
+            bundle_base64: base64::engine::general_purpose::STANDARD
+                .encode("export default () => 1"),
             manifest: AgentManifest {
                 template: "node22".into(),
                 credentials: vec!["openai".into()],
@@ -385,7 +388,10 @@ mod tests {
         drop(store);
 
         let reloaded = Store::open(&root).await.unwrap();
-        assert_eq!(reloaded.get_agent("research").await.unwrap().version, record.version);
+        assert_eq!(
+            reloaded.get_agent("research").await.unwrap().version,
+            record.version
+        );
         let _ = fs::remove_dir_all(root).await;
     }
 
@@ -394,24 +400,50 @@ mod tests {
         let root = test_root();
         let store = Store::open(&root).await.unwrap();
         let bundle = base64::engine::general_purpose::STANDARD.encode("export default () => 1");
-        let one = store.deploy_agent(DeployAgentRequest {
-            name: "research".into(),
-            bundle_base64: bundle.clone(),
-            manifest: AgentManifest {
-                template: "node22".into(), credentials: vec![],
-                egress_allow_hosts: vec!["api.openai.com".into()], allow_private_networks: false, runtime_port: 8080, ttl_seconds: None, max_concurrent_sessions: None, idle_hibernate_seconds: None,
-            },
-        }).await.unwrap();
-        let two = store.deploy_agent(DeployAgentRequest {
-            name: "research".into(),
-            bundle_base64: bundle,
-            manifest: AgentManifest {
-                template: "node22".into(), credentials: vec![],
-                egress_allow_hosts: vec!["api.anthropic.com".into()], allow_private_networks: false, runtime_port: 8080, ttl_seconds: None, max_concurrent_sessions: None, idle_hibernate_seconds: None,
-            },
-        }).await.unwrap();
+        let one = store
+            .deploy_agent(DeployAgentRequest {
+                name: "research".into(),
+                bundle_base64: bundle.clone(),
+                manifest: AgentManifest {
+                    template: "node22".into(),
+                    credentials: vec![],
+                    egress_allow_hosts: vec!["api.openai.com".into()],
+                    allow_private_networks: false,
+                    runtime_port: 8080,
+                    ttl_seconds: None,
+                    max_concurrent_sessions: None,
+                    idle_hibernate_seconds: None,
+                },
+            })
+            .await
+            .unwrap();
+        let two = store
+            .deploy_agent(DeployAgentRequest {
+                name: "research".into(),
+                bundle_base64: bundle,
+                manifest: AgentManifest {
+                    template: "node22".into(),
+                    credentials: vec![],
+                    egress_allow_hosts: vec!["api.anthropic.com".into()],
+                    allow_private_networks: false,
+                    runtime_port: 8080,
+                    ttl_seconds: None,
+                    max_concurrent_sessions: None,
+                    idle_hibernate_seconds: None,
+                },
+            })
+            .await
+            .unwrap();
         assert_ne!(one.version, two.version);
-        assert_eq!(store.get_agent_version("research", &one.version).await.unwrap().manifest.egress_allow_hosts[0], "api.openai.com");
+        assert_eq!(
+            store
+                .get_agent_version("research", &one.version)
+                .await
+                .unwrap()
+                .manifest
+                .egress_allow_hosts[0],
+            "api.openai.com"
+        );
         let _ = fs::remove_dir_all(root).await;
     }
 
@@ -448,8 +480,14 @@ mod tests {
             id
         );
         assert_eq!(store.count_non_terminal_for_agent("a").await, 1);
-        assert_eq!(store.append_event(id, "one", json!(1)).await.unwrap().seq, 1);
-        assert_eq!(store.append_event(id, "two", json!(2)).await.unwrap().seq, 2);
+        assert_eq!(
+            store.append_event(id, "one", json!(1)).await.unwrap().seq,
+            1
+        );
+        assert_eq!(
+            store.append_event(id, "two", json!(2)).await.unwrap().seq,
+            2
+        );
         let events = store.events_after(id, 1).await.unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].kind, "two");

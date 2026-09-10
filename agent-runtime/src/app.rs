@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    model::{CreateSessionRequest, DeployAgentRequest, EventsQuery, GuestEventsResponse, GuestStatusResponse, SessionRecord, SessionStatus, SessionView, SteerRequest},
+    model::{
+        CreateSessionRequest, DeployAgentRequest, EventsQuery, GuestEventsResponse,
+        GuestStatusResponse, SessionRecord, SessionStatus, SessionView, SteerRequest,
+    },
     AppState,
 };
 use anyhow::Result;
@@ -10,7 +13,10 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
-    response::{sse::{Event, KeepAlive, Sse}, IntoResponse, Response},
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse, Response,
+    },
     routing::{get, post},
     Json, Router,
 };
@@ -29,12 +35,42 @@ struct ApiError {
 }
 
 impl ApiError {
-    fn bad_request(e: impl std::fmt::Display) -> Self { Self { status: StatusCode::BAD_REQUEST, message: e.to_string() } }
-    fn not_found(message: impl Into<String>) -> Self { Self { status: StatusCode::NOT_FOUND, message: message.into() } }
-    fn conflict(message: impl Into<String>) -> Self { Self { status: StatusCode::CONFLICT, message: message.into() } }
-    fn bad_gateway(e: impl std::fmt::Display) -> Self { Self { status: StatusCode::BAD_GATEWAY, message: e.to_string() } }
-    fn too_many(message: impl Into<String>) -> Self { Self { status: StatusCode::TOO_MANY_REQUESTS, message: message.into() } }
-    fn internal(e: impl std::fmt::Display) -> Self { Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: e.to_string() } }
+    fn bad_request(e: impl std::fmt::Display) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message: e.to_string(),
+        }
+    }
+    fn not_found(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            message: message.into(),
+        }
+    }
+    fn conflict(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message: message.into(),
+        }
+    }
+    fn bad_gateway(e: impl std::fmt::Display) -> Self {
+        Self {
+            status: StatusCode::BAD_GATEWAY,
+            message: e.to_string(),
+        }
+    }
+    fn too_many(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::TOO_MANY_REQUESTS,
+            message: message.into(),
+        }
+    }
+    fn internal(e: impl std::fmt::Display) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: e.to_string(),
+        }
+    }
 }
 
 impl IntoResponse for ApiError {
@@ -80,26 +116,46 @@ async fn api_auth(
     if presented.is_some_and(|v| constant_time_eq(v.as_bytes(), expected.as_bytes())) {
         next.run(request).await
     } else {
-        (StatusCode::UNAUTHORIZED, Json(json!({"error": "missing or invalid bearer token"}))).into_response()
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "missing or invalid bearer token"})),
+        )
+            .into_response()
     }
 }
 
-async fn deploy_agent(State(state): State<Arc<AppState>>, Json(req): Json<DeployAgentRequest>) -> ApiResult<(StatusCode, Json<crate::model::AgentRecord>)> {
+async fn deploy_agent(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<DeployAgentRequest>,
+) -> ApiResult<(StatusCode, Json<crate::model::AgentRecord>)> {
     if req.manifest.template.trim().is_empty() {
         return Err(ApiError::bad_request("manifest.template is required"));
     }
-    if req.manifest.egress_allow_hosts.iter().any(|h| h.trim().is_empty()) {
+    if req
+        .manifest
+        .egress_allow_hosts
+        .iter()
+        .any(|h| h.trim().is_empty())
+    {
         return Err(ApiError::bad_request("egress allow hosts may not be empty"));
     }
     if req.manifest.max_concurrent_sessions == Some(0) {
-        return Err(ApiError::bad_request("max_concurrent_sessions must be greater than zero"));
+        return Err(ApiError::bad_request(
+            "max_concurrent_sessions must be greater than zero",
+        ));
     }
     for credential in &req.manifest.credentials {
         if state.credentials.descriptor(credential).is_none() {
-            return Err(ApiError::bad_request(format!("credential '{credential}' is not configured on this Fabric host")));
+            return Err(ApiError::bad_request(format!(
+                "credential '{credential}' is not configured on this Fabric host"
+            )));
         }
     }
-    let record = state.store.deploy_agent(req).await.map_err(ApiError::bad_request)?;
+    let record = state
+        .store
+        .deploy_agent(req)
+        .await
+        .map_err(ApiError::bad_request)?;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -107,8 +163,16 @@ async fn list_agents(State(state): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({"items": state.store.list_agents().await}))
 }
 
-async fn get_agent(State(state): State<Arc<AppState>>, Path(name): Path<String>) -> ApiResult<Json<crate::model::AgentRecord>> {
-    state.store.get_agent(&name).await.map(Json).ok_or_else(|| ApiError::not_found("agent not found"))
+async fn get_agent(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Json<crate::model::AgentRecord>> {
+    state
+        .store
+        .get_agent(&name)
+        .await
+        .map(Json)
+        .ok_or_else(|| ApiError::not_found("agent not found"))
 }
 
 async fn create_session(
@@ -167,7 +231,12 @@ async fn create_session(
         let ttl = req.ttl_seconds.or(agent.manifest.ttl_seconds);
         let sandbox = state
             .fluxvm
-            .create_sandbox(name, &agent.manifest.template, ttl, agent.manifest.runtime_port)
+            .create_sandbox(
+                name,
+                &agent.manifest.template,
+                ttl,
+                agent.manifest.runtime_port,
+            )
             .await
             .map_err(ApiError::bad_gateway)?;
 
@@ -239,62 +308,177 @@ async fn create_session(
     Ok((StatusCode::CREATED, Json(updated.into())))
 }
 
-async fn provision_guest(state: &AppState, session: &SessionRecord, agent: &crate::model::AgentRecord, input: Value) -> Result<()> {
-    let bundle = state.store.agent_bundle(&agent.name, &agent.version).await?;
-    state.fluxvm.process(session.sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10)).await?;
-    state.fluxvm.fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755).await?;
-    state.fluxvm.fs_write(session.sandbox_id, "/opt/zyvor/agent/bundle.mjs", &bundle, 0o644).await?;
+async fn provision_guest(
+    state: &AppState,
+    session: &SessionRecord,
+    agent: &crate::model::AgentRecord,
+    input: Value,
+) -> Result<()> {
+    let bundle = state
+        .store
+        .agent_bundle(&agent.name, &agent.version)
+        .await?;
+    state
+        .fluxvm
+        .process(session.sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10))
+        .await?;
+    state
+        .fluxvm
+        .fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755)
+        .await?;
+    state
+        .fluxvm
+        .fs_write(
+            session.sandbox_id,
+            "/opt/zyvor/agent/bundle.mjs",
+            &bundle,
+            0o644,
+        )
+        .await?;
 
     let host = match state.config.egress_advertise_host.as_deref() {
         Some(v) => v.to_string(),
         None => state.fluxvm.default_gateway(session.sandbox_id).await?,
     };
-    let broker = format!("http://{}:{}", format_host(&host), state.config.egress_listen.port());
+    let broker = format!(
+        "http://{}:{}",
+        format_host(&host),
+        state.config.egress_listen.port()
+    );
     let command = format!(
         "mkdir -p /opt/zyvor/agent; ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()), shell_quote(&session.capability_token), shell_quote(&broker), agent.manifest.runtime_port
     );
-    state.fluxvm.process(session.sandbox_id, &command, Some(10)).await?;
+    state
+        .fluxvm
+        .process(session.sandbox_id, &command, Some(10))
+        .await?;
 
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
+    let deadline =
+        tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
     loop {
-        match state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::GET, "health", None).await {
+        match state
+            .fluxvm
+            .guest_request(
+                session.sandbox_id,
+                agent.manifest.runtime_port,
+                Method::GET,
+                "health",
+                None,
+            )
+            .await
+        {
             Ok(v) if v.get("ok").and_then(Value::as_bool) == Some(true) => break,
-            _ if tokio::time::Instant::now() < deadline => tokio::time::sleep(Duration::from_millis(200)).await,
+            _ if tokio::time::Instant::now() < deadline => {
+                tokio::time::sleep(Duration::from_millis(200)).await
+            }
             _ => anyhow::bail!("guest agent worker did not become ready before timeout"),
         }
     }
-    state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::POST, "run", Some(&json!({"input": input}))).await?;
+    state
+        .fluxvm
+        .guest_request(
+            session.sandbox_id,
+            agent.manifest.runtime_port,
+            Method::POST,
+            "run",
+            Some(&json!({"input": input})),
+        )
+        .await?;
     Ok(())
 }
 
 async fn list_sessions(State(state): State<Arc<AppState>>) -> Json<Value> {
-    let items: Vec<SessionView> = state.store.list_sessions().await.into_iter().map(Into::into).collect();
+    let items: Vec<SessionView> = state
+        .store
+        .list_sessions()
+        .await
+        .into_iter()
+        .map(Into::into)
+        .collect();
     Json(json!({"items": items}))
 }
 
-async fn get_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> ApiResult<Json<SessionView>> {
-    state.store.get_session(id).await.map(|v| Json(v.into())).ok_or_else(|| ApiError::not_found("session not found"))
+async fn get_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<SessionView>> {
+    state
+        .store
+        .get_session(id)
+        .await
+        .map(|v| Json(v.into()))
+        .ok_or_else(|| ApiError::not_found("session not found"))
 }
 
-async fn steer_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>, Json(req): Json<SteerRequest>) -> ApiResult<(StatusCode, Json<Value>)> {
+async fn steer_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<SteerRequest>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
     let session = require_session(&state, id).await?;
-    if session.status != SessionStatus::Running { return Err(ApiError::conflict("session is not running")); }
-    let agent = state.store.get_agent_version(&session.agent, &session.agent_version).await.map_err(ApiError::internal)?;
+    if session.status != SessionStatus::Running {
+        return Err(ApiError::conflict("session is not running"));
+    }
+    let agent = state
+        .store
+        .get_agent_version(&session.agent, &session.agent_version)
+        .await
+        .map_err(ApiError::internal)?;
     let message = req.message;
-    let value = state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::POST, "steer", Some(&json!({"message": message.clone()}))).await.map_err(ApiError::bad_gateway)?;
-    state.store.append_event(id, "session.steer.requested", message).await.map_err(ApiError::internal)?;
+    let value = state
+        .fluxvm
+        .guest_request(
+            session.sandbox_id,
+            agent.manifest.runtime_port,
+            Method::POST,
+            "steer",
+            Some(&json!({"message": message.clone()})),
+        )
+        .await
+        .map_err(ApiError::bad_gateway)?;
+    state
+        .store
+        .append_event(id, "session.steer.requested", message)
+        .await
+        .map_err(ApiError::internal)?;
     Ok((StatusCode::ACCEPTED, Json(value)))
 }
 
-async fn cancel_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> ApiResult<(StatusCode, Json<SessionView>)> {
+async fn cancel_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<(StatusCode, Json<SessionView>)> {
     let session = require_session(&state, id).await?;
-    if session.status.is_terminal() { return Err(ApiError::conflict("session is already terminal")); }
-    if let Ok(agent) = state.store.get_agent_version(&session.agent, &session.agent_version).await {
-        let _ = state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::POST, "cancel", Some(&json!({}))).await;
+    if session.status.is_terminal() {
+        return Err(ApiError::conflict("session is already terminal"));
     }
-    let updated = state.store.update_session(id, |s| s.status = SessionStatus::Cancelled).await.map_err(ApiError::internal)?;
-    state.store.append_event(id, "session.cancelled", json!({})).await.map_err(ApiError::internal)?;
+    if let Ok(agent) = state
+        .store
+        .get_agent_version(&session.agent, &session.agent_version)
+        .await
+    {
+        let _ = state
+            .fluxvm
+            .guest_request(
+                session.sandbox_id,
+                agent.manifest.runtime_port,
+                Method::POST,
+                "cancel",
+                Some(&json!({})),
+            )
+            .await;
+    }
+    let updated = state
+        .store
+        .update_session(id, |s| s.status = SessionStatus::Cancelled)
+        .await
+        .map_err(ApiError::internal)?;
+    state
+        .store
+        .append_event(id, "session.cancelled", json!({}))
+        .await
+        .map_err(ApiError::internal)?;
     Ok((StatusCode::ACCEPTED, Json(updated.into())))
 }
 
@@ -322,7 +506,9 @@ async fn hibernate_session_inner(state: &AppState, id: Uuid) -> ApiResult<Sessio
         .await
         .map_err(ApiError::internal)?;
     if transitioned.is_none() {
-        return Err(ApiError::conflict("session state changed while hibernating"));
+        return Err(ApiError::conflict(
+            "session state changed while hibernating",
+        ));
     }
 
     let operation = async {
@@ -392,20 +578,50 @@ async fn hibernate_session_inner(state: &AppState, id: Uuid) -> ApiResult<Sessio
     Ok(updated.into())
 }
 
-async fn resume_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> ApiResult<Json<SessionView>> {
+async fn resume_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<SessionView>> {
     let session = require_session(&state, id).await?;
-    if session.status != SessionStatus::Hibernated { return Err(ApiError::conflict("session is not hibernated")); }
-    state.fluxvm.resume(session.sandbox_id).await.map_err(ApiError::bad_gateway)?;
-    let updated = state.store.update_session(id, |s| s.status = SessionStatus::Running).await.map_err(ApiError::internal)?;
-    state.store.append_event(id, "session.resumed", json!({})).await.map_err(ApiError::internal)?;
+    if session.status != SessionStatus::Hibernated {
+        return Err(ApiError::conflict("session is not hibernated"));
+    }
+    state
+        .fluxvm
+        .resume(session.sandbox_id)
+        .await
+        .map_err(ApiError::bad_gateway)?;
+    let updated = state
+        .store
+        .update_session(id, |s| s.status = SessionStatus::Running)
+        .await
+        .map_err(ApiError::internal)?;
+    state
+        .store
+        .append_event(id, "session.resumed", json!({}))
+        .await
+        .map_err(ApiError::internal)?;
     Ok(Json(updated.into()))
 }
 
-async fn delete_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> ApiResult<StatusCode> {
+async fn delete_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<StatusCode> {
     let session = require_session(&state, id).await?;
-    state.fluxvm.delete(session.sandbox_id).await.map_err(ApiError::bad_gateway)?;
-    let _ = state.store.update_session(id, |s| s.status = SessionStatus::Cancelled).await;
-    let _ = state.store.append_event(id, "session.deleted", json!({})).await;
+    state
+        .fluxvm
+        .delete(session.sandbox_id)
+        .await
+        .map_err(ApiError::bad_gateway)?;
+    let _ = state
+        .store
+        .update_session(id, |s| s.status = SessionStatus::Cancelled)
+        .await;
+    let _ = state
+        .store
+        .append_event(id, "session.deleted", json!({}))
+        .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -440,7 +656,11 @@ async fn stream_events(
 }
 
 async fn require_session(state: &AppState, id: Uuid) -> ApiResult<SessionRecord> {
-    state.store.get_session(id).await.ok_or_else(|| ApiError::not_found("session not found"))
+    state
+        .store
+        .get_session(id)
+        .await
+        .ok_or_else(|| ApiError::not_found("session not found"))
 }
 
 pub async fn sync_loop(state: Arc<AppState>) {
@@ -457,31 +677,91 @@ pub async fn sync_loop(state: Arc<AppState>) {
 }
 
 async fn sync_session(state: &AppState, session: SessionRecord) -> Result<()> {
-    let agent = state.store.get_agent_version(&session.agent, &session.agent_version).await?;
+    let agent = state
+        .store
+        .get_agent_version(&session.agent, &session.agent_version)
+        .await?;
     let path = format!("events?after={}", session.guest_event_cursor);
-    let value = state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::GET, &path, None).await?;
+    let value = state
+        .fluxvm
+        .guest_request(
+            session.sandbox_id,
+            agent.manifest.runtime_port,
+            Method::GET,
+            &path,
+            None,
+        )
+        .await?;
     let events: GuestEventsResponse = serde_json::from_value(value)?;
     let mut cursor = session.guest_event_cursor;
     for event in events.items {
-        if event.seq <= cursor { continue; }
+        if event.seq <= cursor {
+            continue;
+        }
         cursor = event.seq;
-        state.store.append_event(session.id, event.kind.clone(), event.data.clone()).await?;
+        state
+            .store
+            .append_event(session.id, event.kind.clone(), event.data.clone())
+            .await?;
         match event.kind.as_str() {
-            "session.result" => { state.store.update_session(session.id, |s| s.status = SessionStatus::Completed).await?; }
-            "session.failed" => {
-                let error = event.data.get("error").and_then(Value::as_str).map(str::to_string);
-                state.store.update_session(session.id, |s| { s.status = SessionStatus::Failed; s.error = error.clone(); }).await?;
+            "session.result" => {
+                state
+                    .store
+                    .update_session(session.id, |s| s.status = SessionStatus::Completed)
+                    .await?;
             }
-            "session.cancelled" => { state.store.update_session(session.id, |s| s.status = SessionStatus::Cancelled).await?; }
+            "session.failed" => {
+                let error = event
+                    .data
+                    .get("error")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                state
+                    .store
+                    .update_session(session.id, |s| {
+                        s.status = SessionStatus::Failed;
+                        s.error = error.clone();
+                    })
+                    .await?;
+            }
+            "session.cancelled" => {
+                state
+                    .store
+                    .update_session(session.id, |s| s.status = SessionStatus::Cancelled)
+                    .await?;
+            }
             _ => {}
         }
-        state.store.update_session(session.id, |s| s.guest_event_cursor = cursor).await?;
+        state
+            .store
+            .update_session(session.id, |s| s.guest_event_cursor = cursor)
+            .await?;
     }
-    if !state.store.get_session(session.id).await.is_some_and(|s| s.status.is_terminal()) {
-        let value = state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::GET, "status", None).await?;
+    if !state
+        .store
+        .get_session(session.id)
+        .await
+        .is_some_and(|s| s.status.is_terminal())
+    {
+        let value = state
+            .fluxvm
+            .guest_request(
+                session.sandbox_id,
+                agent.manifest.runtime_port,
+                Method::GET,
+                "status",
+                None,
+            )
+            .await?;
         let guest: GuestStatusResponse = serde_json::from_value(value)?;
         if guest.status == "failed" {
-            state.store.update_session(session.id, |s| { s.status = SessionStatus::Failed; s.error = guest.error.clone(); }).await?;
+            state
+                .store
+                .update_session(session.id, |s| {
+                    s.status = SessionStatus::Failed;
+                    s.error = guest.error.clone();
+                })
+                .await?;
         }
     }
     Ok(())
@@ -528,8 +808,10 @@ pub async fn auto_hibernate_loop(state: Arc<AppState>) {
                     None,
                 )
                 .await
-                .and_then(|value| serde_json::from_value::<GuestStatusResponse>(value).map_err(anyhow::Error::from))
-            {
+                .and_then(|value| {
+                    serde_json::from_value::<GuestStatusResponse>(value)
+                        .map_err(anyhow::Error::from)
+                }) {
                 Ok(guest) => guest,
                 Err(_) => continue,
             };
@@ -538,9 +820,13 @@ pub async fn auto_hibernate_loop(state: Arc<AppState>) {
             }
 
             match hibernate_session_inner(&state, session.id).await {
-                Ok(_) => tracing::info!(session = %session.id, idle_secs, "auto-hibernated waiting agent session"),
+                Ok(_) => {
+                    tracing::info!(session = %session.id, idle_secs, "auto-hibernated waiting agent session")
+                }
                 Err(error) if error.status == StatusCode::CONFLICT => {}
-                Err(error) => tracing::warn!(session = %session.id, error = %error.message, "auto-hibernate failed"),
+                Err(error) => {
+                    tracing::warn!(session = %session.id, error = %error.message, "auto-hibernate failed")
+                }
             }
         }
     }
@@ -548,7 +834,9 @@ pub async fn auto_hibernate_loop(state: Arc<AppState>) {
 
 fn validate_request_id(value: &str) -> ApiResult<()> {
     if value.len() > 128 {
-        return Err(ApiError::bad_request("request_id must be at most 128 bytes"));
+        return Err(ApiError::bad_request(
+            "request_id must be at most 128 bytes",
+        ));
     }
     if !value
         .bytes()
@@ -570,13 +858,21 @@ fn shell_quote(value: &str) -> String {
 }
 
 fn format_host(host: &str) -> String {
-    if host.contains(':') && !host.starts_with('[') { format!("[{host}]") } else { host.to_string() }
+    if host.contains(':') && !host.starts_with('[') {
+        format!("[{host}]")
+    } else {
+        host.to_string()
+    }
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() { return false; }
+    if a.len() != b.len() {
+        return false;
+    }
     let mut diff = 0u8;
-    for (&x, &y) in a.iter().zip(b) { diff |= x ^ y; }
+    for (&x, &y) in a.iter().zip(b) {
+        diff |= x ^ y;
+    }
     diff == 0
 }
 

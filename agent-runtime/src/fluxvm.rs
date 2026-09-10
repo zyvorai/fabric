@@ -44,7 +44,9 @@ impl FluxVm {
     }
 
     fn url(&self, path: &str) -> Result<Url> {
-        self.base.join(path).with_context(|| format!("joining FluxVM URL with {path}"))
+        self.base
+            .join(path)
+            .with_context(|| format!("joining FluxVM URL with {path}"))
     }
 
     fn auth(&self, b: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -54,7 +56,10 @@ impl FluxVm {
         }
     }
 
-    async fn parse<T: serde::de::DeserializeOwned>(&self, response: reqwest::Response) -> Result<T> {
+    async fn parse<T: serde::de::DeserializeOwned>(
+        &self,
+        response: reqwest::Response,
+    ) -> Result<T> {
         let status = response.status();
         let bytes = response.bytes().await?;
         if !status.is_success() {
@@ -62,7 +67,10 @@ impl FluxVm {
             bail!("FluxVM returned {status}: {detail}");
         }
         serde_json::from_slice(&bytes).with_context(|| {
-            format!("decoding FluxVM response: {}", String::from_utf8_lossy(&bytes))
+            format!(
+                "decoding FluxVM response: {}",
+                String::from_utf8_lossy(&bytes)
+            )
         })
     }
 
@@ -88,7 +96,10 @@ impl FluxVm {
 
     pub async fn fs_write(&self, id: Uuid, path: &str, bytes: &[u8], mode: u32) -> Result<()> {
         let response = self
-            .auth(self.http.post(self.url(&format!("/v1/sandboxes/{id}/fs/write"))?))
+            .auth(
+                self.http
+                    .post(self.url(&format!("/v1/sandboxes/{id}/fs/write"))?),
+            )
             .json(&json!({
                 "path": path,
                 "content_base64": base64::engine::general_purpose::STANDARD.encode(bytes),
@@ -100,9 +111,17 @@ impl FluxVm {
         Ok(())
     }
 
-    pub async fn process(&self, id: Uuid, command: &str, timeout_seconds: Option<u64>) -> Result<Value> {
+    pub async fn process(
+        &self,
+        id: Uuid,
+        command: &str,
+        timeout_seconds: Option<u64>,
+    ) -> Result<Value> {
         let response = self
-            .auth(self.http.post(self.url(&format!("/v1/sandboxes/{id}/process"))?))
+            .auth(
+                self.http
+                    .post(self.url(&format!("/v1/sandboxes/{id}/process"))?),
+            )
             .json(&json!({"command": command, "timeout_seconds": timeout_seconds}))
             .send()
             .await?;
@@ -147,7 +166,10 @@ impl FluxVm {
 
     pub async fn snapshot(&self, id: Uuid, path: &str) -> Result<()> {
         let response = self
-            .auth(self.http.post(self.url(&format!("/v1/sandboxes/{id}/snapshot"))?))
+            .auth(
+                self.http
+                    .post(self.url(&format!("/v1/sandboxes/{id}/snapshot"))?),
+            )
             .json(&json!({"path": path}))
             .send()
             .await?;
@@ -168,12 +190,21 @@ impl FluxVm {
 
     pub async fn default_gateway(&self, id: Uuid) -> Result<String> {
         let value = self
-            .process(id, "ip route show default | awk '{print $3; exit}'", Some(5))
+            .process(
+                id,
+                "ip route show default | awk '{print $3; exit}'",
+                Some(5),
+            )
             .await?;
         let stdout = value
             .get("stdout")
             .and_then(Value::as_str)
-            .or_else(|| value.get("data").and_then(|v| v.get("stdout")).and_then(Value::as_str))
+            .or_else(|| {
+                value
+                    .get("data")
+                    .and_then(|v| v.get("stdout"))
+                    .and_then(Value::as_str)
+            })
             .unwrap_or_default()
             .trim()
             .to_string();
