@@ -314,6 +314,23 @@ pub async fn apply_vm_spec(
     let vm_exists = matches!(state.store.get_vm(&spec.name), Ok(Some(_)));
 
     if !vm_exists {
+        // Reject before creating anything if this would exceed a tag-scoped
+        // quota. `VMSpec` has no `tenant` field today (unlike
+        // `ContainerGroupSpec`), so only tag-based quotas apply here.
+        super::quotas::check_quota_enforcement(
+            &state,
+            spec.resources.cpus,
+            memory_mb,
+            disk_gb,
+            &spec.tags,
+            None,
+            1,
+            0,
+            None,
+        )
+        .await
+        .map_err(|e| (StatusCode::FORBIDDEN, Json(json!({"error": e}))))?;
+
         // Create the VM
         let req = vm_model::CreateVMRequest {
             name: spec.name.clone(),
