@@ -15,10 +15,18 @@ spec:
         {{- include "zyvor-fabricd-operator.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "zyvor-fabricd-operator.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: operator
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         env:
         - name: ZYVOR_FABRICD_URL
           value: {{ (index .Values "zyvor-fabricd").url | quote }}
