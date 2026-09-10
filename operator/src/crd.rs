@@ -117,6 +117,10 @@ pub struct ContainerGroupSpec {
     /// on the fabric side for enforcement against the caller's JWT.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tenant: Option<String>,
+    /// Names of `kubernetes.io/dockerconfigjson` Secrets, already present in
+    /// the target namespace, to pull this group's images with.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub image_pull_secrets: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -208,6 +212,21 @@ mod container_group_tests {
         spec.tenant = Some("acme".to_string());
         let json = serde_json::to_value(&spec).unwrap();
         assert_eq!(json["tenant"], "acme");
+    }
+
+    #[test]
+    fn spec_image_pull_secrets_defaults_to_empty_and_is_omitted_from_json() {
+        let mut spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"containers": [{"name": "app", "image": "nginx:latest", "cpus": 1, "memory": "512M"}]}"#,
+        )
+        .unwrap();
+        assert!(spec.image_pull_secrets.is_empty());
+        let json = serde_json::to_value(&spec).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("image_pull_secrets"));
+
+        spec.image_pull_secrets = vec!["registry-creds".to_string()];
+        let json = serde_json::to_value(&spec).unwrap();
+        assert_eq!(json["image_pull_secrets"][0], "registry-creds");
     }
 
     #[test]

@@ -13,8 +13,8 @@ use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, HostPathVolumeSource, Pod, PodSpec, PodStatus, ResourceRequirements,
-    Toleration, Volume, VolumeMount as K8sVolumeMount,
+    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, Pod, PodSpec, PodStatus,
+    ResourceRequirements, Toleration, Volume, VolumeMount as K8sVolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -88,6 +88,11 @@ pub struct PodRequest {
     pub volumes: Vec<PodVolumeSource>,
     /// "Always" | "Never" | "OnFailure".
     pub restart_policy: String,
+    /// Names of `kubernetes.io/dockerconfigjson` Secrets (already present in
+    /// the target namespace — this client doesn't create them) to pull the
+    /// group's images with. Pod-level in the Kubernetes API, so it applies
+    /// to every container in the Pod, not per-container.
+    pub image_pull_secrets: Vec<String>,
 }
 
 pub struct PodStatusView {
@@ -250,6 +255,17 @@ fn build_pod(req: &PodRequest) -> Pod {
         )
     };
 
+    let image_pull_secrets = if req.image_pull_secrets.is_empty() {
+        None
+    } else {
+        Some(
+            req.image_pull_secrets
+                .iter()
+                .map(|name| LocalObjectReference { name: name.clone() })
+                .collect(),
+        )
+    };
+
     Pod {
         metadata: ObjectMeta {
             name: Some(req.name.clone()),
@@ -262,6 +278,7 @@ fn build_pod(req: &PodRequest) -> Pod {
             node_name: Some(req.node_name.clone()),
             runtime_class_name: Some(SECURE_CONTAINERS_RUNTIME_CLASS.to_string()),
             restart_policy: Some(req.restart_policy.clone()),
+            image_pull_secrets,
             tolerations: Some(vec![Toleration {
                 key: Some(SECURE_CONTAINERS_TAINT_KEY.to_string()),
                 operator: Some("Equal".to_string()),
@@ -308,6 +325,7 @@ mod tests {
                 host_path: "/srv/web".to_string(),
             }],
             restart_policy: "Always".to_string(),
+            image_pull_secrets: vec![],
         }
     }
 
@@ -368,5 +386,23 @@ mod tests {
         let spec = pod.spec.expect("pod spec");
         assert!(spec.volumes.is_none());
         assert!(spec.containers[0].volume_mounts.is_none());
+    }
+
+    #[test]
+    fn build_pod_omits_image_pull_secrets_when_none_are_requested() {
+        let pod = build_pod(&sample_request());
+        let spec = pod.spec.expect("pod spec");
+        assert!(spec.image_pull_secrets.is_none());
+    }
+
+    #[test]
+    fn build_pod_sets_image_pull_secrets_at_the_pod_level_when_requested() {
+        let mut req = sample_request();
+        req.image_pull_secrets = vec!["registry-creds".to_string(), "another-secret".to_string()];
+        let pod = build_pod(&req);
+        let spec = pod.spec.expect("pod spec");
+        let secrets = spec.image_pull_secrets.expect("image pull secrets");
+        let names: Vec<&str> = secrets.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, vec!["registry-creds", "another-secret"]);
     }
 }

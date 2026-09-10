@@ -85,6 +85,14 @@ pub struct ContainerGroupSpec {
     /// VM routes are scoped via `tenant_scope::vm_tenant`.
     #[serde(default)]
     pub tenant: Option<String>,
+    /// Names of `kubernetes.io/dockerconfigjson` Secrets, already present in
+    /// the target namespace, to pull this group's images with. Pod-level in
+    /// the Kubernetes API (applies to every container in the group), so it
+    /// lives here rather than on `ContainerSpec`. Fabric does not create or
+    /// manage these Secrets itself — provisioning them is the operator's job
+    /// (e.g. via a separate `kubectl create secret docker-registry`).
+    #[serde(default)]
+    pub image_pull_secrets: Vec<String>,
 }
 
 fn default_replicas() -> u32 {
@@ -190,6 +198,24 @@ fn err(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<serde_js
     (status, Json(json!({"error": msg.into()})))
 }
 
+/// Whether `name` is a valid Kubernetes object name (RFC 1123 DNS
+/// subdomain) — used for `image_pull_secrets` entries, which reference an
+/// existing `Secret` by name rather than one fabric itself validated at
+/// creation time the way `validate_vm_name` covers VM/ContainerGroup names.
+fn is_valid_k8s_object_name(name: &str) -> bool {
+    if name.is_empty() || name.len() > 253 {
+        return false;
+    }
+    let valid_chars = name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.');
+    let valid_ends = !name.starts_with('-')
+        && !name.ends_with('-')
+        && !name.starts_with('.')
+        && !name.ends_with('.');
+    valid_chars && valid_ends
+}
+
 fn validate_spec(spec: &ContainerGroupSpec) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
     crate::validation::validate_vm_name(&spec.name).map_err(|(s, m)| err(s, m))?;
 
@@ -222,6 +248,24 @@ fn validate_spec(spec: &ContainerGroupSpec) -> Result<(), (StatusCode, Json<serd
             StatusCode::BAD_REQUEST,
             "restart_policy must be one of Always, Never, OnFailure",
         ));
+    }
+    if spec.image_pull_secrets.len() > 16 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "image_pull_secrets count must not exceed 16",
+        ));
+    }
+    for secret_name in &spec.image_pull_secrets {
+        if !is_valid_k8s_object_name(secret_name) {
+            return Err(err(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "invalid image_pull_secrets entry '{secret_name}': must be a valid \
+                     Kubernetes object name (lowercase alphanumeric, '-' or '.', \
+                     1-253 characters, not starting or ending with '-' or '.')"
+                ),
+            ));
+        }
     }
 
     for c in &spec.containers {
@@ -316,6 +360,7 @@ pub(crate) fn build_pod_request(
         containers,
         volumes,
         restart_policy: spec.restart_policy.clone(),
+        image_pull_secrets: spec.image_pull_secrets.clone(),
     }
 }
 
@@ -638,5 +683,41 @@ mod tests {
         let previous = vec!["web-0".to_string(), "web-1".to_string()];
         let desired = vec!["web-0".to_string(), "web-1".to_string()];
         assert!(stale_pod_names(&previous, &desired).is_empty());
+    }
+
+    #[test]
+    fn container_group_spec_image_pull_secrets_defaults_to_empty_when_omitted() {
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"name": "web", "containers": [{"name": "app", "image": "nginx", "resources": {"cpus": 1, "memory": "512M"}}]}"#,
+        )
+        .unwrap();
+        assert!(spec.image_pull_secrets.is_empty());
+    }
+
+    #[test]
+    fn is_valid_k8s_object_name_accepts_typical_secret_names() {
+        assert!(is_valid_k8s_object_name("registry-creds"));
+        assert!(is_valid_k8s_object_name("my.registry.creds"));
+        assert!(is_valid_k8s_object_name("a"));
+    }
+
+    #[test]
+    fn is_valid_k8s_object_name_rejects_uppercase_underscores_and_bad_edges() {
+        assert!(!is_valid_k8s_object_name(""));
+        assert!(!is_valid_k8s_object_name("Registry-Creds"));
+        assert!(!is_valid_k8s_object_name("registry_creds"));
+        assert!(!is_valid_k8s_object_name("-registry-creds"));
+        assert!(!is_valid_k8s_object_name("registry-creds-"));
+        assert!(!is_valid_k8s_object_name(".registry"));
+    }
+
+    #[test]
+    fn validate_spec_rejects_an_invalid_image_pull_secret_name() {
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"name": "web", "image_pull_secrets": ["Bad_Name"], "containers": [{"name": "app", "image": "nginx", "resources": {"cpus": 1, "memory": "512M"}}]}"#,
+        )
+        .unwrap();
+        let result = validate_spec(&spec);
+        assert!(result.is_err());
     }
 }

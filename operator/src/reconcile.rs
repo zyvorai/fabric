@@ -151,6 +151,7 @@ pub async fn reconcile_container_group(
         "placement": cg.spec.placement,
         "restart_policy": cg.spec.restart_policy,
         "tenant": cg.spec.tenant,
+        "image_pull_secrets": cg.spec.image_pull_secrets,
     });
 
     let resp = with_auth(&ctx, ctx.http.post(&apply_url))
