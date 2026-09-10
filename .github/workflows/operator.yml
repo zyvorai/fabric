@@ -184,6 +184,7 @@ jobs:
             cpus: 1
             memory: 512
           EOF
+          STATE=""
           for i in $(seq 1 60); do
             STATE=$(kubectl get vm e2e-vm -o jsonpath='{.status.state}' 2>/dev/null || true)
             if [ -n "$STATE" ] && [ "$STATE" != "unknown" ]; then
@@ -193,7 +194,18 @@ jobs:
             sleep 2
           done
           kubectl get vm e2e-vm -o yaml
-          kubectl get vm e2e-vm -o jsonpath='{.status.state}' | grep -E 'running|unknown|.' 
+          if [ -z "$STATE" ] || [ "$STATE" = "unknown" ]; then
+            echo "::error::VirtualMachine e2e-vm never reported a status.state (last value: '${STATE:-<empty>}')"
+            exit 1
+          fi
+
+      - name: Diagnose reconcile failure
+        if: failure()
+        run: |
+          kubectl -n fabric-system get pods -o wide
+          kubectl -n fabric-system logs -l app.kubernetes.io/instance=fabric-op --all-containers --prefix --tail=500 || true
+          kubectl get vm e2e-vm -o yaml || true
+          kubectl get events -A --sort-by=.lastTimestamp || true
 
       - name: Delete VirtualMachine CR
         run: |
