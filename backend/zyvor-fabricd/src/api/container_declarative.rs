@@ -327,6 +327,20 @@ pub(crate) fn pod_name(group_name: &str, replicas: u32, index: u32) -> String {
     }
 }
 
+/// Pod names a previous apply created that the current desired set no
+/// longer wants — e.g. `replicas` went down, or dropped to 1 (renaming
+/// `group-0` to the bare `group`). Deliberately compares against the full
+/// *desired* set, not which creates actually succeeded this round: a
+/// transient failure to (re-)create a still-desired pod must not make it
+/// look stale and get deleted too.
+fn stale_pod_names(previous: &[String], desired: &[String]) -> Vec<String> {
+    previous
+        .iter()
+        .filter(|name| !desired.contains(name))
+        .cloned()
+        .collect()
+}
+
 /// POST /api/container-groups/apply — create/update a ContainerGroup:
 /// place it on a Secure-Containers-capable host, then create its Pod(s)
 /// there via the Kubernetes API.
@@ -351,6 +365,20 @@ pub async fn apply_container_group_spec(
         Ok(None)
     );
 
+    // Pods from a previous apply that a lower `replicas` (or any other spec
+    // change) no longer wants — collected now, before they're overwritten,
+    // so they can be deleted once the new desired set exists. Without this,
+    // scaling a group down (or deleting it entirely between two applies that
+    // race) leaked every dropped Pod forever: nothing ever revisited
+    // `ContainerGroupStatus.pod_names` from the *previous* apply.
+    let previous_pod_names: Vec<String> = state
+        .store
+        .get_entity::<ContainerGroupStatus>("container_group_status", &spec.name)
+        .ok()
+        .flatten()
+        .map(|status| status.pod_names)
+        .unwrap_or_default();
+
     let client = state.k8s_pod_client.clone().ok_or_else(|| {
         err(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -371,15 +399,25 @@ pub async fn apply_container_group_spec(
         err(StatusCode::BAD_REQUEST, e)
     })?;
 
+    let desired_pod_names: Vec<String> = (0..spec.replicas)
+        .map(|i| pod_name(&spec.name, spec.replicas, i))
+        .collect();
+
     let mut warnings = Vec::new();
     let mut created_pod_names = Vec::new();
 
-    for i in 0..spec.replicas {
-        let name = pod_name(&spec.name, spec.replicas, i);
-        let pod_req = build_pod_request(&spec, &name, &placed.hostname);
+    for name in &desired_pod_names {
+        let pod_req = build_pod_request(&spec, name, &placed.hostname);
         match client.create_pod(&pod_req).await {
-            Ok(_) => created_pod_names.push(name),
+            Ok(_) => created_pod_names.push(name.clone()),
             Err(e) => warnings.push(format!("failed to create pod '{name}': {e}")),
+        }
+    }
+
+    // Delete any Pod this apply no longer wants (e.g. `replicas` went down).
+    for stale in stale_pod_names(&previous_pod_names, &desired_pod_names) {
+        if let Err(e) = client.delete_pod(&stale).await {
+            warnings.push(format!("failed to delete stale pod '{stale}': {e}"));
         }
     }
 
@@ -566,5 +604,39 @@ mod tests {
     #[test]
     fn pod_name_is_suffixed_by_index_for_multiple_replicas() {
         assert_eq!(pod_name("web", 3, 2), "web-2");
+    }
+
+    #[test]
+    fn stale_pod_names_finds_pods_dropped_by_a_lower_replica_count() {
+        let previous = vec![
+            "web-0".to_string(),
+            "web-1".to_string(),
+            "web-2".to_string(),
+        ];
+        let desired = vec!["web-0".to_string()];
+        assert_eq!(
+            stale_pod_names(&previous, &desired),
+            vec!["web-1".to_string(), "web-2".to_string()]
+        );
+    }
+
+    #[test]
+    fn stale_pod_names_finds_the_renamed_pod_when_scaling_down_to_a_single_replica() {
+        // pod_name() drops the "-0" suffix once replicas == 1, so the old
+        // "web-0" is a different name than the new bare "web" and must be
+        // cleaned up even though the group logically still has "replica 0".
+        let previous = vec!["web-0".to_string()];
+        let desired = vec!["web".to_string()];
+        assert_eq!(
+            stale_pod_names(&previous, &desired),
+            vec!["web-0".to_string()]
+        );
+    }
+
+    #[test]
+    fn stale_pod_names_is_empty_when_nothing_was_dropped() {
+        let previous = vec!["web-0".to_string(), "web-1".to_string()];
+        let desired = vec!["web-0".to_string(), "web-1".to_string()];
+        assert!(stale_pod_names(&previous, &desired).is_empty());
     }
 }
