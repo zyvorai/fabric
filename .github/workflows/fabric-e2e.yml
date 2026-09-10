@@ -56,6 +56,14 @@ jobs:
                   self.send_header("Content-Length", str(len(body)))
                   self.end_headers()
                   self.wfile.write(body)
+              def do_DELETE(self):
+                  # BaseHTTPRequestHandler has no default DELETE handler --
+                  # without this, zyvor-fabricd's DELETE /api/vms/:name
+                  # sees a 501 from this stub, which its soft_miss allowlist
+                  # (routes.rs) doesn't recognize, so every VM-delete e2e
+                  # check fails even though the daemon side is fine.
+                  self.send_response(204)
+                  self.end_headers()
               def log_message(self, *args):
                   pass
           HTTPServer(("127.0.0.1", 7788), H).serve_forever()
