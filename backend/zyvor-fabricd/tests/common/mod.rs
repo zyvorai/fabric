@@ -23,6 +23,7 @@ async fn inject_admin_claims(
         role: security::Role::Admin,
         exp: usize::MAX,
         jti: String::new(),
+        tenant: None,
     });
     next.run(req).await
 }
@@ -41,6 +42,7 @@ pub async fn create_test_app() -> Router {
         daemon: DaemonConfig {
             listen: "127.0.0.1:0".to_string(),
             cors_origins: vec!["http://127.0.0.1:9095".to_string()],
+            public_url: None,
         },
         storage: StorageConfig {
             path: tmp_dir.to_string_lossy().to_string(),
@@ -51,6 +53,7 @@ pub async fn create_test_app() -> Router {
             bridge: "br-test".to_string(),
             networkd_config_dir: tmp_dir.join("networkd").to_string_lossy().to_string(),
             networkd_file_prefix: "50-zyvor-fabricd-".to_string(),
+            hubble_ui_url: None,
         },
         controller: ControllerConfig::default(),
         auth: AuthConfig {
@@ -62,6 +65,7 @@ pub async fn create_test_app() -> Router {
             enabled: false,
             ..TlsConfig::default()
         },
+        container_groups: zyvor_fabricd::config::ContainerGroupsConfig::default(),
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -108,6 +112,7 @@ pub async fn create_test_app() -> Router {
         },
         vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         shutdown: tokio_util::sync::CancellationToken::new(),
+        k8s_pod_client: None,
     });
 
     zyvor_fabricd::server::build_router(state).layer(middleware::from_fn(inject_admin_claims))
@@ -133,6 +138,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         daemon: DaemonConfig {
             listen: "127.0.0.1:0".to_string(),
             cors_origins: vec!["http://127.0.0.1:9095".to_string()],
+            public_url: None,
         },
         storage: StorageConfig {
             path: tmp_dir.to_string_lossy().to_string(),
@@ -143,6 +149,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
             bridge: "br-test".to_string(),
             networkd_config_dir: tmp_dir.join("networkd").to_string_lossy().to_string(),
             networkd_file_prefix: "50-zyvor-fabricd-".to_string(),
+            hubble_ui_url: None,
         },
         controller: ControllerConfig::default(),
         auth: AuthConfig {
@@ -154,6 +161,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
             enabled: false,
             ..TlsConfig::default()
         },
+        container_groups: zyvor_fabricd::config::ContainerGroupsConfig::default(),
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -200,6 +208,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         },
         vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         shutdown: tokio_util::sync::CancellationToken::new(),
+        k8s_pod_client: None,
     });
 
     // Create a role-specific middleware
@@ -211,6 +220,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
                 role,
                 exp: usize::MAX,
                 jti: String::new(),
+                tenant: None,
             });
             next.run(req).await
         }
