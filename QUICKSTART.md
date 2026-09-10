@@ -221,6 +221,8 @@ fabric/
 5. Check out the [Web UI](docs/web-ui.md)
 6. Review [Security](docs/security.md)
 7. Explore [Advanced Features](docs/advanced-features.md)
+8. Deploy durable, FluxVM-sandboxed TypeScript agents: [Agent Runtime Quickstart](docs/tutorials/11-agent-runtime-quickstart.md)
+9. Run Kubernetes-style Pod groups on FluxVM Secure Containers: [Container Groups](docs/container-groups.md)
 
 ## Troubleshooting
 

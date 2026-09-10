@@ -36,6 +36,12 @@ pub enum OutputFormat {
 #[derive(Parser)]
 #[command(name = "zyvorctl")]
 #[command(about = "zyvor-fabricd command-line interface", long_about = None)]
+// clap's --version auto-wiring needs the "cargo" feature (this workspace
+// doesn't enable it, backend/Cargo.toml:75) -- pass the version explicitly
+// via the plain `env!` std macro instead, which needs no clap feature.
+// Without this, --version doesn't exist at all ("unexpected argument"),
+// found live while validating this repo's first non-Ubuntu CI build.
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
