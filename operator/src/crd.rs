@@ -112,6 +112,11 @@ pub struct ContainerGroupSpec {
     pub placement: PlacementSpec,
     #[serde(default = "default_restart_policy")]
     pub restart_policy: String,
+    /// Owning tenant, forwarded verbatim to fabric's
+    /// `/api/container-groups/apply` — see `tenant_scope::apply_create_tenant`
+    /// on the fabric side for enforcement against the caller's JWT.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -188,6 +193,21 @@ mod container_group_tests {
         assert!(!spec.placement.auto_reschedule);
         assert!(spec.placement.node_hint.is_none());
         assert_eq!(spec.containers[0].image, "nginx:latest");
+        assert!(spec.tenant.is_none());
+    }
+
+    #[test]
+    fn spec_serializes_tenant_when_set_and_omits_it_when_absent() {
+        let mut spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"containers": [{"name": "app", "image": "nginx:latest", "cpus": 1, "memory": "512M"}]}"#,
+        )
+        .unwrap();
+        let json = serde_json::to_value(&spec).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("tenant"));
+
+        spec.tenant = Some("acme".to_string());
+        let json = serde_json::to_value(&spec).unwrap();
+        assert_eq!(json["tenant"], "acme");
     }
 
     #[test]

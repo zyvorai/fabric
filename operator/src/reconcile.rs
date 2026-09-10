@@ -150,6 +150,7 @@ pub async fn reconcile_container_group(
         "replicas": cg.spec.replicas,
         "placement": cg.spec.placement,
         "restart_policy": cg.spec.restart_policy,
+        "tenant": cg.spec.tenant,
     });
 
     let resp = with_auth(&ctx, ctx.http.post(&apply_url))
