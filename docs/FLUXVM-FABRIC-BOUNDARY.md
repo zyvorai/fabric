@@ -39,7 +39,9 @@ and the microVM it creates per Pod remain entirely FluxVM's mechanism,
 unchanged from the standalone `RuntimeClass fluxvm` path FluxVM already
 documents (`docs/secure-containers.md`, `docs/secure-containers-set3.md` in
 the fluxvm repo) — Fabric adds a placement/scheduling layer in front of it,
-it does not replace or re-implement it.
+it does not replace or re-implement it. For the fabric-side operator
+walkthrough (node setup → host registration → `ContainerGroup` apply →
+verification), see [container-groups.md](container-groups.md).
 
 ## Migration contract v1
 
