@@ -1098,6 +1098,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/vms/{name}/spec", get(api::declarative::export_vm_spec))
         // Declarative ContainerGroup spec (FluxVM Secure Containers)
         .route(
+            "/container-groups",
+            get(api::container_declarative::list_container_groups),
+        )
+        .route(
             "/container-groups/apply",
             post(api::container_declarative::apply_container_group_spec),
         )
