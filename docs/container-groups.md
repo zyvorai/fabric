@@ -5,7 +5,7 @@ setup on the FluxVM side, registering that host with Fabric, applying a
 `ContainerGroup` spec, and verifying it actually landed. See
 [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md) for how the two
 projects divide ownership of this workload, and the gap-analysis notes in
-this repo's PR history (#97-#107) for the full production-readiness list
+this repo's PR history (#97-#110) for the full production-readiness list
 this feature has worked through.
 
 `ContainerGroup` is still developer-preview: Secure Containers itself is

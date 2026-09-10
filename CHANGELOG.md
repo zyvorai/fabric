@@ -3,6 +3,22 @@
 ## Unreleased
 
 ### Added
+- **Agent Runtime** — standalone component (`agent-runtime/`, `sdk/agent-runtime/`)
+  for deploying durable TypeScript agent sessions, each in its own FluxVM
+  sandbox: immutable content-addressed agent deployments, durable event
+  journal with resumable SSE, mid-run steering/cancellation, checkpoint+pause
+  hibernation, a host-side egress broker that injects provider credentials
+  only after a request leaves the guest, idempotent session creation
+  (`request_id`), per-agent concurrency caps, safe waiting-only
+  auto-hibernation, method/path/port credential scopes, and single-use
+  prewarmed FluxVM pools for low-latency starts. See
+  [agent-runtime/README.md](agent-runtime/README.md).
+- **Container Groups** — Kubernetes-style Pod-group workload backed by
+  FluxVM Secure Containers: tenant scoping + audit trail, image pull
+  secrets, per-tenant namespace isolation, liveness/readiness probes,
+  Kubernetes NetworkPolicy, quota/billing wiring, hostPath backup/restore,
+  CRD/Helm packaging, `zyvorctl` CLI commands, and a web UI page. See
+  [docs/container-groups.md](docs/container-groups.md).
 - **Service Fabric remote-backend lifecycle v2** — weighted drain handoff
   (`POST …/remote-backends/…/drain`), optional `vip` multi-VIP Maglev match,
   inject Ready + active Draining remotes (expired drains skipped),
