@@ -163,6 +163,14 @@ jobs:
           kubectl -n fabric-system get deploy
           kubectl -n fabric-system rollout status deploy -l app.kubernetes.io/instance=fabric-op --timeout=180s
 
+      - name: Diagnose operator pod
+        if: failure()
+        run: |
+          kubectl -n fabric-system get pods -o wide
+          kubectl -n fabric-system describe pods -l app.kubernetes.io/instance=fabric-op
+          kubectl -n fabric-system logs -l app.kubernetes.io/instance=fabric-op --all-containers --prefix --tail=200 || true
+          kubectl -n fabric-system logs -l app.kubernetes.io/instance=fabric-op --all-containers --prefix --previous --tail=200 || true
+
       - name: Create VirtualMachine CR and wait for status
         run: |
           kubectl apply -f - <<'EOF'
