@@ -18,7 +18,7 @@ FROM rust:1.98-slim AS rust-builder
 
 WORKDIR /build
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     libpam0g-dev \
@@ -42,7 +42,7 @@ FROM debian:bookworm-slim
 #   calls). Only takes effect against the real host network when the
 #   container runs with network_mode: host -- see docker-compose.yml.
 # curl: container healthcheck.
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libpam0g \
     nftables \
