@@ -11,6 +11,7 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 | Marketing | `/`, `/product`, `/platform`, `/security` |
 | Sign-in | `/sign-in` (legacy `/login` redirects here) — two-step: username → **Continue** → password |
 | Console | `/app/*` (dashboard, VMs, network, storage, ops, …) |
+| Container Groups | `/app/container-groups` — FluxVM Secure Containers workloads; see [container-groups.md](container-groups.md) |
 
 ---
 

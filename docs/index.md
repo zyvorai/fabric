@@ -94,6 +94,12 @@ Detailed documentation for each major feature area.
 | VM Checkpoints | Create and restore in-memory checkpoints |
 | VM Forking | Fork a running VM for testing |
 
+### Container Workloads
+
+| Document | Description |
+|----------|-------------|
+| [Container Groups](container-groups.md) | Kubernetes-style Pod groups backed by FluxVM Secure Containers -- tenant scoping, image pull secrets, health probes, NetworkPolicy, quotas/billing, backup/restore |
+
 ### Storage
 
 | Document | Description |
@@ -459,6 +465,16 @@ The REST API is organized into the following endpoint groups:
 | `ZYVOR_FABRICD_BACKUP_DIR` | Override backup directory |
 | `ZYVOR_FABRICD_BACKUP_RETAIN` | Override backup retention count |
 | `ZYVOR_FABRICD_BACKUP_TYPE` | Override backup type |
+
+---
+
+## Agent Runtime
+
+Standalone component: durable, FluxVM-sandboxed TypeScript agent sessions with a host-side credential-injecting egress broker. Lives in `agent-runtime/` (Rust daemon), `sdk/agent-runtime/` (SDK + `fabric-agent` CLI), and `examples/agent-runtime/` — outside the `backend/` Cargo workspace, with no dependency on the `networking` crate chain.
+
+| Document | Description |
+|----------|-------------|
+| [agent-runtime/README.md](../agent-runtime/README.md) | Deploy/run, credentials, HTTP API, warm pools, safe auto-hibernation, security notes |
 
 ---
 

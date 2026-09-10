@@ -20,6 +20,8 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | **Enterprise identity** (SCIM 2.0) | [scim-identity.md](scim-identity.md) |
 | **OpenStack compatibility** (Keystone/Nova/…) | [openstack-compat.md](openstack-compat.md) · [Tutorial 08](tutorials/08-openstack-clients.md) |
 | **Host maintenance evacuation** | [host-lifecycle.md](host-lifecycle.md) |
+| **Container Groups** (FluxVM Secure Containers workloads) | [container-groups.md](container-groups.md) |
+| **Agent Runtime** (durable FluxVM-sandboxed agent sessions) | [agent-runtime/README.md](../agent-runtime/README.md) |
 | User page index | [user/PAGE_INDEX.md](user/PAGE_INDEX.md) |
 | Full documentation catalog | [index.md](index.md) |
 
