@@ -53,13 +53,20 @@ jobs:
           cd sdk/agent-runtime
           node --input-type=module - <<'NODE'
           import { build } from 'esbuild';
+          import { resolve } from 'node:path';
           const result = await build({
             entryPoints: ['../../examples/agent-runtime/agent.ts'],
             bundle: true,
             write: false,
             platform: 'node',
             format: 'esm',
-            target: 'node20'
+            target: 'node20',
+            // The example imports the SDK by its published package name, but
+            // this smoke build runs before that package is ever published --
+            // point esbuild at the local source so it resolves the same way
+            // a real agent project (with @zyvor/fabric-agent installed from
+            // npm) would.
+            alias: { '@zyvor/fabric-agent': resolve('src/index.js') }
           });
           if (!result.outputFiles?.[0]?.contents?.length) process.exit(1);
           console.log(`bundle bytes=${result.outputFiles[0].contents.length}`);
