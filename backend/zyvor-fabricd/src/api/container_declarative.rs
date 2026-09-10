@@ -216,6 +216,36 @@ fn is_valid_k8s_object_name(name: &str) -> bool {
     valid_chars && valid_ends
 }
 
+/// Whether `tenant` is safe to use as a Kubernetes *namespace* name
+/// component. Namespace names are DNS-1123 *labels* (max 63 characters,
+/// lowercase alphanumeric or `-`, no dots) — stricter than a generic
+/// object name, and unlike `image_pull_secrets` entries a tenant is
+/// combined with a prefix (`{base}-{tenant}`), so it's capped well short
+/// of 63 to leave the base namespace name room.
+fn is_valid_tenant_name(tenant: &str) -> bool {
+    if tenant.is_empty() || tenant.len() > 40 {
+        return false;
+    }
+    let valid_chars = tenant
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    valid_chars && !tenant.starts_with('-') && !tenant.ends_with('-')
+}
+
+/// The namespace a ContainerGroup's Pod(s) belong in: the shared default
+/// unless the group has a tenant *and* `namespace_per_tenant` is on, in
+/// which case each tenant gets its own `{namespace}-{tenant}` namespace
+/// (auto-created via `K8sPodClient::ensure_namespace` before first use) —
+/// real isolation instead of every tenant's Pods sharing one namespace.
+/// Returns `None` (use the client's own default) rather than a namespace
+/// name so callers don't need to duplicate the base-namespace lookup.
+pub(crate) fn container_group_namespace(state: &AppState, tenant: Option<&str>) -> Option<String> {
+    if !state.config.container_groups.namespace_per_tenant {
+        return None;
+    }
+    tenant.map(|t| format!("{}-{t}", state.config.container_groups.namespace))
+}
+
 fn validate_spec(spec: &ContainerGroupSpec) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
     crate::validation::validate_vm_name(&spec.name).map_err(|(s, m)| err(s, m))?;
 
@@ -402,6 +432,18 @@ pub async fn apply_container_group_spec(
 
     spec.tenant = crate::tenant_scope::apply_create_tenant(&claims, spec.tenant.clone())
         .map_err(|(s, m)| err(s, m))?;
+    if let Some(tenant) = spec.tenant.as_deref() {
+        if !is_valid_tenant_name(tenant) {
+            return Err(err(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "invalid tenant '{tenant}': must be 1-40 characters of lowercase \
+                     alphanumerics or '-', not starting or ending with '-' \
+                     (it becomes part of a Kubernetes namespace name)"
+                ),
+            ));
+        }
+    }
 
     let is_new = matches!(
         state
@@ -432,6 +474,14 @@ pub async fn apply_container_group_spec(
         )
     })?;
 
+    let namespace = container_group_namespace(&state, spec.tenant.as_deref());
+    if let Some(ns) = &namespace {
+        client
+            .ensure_namespace(ns)
+            .await
+            .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+
     let placed = container_placement::place_container_group(&state, &spec).map_err(|e| {
         record_container_group_event(
             &state,
@@ -453,7 +503,7 @@ pub async fn apply_container_group_spec(
 
     for name in &desired_pod_names {
         let pod_req = build_pod_request(&spec, name, &placed.hostname);
-        match client.create_pod(&pod_req).await {
+        match client.create_pod(&pod_req, namespace.as_deref()).await {
             Ok(_) => created_pod_names.push(name.clone()),
             Err(e) => warnings.push(format!("failed to create pod '{name}': {e}")),
         }
@@ -461,7 +511,7 @@ pub async fn apply_container_group_spec(
 
     // Delete any Pod this apply no longer wants (e.g. `replicas` went down).
     for stale in stale_pod_names(&previous_pod_names, &desired_pod_names) {
-        if let Err(e) = client.delete_pod(&stale).await {
+        if let Err(e) = client.delete_pod(&stale, namespace.as_deref()).await {
             warnings.push(format!("failed to delete stale pod '{stale}': {e}"));
         }
     }
@@ -546,6 +596,8 @@ pub async fn delete_container_group(
         .flatten()
         .and_then(|spec| spec.tenant);
 
+    let namespace = container_group_namespace(&state, tenant.as_deref());
+
     let status = state
         .store
         .get_entity::<ContainerGroupStatus>("container_group_status", &name)
@@ -554,7 +606,7 @@ pub async fn delete_container_group(
     if let Some(status) = status {
         if let Some(client) = state.k8s_pod_client.clone() {
             for pod in &status.pod_names {
-                if let Err(e) = client.delete_pod(pod).await {
+                if let Err(e) = client.delete_pod(pod, namespace.as_deref()).await {
                     tracing::warn!(
                         "failed to delete pod '{}' for ContainerGroup '{}': {}",
                         pod,
@@ -719,5 +771,30 @@ mod tests {
         .unwrap();
         let result = validate_spec(&spec);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn is_valid_tenant_name_accepts_typical_tenant_names() {
+        assert!(is_valid_tenant_name("acme"));
+        assert!(is_valid_tenant_name("acme-corp-2"));
+        assert!(is_valid_tenant_name("a"));
+    }
+
+    #[test]
+    fn is_valid_tenant_name_rejects_uppercase_underscores_dots_and_bad_edges() {
+        assert!(!is_valid_tenant_name(""));
+        assert!(!is_valid_tenant_name("Acme"));
+        assert!(!is_valid_tenant_name("acme_corp"));
+        assert!(!is_valid_tenant_name("acme.corp"));
+        assert!(!is_valid_tenant_name("-acme"));
+        assert!(!is_valid_tenant_name("acme-"));
+    }
+
+    #[test]
+    fn is_valid_tenant_name_rejects_names_over_40_characters() {
+        let too_long = "a".repeat(41);
+        assert!(!is_valid_tenant_name(&too_long));
+        let just_right = "a".repeat(40);
+        assert!(is_valid_tenant_name(&just_right));
     }
 }

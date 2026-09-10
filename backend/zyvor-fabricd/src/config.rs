@@ -38,6 +38,13 @@ pub struct ContainerGroupsConfig {
     pub kubeconfig_path: Option<String>,
     #[serde(default = "default_container_groups_namespace")]
     pub namespace: String,
+    /// When true (default), a ContainerGroup with a `tenant` is placed in a
+    /// dedicated namespace derived from it (`{namespace}-{tenant}`),
+    /// auto-created on first use, instead of landing in the single shared
+    /// `namespace` alongside every other tenant's Pods. Untenanted groups
+    /// always use the shared `namespace` regardless of this setting.
+    #[serde(default = "default_namespace_per_tenant")]
+    pub namespace_per_tenant: bool,
 }
 
 impl Default for ContainerGroupsConfig {
@@ -46,8 +53,13 @@ impl Default for ContainerGroupsConfig {
             enabled: false,
             kubeconfig_path: None,
             namespace: default_container_groups_namespace(),
+            namespace_per_tenant: default_namespace_per_tenant(),
         }
     }
+}
+
+fn default_namespace_per_tenant() -> bool {
+    true
 }
 
 fn default_container_groups_namespace() -> String {

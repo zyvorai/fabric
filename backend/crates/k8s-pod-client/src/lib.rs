@@ -13,8 +13,8 @@ use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, Pod, PodSpec, PodStatus,
-    ResourceRequirements, Toleration, Volume, VolumeMount as K8sVolumeMount,
+    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, Namespace, Pod, PodSpec,
+    PodStatus, ResourceRequirements, Toleration, Volume, VolumeMount as K8sVolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -104,7 +104,11 @@ pub struct PodStatusView {
 }
 
 pub struct K8sPodClient {
-    api: Api<Pod>,
+    client: Client,
+    /// Namespace used when a caller doesn't ask for a specific one — the
+    /// pre-multi-tenancy default, still what an untenanted ContainerGroup
+    /// lands in.
+    default_namespace: String,
 }
 
 impl K8sPodClient {
@@ -123,44 +127,81 @@ impl K8sPodClient {
                 .await
                 .context("constructing Kubernetes client from ambient context")?,
         };
-        let api = Api::namespaced(client, &config.namespace);
-        Ok(Self { api })
+        Ok(Self {
+            client,
+            default_namespace: config.namespace.clone(),
+        })
+    }
+
+    fn pods_in(&self, namespace: Option<&str>) -> Api<Pod> {
+        Api::namespaced(
+            self.client.clone(),
+            namespace.unwrap_or(&self.default_namespace),
+        )
+    }
+
+    /// Create the namespace if it doesn't already exist — real per-tenant
+    /// isolation means each tenant's namespace must actually exist before
+    /// their first `ContainerGroup` apply, not just be a config value fabric
+    /// assumes a cluster admin pre-created. A no-op (not an error) if it's
+    /// already there, so callers can call this unconditionally before every
+    /// apply.
+    pub async fn ensure_namespace(&self, namespace: &str) -> Result<()> {
+        let namespaces: Api<Namespace> = Api::all(self.client.clone());
+        if namespaces.get_opt(namespace).await?.is_some() {
+            return Ok(());
+        }
+        let ns = Namespace {
+            metadata: ObjectMeta {
+                name: Some(namespace.to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        match namespaces.create(&PostParams::default(), &ns).await {
+            Ok(_) => Ok(()),
+            // Lost a create race with a concurrent apply for the same
+            // tenant -- the namespace existing is all that matters here.
+            Err(kube::Error::Api(e)) if e.code == 409 => Ok(()),
+            Err(e) => Err(e).with_context(|| format!("creating namespace '{namespace}'")),
+        }
     }
 
     /// Create (or replace, via server-side apply) the Pod backing a
     /// ContainerGroup. Idempotent under the same field manager, so re-`apply`
-    /// of an unchanged spec is a no-op on the API server.
-    pub async fn create_pod(&self, req: &PodRequest) -> Result<Pod> {
+    /// of an unchanged spec is a no-op on the API server. `namespace: None`
+    /// uses the client's configured default (an untenanted group).
+    pub async fn create_pod(&self, req: &PodRequest, namespace: Option<&str>) -> Result<Pod> {
         let pod = build_pod(req);
         let pp = PatchParams::apply("zyvor-fabricd").force();
-        self.api
+        self.pods_in(namespace)
             .patch(&req.name, &pp, &kube::api::Patch::Apply(&pod))
             .await
             .with_context(|| format!("applying Pod '{}'", req.name))
     }
 
-    pub async fn delete_pod(&self, name: &str) -> Result<()> {
-        match self.api.delete(name, &DeleteParams::default()).await {
+    pub async fn delete_pod(&self, name: &str, namespace: Option<&str>) -> Result<()> {
+        match self
+            .pods_in(namespace)
+            .delete(name, &DeleteParams::default())
+            .await
+        {
             Ok(_) => Ok(()),
             Err(kube::Error::Api(e)) if e.code == 404 => Ok(()),
             Err(e) => Err(e).with_context(|| format!("deleting Pod '{name}'")),
         }
     }
 
-    pub async fn get_pod_status(&self, name: &str) -> Result<Option<PodStatusView>> {
-        match self.api.get_opt(name).await {
+    pub async fn get_pod_status(
+        &self,
+        name: &str,
+        namespace: Option<&str>,
+    ) -> Result<Option<PodStatusView>> {
+        match self.pods_in(namespace).get_opt(name).await {
             Ok(Some(pod)) => Ok(Some(to_status_view(&pod))),
             Ok(None) => Ok(None),
             Err(e) => Err(e).with_context(|| format!("getting Pod '{name}'")),
         }
-    }
-
-    /// Unused parameter reserved for a future create-if-missing variant;
-    /// kept out of `create_pod` itself so callers always get server-side
-    /// apply semantics.
-    #[allow(dead_code)]
-    fn _post_params() -> PostParams {
-        PostParams::default()
     }
 }
 
