@@ -818,6 +818,30 @@ pub async fn apply_container_group_spec(
     ))
 }
 
+/// GET /api/container-groups — list all ContainerGroup specs, scoped to the
+/// caller's tenant when their JWT carries one (mirrors
+/// `list_container_group_events`/`list_container_group_backups`).
+pub async fn list_container_groups(
+    RequireRead(claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<ContainerGroupSpec>>, (StatusCode, Json<serde_json::Value>)> {
+    tracing::debug!(
+        "container_declarative::{}",
+        stringify!(list_container_groups)
+    );
+    let mut groups: Vec<ContainerGroupSpec> = state
+        .store
+        .list_entities("container_groups")
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if let Some(tenant) = claims.tenant.as_deref() {
+        groups.retain(|g| g.tenant.as_deref() == Some(tenant));
+    }
+    groups.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(Json(groups))
+}
+
 /// GET /api/container-groups/:name/spec — export a ContainerGroup's stored spec.
 pub async fn export_container_group_spec(
     RequireRead(_claims): RequireRead,

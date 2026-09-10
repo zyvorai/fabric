@@ -159,6 +159,11 @@ enum Commands {
     /// FluxVM runtime contract (capabilities + native migration)
     #[command(subcommand)]
     Runtime(RuntimeCmd),
+
+    // ─── ContainerGroup (FluxVM Secure Containers) ──────────────────────
+    /// Manage ContainerGroup workloads (FluxVM Secure Containers)
+    #[command(subcommand)]
+    ContainerGroup(ContainerGroupCmd),
 }
 
 // ─── Sub-command enums ───────────────────────────────────────────────────────
@@ -692,6 +697,46 @@ enum RuntimeMigrateCmd {
     Cancel {
         name: String,
     },
+}
+
+#[derive(Subcommand)]
+enum ContainerGroupCmd {
+    /// List all ContainerGroups
+    List,
+    /// Show a ContainerGroup's stored spec
+    Info { name: String },
+    /// Apply a ContainerGroup spec from a JSON or YAML file
+    Apply {
+        /// Path to a JSON or YAML file with a ContainerGroupSpec (either the
+        /// bare spec, or `{"spec": {...}}`)
+        #[arg(short, long)]
+        file: String,
+    },
+    /// Delete a ContainerGroup
+    Delete { name: String },
+    /// List recent ContainerGroup audit events (create/apply/delete/quota/placement)
+    Events,
+    /// Manage backups of a ContainerGroup's hostPath volumes
+    #[command(subcommand)]
+    Backup(ContainerGroupBackupCmd),
+}
+
+#[derive(Subcommand)]
+enum ContainerGroupBackupCmd {
+    /// Tar+gzip a ContainerGroup's hostPath volumes into a new backup
+    Create {
+        container_group_name: String,
+        #[arg(long, default_value = "30")]
+        retention_days: u32,
+    },
+    /// List backups
+    List,
+    /// Show a backup's details
+    Info { id: String },
+    /// Delete a backup (and its archive file)
+    Delete { id: String },
+    /// Restore a backup back onto its original host paths
+    Restore { id: String },
 }
 
 // ─── Table row types ─────────────────────────────────────────────────────────
@@ -2048,8 +2093,152 @@ impl Cli {
                     }
                 },
             },
+
+            Commands::ContainerGroup(cmd) => match cmd {
+                ContainerGroupCmd::List => {
+                    let val = api_get(&client, "/container-groups").await?;
+                    print_value(&val, fmt);
+                }
+                ContainerGroupCmd::Info { name } => {
+                    let val = api_get(&client, &format!("/container-groups/{name}/spec")).await?;
+                    print_value(&val, fmt);
+                }
+                ContainerGroupCmd::Apply { file } => {
+                    let config = load_config_file(&file)?;
+                    let spec = config.get("spec").unwrap_or(&config);
+                    let val = api_post(&client, "/container-groups/apply", spec).await?;
+                    println!("Applied ContainerGroup successfully");
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
+                }
+                ContainerGroupCmd::Delete { name } => {
+                    api_delete(&client, &format!("/container-groups/{name}")).await?;
+                    println!("Deleted ContainerGroup '{name}'");
+                }
+                ContainerGroupCmd::Events => {
+                    let val = api_get(&client, "/container-group-events").await?;
+                    print_value(&val, fmt);
+                }
+                ContainerGroupCmd::Backup(cmd) => match cmd {
+                    ContainerGroupBackupCmd::Create {
+                        container_group_name,
+                        retention_days,
+                    } => {
+                        let body = serde_json::json!({
+                            "container_group_name": container_group_name,
+                            "retention_days": retention_days,
+                        });
+                        let val = api_post(&client, "/container-group-backups", &body).await?;
+                        println!("Created backup for ContainerGroup '{container_group_name}'");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    ContainerGroupBackupCmd::List => {
+                        let val = api_get(&client, "/container-group-backups").await?;
+                        print_value(&val, fmt);
+                    }
+                    ContainerGroupBackupCmd::Info { id } => {
+                        let val =
+                            api_get(&client, &format!("/container-group-backups/{id}")).await?;
+                        print_value(&val, fmt);
+                    }
+                    ContainerGroupBackupCmd::Delete { id } => {
+                        api_delete(&client, &format!("/container-group-backups/{id}")).await?;
+                        println!("Deleted backup '{id}'");
+                    }
+                    ContainerGroupBackupCmd::Restore { id } => {
+                        let val = api_post_empty(
+                            &client,
+                            &format!("/container-group-backups/{id}/restore"),
+                        )
+                        .await?;
+                        println!("Restored backup '{id}'");
+                        print_value(&val, fmt);
+                    }
+                },
+            },
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod container_group_cli_tests {
+    use super::*;
+
+    #[test]
+    fn container_group_list_parses() {
+        let cli = Cli::try_parse_from(["zyvorctl", "container-group", "list"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::ContainerGroup(ContainerGroupCmd::List)
+        ));
+    }
+
+    #[test]
+    fn container_group_apply_requires_a_file() {
+        assert!(Cli::try_parse_from(["zyvorctl", "container-group", "apply"]).is_err());
+        let cli =
+            Cli::try_parse_from(["zyvorctl", "container-group", "apply", "-f", "cg.yaml"]).unwrap();
+        match cli.command {
+            Commands::ContainerGroup(ContainerGroupCmd::Apply { file }) => {
+                assert_eq!(file, "cg.yaml");
+            }
+            _ => panic!("expected ContainerGroup::Apply"),
+        }
+    }
+
+    #[test]
+    fn container_group_delete_requires_a_name() {
+        assert!(Cli::try_parse_from(["zyvorctl", "container-group", "delete"]).is_err());
+        let cli = Cli::try_parse_from(["zyvorctl", "container-group", "delete", "web"]).unwrap();
+        match cli.command {
+            Commands::ContainerGroup(ContainerGroupCmd::Delete { name }) => {
+                assert_eq!(name, "web");
+            }
+            _ => panic!("expected ContainerGroup::Delete"),
+        }
+    }
+
+    #[test]
+    fn container_group_backup_create_defaults_retention_days_to_30() {
+        let cli = Cli::try_parse_from(["zyvorctl", "container-group", "backup", "create", "web"])
+            .unwrap();
+        match cli.command {
+            Commands::ContainerGroup(ContainerGroupCmd::Backup(
+                ContainerGroupBackupCmd::Create {
+                    container_group_name,
+                    retention_days,
+                },
+            )) => {
+                assert_eq!(container_group_name, "web");
+                assert_eq!(retention_days, 30);
+            }
+            _ => panic!("expected ContainerGroup::Backup::Create"),
+        }
+    }
+
+    #[test]
+    fn container_group_backup_restore_requires_an_id() {
+        assert!(Cli::try_parse_from(["zyvorctl", "container-group", "backup", "restore"]).is_err());
+        let cli = Cli::try_parse_from([
+            "zyvorctl",
+            "container-group",
+            "backup",
+            "restore",
+            "backup-1",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::ContainerGroup(ContainerGroupCmd::Backup(
+                ContainerGroupBackupCmd::Restore { id },
+            )) => {
+                assert_eq!(id, "backup-1");
+            }
+            _ => panic!("expected ContainerGroup::Backup::Restore"),
+        }
     }
 }
