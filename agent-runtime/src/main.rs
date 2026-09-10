@@ -4,7 +4,7 @@
 use anyhow::Result;
 use axum::{routing::post, Router};
 use tower_http::trace::TraceLayer;
-use zyvor_fabric_agent_runtime::{app, config::Config, egress, AppState};
+use zyvor_fabric_agent_runtime::{app, config::Config, egress, pool, AppState};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,7 +24,10 @@ async fn main() -> Result<()> {
         .layer(TraceLayer::new_for_http());
 
     tokio::spawn(app::sync_loop(state.clone()));
-    tokio::spawn(app::auto_hibernate_loop(state));
+    tokio::spawn(app::auto_hibernate_loop(state.clone()));
+    tokio::spawn(app::expiry_loop(state.clone()));
+    tokio::spawn(app::terminal_cleanup_loop(state.clone()));
+    tokio::spawn(pool::warm_pool_loop(state));
 
     let public_listener = tokio::net::TcpListener::bind(public_addr).await?;
     let egress_listener = tokio::net::TcpListener::bind(egress_addr).await?;

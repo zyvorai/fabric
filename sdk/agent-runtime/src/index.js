@@ -30,6 +30,8 @@ export class Fabric {
     this.agents = {
       list: async () => (await this.request("GET", "/v1/agents")).items,
       get: async (name) => this.request("GET", `/v1/agents/${encodeURIComponent(name)}`),
+      warmPool: async (name) => this.request("GET", `/v1/agents/${encodeURIComponent(name)}/warm-pool`),
+      reconcileWarmPool: async (name) => this.request("POST", `/v1/agents/${encodeURIComponent(name)}/warm-pool`, {}),
     };
   }
 
@@ -129,6 +131,7 @@ export class Session {
       if (event.kind === "session.result") return event.data;
       if (event.kind === "session.failed") throw new Error(event.data?.error || "agent session failed");
       if (event.kind === "session.cancelled") throw new Error("agent session cancelled");
+      if (event.kind === "session.expired") throw new Error("agent session expired");
     }
     const latest = await this.refresh();
     if (latest.status === "completed") return undefined;

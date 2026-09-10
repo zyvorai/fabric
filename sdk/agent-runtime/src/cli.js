@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 
 function usage(exitCode = 0) {
-  console.log(`fabric-agent deploy <agent.ts> --name <name> --template <fluxvm-template> [options]\n\nOptions:\n  --allow-host <host>       repeatable egress allow host\n  --credential <name>       repeatable host-side credential grant\n  --allow-private-network  permit brokered private/link-local destinations\n  --runtime-port <port>     guest worker port (default 8080)\n  --ttl <seconds>           default session TTL\n  --max-concurrency <n>     cap non-terminal sessions for this agent\n  --idle-hibernate <sec>    hibernate only while blocked in ctx.nextSteer()\n  --url <url>               Fabric Agent Runtime URL\n  --token <token>           Fabric Agent Runtime bearer token`);
+  console.log(`fabric-agent deploy <agent.ts> --name <name> --template <fluxvm-template> [options]\n\nOptions:\n  --allow-host <host>       repeatable egress allow host\n  --credential <name>       repeatable host-side credential grant\n  --allow-private-network  permit brokered private/link-local destinations\n  --runtime-port <port>     guest worker port (default 8080)\n  --ttl <seconds>           default session TTL\n  --max-concurrency <n>     cap non-terminal sessions for this agent\n  --idle-hibernate <sec>    hibernate only while blocked in ctx.nextSteer()\n  --warm-pool <n>           keep n single-use sandboxes prewarmed\n  --url <url>               Fabric Agent Runtime URL\n  --token <token>           Fabric Agent Runtime bearer token`);
   process.exit(exitCode);
 }
 
@@ -49,6 +49,7 @@ const response = await fetch(`${baseUrl}/v1/agents`, {
       ttl_seconds: flags.ttl ? Number(flags.ttl) : null,
       max_concurrent_sessions: flags.maxConcurrency ? Number(flags.maxConcurrency) : null,
       idle_hibernate_seconds: flags.idleHibernate ? Number(flags.idleHibernate) : null,
+      warm_pool_size: flags.warmPool ? Number(flags.warmPool) : 0,
     },
   }),
 });
@@ -80,6 +81,7 @@ function parseFlags(argv) {
       case "--ttl": out.ttl = value; break;
       case "--max-concurrency": out.maxConcurrency = value; break;
       case "--idle-hibernate": out.idleHibernate = value; break;
+      case "--warm-pool": out.warmPool = value; break;
       case "--url": out.url = value; break;
       case "--token": out.token = value; break;
       default: console.error(`unknown option: ${arg}`); usage(1);

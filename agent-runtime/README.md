@@ -21,6 +21,11 @@ Deploy JavaScript/TypeScript agents like serverless functions while giving every
 - automatic hibernation only at the safe `ctx.nextSteer()` waiting point
 - method/path/port scopes on host-side credentials
 - bounded-concurrency SDK fan-out with stable result ordering
+- single-use prewarmed FluxVM sandbox pools per immutable agent version
+- warm-pool health repair, stale-claim recovery and automatic replenishment
+- runtime-owned TTL expiry so warm sessions receive their full requested lifetime
+- `start_mode` + `startup_ms` observability for warm/cold launch measurement
+- per-session operation serialization for steer/hibernate/resume/cancel/delete/expiry
 
 The runtime is intentionally a standalone component in the Fabric repository. It consumes FluxVM's existing `/v1/sandboxes` API directly and does not alter the existing `zyvor-fabricd` VM API or backend workspace.
 
@@ -114,6 +119,10 @@ Configuration:
 | `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` | derived | host address visible from sandbox |
 | `ZYVOR_AGENT_SYNC_INTERVAL_MS` | `300` | guest event sync interval |
 | `ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS` | `1000` | scan interval for safe waiting-session auto-hibernate |
+| `ZYVOR_AGENT_WARM_POOL_RECONCILE_INTERVAL_MS` | `2000` | warm-pool health/replenishment interval |
+| `ZYVOR_AGENT_WARM_POOL_MAX_CREATE_PER_TICK` | `2` | cap new standby VMs per agent per reconcile pass |
+| `ZYVOR_AGENT_WARM_POOL_CLAIM_STALE_SECS` | `300` | clean abandoned durable pool claims after crashes |
+| `ZYVOR_AGENT_EXPIRY_SCAN_INTERVAL_MS` | `1000` | runtime-owned session TTL scan interval |
 
 The Agent Runtime refuses to start unless `ZYVOR_AGENT_API_TOKEN` is set, or `ZYVOR_AGENT_ALLOW_NO_AUTH=1` is set to explicitly opt out (only appropriate when something else already restricts access to the API, e.g. a local-only dev loopback bind). For production, also bind the public API behind TLS, firewall port 18082 so only sandbox networks can reach it, and use FluxVM's dataplane/network policy to restrict direct guest egress.
 
@@ -158,7 +167,8 @@ FABRIC_AGENT_URL=http://127.0.0.1:9096 \
   --credential anthropic \
   --allow-host api.anthropic.com \
   --max-concurrency 16 \
-  --idle-hibernate 60
+  --idle-hibernate 60 \
+  --warm-pool 4
 ```
 
 The deploy command uses esbuild to produce one Node 20 ESM bundle. The deployment version hashes both the executable bundle and its security manifest, so changing an egress/credential grant always creates a new immutable version.
@@ -193,6 +203,31 @@ Agents that want interactive steering can call:
 ```ts
 const message = await ctx.nextSteer({ timeoutMs: 30_000 });
 ```
+
+## Fast starts with single-use warm pools
+
+Set `warm_pool_size` on an agent deployment (or `--warm-pool <n>` in the CLI). Fabric continuously keeps that many clean FluxVM sandboxes booted, loads only the generic `worker.mjs`, and pauses them.
+
+When a session arrives, Fabric atomically claims the oldest compatible standby, resumes it, writes the immutable agent bundle, starts the worker, and permanently transfers ownership to that session. The VM is **never recycled** after agent code runs. This preserves the same clean-VM isolation model as a cold start.
+
+```ts
+const pool = await fabric.agents.warmPool("research-agent");
+console.log(pool.desired, pool.ready);
+
+await fabric.agents.reconcileWarmPool("research-agent");
+
+const session = await fabric.agent("research-agent").run(
+  { prompt: "Compare KVM and Firecracker" },
+  { ttl_seconds: 900, start_policy: "prefer-warm" }
+);
+console.log(session.start_mode, session.startup_ms); // warm / measured milliseconds
+```
+
+Warm-pool records are durable. Health checks first move a standby into an unclaimable `reconciling` lease, so reconciliation can never pause or delete a VM after a concurrent session has claimed it. After a runtime crash, reconciliation removes claims already owned by persisted sessions, deletes abandoned stale claims, drains old deployment versions, repairs accidentally running standby VMs back to paused, discards failed/missing VMs, and replenishes toward the configured target. Worker binaries are SHA-256 pinned so a runtime upgrade drains standbys carrying an older worker.
+
+Session admission supports `start_policy: "prefer-warm" | "require-warm" | "cold-only"`. `prefer-warm` is the default and falls back to a cold FluxVM create; `require-warm` returns a load/backpressure error instead of accepting a slow cold start; `cold-only` bypasses the pool for debugging and latency comparisons.
+
+Session TTL is enforced by the Agent Runtime from the session admission timestamp, not the standby VM creation timestamp. This is required for correct TTL behavior with prewarmed VMs. Expired sessions emit `session.expired`, destroy their FluxVM sandbox, and become terminal. Completed, failed, cancelled, and explicitly deleted sessions also release their single-use sandbox; `sandbox_released` is persisted and a cleanup loop retries idempotent deletion after transient FluxVM failures.
 
 ## Reliable retries and fan-out
 
@@ -250,6 +285,8 @@ Port 443 is always allowed for HTTPS. Any other credential-bearing port must be 
 POST   /v1/agents
 GET    /v1/agents
 GET    /v1/agents/{name}
+GET    /v1/agents/{name}/warm-pool
+POST   /v1/agents/{name}/warm-pool   # trigger one reconcile pass
 
 POST   /v1/sessions
 GET    /v1/sessions
@@ -268,7 +305,7 @@ The events endpoint is SSE. Reconnecting with the last seen sequence number repl
 
 `hibernate` asks the guest worker to checkpoint its event boundary, creates a FluxVM memory+disk sandbox snapshot, and pauses the sandbox. `resume` resumes that same paused sandbox, preserving the JavaScript process stack and in-memory agent state.
 
-Session metadata and the host event journal survive Agent Runtime restarts. Exact mid-stack recovery after a **host/FluxVM process restart** additionally requires FluxVM to expose its existing sandbox `SnapshotLoad` primitive through REST; the current FluxVM API exposes snapshot save but not that load operation. This PR does not pretend cold restore is implemented when the upstream REST contract is not present.
+Session metadata, TTL deadlines, warm-pool claims and the host event journal survive Agent Runtime restarts. Exact mid-stack recovery after a **host/FluxVM process restart** additionally requires FluxVM to expose its existing sandbox `SnapshotLoad` primitive through REST; the current FluxVM API exposes snapshot save but not that load operation. This PR does not pretend cold restore is implemented when the upstream REST contract is not present.
 
 ## Security notes
 

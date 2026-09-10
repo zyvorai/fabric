@@ -74,6 +74,14 @@ impl FluxVm {
         })
     }
 
+    pub async fn get_sandbox(&self, id: Uuid) -> Result<SandboxRecord> {
+        let response = self
+            .auth(self.http.get(self.url(&format!("/v1/vms/{id}"))?))
+            .send()
+            .await?;
+        self.parse(response).await
+    }
+
     pub async fn create_sandbox(
         &self,
         name: String,
@@ -182,10 +190,11 @@ impl FluxVm {
             .auth(self.http.delete(self.url(&format!("/v1/vms/{id}"))?))
             .send()
             .await?;
-        if !response.status().is_success() {
-            bail!("FluxVM delete failed: {}", response.status());
+        let status = response.status();
+        if status.is_success() || status == reqwest::StatusCode::NOT_FOUND {
+            return Ok(());
         }
-        Ok(())
+        bail!("FluxVM delete failed: {status}")
     }
 
     pub async fn default_gateway(&self, id: Uuid) -> Result<String> {

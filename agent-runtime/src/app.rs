@@ -4,9 +4,10 @@
 use crate::{
     model::{
         CreateSessionRequest, DeployAgentRequest, EventsQuery, GuestEventsResponse,
-        GuestStatusResponse, SessionRecord, SessionStatus, SessionView, SteerRequest,
+        GuestStatusResponse, SessionRecord, SessionStartMode, SessionStartPolicy, SessionStatus,
+        SessionView, SteerRequest, WarmPoolReconcileResult, WarmPoolView,
     },
-    AppState,
+    pool, AppState,
 };
 use anyhow::Result;
 use axum::{
@@ -26,7 +27,7 @@ use serde_json::{json, Value};
 use std::{convert::Infallible, sync::Arc, time::Duration};
 use uuid::Uuid;
 
-const WORKER: &[u8] = include_bytes!("worker.mjs");
+pub(crate) const WORKER: &[u8] = include_bytes!("worker.mjs");
 
 #[derive(Debug)]
 struct ApiError {
@@ -59,6 +60,12 @@ impl ApiError {
             message: e.to_string(),
         }
     }
+    fn unavailable(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            message: message.into(),
+        }
+    }
     fn too_many(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::TOO_MANY_REQUESTS,
@@ -85,6 +92,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
     let protected = Router::new()
         .route("/v1/agents", get(list_agents).post(deploy_agent))
         .route("/v1/agents/{name}", get(get_agent))
+        .route(
+            "/v1/agents/{name}/warm-pool",
+            get(get_warm_pool).post(reconcile_warm_pool),
+        )
         .route("/v1/sessions", get(list_sessions).post(create_session))
         .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
         .route("/v1/sessions/{id}/steer", post(steer_session))
@@ -144,6 +155,9 @@ async fn deploy_agent(
             "max_concurrent_sessions must be greater than zero",
         ));
     }
+    if req.manifest.warm_pool_size > 64 {
+        return Err(ApiError::bad_request("warm_pool_size may not exceed 64"));
+    }
     for credential in &req.manifest.credentials {
         if state.credentials.descriptor(credential).is_none() {
             return Err(ApiError::bad_request(format!(
@@ -156,6 +170,15 @@ async fn deploy_agent(
         .deploy_agent(req)
         .await
         .map_err(ApiError::bad_request)?;
+    if record.manifest.warm_pool_size > 0 {
+        let pool_state = state.clone();
+        let agent_name = record.name.clone();
+        tokio::spawn(async move {
+            if let Err(error) = pool::reconcile_agent(&pool_state, &agent_name).await {
+                tracing::warn!(agent = %agent_name, %error, "initial warm-pool reconciliation failed");
+            }
+        });
+    }
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -175,10 +198,38 @@ async fn get_agent(
         .ok_or_else(|| ApiError::not_found("agent not found"))
 }
 
+async fn get_warm_pool(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Json<WarmPoolView>> {
+    if state.store.get_agent(&name).await.is_none() {
+        return Err(ApiError::not_found("agent not found"));
+    }
+    pool::pool_view(&state, &name)
+        .await
+        .map(Json)
+        .map_err(ApiError::internal)
+}
+
+async fn reconcile_warm_pool(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Json<WarmPoolReconcileResult>> {
+    if state.store.get_agent(&name).await.is_none() {
+        return Err(ApiError::not_found("agent not found"));
+    }
+    pool::reconcile_agent(&state, &name)
+        .await
+        .map(Json)
+        .map_err(ApiError::bad_gateway)
+}
+
 async fn create_session(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateSessionRequest>,
 ) -> ApiResult<(StatusCode, Json<SessionView>)> {
+    let admission_started = std::time::Instant::now();
+    let admitted_at = Utc::now();
     let agent = state
         .store
         .get_agent(&req.agent)
@@ -194,11 +245,25 @@ async fn create_session(
     if let Some(value) = request_id.as_deref() {
         validate_request_id(value)?;
     }
+    let ttl = req.ttl_seconds.or(agent.manifest.ttl_seconds);
+    let start_policy = req.start_policy;
+    let expires_at = match ttl {
+        Some(seconds) => {
+            let seconds = i64::try_from(seconds)
+                .map_err(|_| ApiError::bad_request("ttl_seconds is too large"))?;
+            Some(
+                admitted_at
+                    .checked_add_signed(chrono::Duration::seconds(seconds))
+                    .ok_or_else(|| ApiError::bad_request("ttl_seconds is too large"))?,
+            )
+        }
+        None => None,
+    };
 
-    // Serialize only the reservation section. This closes both duplicate-VM
-    // races on caller retries and quota races; guest provisioning happens
-    // after the lock is released so slow boots don't block unrelated starts.
-    let (record, input) = {
+    // The lock protects idempotency, quota admission and single-use warm-pool
+    // claims. Warm starts only perform a cheap resume while locked; cold starts
+    // still preserve the existing duplicate-VM safety contract.
+    let (record, input, prewarmed, _session_guard) = {
         let _guard = state.session_create_lock.lock().await;
 
         if let Some(value) = request_id.as_deref() {
@@ -227,58 +292,198 @@ async fn create_session(
         }
 
         let id = Uuid::new_v4();
-        let name = format!("agent-{}", &id.simple().to_string()[..12]);
-        let ttl = req.ttl_seconds.or(agent.manifest.ttl_seconds);
-        let sandbox = state
-            .fluxvm
-            .create_sandbox(
-                name,
-                &agent.manifest.template,
-                ttl,
-                agent.manifest.runtime_port,
-            )
-            .await
-            .map_err(ApiError::bad_gateway)?;
+        // Reserve the per-session operation lock before the record becomes
+        // visible. Sync/expiry/control requests can discover Creating state,
+        // but cannot race provisioning or overwrite its terminal transition.
+        let operation_guard = state.session_lock(id).lock_owned().await;
+        let worker_digest = pool::worker_digest_sha256();
+        let warm =
+            if agent.manifest.warm_pool_size > 0 && start_policy != SessionStartPolicy::ColdOnly {
+                state
+                    .store
+                    .claim_warm_sandbox(
+                        &agent.name,
+                        &agent.version,
+                        &worker_digest,
+                        agent.manifest.runtime_port,
+                        id,
+                    )
+                    .await
+                    .map_err(ApiError::internal)?
+            } else {
+                None
+            };
 
-        let now = Utc::now();
+        if warm.is_none() && start_policy == SessionStartPolicy::RequireWarm {
+            return Err(ApiError::too_many(format!(
+                "agent '{}' warm pool is exhausted; retry after replenishment",
+                agent.name
+            )));
+        }
+
+        let (sandbox_id, start_mode, prewarmed) = if let Some(warm) = warm {
+            match state.fluxvm.resume(warm.sandbox_id).await {
+                Ok(()) => (warm.sandbox_id, SessionStartMode::Warm, true),
+                Err(error) => {
+                    tracing::warn!(
+                        sandbox = %warm.sandbox_id,
+                        %error,
+                        "warm sandbox resume failed; falling back to cold start"
+                    );
+                    if let Err(cleanup_error) = pool::discard_claimed(&state, warm.sandbox_id).await
+                    {
+                        tracing::warn!(
+                            sandbox = %warm.sandbox_id,
+                            error = %cleanup_error,
+                            "failed to clean up unusable warm sandbox; durable claim retained"
+                        );
+                    }
+                    if start_policy == SessionStartPolicy::RequireWarm {
+                        return Err(ApiError::unavailable(
+                            "claimed warm sandbox could not resume; retry after pool replenishment",
+                        ));
+                    }
+                    let name = format!("agent-{}", &id.simple().to_string()[..12]);
+                    let sandbox = state
+                        .fluxvm
+                        .create_sandbox(
+                            name,
+                            &agent.manifest.template,
+                            None,
+                            agent.manifest.runtime_port,
+                        )
+                        .await
+                        .map_err(ApiError::bad_gateway)?;
+                    (sandbox.id, SessionStartMode::Cold, false)
+                }
+            }
+        } else {
+            let name = format!("agent-{}", &id.simple().to_string()[..12]);
+            let sandbox = state
+                .fluxvm
+                .create_sandbox(
+                    name,
+                    &agent.manifest.template,
+                    None,
+                    agent.manifest.runtime_port,
+                )
+                .await
+                .map_err(ApiError::bad_gateway)?;
+            (sandbox.id, SessionStartMode::Cold, false)
+        };
+
         let record = SessionRecord {
             id,
             agent: agent.name.clone(),
             agent_version: agent.version.clone(),
-            sandbox_id: sandbox.id,
+            sandbox_id,
             status: SessionStatus::Creating,
             input: req.input.clone(),
-            created_at: now,
-            updated_at: now,
+            created_at: admitted_at,
+            updated_at: Utc::now(),
             last_event_seq: 0,
             guest_event_cursor: 0,
             request_id: request_id.clone(),
+            start_policy,
+            start_mode,
+            startup_ms: None,
+            expires_at,
+            sandbox_released: false,
             capability_token: random_capability(),
             error: None,
         };
-        state
-            .store
-            .save_session(record.clone())
-            .await
-            .map_err(ApiError::internal)?;
-        state
+        if let Err(error) = state.store.save_session(record.clone()).await {
+            if prewarmed {
+                let _ = pool::discard_claimed(&state, sandbox_id).await;
+            } else {
+                let _ = state.fluxvm.delete(sandbox_id).await;
+            }
+            return Err(ApiError::internal(error));
+        }
+        if prewarmed {
+            // The session record is now the durable owner. Never return this VM
+            // to the pool, even if subsequent agent provisioning fails. If the
+            // pool-file write fails, continue: restart reconciliation can see
+            // the persisted Claiming record and the matching durable session.
+            if let Err(error) = state.store.forget_warm_sandbox(sandbox_id).await {
+                tracing::warn!(
+                    session = %id,
+                    sandbox = %sandbox_id,
+                    %error,
+                    "session owns warm sandbox but pool record cleanup was deferred"
+                );
+            }
+        }
+        if let Err(error) = state
             .store
             .append_event(
                 id,
                 "session.created",
                 json!({
-                    "sandbox_id": sandbox.id,
+                    "sandbox_id": sandbox_id,
                     "agent_version": agent.version.clone(),
                     "request_id": request_id.clone(),
+                    "start_policy": start_policy,
+                    "start_mode": start_mode,
+                    "expires_at": record.expires_at.as_ref(),
                 }),
             )
             .await
-            .map_err(ApiError::internal)?;
-        (record, req.input.clone())
+        {
+            // Admission is not complete until its first durable journal record
+            // exists. If persistence fails after VM allocation, fail closed and
+            // reclaim the single-use sandbox rather than leaving an invisible
+            // Creating session behind. State persistence itself is best effort
+            // here because the original error may be a storage failure.
+            let released = state.fluxvm.delete(sandbox_id).await.is_ok();
+            let message = format!("persisting session.created: {error:#}");
+            let _ = state
+                .store
+                .update_session(id, |s| {
+                    s.status = SessionStatus::Failed;
+                    s.sandbox_released = released;
+                    s.error = Some(message.clone());
+                })
+                .await;
+            return Err(ApiError::internal(error));
+        }
+        if prewarmed {
+            // This event is observability-only: the durable session.created
+            // record already contains start_mode=warm and owns the sandbox. A
+            // secondary journal failure must not turn a valid admission into
+            // an API error that the caller may retry and duplicate.
+            if let Err(error) = state
+                .store
+                .append_event(
+                    id,
+                    "session.warm-pool.claimed",
+                    json!({"sandbox_id": sandbox_id}),
+                )
+                .await
+            {
+                tracing::warn!(
+                    session = %id,
+                    sandbox = %sandbox_id,
+                    %error,
+                    "failed to journal warm-pool claim"
+                );
+            }
+        }
+        (record, req.input.clone(), prewarmed, operation_guard)
     };
 
-    if let Err(error) = provision_guest(&state, &record, &agent, input).await {
+    if let Err(error) = provision_guest(&state, &record, &agent, input, prewarmed).await {
         let message = format!("{error:#}");
+        // Journal the terminal event before setting terminal=true so an SSE
+        // consumer cannot observe the state transition and miss the reason.
+        let _ = state
+            .store
+            .append_event(
+                record.id,
+                "session.failed",
+                json!({"error": message.clone()}),
+            )
+            .await;
         let _ = state
             .store
             .update_session(record.id, |s| {
@@ -286,23 +491,30 @@ async fn create_session(
                 s.error = Some(message.clone());
             })
             .await;
-        let _ = state
-            .store
-            .append_event(record.id, "session.failed", json!({"error": message}))
-            .await;
+        if let Some(failed) = state.store.get_session(record.id).await {
+            let _ = try_release_sandbox(&state, &failed).await;
+        }
         return Err(ApiError::bad_gateway(
             "sandbox was created but agent runtime provisioning failed; inspect the session for details",
         ));
     }
 
+    let startup_ms = u64::try_from(admission_started.elapsed().as_millis()).unwrap_or(u64::MAX);
     let updated = state
         .store
-        .update_session(record.id, |s| s.status = SessionStatus::Running)
+        .update_session(record.id, |s| {
+            s.status = SessionStatus::Running;
+            s.startup_ms = Some(startup_ms);
+        })
         .await
         .map_err(ApiError::internal)?;
     state
         .store
-        .append_event(record.id, "session.running", json!({}))
+        .append_event(
+            record.id,
+            "session.running",
+            json!({"start_mode": updated.start_mode, "startup_ms": startup_ms}),
+        )
         .await
         .map_err(ApiError::internal)?;
     Ok((StatusCode::CREATED, Json(updated.into())))
@@ -313,19 +525,22 @@ async fn provision_guest(
     session: &SessionRecord,
     agent: &crate::model::AgentRecord,
     input: Value,
+    prewarmed: bool,
 ) -> Result<()> {
     let bundle = state
         .store
         .agent_bundle(&agent.name, &agent.version)
         .await?;
-    state
-        .fluxvm
-        .process(session.sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10))
-        .await?;
-    state
-        .fluxvm
-        .fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755)
-        .await?;
+    if !prewarmed {
+        state
+            .fluxvm
+            .process(session.sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10))
+            .await?;
+        state
+            .fluxvm
+            .fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755)
+            .await?;
+    }
     state
         .fluxvm
         .fs_write(
@@ -416,6 +631,8 @@ async fn steer_session(
     Path(id): Path<Uuid>,
     Json(req): Json<SteerRequest>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
+    let lock = state.session_lock(id);
+    let _guard = lock.lock().await;
     let session = require_session(&state, id).await?;
     if session.status != SessionStatus::Running {
         return Err(ApiError::conflict("session is not running"));
@@ -449,6 +666,8 @@ async fn cancel_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<(StatusCode, Json<SessionView>)> {
+    let lock = state.session_lock(id);
+    let _guard = lock.lock().await;
     let session = require_session(&state, id).await?;
     if session.status.is_terminal() {
         return Err(ApiError::conflict("session is already terminal"));
@@ -469,17 +688,21 @@ async fn cancel_session(
             )
             .await;
     }
-    let updated = state
-        .store
-        .update_session(id, |s| s.status = SessionStatus::Cancelled)
-        .await
-        .map_err(ApiError::internal)?;
+    // Persist the terminal event before the terminal state so an SSE client can
+    // never observe terminal=true and exit before the event reaches the journal.
     state
         .store
         .append_event(id, "session.cancelled", json!({}))
         .await
         .map_err(ApiError::internal)?;
-    Ok((StatusCode::ACCEPTED, Json(updated.into())))
+    let updated = state
+        .store
+        .update_session(id, |s| s.status = SessionStatus::Cancelled)
+        .await
+        .map_err(ApiError::internal)?;
+    let _ = try_release_sandbox(&state, &updated).await;
+    let latest = state.store.get_session(id).await.unwrap_or(updated);
+    Ok((StatusCode::ACCEPTED, Json(latest.into())))
 }
 
 async fn hibernate_session(
@@ -490,6 +713,8 @@ async fn hibernate_session(
 }
 
 async fn hibernate_session_inner(state: &AppState, id: Uuid) -> ApiResult<SessionView> {
+    let lock = state.session_lock(id);
+    let _guard = lock.lock().await;
     let session = require_session(state, id).await?;
     if session.status != SessionStatus::Running {
         return Err(ApiError::conflict("only running sessions can hibernate"));
@@ -582,6 +807,8 @@ async fn resume_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<SessionView>> {
+    let lock = state.session_lock(id);
+    let _guard = lock.lock().await;
     let session = require_session(&state, id).await?;
     if session.status != SessionStatus::Hibernated {
         return Err(ApiError::conflict("session is not hibernated"));
@@ -608,20 +835,29 @@ async fn delete_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    let lock = state.session_lock(id);
+    let _guard = lock.lock().await;
     let session = require_session(&state, id).await?;
     state
         .fluxvm
         .delete(session.sandbox_id)
         .await
         .map_err(ApiError::bad_gateway)?;
-    let _ = state
-        .store
-        .update_session(id, |s| s.status = SessionStatus::Cancelled)
-        .await;
-    let _ = state
+    state
         .store
         .append_event(id, "session.deleted", json!({}))
-        .await;
+        .await
+        .map_err(ApiError::internal)?;
+    state
+        .store
+        .update_session(id, |s| {
+            if !s.status.is_terminal() {
+                s.status = SessionStatus::Cancelled;
+            }
+            s.sandbox_released = true;
+        })
+        .await
+        .map_err(ApiError::internal)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -667,9 +903,29 @@ pub async fn sync_loop(state: Arc<AppState>) {
     let interval = Duration::from_millis(state.config.sync_interval_ms.max(50));
     loop {
         let sessions = state.store.active_sessions().await;
-        for session in sessions {
+        for candidate in sessions {
+            let lock = state.session_lock(candidate.id);
+            let _guard = lock.lock().await;
+            let Some(session) = state.store.get_session(candidate.id).await else {
+                continue;
+            };
+            if !matches!(
+                session.status,
+                SessionStatus::Creating | SessionStatus::Running
+            ) {
+                continue;
+            }
+            let session_id = session.id;
             if let Err(error) = sync_session(&state, session).await {
-                tracing::debug!(%error, "agent session sync skipped");
+                tracing::debug!(session = %session_id, %error, "agent session sync skipped");
+                continue;
+            }
+            if let Some(updated) = state.store.get_session(session_id).await {
+                if updated.status.is_terminal() && !updated.sandbox_released {
+                    if let Err(error) = try_release_sandbox(&state, &updated).await {
+                        tracing::debug!(session = %updated.id, %error, "terminal sandbox cleanup deferred");
+                    }
+                }
             }
         }
         tokio::time::sleep(interval).await;
@@ -755,6 +1011,14 @@ async fn sync_session(state: &AppState, session: SessionRecord) -> Result<()> {
             .await?;
         let guest: GuestStatusResponse = serde_json::from_value(value)?;
         if guest.status == "failed" {
+            let message = guest
+                .error
+                .clone()
+                .unwrap_or_else(|| "guest worker reported failure".to_string());
+            state
+                .store
+                .append_event(session.id, "session.failed", json!({"error": message}))
+                .await?;
             state
                 .store
                 .update_session(session.id, |s| {
@@ -827,6 +1091,116 @@ pub async fn auto_hibernate_loop(state: Arc<AppState>) {
                 Err(error) => {
                     tracing::warn!(session = %session.id, error = %error.message, "auto-hibernate failed")
                 }
+            }
+        }
+    }
+}
+
+pub async fn expiry_loop(state: Arc<AppState>) {
+    let interval = Duration::from_millis(state.config.expiry_scan_interval_ms.max(250));
+    loop {
+        tokio::time::sleep(interval).await;
+        let now = Utc::now();
+        for candidate in state.store.list_sessions().await {
+            if candidate.status.is_terminal()
+                || candidate
+                    .expires_at
+                    .as_ref()
+                    .is_none_or(|deadline| deadline > &now)
+            {
+                continue;
+            }
+            let lock = state.session_lock(candidate.id);
+            let _guard = lock.lock().await;
+            let session = match state.store.get_session(candidate.id).await {
+                Some(session) => session,
+                None => continue,
+            };
+            if session.status.is_terminal()
+                || session
+                    .expires_at
+                    .as_ref()
+                    .is_none_or(|deadline| deadline > &Utc::now())
+            {
+                continue;
+            }
+            if let Err(error) = state.fluxvm.delete(session.sandbox_id).await {
+                tracing::warn!(
+                    session = %session.id,
+                    sandbox = %session.sandbox_id,
+                    %error,
+                    "expired session sandbox delete failed; will retry"
+                );
+                continue;
+            }
+            if let Err(error) = state
+                .store
+                .append_event(
+                    session.id,
+                    "session.expired",
+                    json!({"expires_at": session.expires_at.as_ref()}),
+                )
+                .await
+            {
+                tracing::warn!(session = %session.id, %error, "failed to journal session expiry");
+                continue;
+            }
+            if let Err(error) = state
+                .store
+                .update_session(session.id, |s| {
+                    s.status = SessionStatus::Expired;
+                    s.sandbox_released = true;
+                })
+                .await
+            {
+                tracing::warn!(session = %session.id, %error, "failed to persist session expiry");
+                continue;
+            }
+            tracing::info!(session = %session.id, "expired agent session");
+        }
+    }
+}
+
+async fn try_release_sandbox(state: &AppState, session: &SessionRecord) -> Result<()> {
+    if session.sandbox_released {
+        return Ok(());
+    }
+    state.fluxvm.delete(session.sandbox_id).await?;
+    state
+        .store
+        .update_session(session.id, |s| s.sandbox_released = true)
+        .await?;
+    tracing::info!(
+        session = %session.id,
+        sandbox = %session.sandbox_id,
+        "released terminal agent sandbox"
+    );
+    Ok(())
+}
+
+pub async fn terminal_cleanup_loop(state: Arc<AppState>) {
+    let interval = Duration::from_millis(state.config.sync_interval_ms.max(250));
+    loop {
+        tokio::time::sleep(interval).await;
+        for candidate in state.store.list_sessions().await {
+            if !candidate.status.is_terminal() || candidate.sandbox_released {
+                continue;
+            }
+            let lock = state.session_lock(candidate.id);
+            let _guard = lock.lock().await;
+            let Some(session) = state.store.get_session(candidate.id).await else {
+                continue;
+            };
+            if !session.status.is_terminal() || session.sandbox_released {
+                continue;
+            }
+            if let Err(error) = try_release_sandbox(&state, &session).await {
+                tracing::warn!(
+                    session = %session.id,
+                    sandbox = %session.sandbox_id,
+                    %error,
+                    "terminal agent sandbox cleanup failed; will retry"
+                );
             }
         }
     }

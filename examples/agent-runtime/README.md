@@ -17,3 +17,7 @@ npm install
 ```
 
 `fanout.ts` shows retry-safe, bounded-concurrency multi-session orchestration with one stable `request_id` per target.
+
+## Warm-pool example
+
+Deploy the agent with `--warm-pool 4`, then run `warm-pool.ts` to inspect/reconcile the pool and start a TTL-bounded session while printing its `start_mode` and `startup_ms`.
