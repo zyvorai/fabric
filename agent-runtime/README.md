@@ -62,6 +62,18 @@ Provider secret values are never serialized into agent deployments, session reco
 
 Example FluxVM template name used below: `node22-agent`.
 
+**Known limitation:** `POST /v1/sandboxes` always creates a FluxVM
+`flux-vm`-backend sandbox (its own in-tree microVM hypervisor,
+`fluxvm-hypervisor`), regardless of what a template's `backend` field
+says. This backend is less mature than FluxVM's QEMU backend for
+general-purpose images: confirmed live (direct `fluxvm-hypervisor`
+invocation with serial output captured) that it hangs indefinitely
+bringing up a second vCPU (`--cpus 1` boots fine; `--cpus 2+` doesn't),
+and separately hangs during guest kernel boot at virtio-mmio device
+probe on at least one general-purpose Ubuntu+Node.js image. Until
+that's resolved, build and test your template image with `--cpus 1`
+first before assuming a real session will complete end to end.
+
 ## Credentials
 
 Create a **descriptor file**, not a secret file:
