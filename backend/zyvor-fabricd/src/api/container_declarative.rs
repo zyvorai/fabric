@@ -49,6 +49,47 @@ pub struct ContainerSpec {
     pub resources: ResourceSpec,
     #[serde(default)]
     pub volume_mounts: Vec<VolumeMount>,
+    /// Restarted by Kubernetes when this fails past `failure_threshold` —
+    /// without one, a hung/deadlocked container just keeps running forever.
+    #[serde(default)]
+    pub liveness_probe: Option<ProbeSpec>,
+    /// Taken out of Service/DNS rotation (but not restarted) while this
+    /// fails — lets a container signal "up but not ready yet" separately
+    /// from "should be killed".
+    #[serde(default)]
+    pub readiness_probe: Option<ProbeSpec>,
+}
+
+/// Mirrors `k8s_openapi::api::core::v1::Probe`'s tunables — the same knobs
+/// a Kubernetes manifest would expose, no fabric-specific defaults layered
+/// on top beyond what the Kubernetes API itself already defaults
+/// server-side when a field is left unset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProbeSpec {
+    #[serde(flatten)]
+    pub check: ProbeCheckSpec,
+    #[serde(default)]
+    pub initial_delay_secs: Option<u32>,
+    #[serde(default)]
+    pub period_secs: Option<u32>,
+    #[serde(default)]
+    pub timeout_secs: Option<u32>,
+    #[serde(default)]
+    pub success_threshold: Option<u32>,
+    #[serde(default)]
+    pub failure_threshold: Option<u32>,
+}
+
+/// What a probe actually checks. Covers the three most common Kubernetes
+/// probe mechanisms; gRPC probes are a natural follow-up if a customer
+/// asks for one, left out for a first version to keep the API surface
+/// small.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProbeCheckSpec {
+    Http { path: String, port: u16 },
+    Tcp { port: u16 },
+    Exec { command: Vec<String> },
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -331,8 +372,66 @@ fn validate_spec(spec: &ContainerGroupSpec) -> Result<(), (StatusCode, Json<serd
                 )
             })?;
         }
+        for (probe_name, probe) in [
+            ("liveness_probe", &c.liveness_probe),
+            ("readiness_probe", &c.readiness_probe),
+        ] {
+            if let Some(probe) = probe {
+                validate_probe(probe).map_err(|m| {
+                    err(
+                        StatusCode::BAD_REQUEST,
+                        format!("container '{}': {probe_name}: {m}", c.name),
+                    )
+                })?;
+            }
+        }
     }
     Ok(())
+}
+
+fn validate_probe(probe: &ProbeSpec) -> Result<(), String> {
+    match &probe.check {
+        ProbeCheckSpec::Http { path, port } => {
+            if !path.starts_with('/') {
+                return Err("http path must start with '/'".to_string());
+            }
+            if *port == 0 {
+                return Err("port must be between 1 and 65535".to_string());
+            }
+        }
+        ProbeCheckSpec::Tcp { port } => {
+            if *port == 0 {
+                return Err("port must be between 1 and 65535".to_string());
+            }
+        }
+        ProbeCheckSpec::Exec { command } => {
+            if command.is_empty() {
+                return Err("exec command must not be empty".to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_probe_request(probe: &ProbeSpec) -> k8s_pod_client::ProbeSpec {
+    let check = match &probe.check {
+        ProbeCheckSpec::Http { path, port } => k8s_pod_client::ProbeCheck::Http {
+            path: path.clone(),
+            port: *port,
+        },
+        ProbeCheckSpec::Tcp { port } => k8s_pod_client::ProbeCheck::Tcp { port: *port },
+        ProbeCheckSpec::Exec { command } => k8s_pod_client::ProbeCheck::Exec {
+            command: command.clone(),
+        },
+    };
+    k8s_pod_client::ProbeSpec {
+        check,
+        initial_delay_secs: probe.initial_delay_secs,
+        period_secs: probe.period_secs,
+        timeout_secs: probe.timeout_secs,
+        success_threshold: probe.success_threshold,
+        failure_threshold: probe.failure_threshold,
+    }
 }
 
 pub(crate) fn build_pod_request(
@@ -374,6 +473,8 @@ pub(crate) fn build_pod_request(
             cpu_millis: c.resources.cpus.saturating_mul(1000),
             memory_mb,
             volume_mounts,
+            liveness_probe: c.liveness_probe.as_ref().map(build_probe_request),
+            readiness_probe: c.readiness_probe.as_ref().map(build_probe_request),
         });
     }
 
@@ -796,5 +897,83 @@ mod tests {
         assert!(!is_valid_tenant_name(&too_long));
         let just_right = "a".repeat(40);
         assert!(is_valid_tenant_name(&just_right));
+    }
+
+    #[test]
+    fn probe_check_spec_deserializes_from_a_tagged_json_shape() {
+        let probe: ProbeSpec = serde_json::from_str(
+            r#"{"type": "http", "path": "/healthz", "port": 8080, "initial_delay_secs": 5}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            probe.check,
+            ProbeCheckSpec::Http { ref path, port } if path == "/healthz" && port == 8080
+        ));
+        assert_eq!(probe.initial_delay_secs, Some(5));
+    }
+
+    #[test]
+    fn container_spec_probes_default_to_none_when_omitted() {
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"name": "web", "containers": [{"name": "app", "image": "nginx", "resources": {"cpus": 1, "memory": "512M"}}]}"#,
+        )
+        .unwrap();
+        assert!(spec.containers[0].liveness_probe.is_none());
+        assert!(spec.containers[0].readiness_probe.is_none());
+    }
+
+    #[test]
+    fn validate_probe_rejects_an_http_path_without_a_leading_slash() {
+        let probe = ProbeSpec {
+            check: ProbeCheckSpec::Http {
+                path: "healthz".to_string(),
+                port: 8080,
+            },
+            initial_delay_secs: None,
+            period_secs: None,
+            timeout_secs: None,
+            success_threshold: None,
+            failure_threshold: None,
+        };
+        assert!(validate_probe(&probe).is_err());
+    }
+
+    #[test]
+    fn validate_probe_rejects_a_zero_tcp_port() {
+        let probe = ProbeSpec {
+            check: ProbeCheckSpec::Tcp { port: 0 },
+            initial_delay_secs: None,
+            period_secs: None,
+            timeout_secs: None,
+            success_threshold: None,
+            failure_threshold: None,
+        };
+        assert!(validate_probe(&probe).is_err());
+    }
+
+    #[test]
+    fn validate_probe_rejects_an_empty_exec_command() {
+        let probe = ProbeSpec {
+            check: ProbeCheckSpec::Exec { command: vec![] },
+            initial_delay_secs: None,
+            period_secs: None,
+            timeout_secs: None,
+            success_threshold: None,
+            failure_threshold: None,
+        };
+        assert!(validate_probe(&probe).is_err());
+    }
+
+    #[test]
+    fn validate_probe_accepts_a_well_formed_probe() {
+        let probe = ProbeSpec {
+            check: ProbeCheckSpec::Tcp { port: 5432 },
+            initial_delay_secs: Some(5),
+            period_secs: Some(10),
+            timeout_secs: None,
+            success_threshold: None,
+            failure_threshold: Some(3),
+        };
+        assert!(validate_probe(&probe).is_ok());
     }
 }
