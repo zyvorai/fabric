@@ -116,11 +116,7 @@ pub async fn reconcile_all(state: &AppState) -> Result<WarmPoolReconcileResult> 
                 && record.worker_digest_sha256 == worker_digest
         });
         if !keep {
-            let Some(reserved) = state
-                .store
-                .begin_warm_reconcile(record.sandbox_id)
-                .await?
-            else {
+            let Some(reserved) = state.store.begin_warm_reconcile(record.sandbox_id).await? else {
                 // A concurrent session owns this sandbox now.
                 continue;
             };
@@ -194,18 +190,16 @@ async fn reconcile_agent_locked(
             "paused" => {
                 state.store.finish_warm_reconcile(record.sandbox_id).await?;
             }
-            "running" => {
-                match state.fluxvm.pause(record.sandbox_id).await {
-                    Ok(()) => {
-                        state.store.finish_warm_reconcile(record.sandbox_id).await?;
-                        result.repaired += 1;
-                    }
-                    Err(_) => {
-                        delete_reserved(state, &record).await?;
-                        result.removed += 1;
-                    }
+            "running" => match state.fluxvm.pause(record.sandbox_id).await {
+                Ok(()) => {
+                    state.store.finish_warm_reconcile(record.sandbox_id).await?;
+                    result.repaired += 1;
                 }
-            }
+                Err(_) => {
+                    delete_reserved(state, &record).await?;
+                    result.removed += 1;
+                }
+            },
             _ => {
                 delete_reserved(state, &record).await?;
                 result.removed += 1;
@@ -239,11 +233,7 @@ async fn reconcile_agent_locked(
             .rev()
             .take(excess)
         {
-            let Some(reserved) = state
-                .store
-                .begin_warm_reconcile(record.sandbox_id)
-                .await?
-            else {
+            let Some(reserved) = state.store.begin_warm_reconcile(record.sandbox_id).await? else {
                 continue;
             };
             delete_reserved(state, &reserved).await?;

@@ -12,7 +12,10 @@ pub mod store;
 
 use crate::{config::Config, credentials::CredentialVault, fluxvm::FluxVm, store::Store};
 use anyhow::Result;
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use uuid::Uuid;
 
 pub struct AppState {

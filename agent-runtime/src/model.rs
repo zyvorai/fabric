@@ -101,7 +101,10 @@ pub enum SessionStatus {
 
 impl SessionStatus {
     pub fn is_terminal(self) -> bool {
-        matches!(self, Self::Completed | Self::Failed | Self::Cancelled | Self::Expired)
+        matches!(
+            self,
+            Self::Completed | Self::Failed | Self::Cancelled | Self::Expired
+        )
     }
 }
 

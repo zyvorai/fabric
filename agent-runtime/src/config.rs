@@ -58,10 +58,7 @@ impl Config {
                 "ZYVOR_AGENT_WARM_POOL_MAX_CREATE_PER_TICK",
                 "2",
             )?,
-            warm_pool_claim_stale_secs: env_parse(
-                "ZYVOR_AGENT_WARM_POOL_CLAIM_STALE_SECS",
-                "300",
-            )?,
+            warm_pool_claim_stale_secs: env_parse("ZYVOR_AGENT_WARM_POOL_CLAIM_STALE_SECS", "300")?,
             expiry_scan_interval_ms: env_parse("ZYVOR_AGENT_EXPIRY_SCAN_INTERVAL_MS", "1000")?,
         })
     }
