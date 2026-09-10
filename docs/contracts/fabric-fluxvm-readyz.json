@@ -32,7 +32,7 @@
       "ok_status": [200],
       "not_ready_status": [503],
       "required_fields": ["ok"],
-      "optional_fields": ["kvm", "state_dir", "dataplane"]
+      "optional_fields": ["kvm", "state_dir", "dataplane", "secure_containers"]
     }
   },
   "compose": {

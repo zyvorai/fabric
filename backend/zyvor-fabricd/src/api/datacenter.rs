@@ -415,6 +415,7 @@ pub async fn register_host(
         agent_version: req.agent_version,
         created_at: now,
         updated_at: now,
+        secure_containers_ready: req.secure_containers_ready,
     };
     match state.store.save_entity("hosts", &host.id, &host) {
         Ok(_) => (StatusCode::CREATED, Json(host)).into_response(),
@@ -578,6 +579,7 @@ pub async fn host_heartbeat(
     host.cpu_usage_pct = hb.cpu_usage_pct;
     host.memory_usage_pct = hb.memory_usage_pct;
     host.vm_count = hb.vm_count;
+    host.secure_containers_ready = hb.secure_containers_ready;
     host.last_heartbeat = Utc::now();
     host.updated_at = host.last_heartbeat;
     if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {

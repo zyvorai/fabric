@@ -95,6 +95,11 @@ pub struct HostInfo {
     pub agent_version: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Whether this host's containerd is configured with the FluxVM Secure
+    /// Containers runtime (`RuntimeClass fluxvm`) and can accept
+    /// `ContainerGroup` placement. Reported by the host agent on heartbeat.
+    #[serde(default)]
+    pub secure_containers_ready: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +123,8 @@ pub struct HostHeartbeat {
     pub memory_usage_pct: f64,
     pub vm_count: u32,
     pub uptime_secs: u64,
+    #[serde(default)]
+    pub secure_containers_ready: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +180,8 @@ pub struct RegisterHostRequest {
     pub cpus: u32,
     pub memory_mb: u64,
     pub agent_version: String,
+    #[serde(default)]
+    pub secure_containers_ready: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -503,6 +512,7 @@ impl DatacenterManager {
             agent_version: req.agent_version,
             created_at: now,
             updated_at: now,
+            secure_containers_ready: req.secure_containers_ready,
         };
 
         cluster.hosts.push(host.id.clone());
@@ -710,6 +720,7 @@ mod tests {
                 cpus: 32,
                 memory_mb: 131072,
                 agent_version: "0.1.0".into(),
+                secure_containers_ready: false,
             })
             .unwrap();
         (mgr, dc, cluster, host)
@@ -873,6 +884,7 @@ mod tests {
             cpus: 16,
             memory_mb: 65536,
             agent_version: "0.1.0".into(),
+            secure_containers_ready: false,
         })
         .unwrap();
         mgr.register_host(RegisterHostRequest {
@@ -882,6 +894,7 @@ mod tests {
             cpus: 8,
             memory_mb: 32768,
             agent_version: "0.1.0".into(),
+            secure_containers_ready: false,
         })
         .unwrap();
 
@@ -902,6 +915,7 @@ mod tests {
                 memory_usage_pct: 71.3,
                 vm_count: 12,
                 uptime_secs: 86400,
+                secure_containers_ready: false,
             },
         )
         .unwrap();
@@ -939,6 +953,7 @@ mod tests {
                 memory_usage_pct: 20.0,
                 vm_count: 5,
                 uptime_secs: 3600,
+                secure_containers_ready: false,
             },
         )
         .unwrap();
@@ -1032,6 +1047,7 @@ mod tests {
                     memory_usage_pct: 0.0,
                     vm_count: 0,
                     uptime_secs: 0,
+                    secure_containers_ready: false,
                 }
             )
             .is_err());

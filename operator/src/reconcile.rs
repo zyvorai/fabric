@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use crate::{
     controller::Context,
-    crd::{VirtualMachine, VirtualMachineStatus},
+    crd::{ContainerGroup, ContainerGroupStatus, VirtualMachine, VirtualMachineStatus},
     error::OperatorError,
 };
 
@@ -120,6 +120,77 @@ pub async fn reconcile(
 
 pub fn error_policy(
     _vm: Arc<VirtualMachine>,
+    _error: &OperatorError,
+    _ctx: Arc<Context>,
+) -> Action {
+    Action::requeue(Duration::from_secs(60))
+}
+
+/// Thin translator to fabric's `/api/container-groups/*` REST API — never
+/// creates a Pod directly (that's fabric's own placement + `k8s-pod-client`
+/// job), exactly like `reconcile()` above never calls FluxVM directly.
+/// Unlike VM's create-once dance, `apply_container_group_spec` is
+/// idempotent (server-side apply on the Pod objects it creates), so every
+/// reconcile tick just re-applies the current spec.
+pub async fn reconcile_container_group(
+    cg: Arc<ContainerGroup>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let name = cg.name_any();
+    let namespace = cg.namespace().unwrap_or_default();
+
+    tracing::info!("Reconciling ContainerGroup {}/{}", namespace, name);
+
+    let cg_api: Api<ContainerGroup> = Api::namespaced(ctx.client.clone(), &namespace);
+    let apply_url = format!("{}/api/container-groups/apply", ctx.zyvor_fabricd_url);
+
+    let apply_req = json!({
+        "name": name,
+        "containers": cg.spec.containers,
+        "replicas": cg.spec.replicas,
+        "placement": cg.spec.placement,
+        "restart_policy": cg.spec.restart_policy,
+    });
+
+    let resp = with_auth(&ctx, ctx.http.post(&apply_url))
+        .json(&apply_req)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        tracing::error!(
+            "Failed to apply ContainerGroup '{}': {:?}",
+            name,
+            resp.text().await
+        );
+        return Ok(Action::requeue(Duration::from_secs(30)));
+    }
+
+    let observed_state = "applied".to_string();
+    let mut observed_host: Option<String> = None;
+    if let Ok(body) = resp.json::<serde_json::Value>().await {
+        observed_host = body
+            .get("host_name")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+    }
+
+    let status = ContainerGroupStatus {
+        state: observed_state,
+        host_name: observed_host,
+    };
+
+    let patch = json!({ "status": status });
+    let ps = PatchParams::default();
+    let _patched = cg_api
+        .patch_status(&name, &ps, &Patch::Merge(&patch))
+        .await?;
+
+    Ok(Action::requeue(Duration::from_secs(300)))
+}
+
+pub fn error_policy_container_group(
+    _cg: Arc<ContainerGroup>,
     _error: &OperatorError,
     _ctx: Arc<Context>,
 ) -> Action {

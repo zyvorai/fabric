@@ -373,7 +373,7 @@ Same daemon port as Fabric (default **9095**). Catalog uses `daemon.public_url` 
 
 ## Build and Development
 
-- Cargo workspace (52 crates)
+- Cargo workspace (53 crates)
 - npm/Vite for web UI
 - GitHub Actions CI/CD
 - Automated builds, formatting checks, linting
