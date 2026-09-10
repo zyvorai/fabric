@@ -13,11 +13,13 @@ use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, Namespace, Pod, PodSpec,
-    PodStatus, ResourceRequirements, Toleration, Volume, VolumeMount as K8sVolumeMount,
+    Container, EnvVar, ExecAction, HTTPGetAction, HostPathVolumeSource, LocalObjectReference,
+    Namespace, Pod, PodSpec, PodStatus, Probe, ResourceRequirements, TCPSocketAction, Toleration,
+    Volume, VolumeMount as K8sVolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::api::{Api, DeleteParams, PatchParams, PostParams};
 use kube::config::{KubeConfigOptions, Kubeconfig};
 use kube::{Client, Config};
@@ -63,6 +65,29 @@ pub struct PodVolumeSource {
     pub host_path: String,
 }
 
+/// What a probe actually checks. Covers the three most common Kubernetes
+/// probe mechanisms; gRPC probes are a natural follow-up if a customer
+/// asks for one, deliberately left out for a first version to keep the
+/// fabric-facing API surface small.
+pub enum ProbeCheck {
+    Http { path: String, port: u16 },
+    Tcp { port: u16 },
+    Exec { command: Vec<String> },
+}
+
+/// Mirrors `k8s_openapi::api::core::v1::Probe`'s tunables directly — these
+/// are the same knobs `kubectl`/a Kubernetes manifest would expose, no
+/// fabric-specific defaults layered on top beyond what the Kubernetes API
+/// itself already defaults server-side when a field is left `None`.
+pub struct ProbeSpec {
+    pub check: ProbeCheck,
+    pub initial_delay_secs: Option<u32>,
+    pub period_secs: Option<u32>,
+    pub timeout_secs: Option<u32>,
+    pub success_threshold: Option<u32>,
+    pub failure_threshold: Option<u32>,
+}
+
 pub struct PodContainerSpec {
     pub name: String,
     pub image: String,
@@ -75,6 +100,8 @@ pub struct PodContainerSpec {
     pub cpu_millis: u32,
     pub memory_mb: u64,
     pub volume_mounts: Vec<PodVolumeMount>,
+    pub liveness_probe: Option<ProbeSpec>,
+    pub readiness_probe: Option<ProbeSpec>,
 }
 
 pub struct PodRequest {
@@ -216,6 +243,46 @@ fn to_status_view(pod: &Pod) -> PodStatusView {
     }
 }
 
+fn build_probe(spec: &ProbeSpec) -> Probe {
+    let (exec, http_get, tcp_socket) = match &spec.check {
+        ProbeCheck::Exec { command } => (
+            Some(ExecAction {
+                command: Some(command.clone()),
+            }),
+            None,
+            None,
+        ),
+        ProbeCheck::Http { path, port } => (
+            None,
+            Some(HTTPGetAction {
+                path: Some(path.clone()),
+                port: IntOrString::Int(*port as i32),
+                ..Default::default()
+            }),
+            None,
+        ),
+        ProbeCheck::Tcp { port } => (
+            None,
+            None,
+            Some(TCPSocketAction {
+                port: IntOrString::Int(*port as i32),
+                ..Default::default()
+            }),
+        ),
+    };
+    Probe {
+        exec,
+        http_get,
+        tcp_socket,
+        initial_delay_seconds: spec.initial_delay_secs.map(|v| v as i32),
+        period_seconds: spec.period_secs.map(|v| v as i32),
+        timeout_seconds: spec.timeout_secs.map(|v| v as i32),
+        success_threshold: spec.success_threshold.map(|v| v as i32),
+        failure_threshold: spec.failure_threshold.map(|v| v as i32),
+        ..Default::default()
+    }
+}
+
 fn build_pod(req: &PodRequest) -> Pod {
     let containers = req
         .containers
@@ -273,6 +340,8 @@ fn build_pod(req: &PodRequest) -> Pod {
                             .collect(),
                     )
                 },
+                liveness_probe: c.liveness_probe.as_ref().map(build_probe),
+                readiness_probe: c.readiness_probe.as_ref().map(build_probe),
                 ..Default::default()
             }
         })
@@ -360,6 +429,8 @@ mod tests {
                     mount_path: "/data".to_string(),
                     read_only: true,
                 }],
+                liveness_probe: None,
+                readiness_probe: None,
             }],
             volumes: vec![PodVolumeSource {
                 name: "app-vol-0".to_string(),
@@ -445,5 +516,90 @@ mod tests {
         let secrets = spec.image_pull_secrets.expect("image pull secrets");
         let names: Vec<&str> = secrets.iter().map(|s| s.name.as_str()).collect();
         assert_eq!(names, vec!["registry-creds", "another-secret"]);
+    }
+
+    #[test]
+    fn build_pod_omits_probes_when_none_are_requested() {
+        let pod = build_pod(&sample_request());
+        let spec = pod.spec.expect("pod spec");
+        assert!(spec.containers[0].liveness_probe.is_none());
+        assert!(spec.containers[0].readiness_probe.is_none());
+    }
+
+    #[test]
+    fn build_pod_sets_an_http_readiness_probe() {
+        let mut req = sample_request();
+        req.containers[0].readiness_probe = Some(ProbeSpec {
+            check: ProbeCheck::Http {
+                path: "/healthz".to_string(),
+                port: 8080,
+            },
+            initial_delay_secs: Some(5),
+            period_secs: Some(10),
+            timeout_secs: None,
+            success_threshold: None,
+            failure_threshold: Some(3),
+        });
+        let pod = build_pod(&req);
+        let spec = pod.spec.expect("pod spec");
+        let probe = spec.containers[0]
+            .readiness_probe
+            .as_ref()
+            .expect("readiness probe");
+        let http_get = probe.http_get.as_ref().expect("httpGet action");
+        assert_eq!(http_get.path.as_deref(), Some("/healthz"));
+        assert_eq!(http_get.port, IntOrString::Int(8080));
+        assert_eq!(probe.initial_delay_seconds, Some(5));
+        assert_eq!(probe.period_seconds, Some(10));
+        assert_eq!(probe.failure_threshold, Some(3));
+        assert!(probe.exec.is_none());
+        assert!(probe.tcp_socket.is_none());
+    }
+
+    #[test]
+    fn build_pod_sets_a_tcp_liveness_probe() {
+        let mut req = sample_request();
+        req.containers[0].liveness_probe = Some(ProbeSpec {
+            check: ProbeCheck::Tcp { port: 5432 },
+            initial_delay_secs: None,
+            period_secs: None,
+            timeout_secs: None,
+            success_threshold: None,
+            failure_threshold: None,
+        });
+        let pod = build_pod(&req);
+        let spec = pod.spec.expect("pod spec");
+        let probe = spec.containers[0]
+            .liveness_probe
+            .as_ref()
+            .expect("liveness probe");
+        let tcp = probe.tcp_socket.as_ref().expect("tcpSocket action");
+        assert_eq!(tcp.port, IntOrString::Int(5432));
+    }
+
+    #[test]
+    fn build_pod_sets_an_exec_probe() {
+        let mut req = sample_request();
+        req.containers[0].liveness_probe = Some(ProbeSpec {
+            check: ProbeCheck::Exec {
+                command: vec!["cat".to_string(), "/tmp/healthy".to_string()],
+            },
+            initial_delay_secs: None,
+            period_secs: None,
+            timeout_secs: None,
+            success_threshold: None,
+            failure_threshold: None,
+        });
+        let pod = build_pod(&req);
+        let spec = pod.spec.expect("pod spec");
+        let probe = spec.containers[0]
+            .liveness_probe
+            .as_ref()
+            .expect("liveness probe");
+        let exec = probe.exec.as_ref().expect("exec action");
+        assert_eq!(
+            exec.command.as_deref(),
+            Some(["cat".to_string(), "/tmp/healthy".to_string()].as_slice())
+        );
     }
 }

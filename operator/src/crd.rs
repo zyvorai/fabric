@@ -140,6 +140,36 @@ pub struct ContainerSpec {
     pub memory: String,
     #[serde(default)]
     pub volume_mounts: Vec<VolumeMountSpec>,
+    #[serde(default)]
+    pub liveness_probe: Option<ProbeSpec>,
+    #[serde(default)]
+    pub readiness_probe: Option<ProbeSpec>,
+}
+
+/// Mirrors fabric's `container_declarative::ProbeSpec` 1:1 — forwarded
+/// verbatim by `reconcile_container_group`, so the field shapes must match.
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+pub struct ProbeSpec {
+    #[serde(flatten)]
+    pub check: ProbeCheckSpec,
+    #[serde(default)]
+    pub initial_delay_secs: Option<u32>,
+    #[serde(default)]
+    pub period_secs: Option<u32>,
+    #[serde(default)]
+    pub timeout_secs: Option<u32>,
+    #[serde(default)]
+    pub success_threshold: Option<u32>,
+    #[serde(default)]
+    pub failure_threshold: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProbeCheckSpec {
+    Http { path: String, port: u16 },
+    Tcp { port: u16 },
+    Exec { command: Vec<String> },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -227,6 +257,26 @@ mod container_group_tests {
         spec.image_pull_secrets = vec!["registry-creds".to_string()];
         let json = serde_json::to_value(&spec).unwrap();
         assert_eq!(json["image_pull_secrets"][0], "registry-creds");
+    }
+
+    #[test]
+    fn container_spec_probes_default_to_none_and_deserialize_from_tagged_json() {
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"containers": [{"name": "app", "image": "nginx:latest", "cpus": 1, "memory": "512M"}]}"#,
+        )
+        .unwrap();
+        assert!(spec.containers[0].liveness_probe.is_none());
+        assert!(spec.containers[0].readiness_probe.is_none());
+
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"containers": [{"name": "app", "image": "nginx:latest", "cpus": 1, "memory": "512M",
+                "readiness_probe": {"type": "http", "path": "/healthz", "port": 8080}}]}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            spec.containers[0].readiness_probe.as_ref().unwrap().check,
+            ProbeCheckSpec::Http { ref path, port } if path == "/healthz" && port == 8080
+        ));
     }
 
     #[test]
