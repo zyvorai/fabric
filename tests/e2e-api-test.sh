@@ -226,7 +226,10 @@ api GET /api/migrations/nonexistent "" 404 "GET /api/migrations/:id (not found)"
 
 section "Images"
 api GET /api/images "" 200 "GET /api/images (list)"
-api GET /api/images/builds "" 200 "GET /api/images/builds (list)"
+# /api/images/builds never existed as a route (mkosi builds were removed --
+# see the doc comment on images.rs's job-state enum); /images/downloads is
+# the current equivalent job-listing endpoint (cloud-image downloads).
+api GET /api/images/downloads "" 200 "GET /api/images/downloads (list)"
 
 # ─── Plugins ──────────────────────────────────────────────────────────────────
 
