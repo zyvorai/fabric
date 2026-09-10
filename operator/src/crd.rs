@@ -121,6 +121,28 @@ pub struct ContainerGroupSpec {
     /// the target namespace, to pull this group's images with.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub image_pull_secrets: Vec<String>,
+    /// Kubernetes `NetworkPolicy` isolating this group's Pods, forwarded
+    /// verbatim like `tenant`/`image_pull_secrets`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network_policy: Option<NetworkPolicySpec>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
+pub struct NetworkPolicySpec {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ingress: Option<Vec<NetworkPolicyRuleSpec>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub egress: Option<Vec<NetworkPolicyRuleSpec>>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
+pub struct NetworkPolicyRuleSpec {
+    #[serde(default)]
+    pub from_container_groups: Vec<String>,
+    #[serde(default)]
+    pub from_cidrs: Vec<String>,
+    #[serde(default)]
+    pub ports: Vec<u16>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -277,6 +299,24 @@ mod container_group_tests {
             spec.containers[0].readiness_probe.as_ref().unwrap().check,
             ProbeCheckSpec::Http { ref path, port } if path == "/healthz" && port == 8080
         ));
+    }
+
+    #[test]
+    fn network_policy_defaults_to_none_and_deserializes_from_json() {
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"containers": [{"name": "app", "image": "nginx:latest", "cpus": 1, "memory": "512M"}]}"#,
+        )
+        .unwrap();
+        assert!(spec.network_policy.is_none());
+
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"containers": [{"name": "app", "image": "nginx:latest", "cpus": 1, "memory": "512M"}],
+                "network_policy": {"ingress": [{"from_container_groups": ["frontend"], "ports": [8080]}]}}"#,
+        )
+        .unwrap();
+        let ingress = spec.network_policy.unwrap().ingress.unwrap();
+        assert_eq!(ingress[0].from_container_groups, vec!["frontend".to_string()]);
+        assert_eq!(ingress[0].ports, vec![8080]);
     }
 
     #[test]
