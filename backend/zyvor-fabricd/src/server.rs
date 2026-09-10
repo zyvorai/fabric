@@ -3709,8 +3709,13 @@ async fn run_container_group_autohealer(state: Arc<AppState>) {
                 unresponsive_secs
             );
 
+            let namespace = crate::api::container_declarative::container_group_namespace(
+                &state,
+                spec.tenant.as_deref(),
+            );
+
             for pod in &status.pod_names {
-                if let Err(e) = client.delete_pod(pod).await {
+                if let Err(e) = client.delete_pod(pod, namespace.as_deref()).await {
                     tracing::warn!("failed to delete stale pod '{}': {}", pod, e);
                 }
             }
@@ -3728,6 +3733,18 @@ async fn run_container_group_autohealer(state: Arc<AppState>) {
                 }
             };
 
+            if let Some(ns) = &namespace {
+                if let Err(e) = client.ensure_namespace(ns).await {
+                    tracing::error!(
+                        "ContainerGroup '{}': failed to ensure namespace '{}': {}",
+                        spec.name,
+                        ns,
+                        e
+                    );
+                    continue;
+                }
+            }
+
             let mut new_pod_names = Vec::new();
             for i in 0..spec.replicas {
                 let name =
@@ -3737,7 +3754,7 @@ async fn run_container_group_autohealer(state: Arc<AppState>) {
                     &name,
                     &placed.hostname,
                 );
-                match client.create_pod(&pod_req).await {
+                match client.create_pod(&pod_req, namespace.as_deref()).await {
                     Ok(_) => new_pod_names.push(name),
                     Err(e) => tracing::error!("failed to recreate pod '{}': {}", name, e),
                 }
