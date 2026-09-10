@@ -18,6 +18,10 @@ pub struct Config {
     pub sync_interval_ms: u64,
     pub guest_start_timeout_secs: u64,
     pub idle_scan_interval_ms: u64,
+    pub warm_pool_reconcile_interval_ms: u64,
+    pub warm_pool_max_create_per_tick: usize,
+    pub warm_pool_claim_stale_secs: u64,
+    pub expiry_scan_interval_ms: u64,
 }
 
 impl Config {
@@ -46,6 +50,16 @@ impl Config {
             sync_interval_ms: env_parse("ZYVOR_AGENT_SYNC_INTERVAL_MS", "300")?,
             guest_start_timeout_secs: env_parse("ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS", "30")?,
             idle_scan_interval_ms: env_parse("ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS", "1000")?,
+            warm_pool_reconcile_interval_ms: env_parse(
+                "ZYVOR_AGENT_WARM_POOL_RECONCILE_INTERVAL_MS",
+                "2000",
+            )?,
+            warm_pool_max_create_per_tick: env_parse(
+                "ZYVOR_AGENT_WARM_POOL_MAX_CREATE_PER_TICK",
+                "2",
+            )?,
+            warm_pool_claim_stale_secs: env_parse("ZYVOR_AGENT_WARM_POOL_CLAIM_STALE_SECS", "300")?,
+            expiry_scan_interval_ms: env_parse("ZYVOR_AGENT_EXPIRY_SCAN_INTERVAL_MS", "1000")?,
         })
     }
 }

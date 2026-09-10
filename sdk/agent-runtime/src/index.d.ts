@@ -28,6 +28,7 @@ export interface CreateSessionRequest<TInput = unknown> {
   input?: TInput;
   ttl_seconds?: number;
   request_id?: string;
+  start_policy?: "prefer-warm" | "require-warm" | "cold-only";
 }
 
 export interface SessionEvent {
@@ -46,6 +47,11 @@ export declare class Session {
   status: string;
   last_event_seq: number;
   request_id?: string | null;
+  start_policy: "prefer-warm" | "require-warm" | "cold-only";
+  start_mode: "cold" | "warm";
+  startup_ms?: number | null;
+  expires_at?: string | null;
+  sandbox_released: boolean;
   refresh(): Promise<this>;
   steer(message: unknown): Promise<unknown>;
   hibernate(): Promise<this>;
@@ -58,7 +64,7 @@ export declare class Session {
 
 export declare class Fabric {
   constructor(options?: FabricOptions);
-  agent(name: string): { run(input?: unknown, options?: { ttl_seconds?: number; request_id?: string }): Promise<Session> };
+  agent(name: string): { run(input?: unknown, options?: { ttl_seconds?: number; request_id?: string; start_policy?: "prefer-warm" | "require-warm" | "cold-only" }): Promise<Session> };
   sessions: {
     create(request: CreateSessionRequest): Promise<Session>;
     createMany(requests: CreateSessionRequest[], options?: { concurrency?: number }): Promise<Session[]>;
@@ -68,5 +74,20 @@ export declare class Fabric {
   agents: {
     list(): Promise<unknown[]>;
     get(name: string): Promise<unknown>;
+    warmPool(name: string): Promise<{
+      agent: string;
+      agent_version: string;
+      desired: number;
+      ready: number;
+      reconciling: number;
+      claiming: number;
+      sandboxes: unknown[];
+    }>;
+    reconcileWarmPool(name: string): Promise<{
+      created: number;
+      removed: number;
+      repaired: number;
+      ready: number;
+    }>;
   };
 }

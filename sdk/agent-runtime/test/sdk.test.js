@@ -93,3 +93,53 @@ test("createMany rejects invalid concurrency", async () => {
   const client = new Fabric({ fetch: async () => { throw new Error("should not fetch"); } });
   await assert.rejects(() => client.sessions.createMany([], { concurrency: 0 }), /positive integer/);
 });
+
+test("warm-pool SDK endpoints are agent scoped", async () => {
+  const calls = [];
+  const client = new Fabric({
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        agent: "research", agent_version: "v3", desired: 4, ready: 4,
+        reconciling: 0, claiming: 0, sandboxes: [], created: 0, removed: 0, repaired: 0,
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    },
+  });
+  const pool = await client.agents.warmPool("research");
+  assert.equal(pool.ready, 4);
+  await client.agents.reconcileWarmPool("research");
+  assert.match(calls[0].url, /\/v1\/agents\/research\/warm-pool$/);
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(calls[1].init.method, "POST");
+});
+
+test("result surfaces TTL expiry distinctly", async () => {
+  const client = new Fabric({
+    fetch: async () => new Response("", { status: 500 }),
+  });
+  const { Session } = await import("../src/index.js");
+  const session = new Session(client, {
+    id: "expired", agent: "a", agent_version: "v", sandbox_id: "vm",
+    status: "running", last_event_seq: 0, start_mode: "warm",
+  });
+  session.events = async function* () {
+    yield { seq: 1, kind: "session.expired", data: {}, timestamp: new Date().toISOString() };
+  };
+  await assert.rejects(() => session.result(), /session expired/);
+});
+
+test("start_policy is forwarded for warm scheduling control", async () => {
+  let body;
+  const client = new Fabric({
+    fetch: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        id: "warm-required", agent: "research", agent_version: "v3", sandbox_id: "vm3",
+        status: "running", last_event_seq: 0, start_policy: body.start_policy, start_mode: "warm",
+      }), { status: 201, headers: { "content-type": "application/json" } });
+    },
+  });
+  const session = await client.agent("research").run({ prompt: "fast" }, { start_policy: "require-warm" });
+  assert.equal(body.start_policy, "require-warm");
+  assert.equal(session.start_policy, "require-warm");
+});

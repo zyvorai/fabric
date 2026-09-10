@@ -1,7 +1,10 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::model::{AgentRecord, DeployAgentRequest, SessionEvent, SessionRecord, SessionStatus};
+use crate::model::{
+    AgentRecord, DeployAgentRequest, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
+    WarmSandboxState,
+};
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use chrono::Utc;
@@ -21,6 +24,7 @@ pub struct Store {
     root: PathBuf,
     agents: RwLock<HashMap<String, AgentRecord>>,
     sessions: RwLock<HashMap<Uuid, SessionRecord>>,
+    warm_sandboxes: RwLock<HashMap<Uuid, WarmSandboxRecord>>,
 }
 
 impl Store {
@@ -33,6 +37,7 @@ impl Store {
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
+            warm_sandboxes: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -68,6 +73,18 @@ impl Store {
             }
         }
         *self.sessions.write().await = sessions;
+
+        let warm_path = self.root.join("warm-pools.json");
+        let warm_records = match fs::read(&warm_path).await {
+            Ok(raw) => serde_json::from_slice::<Vec<WarmSandboxRecord>>(&raw)
+                .context("decoding warm-pools.json")?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(e.into()),
+        };
+        *self.warm_sandboxes.write().await = warm_records
+            .into_iter()
+            .map(|record| (record.sandbox_id, record))
+            .collect();
         Ok(())
     }
 
@@ -320,12 +337,135 @@ impl Store {
         Ok(out)
     }
 
+    pub async fn list_warm_sandboxes(&self) -> Vec<WarmSandboxRecord> {
+        let mut out: Vec<_> = self.warm_sandboxes.read().await.values().cloned().collect();
+        out.sort_by_key(|a| a.created_at);
+        out
+    }
+
+    pub async fn list_warm_sandboxes_for(
+        &self,
+        agent: &str,
+        version: &str,
+    ) -> Vec<WarmSandboxRecord> {
+        let mut out: Vec<_> = self
+            .warm_sandboxes
+            .read()
+            .await
+            .values()
+            .filter(|record| record.agent == agent && record.agent_version == version)
+            .cloned()
+            .collect();
+        out.sort_by_key(|a| a.created_at);
+        out
+    }
+
+    pub async fn save_warm_sandbox(&self, record: WarmSandboxRecord) -> Result<()> {
+        let mut warm = self.warm_sandboxes.write().await;
+        warm.insert(record.sandbox_id, record);
+        self.persist_warm_sandboxes(&warm).await
+    }
+
+    /// Atomically reserve the oldest ready sandbox for one session. The
+    /// claiming record stays durable until the session record is persisted;
+    /// restart reconciliation can therefore distinguish an owned sandbox from
+    /// an abandoned claim.
+    pub async fn claim_warm_sandbox(
+        &self,
+        agent: &str,
+        version: &str,
+        worker_digest_sha256: &str,
+        runtime_port: u16,
+        session_id: Uuid,
+    ) -> Result<Option<WarmSandboxRecord>> {
+        let mut warm = self.warm_sandboxes.write().await;
+        let candidate = warm
+            .values()
+            .filter(|record| {
+                record.agent == agent
+                    && record.agent_version == version
+                    && record.worker_digest_sha256 == worker_digest_sha256
+                    && record.runtime_port == runtime_port
+                    && record.state == WarmSandboxState::Ready
+            })
+            .min_by_key(|record| record.created_at)
+            .map(|record| record.sandbox_id);
+        let Some(sandbox_id) = candidate else {
+            return Ok(None);
+        };
+        let record = warm
+            .get_mut(&sandbox_id)
+            .context("warm sandbox disappeared while claiming")?;
+        record.state = WarmSandboxState::Claiming;
+        record.claimed_by = Some(session_id);
+        record.updated_at = Utc::now();
+        let claimed = record.clone();
+        self.persist_warm_sandboxes(&warm).await?;
+        Ok(Some(claimed))
+    }
+
+    /// Atomically move a ready pool item into a transient reconciliation
+    /// state. Session claims only select `Ready`, so a health-check can
+    /// safely pause/delete the VM without racing a concurrent claim.
+    pub async fn begin_warm_reconcile(
+        &self,
+        sandbox_id: Uuid,
+    ) -> Result<Option<WarmSandboxRecord>> {
+        let mut warm = self.warm_sandboxes.write().await;
+        let Some(record) = warm.get_mut(&sandbox_id) else {
+            return Ok(None);
+        };
+        match record.state {
+            WarmSandboxState::Claiming => return Ok(None),
+            WarmSandboxState::Ready => {
+                record.state = WarmSandboxState::Reconciling;
+                record.updated_at = Utc::now();
+            }
+            WarmSandboxState::Reconciling => {}
+        }
+        let reserved = record.clone();
+        self.persist_warm_sandboxes(&warm).await?;
+        Ok(Some(reserved))
+    }
+
+    /// Return a health-checked pool item to the claimable state. A persisted
+    /// `Reconciling` record is also recovered this way after a process crash.
+    pub async fn finish_warm_reconcile(&self, sandbox_id: Uuid) -> Result<()> {
+        let mut warm = self.warm_sandboxes.write().await;
+        let record = warm
+            .get_mut(&sandbox_id)
+            .with_context(|| format!("warm sandbox {sandbox_id} not found"))?;
+        if record.state == WarmSandboxState::Reconciling {
+            record.state = WarmSandboxState::Ready;
+            record.updated_at = Utc::now();
+            self.persist_warm_sandboxes(&warm).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn forget_warm_sandbox(&self, sandbox_id: Uuid) -> Result<Option<WarmSandboxRecord>> {
+        let mut warm = self.warm_sandboxes.write().await;
+        let removed = warm.remove(&sandbox_id);
+        self.persist_warm_sandboxes(&warm).await?;
+        Ok(removed)
+    }
+
+    async fn persist_warm_sandboxes(&self, warm: &HashMap<Uuid, WarmSandboxRecord>) -> Result<()> {
+        let mut records: Vec<_> = warm.values().cloned().collect();
+        records.sort_by_key(|a| a.created_at);
+        atomic_write(
+            &self.root.join("warm-pools.json"),
+            &serde_json::to_vec_pretty(&records)?,
+        )
+        .await
+    }
+
     pub async fn active_sessions(&self) -> Vec<SessionRecord> {
         self.sessions
             .read()
             .await
             .values()
-            .filter(|s| !s.status.is_terminal() && s.status != SessionStatus::Hibernated)
+            .filter(|s| matches!(s.status, SessionStatus::Creating | SessionStatus::Running))
             .cloned()
             .collect()
     }
@@ -357,7 +497,10 @@ pub fn validate_name(name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AgentManifest, DeployAgentRequest, SessionRecord};
+    use crate::model::{
+        AgentManifest, DeployAgentRequest, SessionRecord, SessionStartMode, WarmSandboxRecord,
+        WarmSandboxState,
+    };
     use serde_json::json;
 
     fn test_root() -> PathBuf {
@@ -381,6 +524,7 @@ mod tests {
                 ttl_seconds: None,
                 max_concurrent_sessions: None,
                 idle_hibernate_seconds: None,
+                warm_pool_size: 0,
             },
         };
         let record = store.deploy_agent(request).await.unwrap();
@@ -413,6 +557,7 @@ mod tests {
                     ttl_seconds: None,
                     max_concurrent_sessions: None,
                     idle_hibernate_seconds: None,
+                    warm_pool_size: 0,
                 },
             })
             .await
@@ -430,6 +575,7 @@ mod tests {
                     ttl_seconds: None,
                     max_concurrent_sessions: None,
                     idle_hibernate_seconds: None,
+                    warm_pool_size: 0,
                 },
             })
             .await
@@ -466,6 +612,11 @@ mod tests {
                 last_event_seq: 0,
                 guest_event_cursor: 0,
                 request_id: Some("job:1".into()),
+                start_policy: crate::model::SessionStartPolicy::PreferWarm,
+                start_mode: SessionStartMode::Cold,
+                startup_ms: None,
+                expires_at: None,
+                sandbox_released: false,
                 capability_token: "cap".into(),
                 error: None,
             })
@@ -491,6 +642,92 @@ mod tests {
         let events = store.events_after(id, 1).await.unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].kind, "two");
+        let _ = fs::remove_dir_all(root).await;
+    }
+    #[tokio::test]
+    async fn reconciling_warm_sandbox_cannot_be_claimed() {
+        let root = test_root();
+        let store = Store::open(&root).await.unwrap();
+        let sandbox_id = Uuid::new_v4();
+        let now = Utc::now();
+        store
+            .save_warm_sandbox(WarmSandboxRecord {
+                sandbox_id,
+                agent: "research".into(),
+                agent_version: "abc123".into(),
+                runtime_port: 8080,
+                worker_digest_sha256: "worker-digest".into(),
+                state: WarmSandboxState::Ready,
+                claimed_by: None,
+                created_at: now,
+                updated_at: now,
+            })
+            .await
+            .unwrap();
+
+        let reserved = store
+            .begin_warm_reconcile(sandbox_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(reserved.state, WarmSandboxState::Reconciling);
+        assert!(store
+            .claim_warm_sandbox("research", "abc123", "worker-digest", 8080, Uuid::new_v4(),)
+            .await
+            .unwrap()
+            .is_none());
+
+        store.finish_warm_reconcile(sandbox_id).await.unwrap();
+        assert!(store
+            .claim_warm_sandbox("research", "abc123", "worker-digest", 8080, Uuid::new_v4(),)
+            .await
+            .unwrap()
+            .is_some());
+        let _ = fs::remove_dir_all(root).await;
+    }
+
+    #[tokio::test]
+    async fn warm_sandbox_claim_is_durable_and_single_use() {
+        let root = test_root();
+        let store = Store::open(&root).await.unwrap();
+        let sandbox_id = Uuid::new_v4();
+        let now = Utc::now();
+        store
+            .save_warm_sandbox(WarmSandboxRecord {
+                sandbox_id,
+                agent: "research".into(),
+                agent_version: "abc123".into(),
+                runtime_port: 8080,
+                worker_digest_sha256: "worker-digest".into(),
+                state: WarmSandboxState::Ready,
+                claimed_by: None,
+                created_at: now,
+                updated_at: now,
+            })
+            .await
+            .unwrap();
+
+        let session_id = Uuid::new_v4();
+        let claimed = store
+            .claim_warm_sandbox("research", "abc123", "worker-digest", 8080, session_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(claimed.sandbox_id, sandbox_id);
+        assert_eq!(claimed.state, WarmSandboxState::Claiming);
+        assert_eq!(claimed.claimed_by, Some(session_id));
+        assert!(store
+            .claim_warm_sandbox("research", "abc123", "worker-digest", 8080, Uuid::new_v4(),)
+            .await
+            .unwrap()
+            .is_none());
+        drop(store);
+
+        let reloaded = Store::open(&root).await.unwrap();
+        let records = reloaded.list_warm_sandboxes_for("research", "abc123").await;
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].state, WarmSandboxState::Claiming);
+        assert_eq!(records[0].claimed_by, Some(session_id));
         let _ = fs::remove_dir_all(root).await;
     }
 }
