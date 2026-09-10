@@ -380,6 +380,7 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
     /// identity is still unresolved after that merge. When false, Fabric still
     /// fans matching remote CIDRs and leaves residual gaps to FluxVM's
     /// node-local fail-closed compile (`unresolved_identities`).
+    #[allow(clippy::too_many_arguments)]
     pub async fn apply_with_remote_directory<R: RemoteIpcacheClient>(
         &self,
         spec: &ServicePolicySpec,

@@ -46,7 +46,12 @@ pub struct MigrationManager {
     /// Drives the *source* (local) VM's pause-for-final-sync step — see
     /// `live_sync`. The target node's own start is still a raw SSH+CLI
     /// call (see `live_sync`'s doc comment) since it's a different host,
-    /// outside what a local `Arc<dyn VmDriver>` can reach.
+    /// outside what a local `Arc<dyn VmDriver>` can reach. Currently unread:
+    /// `live_sync` is intentionally stubbed out under the FluxVM runtime
+    /// boundary (see its doc comment) and never reaches the code that
+    /// would call `self.driver` — kept, not deleted, since `new()` still
+    /// takes and stores a driver for when that path is un-stubbed.
+    #[allow(dead_code)]
     driver: Arc<dyn VmDriver>,
 }
 

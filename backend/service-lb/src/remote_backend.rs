@@ -640,6 +640,7 @@ impl<C: ServiceNodeClient> RemoteBackendOrchestrator<C> {
     }
 
     /// Mark remote Draining (weighted handoff) and reconcile onto FluxVM nodes.
+    #[allow(clippy::too_many_arguments)]
     pub async fn drain_and_reconcile(
         &self,
         route_domain: &str,
@@ -675,6 +676,7 @@ impl<C: ServiceNodeClient> RemoteBackendOrchestrator<C> {
 
     /// Delete catalog entry; next reconcile strips it via applied-key tracking.
     /// Optionally runs an immediate reconcile for the service.
+    #[allow(clippy::too_many_arguments)]
     pub async fn delete_and_reconcile(
         &self,
         route_domain: &str,

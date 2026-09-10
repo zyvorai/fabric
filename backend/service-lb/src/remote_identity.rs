@@ -431,6 +431,7 @@ impl<C: RemoteIpcacheClient> RemoteIdentityOrchestrator<C> {
     }
 
     /// Delete from directory and strip remote ipcache rows on fan-out nodes.
+    #[allow(clippy::too_many_arguments)]
     pub async fn delete_and_unfan(
         &self,
         route_domain: &str,
