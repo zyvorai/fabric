@@ -14,8 +14,7 @@
 //! service names per VIP). Geneve/VXLAN tunnels remain out of scope.
 
 use crate::{
-    domain_key, BackendState, EdgeLease, NodeTarget, ServiceBackend, ServiceNodeClient,
-    ServiceSpec,
+    domain_key, BackendState, EdgeLease, NodeTarget, ServiceBackend, ServiceNodeClient, ServiceSpec,
 };
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -108,10 +107,7 @@ fn matches_endpoint(
     address: &str,
     port: u16,
 ) -> bool {
-    b.route_domain == route_domain
-        && b.service == service
-        && b.address == address
-        && b.port == port
+    b.route_domain == route_domain && b.service == service && b.address == address && b.port == port
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -162,7 +158,8 @@ impl RemoteBackendDirectory {
             backend.route_domain = default_route_domain();
         }
         if backend.state == BackendState::Draining && backend.drain_until_unix_ms.is_none() {
-            backend.drain_until_unix_ms = Some(now_unix_ms().saturating_add(DEFAULT_DRAIN_UPSERT_MS));
+            backend.drain_until_unix_ms =
+                Some(now_unix_ms().saturating_add(DEFAULT_DRAIN_UPSERT_MS));
         }
         validate_remote_backend(&backend)?;
         let key = directory_key(
@@ -315,12 +312,7 @@ impl RemoteBackendDirectory {
         first.context("begin_drain updated no rows")
     }
 
-    fn record_applied(
-        &self,
-        route_domain: &str,
-        service: &str,
-        keys: Vec<String>,
-    ) -> Result<()> {
+    fn record_applied(&self, route_domain: &str, service: &str, keys: Vec<String>) -> Result<()> {
         let mut state = self.load()?;
         let ak = applied_key(route_domain, service);
         if keys.is_empty() {
@@ -442,9 +434,8 @@ pub fn merge_remote_backends(
     now_unix_ms: u64,
 ) -> Result<ServiceSpec> {
     let mut out = local.clone();
-    out.backends.retain(|b| {
-        !previously_applied.contains(&backend_key(&b.address.to_string(), b.port))
-    });
+    out.backends
+        .retain(|b| !previously_applied.contains(&backend_key(&b.address.to_string(), b.port)));
     let local_keys: HashSet<String> = out
         .backends
         .iter()
@@ -500,9 +491,8 @@ pub fn injected_remote_keys(
     let merged = merge_remote_backends(local, remotes, previously_applied, now_unix_ms)?;
     let local_after_strip: HashSet<String> = {
         let mut tmp = local.clone();
-        tmp.backends.retain(|b| {
-            !previously_applied.contains(&backend_key(&b.address.to_string(), b.port))
-        });
+        tmp.backends
+            .retain(|b| !previously_applied.contains(&backend_key(&b.address.to_string(), b.port)));
         tmp.backends
             .iter()
             .map(|b| backend_key(&b.address.to_string(), b.port))
@@ -565,14 +555,12 @@ impl<C: ServiceNodeClient> RemoteBackendOrchestrator<C> {
             .filter(|b| remote_active_for_merge(b, now_unix_ms))
             .count();
 
-        let mut must_touch: HashSet<String> =
-            remotes.iter().map(|b| b.service.clone()).collect();
+        let mut must_touch: HashSet<String> = remotes.iter().map(|b| b.service.clone()).collect();
         if let Some(svc) = service {
             must_touch.insert(svc.to_string());
         }
 
-        let targets =
-            reconcile_targets(nodes, site_id, Some(rd), leases, service, now_unix_ms);
+        let targets = reconcile_targets(nodes, site_id, Some(rd), leases, service, now_unix_ms);
         if targets.is_empty() {
             bail!("remote backend reconcile has no nodes in the owning site/route-domain");
         }
@@ -616,10 +604,8 @@ impl<C: ServiceNodeClient> RemoteBackendOrchestrator<C> {
                 }
 
                 let prev = self.directory.applied_keys(rd, &current.name)?;
-                let merged =
-                    merge_remote_backends(&current, &svc_remotes, &prev, now_unix_ms)?;
-                let injected =
-                    injected_remote_keys(&current, &svc_remotes, &prev, now_unix_ms)?;
+                let merged = merge_remote_backends(&current, &svc_remotes, &prev, now_unix_ms)?;
+                let injected = injected_remote_keys(&current, &svc_remotes, &prev, now_unix_ms)?;
                 self.client
                     .upsert_service(node, &merged)
                     .await
@@ -654,6 +640,7 @@ impl<C: ServiceNodeClient> RemoteBackendOrchestrator<C> {
     }
 
     /// Mark remote Draining (weighted handoff) and reconcile onto FluxVM nodes.
+    #[allow(clippy::too_many_arguments)]
     pub async fn drain_and_reconcile(
         &self,
         route_domain: &str,
@@ -689,6 +676,7 @@ impl<C: ServiceNodeClient> RemoteBackendOrchestrator<C> {
 
     /// Delete catalog entry; next reconcile strips it via applied-key tracking.
     /// Optionally runs an immediate reconcile for the service.
+    #[allow(clippy::too_many_arguments)]
     pub async fn delete_and_reconcile(
         &self,
         route_domain: &str,
@@ -753,9 +741,7 @@ fn reconcile_targets<'a>(
     let leased: HashSet<&str> = leases
         .iter()
         .filter(|lease| lease.active(service, now_unix_ms))
-        .filter(|lease| {
-            domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref()) == want
-        })
+        .filter(|lease| domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref()) == want)
         .map(|lease| lease.node.as_str())
         .collect();
     if leased.is_empty() {
@@ -955,9 +941,7 @@ mod tests {
             .record_applied("rd-1", "payments", injected.clone())
             .unwrap();
 
-        store
-            .delete("rd-1", "payments", "10.50.1.9", 8443)
-            .unwrap();
+        store.delete("rd-1", "payments", "10.50.1.9", 8443).unwrap();
         let remotes2 = store.list(Some("payments"), None, Some("rd-1")).unwrap();
         assert!(remotes2.is_empty());
         let prev2 = store.applied_keys("rd-1", "payments").unwrap();
@@ -977,11 +961,18 @@ mod tests {
         b.vip = Some("10.40.0.200".into());
         store.upsert(a).unwrap();
         store.upsert(b).unwrap();
-        assert_eq!(store.list(Some("payments"), None, Some("rd-1")).unwrap().len(), 2);
-        store
-            .delete("rd-1", "payments", "10.50.1.9", 8443)
-            .unwrap();
-        assert!(store.list(Some("payments"), None, Some("rd-1")).unwrap().is_empty());
+        assert_eq!(
+            store
+                .list(Some("payments"), None, Some("rd-1"))
+                .unwrap()
+                .len(),
+            2
+        );
+        store.delete("rd-1", "payments", "10.50.1.9", 8443).unwrap();
+        assert!(store
+            .list(Some("payments"), None, Some("rd-1"))
+            .unwrap()
+            .is_empty());
     }
 
     #[derive(Clone, Default)]
@@ -991,11 +982,7 @@ mod tests {
 
     #[async_trait]
     impl ServiceNodeClient for FakeSvc {
-        async fn get_service(
-            &self,
-            node: &NodeTarget,
-            name: &str,
-        ) -> Result<Option<ServiceSpec>> {
+        async fn get_service(&self, node: &NodeTarget, name: &str) -> Result<Option<ServiceSpec>> {
             Ok(self
                 .state
                 .lock()
@@ -1081,7 +1068,14 @@ mod tests {
 
         let orch = RemoteBackendOrchestrator::new(store, fake.clone());
         let report = orch
-            .reconcile(Some("payments"), None, Some("rd-1"), &[node.clone()], &[], 0)
+            .reconcile(
+                Some("payments"),
+                None,
+                Some("rd-1"),
+                &[node.clone()],
+                &[],
+                0,
+            )
             .await
             .unwrap();
         assert_eq!(report.remote_backends, 1);

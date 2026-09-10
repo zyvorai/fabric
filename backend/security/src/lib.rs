@@ -495,6 +495,7 @@ mod tests {
             role: Role::User,
             exp: 1, // Unix timestamp 1 = 1970-01-01, long expired
             jti: "test-jti".to_string(),
+            tenant: None,
         };
         let token = jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),

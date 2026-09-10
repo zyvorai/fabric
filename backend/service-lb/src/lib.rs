@@ -736,8 +736,7 @@ impl ServiceNodeClient for FluxVmHttpClient {
         let resp = self
             .auth(
                 node,
-                self.http
-                    .get(Self::url(node, "/v1/network/services")?),
+                self.http.get(Self::url(node, "/v1/network/services")?),
             )
             .send()
             .await?;
@@ -1048,13 +1047,12 @@ where
         let mut applied = Vec::new();
         for node in nodes {
             let mut node_spec = spec.clone();
-            let advertise =
-                spec.exposure.north_south() && active.contains(node.name.as_str());
+            let advertise = spec.exposure.north_south() && active.contains(node.name.as_str());
             // Fail closed: never apply advertise=true from a mismatched route domain.
             if advertise {
-                let lease = leases.iter().find(|l| {
-                    l.active(&spec.name, now_unix_ms) && l.node == node.name
-                });
+                let lease = leases
+                    .iter()
+                    .find(|l| l.active(&spec.name, now_unix_ms) && l.node == node.name);
                 match lease {
                     Some(l) if lease_matches_service_domain(l, spec) => {}
                     Some(l) => bail!(
@@ -1518,9 +1516,7 @@ fn intent_prefixes(intent: &BgpVipIntent) -> Vec<String> {
 }
 
 pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
-    let parent = path
-        .parent()
-        .context("atomic write path has no parent")?;
+    let parent = path.parent().context("atomic write path has no parent")?;
     fs::create_dir_all(parent)?;
     let tmp = path.with_extension("tmp");
     {

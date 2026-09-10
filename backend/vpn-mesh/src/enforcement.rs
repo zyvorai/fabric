@@ -411,6 +411,8 @@ mod tests {
         let nested = anyhow::anyhow!("Received a netlink error message File exists (os error 17)")
             .context("failed to add address 10.0.0.1/24 to 'zftwg0'");
         assert!(is_addr_already_present(&nested));
-        assert!(!is_addr_already_present(&anyhow::anyhow!("permission denied")));
+        assert!(!is_addr_already_present(&anyhow::anyhow!(
+            "permission denied"
+        )));
     }
 }
