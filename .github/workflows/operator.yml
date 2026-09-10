@@ -27,6 +27,8 @@ jobs:
           helm template test operator/charts/zyvor-fabricd-operator > /tmp/operator.yaml
           grep -q 'ZYVOR_FABRICD_URL' /tmp/operator.yaml
           grep -q 'virtualmachines.zyvor-fabricd.io' /tmp/operator.yaml
+          grep -q 'containergroups.zyvor-fabricd.io' /tmp/operator.yaml
+          grep -q 'resources: \["containergroups"' /tmp/operator.yaml
 
   kind-e2e:
     runs-on: ubuntu-latest
