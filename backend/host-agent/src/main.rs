@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use tokio::signal;
@@ -107,11 +106,20 @@ struct RegistrationPayload {
     metrics: SystemMetrics,
 }
 
-/// Payload sent on each heartbeat.
+/// Payload sent on each heartbeat. Deliberately flat, matching
+/// `datacenter::HostHeartbeat` field-for-field (the controller's
+/// `host_heartbeat` handler deserializes straight into that type) --
+/// previously this sent `{timestamp, metrics: {...}}`, a shape
+/// `HostHeartbeat` can't parse at all (missing required `cpu_usage_pct`/
+/// `memory_usage_pct`), so every heartbeat this agent sent was silently
+/// rejected before `secure_containers_ready` even existed as a concept here.
 #[derive(Debug, Serialize)]
 struct HeartbeatPayload {
-    timestamp: DateTime<Utc>,
-    metrics: SystemMetrics,
+    cpu_usage_pct: f64,
+    memory_usage_pct: f64,
+    vm_count: u32,
+    uptime_secs: u64,
+    secure_containers_ready: bool,
 }
 
 /// Wrapper the controller uses when returning a list of pending commands.
@@ -132,6 +140,12 @@ struct Agent {
     heartbeat_interval: Duration,
     http_client: reqwest::Client,
     driver: Arc<dyn VmDriver>,
+    /// Base URL of the local FluxVM daemon, used only to probe `/readyz` for
+    /// `secure_containers.available` ahead of each heartbeat -- kept
+    /// separate from `driver` (a `dyn VmDriver`) since that trait has no
+    /// readiness-probe method and adding one would ripple into every other
+    /// implementor for a need specific to this one capability flag.
+    fluxvm_url: String,
 }
 
 impl Agent {
@@ -142,6 +156,7 @@ impl Agent {
         address: String,
         heartbeat_interval: Duration,
         driver: Arc<dyn VmDriver>,
+        fluxvm_url: String,
     ) -> Self {
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
@@ -155,6 +170,7 @@ impl Agent {
             address,
             heartbeat_interval,
             http_client,
+            fluxvm_url,
             driver,
         }
     }
@@ -222,16 +238,48 @@ impl Agent {
 
     // -- heartbeat ---------------------------------------------------------
 
+    /// Probe the local FluxVM daemon's `/readyz` for
+    /// `secure_containers.available` (see `docs/contracts/
+    /// fabric-fluxvm-readyz.json` and `fluxvm-scheduler::readyz`'s
+    /// `secure_containers_status`, which is what actually populates this
+    /// field: KVM present, the `containerd-shim-fluxvm-v2` binary on
+    /// `PATH`, and the configured guest image present). Any failure to
+    /// reach FluxVM or parse the response is treated as "not ready" rather
+    /// than propagated -- a heartbeat must still go out even when FluxVM is
+    /// temporarily unreachable, just reporting this host as not currently
+    /// Secure-Containers-capable.
+    async fn secure_containers_ready(&self) -> bool {
+        let url = format!("{}/readyz", self.fluxvm_url);
+        let body = match self.http_client.get(&url).send().await {
+            Ok(resp) => match resp.json::<serde_json::Value>().await {
+                Ok(body) => body,
+                Err(e) => {
+                    tracing::debug!(error = %e, "failed to parse FluxVM /readyz response");
+                    return false;
+                }
+            },
+            Err(e) => {
+                tracing::debug!(error = %e, "failed to reach FluxVM /readyz");
+                return false;
+            }
+        };
+        extract_secure_containers_available(&body)
+    }
+
     async fn send_heartbeat(&self) -> Result<()> {
         let url = format!(
             "{}/api/hosts/{}/heartbeat",
             self.controller_url, self.host_id
         );
         let metrics = self.collect_system_metrics().await;
+        let secure_containers_ready = self.secure_containers_ready().await;
 
         let payload = HeartbeatPayload {
-            timestamp: Utc::now(),
-            metrics,
+            cpu_usage_pct: metrics.cpu_usage_pct,
+            memory_usage_pct: metrics.memory_usage_pct,
+            vm_count: metrics.vm_count,
+            uptime_secs: metrics.uptime_secs,
+            secure_containers_ready,
         };
 
         let resp = self
@@ -546,6 +594,19 @@ fn read_loadavg() -> Result<[f64; 3]> {
     ])
 }
 
+/// Pulls `secure_containers.available` out of a FluxVM `/readyz` response
+/// body (see `docs/contracts/fabric-fluxvm-readyz.json`). Missing/malformed
+/// shapes (an older FluxVM without this optional field, or an unexpected
+/// response) resolve to `false` rather than erroring -- "not currently
+/// known to be Secure-Containers-capable" is the safe default for
+/// placement to filter on.
+fn extract_secure_containers_available(body: &serde_json::Value) -> bool {
+    body.get("secure_containers")
+        .and_then(|v| v.get("available"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
 // ---------------------------------------------------------------------------
 // Host-ID persistence
 // ---------------------------------------------------------------------------
@@ -693,7 +754,74 @@ async fn main() -> Result<()> {
         address,
         heartbeat_interval,
         driver,
+        config.fluxvm_url,
     );
 
     agent.run(shutdown_rx).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_secure_containers_available_reads_the_nested_flag() {
+        let body = serde_json::json!({
+            "ok": true,
+            "kvm": true,
+            "secure_containers": {
+                "available": true,
+                "shim_installed": true,
+                "guest_image_present": true
+            }
+        });
+        assert!(extract_secure_containers_available(&body));
+    }
+
+    #[test]
+    fn extract_secure_containers_available_is_false_when_not_available() {
+        let body = serde_json::json!({
+            "ok": true,
+            "secure_containers": {
+                "available": false,
+                "shim_installed": false,
+                "guest_image_present": true
+            }
+        });
+        assert!(!extract_secure_containers_available(&body));
+    }
+
+    #[test]
+    fn extract_secure_containers_available_defaults_to_false_when_the_field_is_absent() {
+        // Older FluxVM without the optional `secure_containers` field.
+        let body = serde_json::json!({"ok": true, "kvm": true});
+        assert!(!extract_secure_containers_available(&body));
+    }
+
+    #[test]
+    fn extract_secure_containers_available_defaults_to_false_on_malformed_shape() {
+        let body = serde_json::json!({"secure_containers": "not an object"});
+        assert!(!extract_secure_containers_available(&body));
+    }
+
+    #[test]
+    fn heartbeat_payload_serializes_as_a_flat_object_matching_host_heartbeat() {
+        let payload = HeartbeatPayload {
+            cpu_usage_pct: 12.5,
+            memory_usage_pct: 40.0,
+            vm_count: 3,
+            uptime_secs: 86400,
+            secure_containers_ready: true,
+        };
+        let json = serde_json::to_value(&payload).unwrap();
+        let obj = json.as_object().unwrap();
+        // Regression guard: this used to be `{"timestamp": ..., "metrics": {...}}`,
+        // a shape the controller's `HostHeartbeat` extractor rejects outright.
+        assert_eq!(obj.len(), 5);
+        assert_eq!(json["cpu_usage_pct"], 12.5);
+        assert_eq!(json["memory_usage_pct"], 40.0);
+        assert_eq!(json["vm_count"], 3);
+        assert_eq!(json["uptime_secs"], 86400);
+        assert_eq!(json["secure_containers_ready"], true);
+    }
 }
