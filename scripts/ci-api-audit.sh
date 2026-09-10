@@ -41,6 +41,13 @@ enabled = true
 jwt_secret = "$JWT_SECRET"
 db_path = "$WORKDIR/data/auth.db"
 default_admin_password = "$ADMIN_PASS"
+
+# This script only ever talks to $API_HOST over plain HTTP, so there's no
+# reason to generate a self-signed cert -- and TlsConfig's own defaults
+# point at root-owned /etc/zyvor-fabricd/tls, which a CI runner can't write
+# to. TLS has no env-var override, only this file, so it must be set here.
+[tls]
+enabled = false
 EOF
 
 echo "==> Building zyvor-fabricd (release)..."
