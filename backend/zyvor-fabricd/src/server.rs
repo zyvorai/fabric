@@ -1113,6 +1113,21 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/container-group-events",
             get(api::container_declarative::list_container_group_events),
         )
+        // ContainerGroup volume backup/restore
+        .route(
+            "/container-group-backups",
+            get(api::container_group_backups::list_container_group_backups)
+                .post(api::container_group_backups::create_container_group_backup),
+        )
+        .route(
+            "/container-group-backups/{id}",
+            get(api::container_group_backups::get_container_group_backup)
+                .delete(api::container_group_backups::delete_container_group_backup),
+        )
+        .route(
+            "/container-group-backups/{id}/restore",
+            post(api::container_group_backups::restore_container_group_backup),
+        )
         // Auto-scaling
         .route(
             "/autoscale",

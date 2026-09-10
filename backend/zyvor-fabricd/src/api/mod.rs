@@ -37,6 +37,7 @@ pub mod zones;
 // Phase 2 API modules for enterprise features
 pub mod certificates;
 pub mod container_declarative;
+pub mod container_group_backups;
 pub mod container_placement;
 pub mod content_library;
 pub mod datacenter;
