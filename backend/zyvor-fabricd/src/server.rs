@@ -3648,8 +3648,10 @@ async fn run_container_group_autohealer(state: Arc<AppState>) {
     loop {
         interval.tick().await;
 
-        let groups: Vec<ContainerGroupSpec> =
-            state.store.list_entities("container_groups").unwrap_or_default();
+        let groups: Vec<ContainerGroupSpec> = state
+            .store
+            .list_entities("container_groups")
+            .unwrap_or_default();
         if groups.is_empty() {
             continue;
         }
@@ -3678,10 +3680,7 @@ async fn run_container_group_autohealer(state: Arc<AppState>) {
                 continue;
             }
 
-            let has_volumes = spec
-                .containers
-                .iter()
-                .any(|c| !c.volume_mounts.is_empty());
+            let has_volumes = spec.containers.iter().any(|c| !c.volume_mounts.is_empty());
 
             // A `node_hint` is an explicit pin — `place_container_group`
             // would just resolve back to this same (now-dead) host, so
@@ -3712,7 +3711,8 @@ async fn run_container_group_autohealer(state: Arc<AppState>) {
                 }
             }
 
-            let placed = match crate::api::container_placement::place_container_group(&state, &spec) {
+            let placed = match crate::api::container_placement::place_container_group(&state, &spec)
+            {
                 Ok(p) => p,
                 Err(e) => {
                     tracing::error!(
@@ -3726,7 +3726,8 @@ async fn run_container_group_autohealer(state: Arc<AppState>) {
 
             let mut new_pod_names = Vec::new();
             for i in 0..spec.replicas {
-                let name = crate::api::container_declarative::pod_name(&spec.name, spec.replicas, i);
+                let name =
+                    crate::api::container_declarative::pod_name(&spec.name, spec.replicas, i);
                 let pod_req = crate::api::container_declarative::build_pod_request(
                     &spec,
                     &name,

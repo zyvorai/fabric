@@ -40,7 +40,11 @@ pub async fn run(client: Client) -> Result<()> {
     });
 
     let vm_controller = Controller::new(vms, Config::default())
-        .run(reconcile::reconcile, reconcile::error_policy, context.clone())
+        .run(
+            reconcile::reconcile,
+            reconcile::error_policy,
+            context.clone(),
+        )
         .for_each(|res| async move {
             match res {
                 Ok(o) => tracing::info!("Reconciled VM: {:?}", o),

@@ -99,8 +99,7 @@ impl ContainerGroupSpec {
         let mut memory_mb: u64 = 0;
         for c in &self.containers {
             cpus = cpus.saturating_add(c.resources.cpus);
-            memory_mb =
-                memory_mb.saturating_add(parse_memory_mb(&c.resources.memory).unwrap_or(0));
+            memory_mb = memory_mb.saturating_add(parse_memory_mb(&c.resources.memory).unwrap_or(0));
         }
         let replicas = self.replicas.max(1);
         (
@@ -150,7 +149,10 @@ fn validate_spec(spec: &ContainerGroupSpec) -> Result<(), (StatusCode, Json<serd
         ));
     }
     if spec.tags.len() > 100 {
-        return Err(err(StatusCode::BAD_REQUEST, "tags count must not exceed 100"));
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "tags count must not exceed 100",
+        ));
     }
     if !matches!(
         spec.restart_policy.as_str(),
@@ -183,7 +185,10 @@ fn validate_spec(spec: &ContainerGroupSpec) -> Result<(), (StatusCode, Json<serd
         })?;
         for vol in &c.volume_mounts {
             crate::validation::validate_host_path(&vol.host).map_err(|(s, m)| {
-                err(s, format!("container '{}': invalid volume host path: {}", c.name, m))
+                err(
+                    s,
+                    format!("container '{}': invalid volume host path: {}", c.name, m),
+                )
             })?;
             crate::validation::validate_machine_path(&vol.guest).map_err(|(s, m)| {
                 err(
@@ -227,7 +232,11 @@ pub(crate) fn build_pod_request(
             image: c.image.clone(),
             command: c.command.clone(),
             args: c.args.clone(),
-            env: c.env.iter().map(|e| (e.name.clone(), e.value.clone())).collect(),
+            env: c
+                .env
+                .iter()
+                .map(|e| (e.name.clone(), e.value.clone()))
+                .collect(),
             cpu_millis: c.resources.cpus.saturating_mul(1000),
             memory_mb,
             volume_mounts,
@@ -266,7 +275,10 @@ pub async fn apply_container_group_spec(
     State(state): State<Arc<AppState>>,
     Json(spec): Json<ContainerGroupSpec>,
 ) -> Result<(StatusCode, Json<ContainerGroupApplyResult>), (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("container_declarative::{}", stringify!(apply_container_group_spec));
+    tracing::debug!(
+        "container_declarative::{}",
+        stringify!(apply_container_group_spec)
+    );
     validate_spec(&spec)?;
 
     let client = state.k8s_pod_client.clone().ok_or_else(|| {
@@ -326,8 +338,14 @@ pub async fn export_container_group_spec(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<ContainerGroupSpec>, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("container_declarative::{}", stringify!(export_container_group_spec));
-    match state.store.get_entity::<ContainerGroupSpec>("container_groups", &name) {
+    tracing::debug!(
+        "container_declarative::{}",
+        stringify!(export_container_group_spec)
+    );
+    match state
+        .store
+        .get_entity::<ContainerGroupSpec>("container_groups", &name)
+    {
         Ok(Some(spec)) => Ok(Json(spec)),
         Ok(None) => Err(err(StatusCode::NOT_FOUND, "ContainerGroup not found")),
         Err(e) => Err(err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
@@ -341,7 +359,10 @@ pub async fn delete_container_group(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
-    tracing::debug!("container_declarative::{}", stringify!(delete_container_group));
+    tracing::debug!(
+        "container_declarative::{}",
+        stringify!(delete_container_group)
+    );
 
     let status = state
         .store
@@ -352,7 +373,12 @@ pub async fn delete_container_group(
         if let Some(client) = state.k8s_pod_client.clone() {
             for pod in &status.pod_names {
                 if let Err(e) = client.delete_pod(pod).await {
-                    tracing::warn!("failed to delete pod '{}' for ContainerGroup '{}': {}", pod, name, e);
+                    tracing::warn!(
+                        "failed to delete pod '{}' for ContainerGroup '{}': {}",
+                        pod,
+                        name,
+                        e
+                    );
                 }
             }
         }

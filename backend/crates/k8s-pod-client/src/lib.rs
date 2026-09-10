@@ -329,7 +329,10 @@ mod tests {
         let spec = pod.spec.expect("pod spec");
         let tolerations = spec.tolerations.expect("tolerations");
         assert_eq!(tolerations.len(), 1);
-        assert_eq!(tolerations[0].key.as_deref(), Some(SECURE_CONTAINERS_TAINT_KEY));
+        assert_eq!(
+            tolerations[0].key.as_deref(),
+            Some(SECURE_CONTAINERS_TAINT_KEY)
+        );
         assert_eq!(tolerations[0].effect.as_deref(), Some("NoSchedule"));
     }
 
