@@ -105,6 +105,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Availability Zones', path: '/app/zones', icon: Globe },
       { label: 'Snapshots', path: '/app/snapshots', icon: Camera },
       { label: 'Backups', path: '/app/backups', icon: Save },
+      { label: 'Container Groups', path: '/app/container-groups', icon: Boxes },
       { label: 'Quotas', path: '/app/quotas', icon: Shield },
       { label: 'Lifecycle', path: '/app/lifecycle', icon: PackageCheck },
       { label: 'Bulk Operations', path: '/app/bulk-operations', icon: Layers },
