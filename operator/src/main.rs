@@ -22,6 +22,14 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting zyvor-fabricd Kubernetes operator");
 
+    // kube and reqwest pull in rustls with both the `ring` and `aws-lc-rs`
+    // crypto-provider backends available transitively, so rustls can't pick
+    // one on its own and panics on the first TLS handshake unless a process
+    // default is installed explicitly.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("no other rustls CryptoProvider installed yet");
+
     let client = Client::try_default().await?;
 
     controller::run(client).await?;
