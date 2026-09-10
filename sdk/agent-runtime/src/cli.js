@@ -4,7 +4,8 @@
 
 import { build } from "esbuild";
 import { readFile } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function usage(exitCode = 0) {
   console.log(`fabric-agent deploy <agent.ts> --name <name> --template <fluxvm-template> [options]\n\nOptions:\n  --allow-host <host>       repeatable egress allow host\n  --credential <name>       repeatable host-side credential grant\n  --allow-private-network  permit brokered private/link-local destinations\n  --runtime-port <port>     guest worker port (default 8080)\n  --ttl <seconds>           default session TTL\n  --max-concurrency <n>     cap non-terminal sessions for this agent\n  --idle-hibernate <sec>    hibernate only while blocked in ctx.nextSteer()\n  --warm-pool <n>           keep n single-use sandboxes prewarmed\n  --url <url>               Fabric Agent Runtime URL\n  --token <token>           Fabric Agent Runtime bearer token`);
@@ -27,6 +28,11 @@ const output = await build({
   target: "node20",
   sourcemap: "inline",
   legalComments: "inline",
+  // Resolve the SDK by its published package name against this local
+  // checkout's own source -- the deployed bundle only ever needs the
+  // ctx helpers inlined, and requiring a real npm publish before anyone
+  // can deploy an agent would make the documented workflow unusable.
+  alias: { "@zyvor/fabric-agent": resolve(dirname(fileURLToPath(import.meta.url)), "index.js") },
 });
 const bundle = output.outputFiles[0].contents;
 const baseUrl = (flags.url || process.env.FABRIC_AGENT_URL || "http://127.0.0.1:9096").replace(/\/$/, "");

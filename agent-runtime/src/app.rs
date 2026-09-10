@@ -9,7 +9,7 @@ use crate::{
     },
     pool, AppState,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -520,6 +520,31 @@ async fn create_session(
     Ok((StatusCode::CREATED, Json(updated.into())))
 }
 
+/// Blocks until the guest's vsock-based FluxVM guest agent accepts a
+/// command, or `guest_start_timeout_secs` elapses. Only meaningful right
+/// after a cold `create_sandbox()`; a resumed/prewarmed sandbox's channel is
+/// already up.
+async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Result<()> {
+    let deadline =
+        tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
+    loop {
+        match state
+            .fluxvm
+            .process(sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10))
+            .await
+        {
+            Ok(_) => return Ok(()),
+            Err(error) if tokio::time::Instant::now() < deadline => {
+                tracing::debug!(sandbox = %sandbox_id, %error, "guest agent not ready yet, retrying");
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+            Err(error) => {
+                return Err(error).context("guest agent did not become ready before timeout")
+            }
+        }
+    }
+}
+
 async fn provision_guest(
     state: &AppState,
     session: &SessionRecord,
@@ -532,10 +557,15 @@ async fn provision_guest(
         .agent_bundle(&agent.name, &agent.version)
         .await?;
     if !prewarmed {
-        state
-            .fluxvm
-            .process(session.sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10))
-            .await?;
+        // create_sandbox() returns as soon as the VM process is launched, not
+        // once the guest has finished booting -- the in-guest fluxvm-guest-agent
+        // only starts listening on its vsock channel partway through boot. The
+        // very first guest-agent call after a cold create therefore routinely
+        // races that boot and fails with "connecting to vsock proxy socket ...
+        // No such file or directory" on a real (non-mocked) FluxVM backend.
+        // Retry until the channel comes up rather than failing the session for
+        // a timing issue that resolves itself within a few seconds.
+        wait_for_guest_agent_ready(state, session.sandbox_id).await?;
         state
             .fluxvm
             .fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755)
