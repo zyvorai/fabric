@@ -52,7 +52,7 @@ pub fn place_container_group(
     if capable.is_empty() {
         return Err(
             "no Secure-Containers-capable host is currently connected (register one via \
-             POST /api/datacenter/hosts, or heartbeat secure_containers_ready=true)"
+             POST /api/hosts, or heartbeat secure_containers_ready=true)"
                 .to_string(),
         );
     }
