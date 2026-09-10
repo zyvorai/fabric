@@ -12,8 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::api::container_declarative::ContainerGroupSpec;
 use crate::server::AppState;
-use security::{RequireAdmin, RequireRead, RequireWrite};
+use security::{RequireAdmin, RequireRead};
 
 // ============================================================================
 // Data Structures
@@ -31,7 +32,23 @@ pub struct ResourceQuota {
     pub used_memory: u64,
     pub used_disk: u64,
     pub used_vms: u32,
+    /// `None` means no ContainerGroup pod-count limit is configured for this
+    /// quota (unlike `max_vms`, which is always enforced) — most existing
+    /// quotas predate ContainerGroup support and shouldn't suddenly start
+    /// blocking container workloads just because this field deserializes to
+    /// a default.
+    #[serde(default)]
+    pub max_containers: Option<u32>,
+    #[serde(default)]
+    pub used_containers: u32,
     pub tags: Option<Vec<String>>,
+    /// Scopes this quota to a single tenant (matched against `VM.labels["tenant"]`
+    /// or `ContainerGroupSpec.tenant`) rather than by tag overlap. Takes
+    /// precedence over `tags` when set — the natural fit now that
+    /// ContainerGroup has a first-class `tenant` field, and needed for a
+    /// self-serve model where each tenant gets their own quota.
+    #[serde(default)]
+    pub tenant: Option<String>,
     pub enabled: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
@@ -44,7 +61,11 @@ pub struct CreateQuotaRequest {
     pub max_memory: u64,
     pub max_disk: u64,
     pub max_vms: u32,
+    #[serde(default)]
+    pub max_containers: Option<u32>,
     pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub tenant: Option<String>,
     #[serde(default = "crate::validation::default_true")]
     pub enabled: bool,
 }
@@ -56,7 +77,9 @@ pub struct UpdateQuotaRequest {
     pub max_memory: Option<u64>,
     pub max_disk: Option<u64>,
     pub max_vms: Option<u32>,
+    pub max_containers: Option<u32>,
     pub tags: Option<Vec<String>>,
+    pub tenant: Option<String>,
     pub enabled: Option<bool>,
 }
 
@@ -68,6 +91,8 @@ pub struct QuotaUsage {
     pub memory_percent: f64,
     pub disk_percent: f64,
     pub vms_percent: f64,
+    /// `None` when the quota has no `max_containers` configured.
+    pub containers_percent: Option<f64>,
     pub is_exceeded: bool,
     pub exceeded_resources: Vec<String>,
 }
@@ -94,6 +119,15 @@ fn validate_quota(req: &CreateQuotaRequest) -> Result<(), String> {
     // Validate name is not empty
     if req.name.trim().is_empty() {
         return Err("Quota name cannot be empty".to_string());
+    }
+
+    if let Some(tenant) = &req.tenant {
+        if !crate::api::container_declarative::is_valid_tenant_name(tenant) {
+            return Err(format!(
+                "invalid tenant '{tenant}': must be 1-40 characters of lowercase \
+                 alphanumerics or '-', not starting or ending with '-'"
+            ));
+        }
     }
 
     Ok(())
@@ -129,6 +163,14 @@ impl QuotaUsage {
             0.0
         };
 
+        let containers_percent = quota.max_containers.map(|max| {
+            if max > 0 {
+                (quota.used_containers as f64 / max as f64) * 100.0
+            } else {
+                0.0
+            }
+        });
+
         let mut exceeded_resources = Vec::new();
         let mut is_exceeded = false;
 
@@ -148,6 +190,12 @@ impl QuotaUsage {
             exceeded_resources.push("vms".to_string());
             is_exceeded = true;
         }
+        if let Some(max_containers) = quota.max_containers {
+            if quota.used_containers > max_containers {
+                exceeded_resources.push("containers".to_string());
+                is_exceeded = true;
+            }
+        }
 
         Self {
             quota_id: quota.id.clone(),
@@ -156,6 +204,7 @@ impl QuotaUsage {
             memory_percent,
             disk_percent,
             vms_percent,
+            containers_percent,
             is_exceeded,
             exceeded_resources,
         }
@@ -208,7 +257,7 @@ pub async fn get_quota(
 }
 
 pub async fn create_quota(
-    RequireWrite(_claims): RequireWrite,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateQuotaRequest>,
 ) -> Result<(StatusCode, Json<ResourceQuota>), (StatusCode, Json<serde_json::Value>)> {
@@ -226,11 +275,14 @@ pub async fn create_quota(
         max_memory: req.max_memory,
         max_disk: req.max_disk,
         max_vms: req.max_vms,
+        max_containers: req.max_containers,
         used_cpus: 0,
         used_memory: 0,
         used_disk: 0,
         used_vms: 0,
+        used_containers: 0,
         tags: req.tags,
+        tenant: req.tenant,
         enabled: req.enabled,
         created: now,
         updated: now,
@@ -249,7 +301,7 @@ pub async fn create_quota(
 }
 
 pub async fn update_quota(
-    RequireWrite(_claims): RequireWrite,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateQuotaRequest>,
@@ -315,8 +367,20 @@ pub async fn update_quota(
         }
         quota.max_vms = max_vms;
     }
+    if let Some(max_containers) = req.max_containers {
+        quota.max_containers = Some(max_containers);
+    }
     if let Some(tags) = req.tags {
         quota.tags = Some(tags);
+    }
+    if let Some(tenant) = req.tenant {
+        if !crate::api::container_declarative::is_valid_tenant_name(&tenant) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("invalid tenant '{tenant}'")})),
+            ));
+        }
+        quota.tenant = Some(tenant);
     }
     if let Some(enabled) = req.enabled {
         quota.enabled = enabled;
@@ -369,7 +433,7 @@ pub async fn delete_quota(
 }
 
 pub async fn enable_quota(
-    RequireWrite(_claims): RequireWrite,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -405,7 +469,7 @@ pub async fn enable_quota(
 }
 
 pub async fn disable_quota(
-    RequireWrite(_claims): RequireWrite,
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -464,7 +528,7 @@ pub async fn get_quota_usage(
             Json(json!({"error": "Quota not found"})),
         ))?;
 
-    // Load VMs once and calculate usage
+    // Load VMs and ContainerGroups once and calculate usage
     let vms = state.store.list_vms().map_err(|e| {
         tracing::error!("Failed to load VMs: {}", e);
         (
@@ -472,7 +536,11 @@ pub async fn get_quota_usage(
             Json(json!({"error": "Failed to load VMs"})),
         )
     })?;
-    calculate_quota_usage(&vms, &mut quota);
+    let container_groups = state
+        .store
+        .list_entities::<ContainerGroupSpec>("container_groups")
+        .unwrap_or_default();
+    calculate_quota_usage(&vms, &container_groups, &mut quota);
 
     let usage = QuotaUsage::from_quota(&quota);
     Ok(Json(usage))
@@ -497,10 +565,14 @@ pub async fn get_all_quota_usage(
         .list_entities::<ResourceQuota>("quotas")
         .unwrap_or_default();
 
-    // Load VMs once for all quota calculations
+    // Load VMs and ContainerGroups once for all quota calculations
     let vms = state.store.list_vms().unwrap_or_default();
+    let container_groups = state
+        .store
+        .list_entities::<ContainerGroupSpec>("container_groups")
+        .unwrap_or_default();
     for quota in &mut quotas {
-        calculate_quota_usage(&vms, quota);
+        calculate_quota_usage(&vms, &container_groups, quota);
     }
 
     let usage: Vec<QuotaUsage> = quotas.iter().map(QuotaUsage::from_quota).collect();
@@ -522,30 +594,44 @@ pub async fn get_all_quota_usage(
 // Usage Calculation Helper
 // ============================================================================
 
-/// Calculate real quota usage from a pre-loaded list of VMs
-fn calculate_quota_usage(vms: &[vm_model::VM], quota: &mut ResourceQuota) {
+/// Whether `quota` applies to a workload with the given tenant/tags. A
+/// `quota.tenant` match takes precedence over tag overlap — the natural fit
+/// now that ContainerGroup carries a first-class `tenant` (VM's tenant lives
+/// in `labels["tenant"]`, since `vm_model::VM` has no dedicated field). A
+/// quota with neither `tenant` nor `tags` set applies to every workload,
+/// matching the pre-existing tag-only behavior.
+fn quota_applies(quota: &ResourceQuota, tenant: Option<&str>, tags: &[String]) -> bool {
+    if let Some(quota_tenant) = &quota.tenant {
+        return tenant == Some(quota_tenant.as_str());
+    }
+    match &quota.tags {
+        Some(quota_tags) => tags.iter().any(|tag| quota_tags.contains(tag)),
+        None => true,
+    }
+}
+
+/// Calculate real quota usage from pre-loaded VMs and ContainerGroups. CPU
+/// and memory form one shared compute budget across both workload types
+/// (they compete for the same host capacity); VM count and container pod
+/// count are tracked as separate sub-limits since they're different units.
+/// ContainerGroup has no disk concept today (ephemeral/hostPath volumes
+/// only, see `container_declarative`), so `used_disk` stays VM-only.
+fn calculate_quota_usage(
+    vms: &[vm_model::VM],
+    container_groups: &[ContainerGroupSpec],
+    quota: &mut ResourceQuota,
+) {
     // Reset usage counters
     quota.used_cpus = 0;
     quota.used_memory = 0;
     quota.used_disk = 0;
     quota.used_vms = 0;
+    quota.used_containers = 0;
 
-    // Calculate usage from VMs matching this quota
     for vm in vms {
-        // Check if VM matches this quota's tags
-        let matches = if let Some(quota_tags) = &quota.tags {
-            // Quota has tags - check if VM has matching tags
-            if let Some(vm_tags) = &vm.tags {
-                vm_tags.iter().any(|tag| quota_tags.contains(tag))
-            } else {
-                false // VM has no tags, doesn't match tag-based quota
-            }
-        } else {
-            // Quota has no tags - applies to all VMs
-            true
-        };
-
-        if matches {
+        let vm_tenant = vm.labels.as_ref().and_then(|l| l.get("tenant"));
+        let vm_tags = vm.tags.as_deref().unwrap_or(&[]);
+        if quota_applies(quota, vm_tenant.map(String::as_str), vm_tags) {
             quota.used_cpus += vm.cpus;
             quota.used_memory += vm.memory;
             quota.used_disk += vm.disk;
@@ -553,13 +639,23 @@ fn calculate_quota_usage(vms: &[vm_model::VM], quota: &mut ResourceQuota) {
         }
     }
 
+    for cg in container_groups {
+        if quota_applies(quota, cg.tenant.as_deref(), &cg.tags) {
+            let (cpus, memory_mb) = cg.total_resources();
+            quota.used_cpus += cpus;
+            quota.used_memory += memory_mb;
+            quota.used_containers += cg.replicas;
+        }
+    }
+
     tracing::debug!(
-        "Calculated quota '{}' usage: {} CPUs, {} MB memory, {} GB disk, {} VMs",
+        "Calculated quota '{}' usage: {} CPUs, {} MB memory, {} GB disk, {} VMs, {} container replicas",
         quota.name,
         quota.used_cpus,
         quota.used_memory,
         quota.used_disk,
-        quota.used_vms
+        quota.used_vms,
+        quota.used_containers
     );
 }
 
@@ -567,42 +663,52 @@ fn calculate_quota_usage(vms: &[vm_model::VM], quota: &mut ResourceQuota) {
 // Enforcement Logic
 // ============================================================================
 
-/// Check if creating a new VM would exceed quota
+/// Check if creating/applying a workload would exceed any applicable quota.
+/// Usage is recalculated live from the current VM/ContainerGroup lists
+/// rather than trusting each quota's stored `used_*` counters, which are
+/// only refreshed when someone calls the usage-report endpoints — trusting
+/// them here would let usage drift stale between reports and silently admit
+/// requests a fresh count would have blocked.
+///
+/// `exclude_container_group`, when set, drops that group from the usage
+/// count before checking — required when re-applying an existing
+/// ContainerGroup, since the store still holds its *previous* spec at check
+/// time and `cpus`/`memory`/`containers_delta` already represent that
+/// group's full new footprint, not an incremental add.
+#[allow(clippy::too_many_arguments)]
 pub async fn check_quota_enforcement(
     state: &AppState,
     cpus: u32,
     memory: u64,
     disk: u64,
     tags: &[String],
+    tenant: Option<&str>,
+    vms_delta: u32,
+    containers_delta: u32,
+    exclude_container_group: Option<&str>,
 ) -> Result<(), String> {
-    // Load all enabled quotas
-    let quotas = state
+    let mut quotas: Vec<ResourceQuota> = state
         .store
         .list_entities::<ResourceQuota>("quotas")
         .unwrap_or_default();
-
-    let enabled_quotas: Vec<ResourceQuota> = quotas.into_iter().filter(|q| q.enabled).collect();
-
-    // Find quotas that apply to the given tags
-    let mut applicable_quotas = Vec::new();
-
-    for quota in enabled_quotas {
-        if let Some(quota_tags) = &quota.tags {
-            // Check if any of the VM's tags match the quota's tags
-            if tags.iter().any(|tag| quota_tags.contains(tag)) {
-                applicable_quotas.push(quota);
-            }
-        } else {
-            // Quota with no tags applies to all VMs
-            applicable_quotas.push(quota);
-        }
+    quotas.retain(|q| q.enabled && quota_applies(q, tenant, tags));
+    if quotas.is_empty() {
+        return Ok(());
     }
 
-    // Check each applicable quota
-    for quota in applicable_quotas {
+    let vms = state.store.list_vms().unwrap_or_default();
+    let mut container_groups: Vec<ContainerGroupSpec> = state
+        .store
+        .list_entities::<ContainerGroupSpec>("container_groups")
+        .unwrap_or_default();
+    if let Some(exclude) = exclude_container_group {
+        container_groups.retain(|cg| cg.name != exclude);
+    }
+
+    for mut quota in quotas {
+        calculate_quota_usage(&vms, &container_groups, &mut quota);
         let mut violations = Vec::new();
 
-        // Check CPU quota
         if quota.used_cpus + cpus > quota.max_cpus {
             violations.push(format!(
                 "CPU quota exceeded: would use {} CPUs but limit is {} (current: {})",
@@ -612,7 +718,6 @@ pub async fn check_quota_enforcement(
             ));
         }
 
-        // Check memory quota
         if quota.used_memory + memory > quota.max_memory {
             violations.push(format!(
                 "Memory quota exceeded: would use {} MB but limit is {} MB (current: {} MB)",
@@ -622,7 +727,6 @@ pub async fn check_quota_enforcement(
             ));
         }
 
-        // Check disk quota
         if quota.used_disk + disk > quota.max_disk {
             violations.push(format!(
                 "Disk quota exceeded: would use {} GB but limit is {} GB (current: {} GB)",
@@ -632,17 +736,28 @@ pub async fn check_quota_enforcement(
             ));
         }
 
-        // Check VM count quota
-        if quota.used_vms + 1 > quota.max_vms {
+        if vms_delta > 0 && quota.used_vms + vms_delta > quota.max_vms {
             violations.push(format!(
                 "VM count quota exceeded: would have {} VMs but limit is {} (current: {})",
-                quota.used_vms + 1,
+                quota.used_vms + vms_delta,
                 quota.max_vms,
                 quota.used_vms
             ));
         }
 
-        // If any violations, return error
+        if containers_delta > 0 {
+            if let Some(max_containers) = quota.max_containers {
+                if quota.used_containers + containers_delta > max_containers {
+                    violations.push(format!(
+                        "Container quota exceeded: would have {} container replicas but limit is {} (current: {})",
+                        quota.used_containers + containers_delta,
+                        max_containers,
+                        quota.used_containers
+                    ));
+                }
+            }
+        }
+
         if !violations.is_empty() {
             let error_msg = format!(
                 "Quota '{}' would be exceeded:\n  - {}",
@@ -655,4 +770,161 @@ pub async fn check_quota_enforcement(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_quota() -> ResourceQuota {
+        let now = Utc::now();
+        ResourceQuota {
+            id: "q1".to_string(),
+            name: "acme quota".to_string(),
+            max_cpus: 10,
+            max_memory: 10_240,
+            max_disk: 500,
+            max_vms: 5,
+            used_cpus: 0,
+            used_memory: 0,
+            used_disk: 0,
+            used_vms: 0,
+            max_containers: None,
+            used_containers: 0,
+            tags: None,
+            tenant: None,
+            enabled: true,
+            created: now,
+            updated: now,
+        }
+    }
+
+    fn sample_container_group(
+        name: &str,
+        tenant: Option<&str>,
+        replicas: u32,
+    ) -> ContainerGroupSpec {
+        let tenant_field = match tenant {
+            Some(t) => format!(r#", "tenant": "{t}""#),
+            None => String::new(),
+        };
+        serde_json::from_str(&format!(
+            r#"{{"name": "{name}", "replicas": {replicas}, "containers": [{{"name": "app", "image": "nginx", "resources": {{"cpus": 2, "memory": "512M"}}}}]{tenant_field}}}"#
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn quota_applies_with_no_tenant_or_tags_matches_everything() {
+        let quota = sample_quota();
+        assert!(quota_applies(&quota, None, &[]));
+        assert!(quota_applies(&quota, Some("acme"), &["prod".to_string()]));
+    }
+
+    #[test]
+    fn quota_applies_by_tenant_ignores_tags() {
+        let mut quota = sample_quota();
+        quota.tenant = Some("acme".to_string());
+        quota.tags = Some(vec!["prod".to_string()]);
+        assert!(quota_applies(&quota, Some("acme"), &[]));
+        assert!(!quota_applies(
+            &quota,
+            Some("other-tenant"),
+            &["prod".to_string()]
+        ));
+        assert!(!quota_applies(&quota, None, &["prod".to_string()]));
+    }
+
+    #[test]
+    fn quota_applies_by_tag_overlap_when_no_tenant_set() {
+        let mut quota = sample_quota();
+        quota.tags = Some(vec!["prod".to_string()]);
+        assert!(quota_applies(
+            &quota,
+            None,
+            &["prod".to_string(), "web".to_string()]
+        ));
+        assert!(!quota_applies(&quota, None, &["staging".to_string()]));
+    }
+
+    #[test]
+    fn calculate_quota_usage_counts_container_group_resources_and_replicas() {
+        let mut quota = sample_quota();
+        quota.tenant = Some("acme".to_string());
+        let groups = vec![
+            sample_container_group("web", Some("acme"), 3),
+            sample_container_group("other", Some("other-tenant"), 5),
+        ];
+        calculate_quota_usage(&[], &groups, &mut quota);
+        // "web": 2 cpus * 3 replicas = 6 cpus, 512 MB * 3 = 1536 MB
+        assert_eq!(quota.used_cpus, 6);
+        assert_eq!(quota.used_memory, 1536);
+        assert_eq!(quota.used_containers, 3);
+        assert_eq!(quota.used_vms, 0);
+    }
+
+    #[test]
+    fn calculate_quota_usage_combines_vm_and_container_group_cpu_and_memory() {
+        let mut quota = sample_quota();
+        let mut vm = vm_model::VM::new("vm-1".to_string(), "img".to_string(), 4, 4096);
+        vm.labels = Some(std::collections::HashMap::from([(
+            "tenant".to_string(),
+            "acme".to_string(),
+        )]));
+        quota.tenant = Some("acme".to_string());
+        let groups = vec![sample_container_group("web", Some("acme"), 1)];
+        calculate_quota_usage(&[vm], &groups, &mut quota);
+        assert_eq!(quota.used_cpus, 4 + 2);
+        assert_eq!(quota.used_memory, 4096 + 512);
+        assert_eq!(quota.used_vms, 1);
+        assert_eq!(quota.used_containers, 1);
+    }
+
+    #[test]
+    fn quota_usage_containers_percent_is_none_without_max_containers() {
+        let quota = sample_quota();
+        let usage = QuotaUsage::from_quota(&quota);
+        assert!(usage.containers_percent.is_none());
+    }
+
+    #[test]
+    fn quota_usage_flags_exceeded_containers() {
+        let mut quota = sample_quota();
+        quota.max_containers = Some(2);
+        quota.used_containers = 3;
+        let usage = QuotaUsage::from_quota(&quota);
+        assert_eq!(usage.containers_percent, Some(150.0));
+        assert!(usage.is_exceeded);
+        assert!(usage.exceeded_resources.contains(&"containers".to_string()));
+    }
+
+    #[test]
+    fn calculate_quota_usage_is_zero_once_the_only_group_is_excluded() {
+        // `check_quota_enforcement` re-applying an existing ContainerGroup
+        // filters that group's own (stale, pre-apply) spec out of the
+        // container_groups list before calling `calculate_quota_usage` --
+        // otherwise a no-op re-apply would double-count the group's own
+        // prior contribution against itself and get rejected. This checks
+        // the usage math that filtering relies on.
+        let mut quota = ResourceQuota {
+            max_cpus: 2,
+            max_containers: Some(1),
+            tenant: Some("acme".to_string()),
+            ..sample_quota()
+        };
+        let all_groups = vec![sample_container_group("web", Some("acme"), 1)];
+        let excluding_web: Vec<ContainerGroupSpec> = all_groups
+            .iter()
+            .filter(|cg| cg.name != "web")
+            .cloned()
+            .collect();
+
+        calculate_quota_usage(&[], &all_groups, &mut quota);
+        assert_eq!(quota.used_cpus, 2);
+        assert_eq!(quota.used_containers, 1);
+
+        calculate_quota_usage(&[], &excluding_web, &mut quota);
+        assert_eq!(quota.used_cpus, 0);
+        assert_eq!(quota.used_containers, 0);
+    }
 }

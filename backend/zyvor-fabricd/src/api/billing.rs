@@ -1,6 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::api::container_declarative::ContainerGroupSpec;
 use crate::server::AppState;
 use axum::{
     extract::{Path, State},
@@ -130,6 +131,29 @@ pub async fn generate_invoice(
         total_usage.cpu_hours += vm.cpus as f64 * hours;
         total_usage.memory_gb_hours += (vm.memory as f64 / 1024.0) * hours;
         total_usage.storage_gb_hours += vm.disk as f64 * hours;
+    }
+
+    // Collect usage for all ContainerGroups belonging to this tenant (by
+    // `spec.tenant` or a tag matching the tenant id, mirroring the VM
+    // filter above). ContainerGroup has no disk concept, so it only
+    // contributes CPU/memory hours.
+    let container_groups = state
+        .store
+        .list_entities::<ContainerGroupSpec>("container_groups")
+        .unwrap_or_default();
+    let tenant_groups: Vec<&ContainerGroupSpec> = container_groups
+        .iter()
+        .filter(|cg| {
+            cg.tenant.as_deref() == Some(tenant_id.as_str())
+                || cg.tags.iter().any(|t| t == &tenant_id)
+        })
+        .collect();
+
+    for cg in &tenant_groups {
+        let hours = 720.0; // 30 days
+        let (cpus, memory_mb) = cg.total_resources();
+        total_usage.cpu_hours += cpus as f64 * hours;
+        total_usage.memory_gb_hours += (memory_mb as f64 / 1024.0) * hours;
     }
 
     let invoice = billing::calculate_cost(&total_usage, &pricing);

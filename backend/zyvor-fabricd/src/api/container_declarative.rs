@@ -244,6 +244,7 @@ pub enum ContainerGroupEventType {
     Applied,
     Deleted,
     PlacementFailed,
+    QuotaExceeded,
 }
 
 fn record_container_group_event(
@@ -299,7 +300,7 @@ fn is_valid_k8s_object_name(name: &str) -> bool {
 /// object name, and unlike `image_pull_secrets` entries a tenant is
 /// combined with a prefix (`{base}-{tenant}`), so it's capped well short
 /// of 63 to leave the base namespace name room.
-fn is_valid_tenant_name(tenant: &str) -> bool {
+pub(crate) fn is_valid_tenant_name(tenant: &str) -> bool {
     if tenant.is_empty() || tenant.len() > 40 {
         return false;
     }
@@ -660,6 +661,36 @@ pub async fn apply_container_group_spec(
         Ok(None)
     );
 
+    // Reject before touching Kubernetes at all if this would exceed a
+    // tenant/tag-scoped quota. `exclude_container_group` drops this group's
+    // own previous spec (if any) from the usage count first, since
+    // `total_resources()`/`spec.replicas` below are this apply's full new
+    // footprint, not an incremental add over the old one.
+    let (req_cpus, req_memory_mb) = spec.total_resources();
+    if let Err(e) = super::quotas::check_quota_enforcement(
+        &state,
+        req_cpus,
+        req_memory_mb,
+        0,
+        &spec.tags,
+        spec.tenant.as_deref(),
+        0,
+        spec.replicas,
+        Some(spec.name.as_str()),
+    )
+    .await
+    {
+        record_container_group_event(
+            &state,
+            ContainerGroupEventType::QuotaExceeded,
+            &spec.name,
+            spec.tenant.clone(),
+            claims.sub.clone(),
+            Some(e.clone()),
+        );
+        return Err(err(StatusCode::FORBIDDEN, e));
+    }
+
     // Pods from a previous apply that a lower `replicas` (or any other spec
     // change) no longer wants — collected now, before they're overwritten,
     // so they can be deleted once the new desired set exists. Without this,
@@ -922,6 +953,21 @@ mod tests {
         assert!(!obj.contains_key("tenant"));
         assert!(!obj.contains_key("detail"));
         assert_eq!(json["actor"], "user-1");
+    }
+
+    #[test]
+    fn quota_exceeded_event_type_serializes_as_snake_case() {
+        let event = ContainerGroupEvent {
+            id: "e1".to_string(),
+            event_type: ContainerGroupEventType::QuotaExceeded,
+            container_group_name: "web".to_string(),
+            tenant: Some("acme".to_string()),
+            actor: "user-1".to_string(),
+            detail: Some("CPU quota exceeded".to_string()),
+            timestamp: chrono::Utc::now(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["event_type"], "quota_exceeded");
     }
 
     #[test]
