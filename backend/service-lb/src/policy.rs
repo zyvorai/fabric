@@ -10,9 +10,7 @@
 
 use crate::{
     domain_key,
-    remote_identity::{
-        resolve_policy_identities, RemoteIdentityDirectory, RemoteIpcacheClient,
-    },
+    remote_identity::{resolve_policy_identities, RemoteIdentityDirectory, RemoteIpcacheClient},
     EdgeLease, NodeTarget, ServiceSpec,
 };
 use anyhow::{bail, Context, Result};
@@ -335,8 +333,14 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
         if nodes.is_empty() {
             bail!("policy apply requires at least one FluxVM node");
         }
-        let targets =
-            policy_fanout_nodes(&spec.service, nodes, site_id, route_domain, leases, now_unix_ms);
+        let targets = policy_fanout_nodes(
+            &spec.service,
+            nodes,
+            site_id,
+            route_domain,
+            leases,
+            now_unix_ms,
+        );
         if targets.is_empty() {
             bail!("policy apply has no nodes in the owning site/route-domain");
         }
@@ -404,8 +408,14 @@ impl<C: PolicyNodeClient> PolicyOrchestrator<C> {
                 report.unresolved
             );
         }
-        let targets =
-            policy_fanout_nodes(&spec.service, nodes, site_id, route_domain, leases, now_unix_ms);
+        let targets = policy_fanout_nodes(
+            &spec.service,
+            nodes,
+            site_id,
+            route_domain,
+            leases,
+            now_unix_ms,
+        );
         if targets.is_empty() {
             bail!("policy apply has no nodes in the owning site/route-domain");
         }
@@ -521,9 +531,7 @@ fn policy_fanout_nodes<'a>(
     let leased: HashSet<&str> = leases
         .iter()
         .filter(|lease| lease.active(service, now_unix_ms))
-        .filter(|lease| {
-            domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref()) == want
-        })
+        .filter(|lease| domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref()) == want)
         .map(|lease| lease.node.as_str())
         .collect();
     nodes
@@ -684,14 +692,7 @@ mod tests {
             },
         ];
         let report = orch
-            .apply_with_site(
-                &policy,
-                &nodes,
-                Some("site-a"),
-                Some("rd-1"),
-                &leases,
-                100,
-            )
+            .apply_with_site(&policy, &nodes, Some("site-a"), Some("rd-1"), &leases, 100)
             .await
             .unwrap();
         assert_eq!(report.applied_nodes, vec!["a"]);
@@ -702,7 +703,9 @@ mod tests {
 
     #[tokio::test]
     async fn policy_apply_merges_same_domain_remote_and_fail_closed() {
-        use crate::remote_identity::{RemoteIdentity, RemoteIdentityDirectory, RemoteIpcacheClient};
+        use crate::remote_identity::{
+            RemoteIdentity, RemoteIdentityDirectory, RemoteIpcacheClient,
+        };
         use async_trait::async_trait;
         use std::collections::BTreeMap;
         use tempfile::tempdir;
