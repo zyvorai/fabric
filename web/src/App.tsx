@@ -30,6 +30,7 @@ const Zones = lazy(() => import('./pages/Zones'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Templates = lazy(() => import('./pages/Templates'))
 const Quotas = lazy(() => import('./pages/Quotas'))
+const ContainerGroups = lazy(() => import('./pages/ContainerGroups'))
 const Schedules = lazy(() => import('./pages/Schedules'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
 const Analytics = lazy(() => import('./pages/Analytics'))
@@ -138,6 +139,7 @@ function ConsoleRoutes() {
             <Route path="storage" element={<Storage />} />
             <Route path="templates" element={<Templates />} />
             <Route path="quotas" element={<Quotas />} />
+            <Route path="container-groups" element={<ContainerGroups />} />
             <Route path="schedules" element={<Schedules />} />
             <Route path="autoscale" element={<AutoscalePage />} />
             <Route path="zones" element={<Zones />} />

@@ -517,6 +517,77 @@ describe('contentLibrary', () => {
   })
 })
 
+// ─── containerGroups.ts ───────────────────────────────────────────────────────
+
+describe('containerGroups', () => {
+  it('listContainerGroups calls apiGet', async () => {
+    const { listContainerGroups } = await import('../containerGroups')
+    await listContainerGroups()
+    expect(mockApiGet).toHaveBeenCalledWith('/api/container-groups')
+  })
+
+  it('getContainerGroup calls apiGet with the encoded name', async () => {
+    const { getContainerGroup } = await import('../containerGroups')
+    await getContainerGroup('web app')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/container-groups/web%20app/spec')
+  })
+
+  it('applyContainerGroup calls apiPost with the spec', async () => {
+    const { applyContainerGroup } = await import('../containerGroups')
+    const spec = { name: 'web', containers: [{ name: 'app', image: 'nginx', resources: { cpus: 1, memory: '512M' } }] }
+    await applyContainerGroup(spec)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/container-groups/apply', spec)
+  })
+
+  it('deleteContainerGroup calls apiDelete with the encoded name', async () => {
+    const { deleteContainerGroup } = await import('../containerGroups')
+    await deleteContainerGroup('web')
+    expect(mockApiDelete).toHaveBeenCalledWith('/api/container-groups/web')
+  })
+
+  it('listContainerGroupEvents calls apiGet', async () => {
+    const { listContainerGroupEvents } = await import('../containerGroups')
+    await listContainerGroupEvents()
+    expect(mockApiGet).toHaveBeenCalledWith('/api/container-group-events')
+  })
+
+  it('listContainerGroupBackups calls apiGet', async () => {
+    const { listContainerGroupBackups } = await import('../containerGroups')
+    await listContainerGroupBackups()
+    expect(mockApiGet).toHaveBeenCalledWith('/api/container-group-backups')
+  })
+
+  it('createContainerGroupBackup calls apiPost with a default retention of 30 days', async () => {
+    const { createContainerGroupBackup } = await import('../containerGroups')
+    await createContainerGroupBackup('web')
+    expect(mockApiPost).toHaveBeenCalledWith('/api/container-group-backups', {
+      container_group_name: 'web',
+      retention_days: 30,
+    })
+  })
+
+  it('createContainerGroupBackup respects an explicit retention', async () => {
+    const { createContainerGroupBackup } = await import('../containerGroups')
+    await createContainerGroupBackup('web', 7)
+    expect(mockApiPost).toHaveBeenCalledWith('/api/container-group-backups', {
+      container_group_name: 'web',
+      retention_days: 7,
+    })
+  })
+
+  it('deleteContainerGroupBackup calls apiDelete with the encoded id', async () => {
+    const { deleteContainerGroupBackup } = await import('../containerGroups')
+    await deleteContainerGroupBackup('backup-1')
+    expect(mockApiDelete).toHaveBeenCalledWith('/api/container-group-backups/backup-1')
+  })
+
+  it('restoreContainerGroupBackup calls apiPost with no body', async () => {
+    const { restoreContainerGroupBackup } = await import('../containerGroups')
+    await restoreContainerGroupBackup('backup-1')
+    expect(mockApiPost).toHaveBeenCalledWith('/api/container-group-backups/backup-1/restore')
+  })
+})
+
 // ─── datacenter.ts ────────────────────────────────────────────────────────────
 
 describe('datacenter', () => {
