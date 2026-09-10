@@ -134,6 +134,42 @@ pub struct ContainerGroupSpec {
     /// (e.g. via a separate `kubectl create secret docker-registry`).
     #[serde(default)]
     pub image_pull_secrets: Vec<String>,
+    /// Kubernetes `NetworkPolicy` isolating this group's Pods. `None`
+    /// (default) creates no policy at all — unrestricted, matching today's
+    /// behavior. A standard K8s `NetworkPolicy` rather than fabric's own
+    /// Cilium-identity-based `VmNetworkPolicy` (which VMs use): that engine
+    /// keys policy on a FluxVM VM id, and a ContainerGroup's underlying
+    /// per-Pod microVM id is only knowable by polling FluxVM and matching
+    /// `pod_uid` after the fact — real, but meaningfully more machinery
+    /// than a v1 needs. `NetworkPolicy` is portable to any CNI that
+    /// enforces it and needs no such correlation.
+    #[serde(default)]
+    pub network_policy: Option<NetworkPolicySpec>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NetworkPolicySpec {
+    /// `None` leaves ingress unrestricted by this policy. `Some(vec![])`
+    /// denies all ingress. `Some(rules)` allows only what the rules
+    /// describe.
+    #[serde(default)]
+    pub ingress: Option<Vec<NetworkPolicyRuleSpec>>,
+    /// Same semantics as `ingress`, for outbound traffic.
+    #[serde(default)]
+    pub egress: Option<Vec<NetworkPolicyRuleSpec>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NetworkPolicyRuleSpec {
+    /// Allow from/to another ContainerGroup's Pods in the same namespace,
+    /// by name.
+    #[serde(default)]
+    pub from_container_groups: Vec<String>,
+    #[serde(default)]
+    pub from_cidrs: Vec<String>,
+    /// Empty means all ports for whatever this rule matches.
+    #[serde(default)]
+    pub ports: Vec<u16>,
 }
 
 fn default_replicas() -> u32 {
@@ -386,6 +422,34 @@ fn validate_spec(spec: &ContainerGroupSpec) -> Result<(), (StatusCode, Json<serd
             }
         }
     }
+
+    if let Some(policy) = &spec.network_policy {
+        for (direction, rules) in [("ingress", &policy.ingress), ("egress", &policy.egress)] {
+            let Some(rules) = rules else { continue };
+            for rule in rules {
+                for group in &rule.from_container_groups {
+                    crate::validation::validate_vm_name(group).map_err(|(s, m)| {
+                        err(s, format!("network_policy.{direction}: invalid from_container_groups entry '{group}': {m}"))
+                    })?;
+                }
+                for cidr in &rule.from_cidrs {
+                    crate::validation::validate_cidr(cidr).map_err(|m| {
+                        err(
+                            StatusCode::BAD_REQUEST,
+                            format!("network_policy.{direction}: invalid from_cidrs entry '{cidr}': {m}"),
+                        )
+                    })?;
+                }
+                if rule.ports.contains(&0) {
+                    return Err(err(
+                        StatusCode::BAD_REQUEST,
+                        format!("network_policy.{direction}: port must be between 1 and 65535"),
+                    ));
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -432,6 +496,49 @@ fn build_probe_request(probe: &ProbeSpec) -> k8s_pod_client::ProbeSpec {
         success_threshold: probe.success_threshold,
         failure_threshold: probe.failure_threshold,
     }
+}
+
+fn build_network_policy_rule(rule: &NetworkPolicyRuleSpec) -> k8s_pod_client::NetworkPolicyRule {
+    let peer_label_selectors = rule
+        .from_container_groups
+        .iter()
+        .map(|group| {
+            let mut labels = std::collections::BTreeMap::new();
+            labels.insert(
+                "fabric.zyvor.dev/container-group".to_string(),
+                group.clone(),
+            );
+            labels
+        })
+        .collect();
+    k8s_pod_client::NetworkPolicyRule {
+        peer_label_selectors,
+        cidrs: rule.from_cidrs.clone(),
+        ports: rule.ports.clone(),
+    }
+}
+
+pub(crate) fn build_network_policy_request(
+    spec: &ContainerGroupSpec,
+) -> Option<k8s_pod_client::NetworkPolicyRequest> {
+    let policy = spec.network_policy.as_ref()?;
+    let mut pod_selector_labels = std::collections::BTreeMap::new();
+    pod_selector_labels.insert(
+        "fabric.zyvor.dev/container-group".to_string(),
+        spec.name.clone(),
+    );
+    Some(k8s_pod_client::NetworkPolicyRequest {
+        name: spec.name.clone(),
+        pod_selector_labels,
+        ingress: policy
+            .ingress
+            .as_ref()
+            .map(|rules| rules.iter().map(build_network_policy_rule).collect()),
+        egress: policy
+            .egress
+            .as_ref()
+            .map(|rules| rules.iter().map(build_network_policy_rule).collect()),
+    })
 }
 
 pub(crate) fn build_pod_request(
@@ -617,6 +724,28 @@ pub async fn apply_container_group_spec(
         }
     }
 
+    match build_network_policy_request(&spec) {
+        Some(policy_req) => {
+            if let Err(e) = client
+                .apply_network_policy(&policy_req, namespace.as_deref())
+                .await
+            {
+                warnings.push(format!("failed to apply network policy: {e}"));
+            }
+        }
+        // No policy this apply -- remove any the group had before rather
+        // than leaving a stale one enforcing rules the current spec no
+        // longer declares.
+        None => {
+            if let Err(e) = client
+                .delete_network_policy(&spec.name, namespace.as_deref())
+                .await
+            {
+                warnings.push(format!("failed to remove stale network policy: {e}"));
+            }
+        }
+    }
+
     state
         .store
         .save_entity("container_groups", &spec.name, &spec)
@@ -704,8 +833,8 @@ pub async fn delete_container_group(
         .get_entity::<ContainerGroupStatus>("container_group_status", &name)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    if let Some(status) = status {
-        if let Some(client) = state.k8s_pod_client.clone() {
+    if let Some(client) = state.k8s_pod_client.clone() {
+        if let Some(status) = status {
             for pod in &status.pod_names {
                 if let Err(e) = client.delete_pod(pod, namespace.as_deref()).await {
                     tracing::warn!(
@@ -716,6 +845,16 @@ pub async fn delete_container_group(
                     );
                 }
             }
+        }
+        if let Err(e) = client
+            .delete_network_policy(&name, namespace.as_deref())
+            .await
+        {
+            tracing::warn!(
+                "failed to delete network policy for ContainerGroup '{}': {}",
+                name,
+                e
+            );
         }
     }
 
@@ -975,5 +1114,79 @@ mod tests {
             failure_threshold: Some(3),
         };
         assert!(validate_probe(&probe).is_ok());
+    }
+
+    fn sample_container_group_spec() -> ContainerGroupSpec {
+        serde_json::from_str(
+            r#"{"name": "web", "containers": [{"name": "app", "image": "nginx", "resources": {"cpus": 1, "memory": "512M"}}]}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn network_policy_defaults_to_none_when_omitted() {
+        let spec = sample_container_group_spec();
+        assert!(spec.network_policy.is_none());
+        assert!(build_network_policy_request(&spec).is_none());
+    }
+
+    #[test]
+    fn build_network_policy_request_maps_a_container_group_peer() {
+        let mut spec = sample_container_group_spec();
+        spec.network_policy = Some(NetworkPolicySpec {
+            ingress: Some(vec![NetworkPolicyRuleSpec {
+                from_container_groups: vec!["frontend".to_string()],
+                from_cidrs: vec![],
+                ports: vec![8080],
+            }]),
+            egress: None,
+        });
+        let req = build_network_policy_request(&spec).expect("network policy request");
+        assert_eq!(req.name, "web");
+        let ingress = req.ingress.expect("ingress rules");
+        assert_eq!(
+            ingress[0].peer_label_selectors[0]["fabric.zyvor.dev/container-group"],
+            "frontend"
+        );
+        assert_eq!(ingress[0].ports, vec![8080]);
+        assert!(req.egress.is_none());
+    }
+
+    #[test]
+    fn validate_spec_rejects_a_malformed_cidr_in_network_policy() {
+        let mut spec = sample_container_group_spec();
+        spec.network_policy = Some(NetworkPolicySpec {
+            ingress: Some(vec![NetworkPolicyRuleSpec {
+                from_container_groups: vec![],
+                from_cidrs: vec!["not-a-cidr".to_string()],
+                ports: vec![],
+            }]),
+            egress: None,
+        });
+        assert!(validate_spec(&spec).is_err());
+    }
+
+    #[test]
+    fn validate_spec_rejects_a_zero_port_in_network_policy() {
+        let mut spec = sample_container_group_spec();
+        spec.network_policy = Some(NetworkPolicySpec {
+            ingress: None,
+            egress: Some(vec![NetworkPolicyRuleSpec {
+                from_container_groups: vec![],
+                from_cidrs: vec![],
+                ports: vec![0],
+            }]),
+        });
+        assert!(validate_spec(&spec).is_err());
+    }
+
+    #[test]
+    fn validate_spec_accepts_a_deny_all_network_policy() {
+        let mut spec = sample_container_group_spec();
+        spec.network_policy = Some(NetworkPolicySpec {
+            ingress: Some(vec![]),
+            egress: None,
+        });
+        assert!(validate_spec(&spec).is_ok());
     }
 }

@@ -17,8 +17,12 @@ use k8s_openapi::api::core::v1::{
     Namespace, Pod, PodSpec, PodStatus, Probe, ResourceRequirements, TCPSocketAction, Toleration,
     Volume, VolumeMount as K8sVolumeMount,
 };
+use k8s_openapi::api::networking::v1::{
+    IPBlock, NetworkPolicy, NetworkPolicyEgressRule, NetworkPolicyIngressRule, NetworkPolicyPeer,
+    NetworkPolicyPort, NetworkPolicySpec as K8sNetworkPolicySpec,
+};
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::api::{Api, DeleteParams, PatchParams, PostParams};
 use kube::config::{KubeConfigOptions, Kubeconfig};
@@ -130,6 +134,35 @@ pub struct PodStatusView {
     pub resource_version: Option<String>,
 }
 
+/// One `from`/`to` peer plus the ports it's allowed on, for one direction of
+/// a `NetworkPolicy` rule. Peers are OR'd together (any one matching is
+/// enough); an empty `peer_labels`/`cidr` set with a non-empty `ports` list
+/// means "any source/destination, but only on these ports" (an absent
+/// Kubernetes `from`/`to` field, not an empty-array "match nothing").
+pub struct NetworkPolicyRule {
+    /// Each entry becomes its own `podSelector` peer (OR'd with the others
+    /// and with `cidr`) — e.g. `{"fabric.zyvor.dev/container-group": "web"}`
+    /// to allow from another ContainerGroup's Pods in the same namespace.
+    pub peer_label_selectors: Vec<BTreeMap<String, String>>,
+    pub cidrs: Vec<String>,
+    /// Empty means "all ports" for whatever peers this rule matches.
+    pub ports: Vec<u16>,
+}
+
+/// A Kubernetes `NetworkPolicy`. `ingress`/`egress` being `None` leaves that
+/// direction untouched by this policy (unrestricted, unless some *other*
+/// NetworkPolicy in the namespace isolates it); `Some(vec![])` isolates
+/// that direction with zero allowed rules (deny-all); `Some(rules)` allows
+/// only what the rules describe.
+pub struct NetworkPolicyRequest {
+    pub name: String,
+    /// Pods this policy applies to — a ContainerGroup's own
+    /// `fabric.zyvor.dev/container-group` label in practice.
+    pub pod_selector_labels: BTreeMap<String, String>,
+    pub ingress: Option<Vec<NetworkPolicyRule>>,
+    pub egress: Option<Vec<NetworkPolicyRule>>,
+}
+
 pub struct K8sPodClient {
     client: Client,
     /// Namespace used when a caller doesn't ask for a specific one — the
@@ -229,6 +262,135 @@ impl K8sPodClient {
             Ok(None) => Ok(None),
             Err(e) => Err(e).with_context(|| format!("getting Pod '{name}'")),
         }
+    }
+
+    fn network_policies_in(&self, namespace: Option<&str>) -> Api<NetworkPolicy> {
+        Api::namespaced(
+            self.client.clone(),
+            namespace.unwrap_or(&self.default_namespace),
+        )
+    }
+
+    /// Create (or replace, via server-side apply) the `NetworkPolicy`
+    /// isolating a ContainerGroup. Idempotent the same way `create_pod` is.
+    pub async fn apply_network_policy(
+        &self,
+        req: &NetworkPolicyRequest,
+        namespace: Option<&str>,
+    ) -> Result<()> {
+        let policy = build_network_policy(req);
+        let pp = PatchParams::apply("zyvor-fabricd").force();
+        self.network_policies_in(namespace)
+            .patch(&req.name, &pp, &kube::api::Patch::Apply(&policy))
+            .await
+            .with_context(|| format!("applying NetworkPolicy '{}'", req.name))?;
+        Ok(())
+    }
+
+    pub async fn delete_network_policy(&self, name: &str, namespace: Option<&str>) -> Result<()> {
+        match self
+            .network_policies_in(namespace)
+            .delete(name, &DeleteParams::default())
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(kube::Error::Api(e)) if e.code == 404 => Ok(()),
+            Err(e) => Err(e).with_context(|| format!("deleting NetworkPolicy '{name}'")),
+        }
+    }
+}
+
+fn build_network_policy_peers(rule: &NetworkPolicyRule) -> Option<Vec<NetworkPolicyPeer>> {
+    let mut peers = Vec::new();
+    for labels in &rule.peer_label_selectors {
+        peers.push(NetworkPolicyPeer {
+            pod_selector: Some(LabelSelector {
+                match_labels: Some(labels.clone()),
+                match_expressions: None,
+            }),
+            ip_block: None,
+            namespace_selector: None,
+        });
+    }
+    for cidr in &rule.cidrs {
+        peers.push(NetworkPolicyPeer {
+            ip_block: Some(IPBlock {
+                cidr: cidr.clone(),
+                except: None,
+            }),
+            pod_selector: None,
+            namespace_selector: None,
+        });
+    }
+    if peers.is_empty() {
+        None
+    } else {
+        Some(peers)
+    }
+}
+
+fn build_network_policy_ports(rule: &NetworkPolicyRule) -> Option<Vec<NetworkPolicyPort>> {
+    if rule.ports.is_empty() {
+        return None;
+    }
+    Some(
+        rule.ports
+            .iter()
+            .map(|p| NetworkPolicyPort {
+                port: Some(IntOrString::Int(*p as i32)),
+                protocol: None,
+                end_port: None,
+            })
+            .collect(),
+    )
+}
+
+fn build_network_policy(req: &NetworkPolicyRequest) -> NetworkPolicy {
+    let ingress = req.ingress.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| NetworkPolicyIngressRule {
+                from: build_network_policy_peers(r),
+                ports: build_network_policy_ports(r),
+            })
+            .collect()
+    });
+    let egress = req.egress.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| NetworkPolicyEgressRule {
+                to: build_network_policy_peers(r),
+                ports: build_network_policy_ports(r),
+            })
+            .collect()
+    });
+
+    let mut policy_types = Vec::new();
+    if req.ingress.is_some() {
+        policy_types.push("Ingress".to_string());
+    }
+    if req.egress.is_some() {
+        policy_types.push("Egress".to_string());
+    }
+
+    NetworkPolicy {
+        metadata: ObjectMeta {
+            name: Some(req.name.clone()),
+            ..Default::default()
+        },
+        spec: Some(K8sNetworkPolicySpec {
+            pod_selector: LabelSelector {
+                match_labels: Some(req.pod_selector_labels.clone()),
+                match_expressions: None,
+            },
+            ingress,
+            egress,
+            policy_types: if policy_types.is_empty() {
+                None
+            } else {
+                Some(policy_types)
+            },
+        }),
     }
 }
 
@@ -601,5 +763,82 @@ mod tests {
             exec.command.as_deref(),
             Some(["cat".to_string(), "/tmp/healthy".to_string()].as_slice())
         );
+    }
+
+    fn sample_network_policy_request() -> NetworkPolicyRequest {
+        let mut selector = BTreeMap::new();
+        selector.insert(
+            "fabric.zyvor.dev/container-group".to_string(),
+            "web".to_string(),
+        );
+        NetworkPolicyRequest {
+            name: "web".to_string(),
+            pod_selector_labels: selector,
+            ingress: None,
+            egress: None,
+        }
+    }
+
+    #[test]
+    fn build_network_policy_leaves_a_direction_untouched_when_absent() {
+        let req = sample_network_policy_request();
+        let policy = build_network_policy(&req);
+        let spec = policy.spec.expect("policy spec");
+        assert!(spec.policy_types.is_none());
+        assert!(spec.ingress.is_none());
+        assert!(spec.egress.is_none());
+    }
+
+    #[test]
+    fn build_network_policy_deny_all_ingress_is_isolated_with_no_rules() {
+        let mut req = sample_network_policy_request();
+        req.ingress = Some(vec![]);
+        let policy = build_network_policy(&req);
+        let spec = policy.spec.expect("policy spec");
+        assert_eq!(
+            spec.policy_types.as_deref(),
+            Some(["Ingress".to_string()].as_slice())
+        );
+        assert_eq!(spec.ingress, Some(vec![]));
+    }
+
+    #[test]
+    fn build_network_policy_allows_from_another_container_group_and_a_cidr() {
+        let mut req = sample_network_policy_request();
+        let mut peer_labels = BTreeMap::new();
+        peer_labels.insert(
+            "fabric.zyvor.dev/container-group".to_string(),
+            "frontend".to_string(),
+        );
+        req.ingress = Some(vec![NetworkPolicyRule {
+            peer_label_selectors: vec![peer_labels],
+            cidrs: vec!["10.0.0.0/8".to_string()],
+            ports: vec![8080],
+        }]);
+        let policy = build_network_policy(&req);
+        let spec = policy.spec.expect("policy spec");
+        let ingress = spec.ingress.expect("ingress rules");
+        assert_eq!(ingress.len(), 1);
+        let from = ingress[0].from.as_ref().expect("from peers");
+        assert_eq!(from.len(), 2);
+        assert!(from[0].pod_selector.is_some());
+        assert!(from[1].ip_block.is_some());
+        let ports = ingress[0].ports.as_ref().expect("ports");
+        assert_eq!(ports[0].port, Some(IntOrString::Int(8080)));
+    }
+
+    #[test]
+    fn build_network_policy_port_only_rule_has_no_peer_restriction() {
+        let mut req = sample_network_policy_request();
+        req.egress = Some(vec![NetworkPolicyRule {
+            peer_label_selectors: vec![],
+            cidrs: vec![],
+            ports: vec![53],
+        }]);
+        let policy = build_network_policy(&req);
+        let spec = policy.spec.expect("policy spec");
+        let egress = spec.egress.expect("egress rules");
+        assert!(egress[0].to.is_none());
+        assert!(egress[0].ports.is_some());
     }
 }
