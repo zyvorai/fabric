@@ -30,6 +30,7 @@ on:
 
 jobs:
   build:
+    name: build (${{ matrix.name }})
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.image }}
