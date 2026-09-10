@@ -584,10 +584,7 @@ pub async fn reconcile_vpn(state: &AppState) -> anyhow::Result<()> {
 
     // All Fabric-owned iface names (including disabled) — stale removal must
     // not touch unmanaged host WireGuard (e.g. Cilium).
-    let mut managed_names: Vec<String> = tunnels
-        .iter()
-        .map(|t| t.interface_name.clone())
-        .collect();
+    let mut managed_names: Vec<String> = tunnels.iter().map(|t| t.interface_name.clone()).collect();
 
     let enabled_tunnels: Vec<VpnTunnel> = tunnels.into_iter().filter(|t| t.enabled).collect();
     let enabled_networks: Vec<VpnNetwork> = networks.into_iter().filter(|n| n.enabled).collect();

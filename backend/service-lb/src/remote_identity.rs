@@ -144,18 +144,12 @@ impl RemoteIdentityDirectory {
                 true
             })
             .collect();
-        out.sort_by(|a, b| {
-            (&a.route_domain, a.identity_id).cmp(&(&b.route_domain, b.identity_id))
-        });
+        out.sort_by(|a, b| (&a.route_domain, a.identity_id).cmp(&(&b.route_domain, b.identity_id)));
         Ok(out)
     }
 
     /// Delete by `(route_domain, identity_id)`. Returns the removed entry if any.
-    pub fn delete(
-        &self,
-        route_domain: &str,
-        identity_id: u32,
-    ) -> Result<Option<RemoteIdentity>> {
+    pub fn delete(&self, route_domain: &str, identity_id: u32) -> Result<Option<RemoteIdentity>> {
         let rd = if route_domain.is_empty() {
             default_route_domain()
         } else {
@@ -276,12 +270,8 @@ pub struct RemoteReconcileReport {
 
 #[async_trait]
 pub trait RemoteIpcacheClient: Send + Sync {
-    async fn upsert_remote(
-        &self,
-        node: &NodeTarget,
-        identity: u32,
-        cidrs: &[String],
-    ) -> Result<()>;
+    async fn upsert_remote(&self, node: &NodeTarget, identity: u32, cidrs: &[String])
+        -> Result<()>;
     async fn delete_remote(&self, node: &NodeTarget, identity: u32) -> Result<()>;
     /// Refresh FluxVM sid maps after ipcache mutation (best-effort optional).
     async fn reconcile_policies(&self, node: &NodeTarget) -> Result<()> {
@@ -405,7 +395,14 @@ impl<C: RemoteIpcacheClient> RemoteIdentityOrchestrator<C> {
         }
         let rd = route_domain.unwrap_or("default");
         let entries = self.directory.list(site_id, Some(rd))?;
-        let targets = reconcile_targets(nodes, site_id, Some(rd), leases, service_for_leases, now_unix_ms);
+        let targets = reconcile_targets(
+            nodes,
+            site_id,
+            Some(rd),
+            leases,
+            service_for_leases,
+            now_unix_ms,
+        );
         if targets.is_empty() {
             bail!("remote identity reconcile has no nodes in the owning site/route-domain");
         }
@@ -434,6 +431,7 @@ impl<C: RemoteIpcacheClient> RemoteIdentityOrchestrator<C> {
     }
 
     /// Delete from directory and strip remote ipcache rows on fan-out nodes.
+    #[allow(clippy::too_many_arguments)]
     pub async fn delete_and_unfan(
         &self,
         route_domain: &str,
@@ -519,9 +517,7 @@ fn reconcile_targets<'a>(
     let leased: HashSet<&str> = leases
         .iter()
         .filter(|lease| lease.active(service, now_unix_ms))
-        .filter(|lease| {
-            domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref()) == want
-        })
+        .filter(|lease| domain_key(lease.site_id.as_deref(), lease.route_domain.as_deref()) == want)
         .map(|lease| lease.node.as_str())
         .collect();
     if leased.is_empty() {
@@ -600,14 +596,8 @@ mod tests {
                 updated_unix_ms: 1,
             })
             .unwrap();
-        let report = resolve_policy_identities(
-            &[42],
-            &[],
-            Some("rd-1"),
-            &store,
-            &HashSet::new(),
-        )
-        .unwrap();
+        let report =
+            resolve_policy_identities(&[42], &[], Some("rd-1"), &store, &HashSet::new()).unwrap();
         assert_eq!(report.resolved_remote, vec![42]);
         assert!(report.unresolved.is_empty());
     }
@@ -626,14 +616,8 @@ mod tests {
                 updated_unix_ms: 1,
             })
             .unwrap();
-        let report = resolve_policy_identities(
-            &[42],
-            &[],
-            Some("rd-1"),
-            &store,
-            &HashSet::new(),
-        )
-        .unwrap();
+        let report =
+            resolve_policy_identities(&[42], &[], Some("rd-1"), &store, &HashSet::new()).unwrap();
         assert!(report.resolved_remote.is_empty());
         assert_eq!(report.unresolved, vec![42]);
     }

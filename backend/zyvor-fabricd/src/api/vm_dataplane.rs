@@ -1075,7 +1075,11 @@ pub async fn upsert_service_policy(
             if !remotes.is_empty() {
                 let remote = service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new()
                     .map_err(|e| {
-                        map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote ipcache client", e)
+                        map_driver_err(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "remote ipcache client",
+                            e,
+                        )
                     })?;
                 for node in &nodes {
                     for entry in &remotes {
@@ -1137,7 +1141,9 @@ pub async fn service_envoy_contract(
     fluxvm_json_get(&state, &format!("/v1/network/services/{name}/l7/envoy")).await
 }
 
-fn remote_identity_directory(state: &AppState) -> service_lb::remote_identity::RemoteIdentityDirectory {
+fn remote_identity_directory(
+    state: &AppState,
+) -> service_lb::remote_identity::RemoteIdentityDirectory {
     let path = std::path::PathBuf::from(&state.config.storage.path)
         .join("service-fabric")
         .join("remote-identities.json");
@@ -1196,12 +1202,20 @@ pub async fn delete_remote_identity(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Path((route_domain, identity_id)): Path<(String, u32)>,
-) -> Result<Json<service_lb::remote_identity::RemoteReconcileReport>, (StatusCode, Json<serde_json::Value>)>
-{
+) -> Result<
+    Json<service_lb::remote_identity::RemoteReconcileReport>,
+    (StatusCode, Json<serde_json::Value>),
+> {
     let nodes = service_nodes(&state);
     let dir = remote_identity_directory(&state);
-    let client = service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new()
-        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote ipcache client", e))?;
+    let client =
+        service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new().map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "remote ipcache client",
+                e,
+            )
+        })?;
     let orch = service_lb::remote_identity::RemoteIdentityOrchestrator::new(dir, client);
     let report = orch
         .delete_and_unfan(&route_domain, identity_id, &nodes, None, &[], None, 0)
@@ -1215,12 +1229,20 @@ pub async fn reconcile_remote_identities(
     RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     Json(body): Json<RemoteIdentityReconcileBody>,
-) -> Result<Json<service_lb::remote_identity::RemoteReconcileReport>, (StatusCode, Json<serde_json::Value>)>
-{
+) -> Result<
+    Json<service_lb::remote_identity::RemoteReconcileReport>,
+    (StatusCode, Json<serde_json::Value>),
+> {
     let nodes = service_nodes(&state);
     let dir = remote_identity_directory(&state);
-    let client = service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new()
-        .map_err(|e| map_driver_err(StatusCode::INTERNAL_SERVER_ERROR, "remote ipcache client", e))?;
+    let client =
+        service_lb::remote_identity::FluxVmRemoteIpcacheHttpClient::new().map_err(|e| {
+            map_driver_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "remote ipcache client",
+                e,
+            )
+        })?;
     let orch = service_lb::remote_identity::RemoteIdentityOrchestrator::new(dir, client);
     let report = orch
         .reconcile(
@@ -1236,7 +1258,9 @@ pub async fn reconcile_remote_identities(
     Ok(Json(report))
 }
 
-fn remote_backend_directory(state: &AppState) -> service_lb::remote_backend::RemoteBackendDirectory {
+fn remote_backend_directory(
+    state: &AppState,
+) -> service_lb::remote_backend::RemoteBackendDirectory {
     let path = std::path::PathBuf::from(&state.config.storage.path)
         .join("service-fabric")
         .join("remote-backends.json");
