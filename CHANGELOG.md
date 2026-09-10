@@ -117,6 +117,10 @@
 - Live snapshot create now waits/retries for QMP readiness (409 when still starting); UI retries on 409; Snapshot Manager gained Disk/Full picker; FluxVM HTTP client timeout raised to 180s; auto-healer skips VMs updated within 90s to avoid restart storms after start.
 - Workspace-wide clippy lint drift across ~24 crates that had accumulated under current stable Rust (mostly `new_without_default`, `derivable_impls`, and small iterator/idiom lints) — `cargo clippy -- -D warnings` is green again.
 - `fault-tolerance`'s test-only `MockDriver` was missing `get_cgroup_path`, a method `driver-core::VMDriver` gained since the mock was last updated — a real compile error in test code, not just a lint.
+- Agent Runtime cold-start race: the guest's vsock channel isn't up the instant `create_sandbox()` returns, so the first guest-agent call after a cold create routinely failed with "connecting to vsock proxy socket ... No such file or directory." Found by deploying against a real FluxVM host with real KVM — nothing in CI exercises this path yet. Now retries until the channel comes up or `guest_start_timeout_secs` elapses.
+- `fabric-agent deploy` (the actual CLI, not just its CI smoke build) couldn't resolve `@zyvor/fabric-agent` in an agent's own `import` — the package isn't published to npm yet, so every real deploy failed. `esbuild`'s `alias` option now points at the SDK's own local source.
+- `api-audit` CI smoke test: TLS defaults to enabled with cert/key paths under root-owned `/etc/zyvor-fabricd/tls`, and self-signed cert generation is fatal on startup — the smoke script never disabled it even though it only ever talks plain HTTP. `[tls] enabled = false` in the generated config.
+- 8 pre-existing e2e failures (VM clone, VM delete, bridge creation): the FluxVM HTTP stub's generic response didn't match the shape `fluxvm-client` deserializes, clone needs a real disk somewhere findable, and bridge creation needs `CAP_NET_ADMIN` the daemon process didn't have in CI. All reproduced live on a real host before fixing; `e2e` is fully green (153/153) for the first time.
 
 ## 0.2.1
 
