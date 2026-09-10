@@ -23,7 +23,8 @@ async fn main() -> Result<()> {
         .with_state(state.clone())
         .layer(TraceLayer::new_for_http());
 
-    tokio::spawn(app::sync_loop(state));
+    tokio::spawn(app::sync_loop(state.clone()));
+    tokio::spawn(app::auto_hibernate_loop(state));
 
     let public_listener = tokio::net::TcpListener::bind(public_addr).await?;
     let egress_listener = tokio::net::TcpListener::bind(egress_addr).await?;

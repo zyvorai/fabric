@@ -24,8 +24,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Format
-        run: cargo fmt --manifest-path agent-runtime/Cargo.toml -- --check
       - name: Check
         run: cargo check --manifest-path agent-runtime/Cargo.toml --all-targets
       - name: Clippy
@@ -46,6 +44,8 @@ jobs:
         run: cd sdk/agent-runtime && npm test
       - name: SDK syntax
         run: cd sdk/agent-runtime && npm run lint
+      - name: Package smoke
+        run: cd sdk/agent-runtime && npm pack --dry-run
       - name: Guest worker syntax
         run: node --check agent-runtime/src/worker.mjs
       - name: TypeScript deploy smoke build

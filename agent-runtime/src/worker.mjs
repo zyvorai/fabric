@@ -19,6 +19,7 @@ let seq = 0;
 const events = [];
 const steering = [];
 const waiters = [];
+let waitingCount = 0;
 let state = "idle";
 let lastError = null;
 let cancelled = false;
@@ -38,10 +39,28 @@ function wakeSteerers() {
 async function nextSteer({ timeoutMs = 0 } = {}) {
   if (steering.length) return steering.shift();
   if (cancelled) return null;
+
+  // Expose a precise idle point to the host. The control plane may hibernate
+  // only while the JavaScript agent is blocked here, never while arbitrary
+  // user code is actively computing without emitting events.
+  waitingCount += 1;
+  if (waitingCount === 1 && state === "running") {
+    state = "waiting";
+    emit("session.waiting", { timeout_ms: timeoutMs });
+  }
+
   return new Promise((resolve) => {
     let timer;
+    let settled = false;
     const done = (value) => {
+      if (settled) return;
+      settled = true;
       if (timer) clearTimeout(timer);
+      waitingCount = Math.max(0, waitingCount - 1);
+      if (!cancelled && waitingCount === 0 && state === "waiting") {
+        state = "running";
+        emit("session.running", { reason: value === null ? "wait-timeout" : "steered" });
+      }
       resolve(value);
     };
     waiters.push(done);
@@ -49,7 +68,7 @@ async function nextSteer({ timeoutMs = 0 } = {}) {
       timer = setTimeout(() => {
         const idx = waiters.indexOf(done);
         if (idx >= 0) waiters.splice(idx, 1);
-        resolve(null);
+        done(null);
       }, timeoutMs);
     }
   });

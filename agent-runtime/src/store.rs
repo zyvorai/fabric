@@ -182,6 +182,28 @@ impl Store {
         out
     }
 
+    pub async fn find_session_by_request_id(
+        &self,
+        agent: &str,
+        request_id: &str,
+    ) -> Option<SessionRecord> {
+        self.sessions
+            .read()
+            .await
+            .values()
+            .find(|s| s.agent == agent && s.request_id.as_deref() == Some(request_id))
+            .cloned()
+    }
+
+    pub async fn count_non_terminal_for_agent(&self, agent: &str) -> usize {
+        self.sessions
+            .read()
+            .await
+            .values()
+            .filter(|s| s.agent == agent && !s.status.is_terminal())
+            .count()
+    }
+
     pub async fn update_session<F>(&self, id: Uuid, f: F) -> Result<SessionRecord>
     where
         F: FnOnce(&mut SessionRecord),
@@ -197,6 +219,30 @@ impl Store {
         };
         self.persist_session(&updated).await?;
         Ok(updated)
+    }
+
+    /// Atomically move a session from one status to another. Returns `None`
+    /// when another concurrent operation already changed the status.
+    pub async fn compare_and_set_status(
+        &self,
+        id: Uuid,
+        expected: SessionStatus,
+        next: SessionStatus,
+    ) -> Result<Option<SessionRecord>> {
+        let updated = {
+            let mut sessions = self.sessions.write().await;
+            let record = sessions
+                .get_mut(&id)
+                .with_context(|| format!("session {id} not found"))?;
+            if record.status != expected {
+                return Ok(None);
+            }
+            record.status = next;
+            record.updated_at = Utc::now();
+            record.clone()
+        };
+        self.persist_session(&updated).await?;
+        Ok(Some(updated))
     }
 
     async fn persist_session(&self, record: &SessionRecord) -> Result<()> {
@@ -330,6 +376,8 @@ mod tests {
                 allow_private_networks: false,
                 runtime_port: 8080,
                 ttl_seconds: None,
+                max_concurrent_sessions: None,
+                idle_hibernate_seconds: None,
             },
         };
         let record = store.deploy_agent(request).await.unwrap();
@@ -351,7 +399,7 @@ mod tests {
             bundle_base64: bundle.clone(),
             manifest: AgentManifest {
                 template: "node22".into(), credentials: vec![],
-                egress_allow_hosts: vec!["api.openai.com".into()], allow_private_networks: false, runtime_port: 8080, ttl_seconds: None,
+                egress_allow_hosts: vec!["api.openai.com".into()], allow_private_networks: false, runtime_port: 8080, ttl_seconds: None, max_concurrent_sessions: None, idle_hibernate_seconds: None,
             },
         }).await.unwrap();
         let two = store.deploy_agent(DeployAgentRequest {
@@ -359,7 +407,7 @@ mod tests {
             bundle_base64: bundle,
             manifest: AgentManifest {
                 template: "node22".into(), credentials: vec![],
-                egress_allow_hosts: vec!["api.anthropic.com".into()], allow_private_networks: false, runtime_port: 8080, ttl_seconds: None,
+                egress_allow_hosts: vec!["api.anthropic.com".into()], allow_private_networks: false, runtime_port: 8080, ttl_seconds: None, max_concurrent_sessions: None, idle_hibernate_seconds: None,
             },
         }).await.unwrap();
         assert_ne!(one.version, two.version);
@@ -385,11 +433,21 @@ mod tests {
                 updated_at: now,
                 last_event_seq: 0,
                 guest_event_cursor: 0,
+                request_id: Some("job:1".into()),
                 capability_token: "cap".into(),
                 error: None,
             })
             .await
             .unwrap();
+        assert_eq!(
+            store
+                .find_session_by_request_id("a", "job:1")
+                .await
+                .unwrap()
+                .id,
+            id
+        );
+        assert_eq!(store.count_non_terminal_for_agent("a").await, 1);
         assert_eq!(store.append_event(id, "one", json!(1)).await.unwrap().seq, 1);
         assert_eq!(store.append_event(id, "two", json!(2)).await.unwrap().seq, 2);
         let events = store.events_after(id, 1).await.unwrap();

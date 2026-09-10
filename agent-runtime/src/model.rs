@@ -25,6 +25,14 @@ pub struct AgentManifest {
     pub runtime_port: u16,
     #[serde(default)]
     pub ttl_seconds: Option<u64>,
+    /// Maximum number of non-terminal sessions for this agent deployment.
+    /// `None` keeps the runtime-wide default behavior.
+    #[serde(default)]
+    pub max_concurrent_sessions: Option<usize>,
+    /// When set, the runtime may hibernate a session that has been waiting for
+    /// steering input without activity for this many seconds.
+    #[serde(default)]
+    pub idle_hibernate_seconds: Option<u64>,
 }
 
 fn default_runtime_port() -> u16 {
@@ -54,6 +62,10 @@ pub struct CreateSessionRequest {
     pub input: Value,
     #[serde(default)]
     pub ttl_seconds: Option<u64>,
+    /// Optional caller-generated idempotency key. Reusing the same key for the
+    /// same agent returns the original session instead of creating a second VM.
+    #[serde(default)]
+    pub request_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -86,6 +98,8 @@ pub struct SessionRecord {
     pub updated_at: DateTime<Utc>,
     pub last_event_seq: u64,
     pub guest_event_cursor: u64,
+    #[serde(default)]
+    pub request_id: Option<String>,
     /// Capability token accepted only by the host-side egress broker for this
     /// exact session. It is never returned by the public API.
     pub capability_token: String,
@@ -104,6 +118,7 @@ pub struct SessionView {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub last_event_seq: u64,
+    pub request_id: Option<String>,
     pub error: Option<String>,
 }
 
@@ -119,6 +134,7 @@ impl From<SessionRecord> for SessionView {
             created_at: v.created_at,
             updated_at: v.updated_at,
             last_event_seq: v.last_event_seq,
+            request_id: v.request_id,
             error: v.error,
         }
     }

@@ -15,3 +15,5 @@ npm install
   --credential anthropic \
   --allow-host api.anthropic.com
 ```
+
+`fanout.ts` shows retry-safe, bounded-concurrency multi-session orchestration with one stable `request_id` per target.

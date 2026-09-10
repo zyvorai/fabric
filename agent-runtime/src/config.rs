@@ -17,6 +17,7 @@ pub struct Config {
     pub egress_advertise_host: Option<String>,
     pub sync_interval_ms: u64,
     pub guest_start_timeout_secs: u64,
+    pub idle_scan_interval_ms: u64,
 }
 
 impl Config {
@@ -39,6 +40,7 @@ impl Config {
             egress_advertise_host: env_opt("ZYVOR_AGENT_EGRESS_ADVERTISE_HOST"),
             sync_interval_ms: env_parse("ZYVOR_AGENT_SYNC_INTERVAL_MS", "300")?,
             guest_start_timeout_secs: env_parse("ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS", "30")?,
+            idle_scan_interval_ms: env_parse("ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS", "1000")?,
         })
     }
 }

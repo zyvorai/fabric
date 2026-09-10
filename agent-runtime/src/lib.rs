@@ -19,6 +19,8 @@ pub struct AppState {
     pub fluxvm: FluxVm,
     pub credentials: CredentialVault,
     pub egress_http: reqwest::Client,
+    /// Serializes the idempotency/quota reservation section of session creation.
+    pub session_create_lock: tokio::sync::Mutex<()>,
 }
 
 impl AppState {
@@ -31,6 +33,13 @@ impl AppState {
             .redirect(reqwest::redirect::Policy::none())
             .timeout(std::time::Duration::from_secs(120))
             .build()?;
-        Ok(Arc::new(Self { config, store, fluxvm, credentials, egress_http }))
+        Ok(Arc::new(Self {
+            config,
+            store,
+            fluxvm,
+            credentials,
+            egress_http,
+            session_create_lock: tokio::sync::Mutex::new(()),
+        }))
     }
 }

@@ -17,3 +17,14 @@ export default defineAgent(async (ctx) => {
 ```
 
 See `../../agent-runtime/README.md` for runtime deployment, credentials, session APIs, hibernation and security details.
+
+## Idempotent fan-out
+
+```ts
+const sessions = await fabric.sessions.createMany([
+  { agent: "research", input: { target: "a" }, request_id: "scan:a" },
+  { agent: "research", input: { target: "b" }, request_id: "scan:b" }
+], { concurrency: 2 });
+```
+
+`request_id` prevents duplicate sandboxes when a caller retries the same agent start. `createMany` bounds client-side launch concurrency and preserves input/result ordering.

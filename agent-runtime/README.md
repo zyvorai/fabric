@@ -16,6 +16,11 @@ Deploy JavaScript/TypeScript agents like serverless functions while giving every
 - private/link-local egress blocked by default to reduce SSRF/metadata exposure
 - TypeScript/JavaScript SDK and `fabric-agent deploy` CLI
 - no dependency on a particular model SDK or provider
+- idempotent session creation with caller `request_id` keys
+- per-agent non-terminal session concurrency caps
+- automatic hibernation only at the safe `ctx.nextSteer()` waiting point
+- method/path/port scopes on host-side credentials
+- bounded-concurrency SDK fan-out with stable result ordering
 
 The runtime is intentionally a standalone component in the Fabric repository. It consumes FluxVM's existing `/v1/sandboxes` API directly and does not alter the existing `zyvor-fabricd` VM API or backend workspace.
 
@@ -61,13 +66,17 @@ Create a **descriptor file**, not a secret file:
   "anthropic": {
     "host": "api.anthropic.com",
     "header": "x-api-key",
-    "env": "ANTHROPIC_API_KEY"
+    "env": "ANTHROPIC_API_KEY",
+    "allowed_methods": ["POST"],
+    "path_prefixes": ["/v1/"]
   },
   "openai": {
     "host": "api.openai.com",
     "header": "authorization",
     "env": "OPENAI_API_KEY",
-    "prefix": "Bearer "
+    "prefix": "Bearer ",
+    "allowed_methods": ["POST"],
+    "path_prefixes": ["/v1/"]
   }
 }
 ```
@@ -103,6 +112,7 @@ Configuration:
 | `ZYVOR_AGENT_CREDENTIALS_FILE` | unset | descriptor JSON above |
 | `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` | derived | host address visible from sandbox |
 | `ZYVOR_AGENT_SYNC_INTERVAL_MS` | `300` | guest event sync interval |
+| `ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS` | `1000` | scan interval for safe waiting-session auto-hibernate |
 
 For production, set `ZYVOR_AGENT_API_TOKEN`, bind the public API behind TLS, firewall port 18082 so only sandbox networks can reach it, and use FluxVM's dataplane/network policy to restrict direct guest egress.
 
@@ -145,7 +155,9 @@ FABRIC_AGENT_URL=http://127.0.0.1:9096 \
   --name research-agent \
   --template node22-agent \
   --credential anthropic \
-  --allow-host api.anthropic.com
+  --allow-host api.anthropic.com \
+  --max-concurrency 16 \
+  --idle-hibernate 60
 ```
 
 The deploy command uses esbuild to produce one Node 20 ESM bundle. The deployment version hashes both the executable bundle and its security manifest, so changing an egress/credential grant always creates a new immutable version.
@@ -180,6 +192,56 @@ Agents that want interactive steering can call:
 ```ts
 const message = await ctx.nextSteer({ timeoutMs: 30_000 });
 ```
+
+## Reliable retries and fan-out
+
+Pass a stable caller id to make session creation idempotent. A retry with the same agent and `request_id` returns the already-reserved session instead of launching another sandbox:
+
+```ts
+const session = await fabric.agent("research-agent").run(
+  { prompt: "Investigate KVM" },
+  { request_id: "ticket:INC-1042" }
+);
+```
+
+For bounded fan-out across many independent sessions:
+
+```ts
+const sessions = await fabric.sessions.createMany(
+  targets.map((target) => ({
+    agent: "research-agent",
+    input: { target },
+    request_id: `scan:${target}`
+  })),
+  { concurrency: 8 }
+);
+```
+
+`max_concurrent_sessions` is enforced server-side against all non-terminal sessions for an agent, including hibernated sessions that still reserve a sandbox. This prevents retry storms and unbounded per-agent VM creation.
+
+## Safe automatic hibernation
+
+`idle_hibernate_seconds` does **not** treat a quiet log stream as proof of idleness. The guest worker exposes `waiting` only while user code is blocked inside `ctx.nextSteer()`. The host auto-hibernator checks both the configured idle duration and that explicit guest state before snapshot+pause. CPU-bound or tool-running code is never auto-frozen simply because it emitted no events.
+
+## Credential request scopes
+
+Credential descriptors can reduce a provider key to specific methods, URL path prefixes, and non-standard TLS ports:
+
+```json
+{
+  "github-writer": {
+    "host": "api.github.com",
+    "header": "authorization",
+    "env": "GITHUB_TOKEN",
+    "prefix": "Bearer ",
+    "allowed_methods": ["GET", "POST"],
+    "path_prefixes": ["/repos/zyvorai/"],
+    "allowed_ports": []
+  }
+}
+```
+
+Port 443 is always allowed for HTTPS. Any other credential-bearing port must be explicitly listed. Empty `allowed_methods` or `path_prefixes` keeps that dimension unrestricted.
 
 ## HTTP API
 

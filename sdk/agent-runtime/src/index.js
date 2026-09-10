@@ -17,6 +17,13 @@ export class Fabric {
     this.fetch = fetchImpl;
     this.sessions = {
       create: async (request) => new Session(this, await this.request("POST", "/v1/sessions", request)),
+      createMany: async (requests, { concurrency = 4 } = {}) => {
+        if (!Array.isArray(requests)) throw new TypeError("requests must be an array");
+        if (!Number.isInteger(concurrency) || concurrency < 1) {
+          throw new TypeError("concurrency must be a positive integer");
+        }
+        return mapConcurrent(requests, concurrency, (request) => this.sessions.create(request));
+      },
       get: async (id) => new Session(this, await this.request("GET", `/v1/sessions/${id}`)),
       list: async () => (await this.request("GET", "/v1/sessions")).items.map((v) => new Session(this, v)),
     };
@@ -140,4 +147,20 @@ function parseSse(block) {
     else out[key] = value;
   }
   return out;
+}
+
+
+async function mapConcurrent(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    for (;;) {
+      const index = next++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index], index);
+    }
+  }
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }

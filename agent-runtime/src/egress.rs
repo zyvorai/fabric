@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    credentials::{host_matches, CredentialVault},
+    credentials::{credential_allows_request, host_matches, CredentialVault},
     model::EgressRequest,
     AppState,
 };
@@ -75,7 +75,7 @@ async fn proxy_inner(
         .method
         .parse::<reqwest::Method>()
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid HTTP method".into()))?;
-    let mut upstream = state.egress_http.request(method, url.clone());
+    let mut upstream = state.egress_http.request(method.clone(), url.clone());
     for (name, value) in request.headers {
         if is_hop_or_secret_header(&name) || state.credentials.is_injection_header(&name) {
             continue;
@@ -100,6 +100,17 @@ async fn proxy_inner(
             .map_err(|e| (StatusCode::BAD_GATEWAY, e.to_string()))?;
         if !host_matches(&descriptor.host, host) {
             return Err((StatusCode::FORBIDDEN, format!("credential '{name}' cannot be used for host {host}")));
+        }
+        let port = url.port_or_known_default().unwrap_or(443);
+        if !credential_allows_request(descriptor, &method, url.path(), port) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                format!(
+                    "credential '{name}' policy denies {} {} on port {port}",
+                    method.as_str(),
+                    url.path()
+                ),
+            ));
         }
         let header_name = reqwest::header::HeaderName::from_bytes(descriptor.header.as_bytes())
             .map_err(|_| (StatusCode::BAD_GATEWAY, "configured credential header is invalid".into()))?;

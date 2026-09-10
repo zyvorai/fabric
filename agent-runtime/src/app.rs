@@ -33,6 +33,7 @@ impl ApiError {
     fn not_found(message: impl Into<String>) -> Self { Self { status: StatusCode::NOT_FOUND, message: message.into() } }
     fn conflict(message: impl Into<String>) -> Self { Self { status: StatusCode::CONFLICT, message: message.into() } }
     fn bad_gateway(e: impl std::fmt::Display) -> Self { Self { status: StatusCode::BAD_GATEWAY, message: e.to_string() } }
+    fn too_many(message: impl Into<String>) -> Self { Self { status: StatusCode::TOO_MANY_REQUESTS, message: message.into() } }
     fn internal(e: impl std::fmt::Display) -> Self { Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: e.to_string() } }
 }
 
@@ -90,6 +91,9 @@ async fn deploy_agent(State(state): State<Arc<AppState>>, Json(req): Json<Deploy
     if req.manifest.egress_allow_hosts.iter().any(|h| h.trim().is_empty()) {
         return Err(ApiError::bad_request("egress allow hosts may not be empty"));
     }
+    if req.manifest.max_concurrent_sessions == Some(0) {
+        return Err(ApiError::bad_request("max_concurrent_sessions must be greater than zero"));
+    }
     for credential in &req.manifest.credentials {
         if state.credentials.descriptor(credential).is_none() {
             return Err(ApiError::bad_request(format!("credential '{credential}' is not configured on this Fabric host")));
@@ -107,43 +111,131 @@ async fn get_agent(State(state): State<Arc<AppState>>, Path(name): Path<String>)
     state.store.get_agent(&name).await.map(Json).ok_or_else(|| ApiError::not_found("agent not found"))
 }
 
-async fn create_session(State(state): State<Arc<AppState>>, Json(req): Json<CreateSessionRequest>) -> ApiResult<(StatusCode, Json<SessionView>)> {
-    let agent = state.store.get_agent(&req.agent).await.ok_or_else(|| ApiError::not_found("agent not found"))?;
-    let id = Uuid::new_v4();
-    let name = format!("agent-{}", &id.simple().to_string()[..12]);
-    let ttl = req.ttl_seconds.or(agent.manifest.ttl_seconds);
-    let sandbox = state.fluxvm
-        .create_sandbox(name, &agent.manifest.template, ttl, agent.manifest.runtime_port)
+async fn create_session(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateSessionRequest>,
+) -> ApiResult<(StatusCode, Json<SessionView>)> {
+    let agent = state
+        .store
+        .get_agent(&req.agent)
         .await
-        .map_err(ApiError::bad_gateway)?;
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
 
-    let now = Utc::now();
-    let record = SessionRecord {
-        id,
-        agent: agent.name.clone(),
-        agent_version: agent.version.clone(),
-        sandbox_id: sandbox.id,
-        status: SessionStatus::Creating,
-        input: req.input.clone(),
-        created_at: now,
-        updated_at: now,
-        last_event_seq: 0,
-        guest_event_cursor: 0,
-        capability_token: random_capability(),
-        error: None,
-    };
-    state.store.save_session(record.clone()).await.map_err(ApiError::internal)?;
-    state.store.append_event(id, "session.created", json!({"sandbox_id": sandbox.id, "agent_version": agent.version})).await.map_err(ApiError::internal)?;
-
-    if let Err(error) = provision_guest(&state, &record, &agent, req.input).await {
-        let message = format!("{error:#}");
-        let _ = state.store.update_session(id, |s| { s.status = SessionStatus::Failed; s.error = Some(message.clone()); }).await;
-        let _ = state.store.append_event(id, "session.failed", json!({"error": message})).await;
-        return Err(ApiError::bad_gateway("sandbox was created but agent runtime provisioning failed; inspect the session for details"));
+    let request_id = req
+        .request_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string);
+    if let Some(value) = request_id.as_deref() {
+        validate_request_id(value)?;
     }
 
-    let updated = state.store.update_session(id, |s| s.status = SessionStatus::Running).await.map_err(ApiError::internal)?;
-    state.store.append_event(id, "session.running", json!({})).await.map_err(ApiError::internal)?;
+    // Serialize only the reservation section. This closes both duplicate-VM
+    // races on caller retries and quota races; guest provisioning happens
+    // after the lock is released so slow boots don't block unrelated starts.
+    let (record, input) = {
+        let _guard = state.session_create_lock.lock().await;
+
+        if let Some(value) = request_id.as_deref() {
+            if let Some(existing) = state
+                .store
+                .find_session_by_request_id(&agent.name, value)
+                .await
+            {
+                if existing.input != req.input {
+                    return Err(ApiError::conflict(
+                        "request_id was already used for this agent with different input",
+                    ));
+                }
+                return Ok((StatusCode::OK, Json(existing.into())));
+            }
+        }
+
+        if let Some(max) = agent.manifest.max_concurrent_sessions {
+            let active = state.store.count_non_terminal_for_agent(&agent.name).await;
+            if active >= max {
+                return Err(ApiError::too_many(format!(
+                    "agent '{}' reached max_concurrent_sessions ({max})",
+                    agent.name
+                )));
+            }
+        }
+
+        let id = Uuid::new_v4();
+        let name = format!("agent-{}", &id.simple().to_string()[..12]);
+        let ttl = req.ttl_seconds.or(agent.manifest.ttl_seconds);
+        let sandbox = state
+            .fluxvm
+            .create_sandbox(name, &agent.manifest.template, ttl, agent.manifest.runtime_port)
+            .await
+            .map_err(ApiError::bad_gateway)?;
+
+        let now = Utc::now();
+        let record = SessionRecord {
+            id,
+            agent: agent.name.clone(),
+            agent_version: agent.version.clone(),
+            sandbox_id: sandbox.id,
+            status: SessionStatus::Creating,
+            input: req.input.clone(),
+            created_at: now,
+            updated_at: now,
+            last_event_seq: 0,
+            guest_event_cursor: 0,
+            request_id: request_id.clone(),
+            capability_token: random_capability(),
+            error: None,
+        };
+        state
+            .store
+            .save_session(record.clone())
+            .await
+            .map_err(ApiError::internal)?;
+        state
+            .store
+            .append_event(
+                id,
+                "session.created",
+                json!({
+                    "sandbox_id": sandbox.id,
+                    "agent_version": agent.version.clone(),
+                    "request_id": request_id.clone(),
+                }),
+            )
+            .await
+            .map_err(ApiError::internal)?;
+        (record, req.input.clone())
+    };
+
+    if let Err(error) = provision_guest(&state, &record, &agent, input).await {
+        let message = format!("{error:#}");
+        let _ = state
+            .store
+            .update_session(record.id, |s| {
+                s.status = SessionStatus::Failed;
+                s.error = Some(message.clone());
+            })
+            .await;
+        let _ = state
+            .store
+            .append_event(record.id, "session.failed", json!({"error": message}))
+            .await;
+        return Err(ApiError::bad_gateway(
+            "sandbox was created but agent runtime provisioning failed; inspect the session for details",
+        ));
+    }
+
+    let updated = state
+        .store
+        .update_session(record.id, |s| s.status = SessionStatus::Running)
+        .await
+        .map_err(ApiError::internal)?;
+    state
+        .store
+        .append_event(record.id, "session.running", json!({}))
+        .await
+        .map_err(ApiError::internal)?;
     Ok((StatusCode::CREATED, Json(updated.into())))
 }
 
@@ -189,7 +281,9 @@ async fn steer_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>,
     let session = require_session(&state, id).await?;
     if session.status != SessionStatus::Running { return Err(ApiError::conflict("session is not running")); }
     let agent = state.store.get_agent_version(&session.agent, &session.agent_version).await.map_err(ApiError::internal)?;
-    let value = state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::POST, "steer", Some(&json!({"message": req.message}))).await.map_err(ApiError::bad_gateway)?;
+    let message = req.message;
+    let value = state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::POST, "steer", Some(&json!({"message": message.clone()}))).await.map_err(ApiError::bad_gateway)?;
+    state.store.append_event(id, "session.steer.requested", message).await.map_err(ApiError::internal)?;
     Ok((StatusCode::ACCEPTED, Json(value)))
 }
 
@@ -204,20 +298,98 @@ async fn cancel_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>
     Ok((StatusCode::ACCEPTED, Json(updated.into())))
 }
 
-async fn hibernate_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> ApiResult<Json<SessionView>> {
-    let session = require_session(&state, id).await?;
-    if session.status != SessionStatus::Running { return Err(ApiError::conflict("only running sessions can hibernate")); }
-    let agent = state.store.get_agent_version(&session.agent, &session.agent_version).await.map_err(ApiError::internal)?;
-    state.store.update_session(id, |s| s.status = SessionStatus::Hibernating).await.map_err(ApiError::internal)?;
-    state.fluxvm.guest_request(session.sandbox_id, agent.manifest.runtime_port, Method::POST, "checkpoint", Some(&json!({}))).await.map_err(ApiError::bad_gateway)?;
-    tokio::fs::create_dir_all(&state.config.snapshot_dir).await.map_err(ApiError::internal)?;
-    let snapshot = state.config.snapshot_dir.join(format!("{id}.snapshot"));
-    let snapshot_string = snapshot.to_string_lossy().into_owned();
-    state.fluxvm.snapshot(session.sandbox_id, &snapshot_string).await.map_err(ApiError::bad_gateway)?;
-    state.fluxvm.pause(session.sandbox_id).await.map_err(ApiError::bad_gateway)?;
-    let updated = state.store.update_session(id, |s| s.status = SessionStatus::Hibernated).await.map_err(ApiError::internal)?;
-    state.store.append_event(id, "session.hibernated", json!({"snapshot": snapshot.file_name().and_then(|s| s.to_str())})).await.map_err(ApiError::internal)?;
-    Ok(Json(updated.into()))
+async fn hibernate_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<SessionView>> {
+    hibernate_session_inner(&state, id).await.map(Json)
+}
+
+async fn hibernate_session_inner(state: &AppState, id: Uuid) -> ApiResult<SessionView> {
+    let session = require_session(state, id).await?;
+    if session.status != SessionStatus::Running {
+        return Err(ApiError::conflict("only running sessions can hibernate"));
+    }
+    let agent = state
+        .store
+        .get_agent_version(&session.agent, &session.agent_version)
+        .await
+        .map_err(ApiError::internal)?;
+
+    let transitioned = state
+        .store
+        .compare_and_set_status(id, SessionStatus::Running, SessionStatus::Hibernating)
+        .await
+        .map_err(ApiError::internal)?;
+    if transitioned.is_none() {
+        return Err(ApiError::conflict("session state changed while hibernating"));
+    }
+
+    let operation = async {
+        state
+            .fluxvm
+            .guest_request(
+                session.sandbox_id,
+                agent.manifest.runtime_port,
+                Method::POST,
+                "checkpoint",
+                Some(&json!({})),
+            )
+            .await
+            .map_err(ApiError::bad_gateway)?;
+        tokio::fs::create_dir_all(&state.config.snapshot_dir)
+            .await
+            .map_err(ApiError::internal)?;
+        let snapshot = state.config.snapshot_dir.join(format!("{id}.snapshot"));
+        let snapshot_string = snapshot.to_string_lossy().into_owned();
+        state
+            .fluxvm
+            .snapshot(session.sandbox_id, &snapshot_string)
+            .await
+            .map_err(ApiError::bad_gateway)?;
+        state
+            .fluxvm
+            .pause(session.sandbox_id)
+            .await
+            .map_err(ApiError::bad_gateway)?;
+        Ok::<_, ApiError>(snapshot)
+    }
+    .await;
+
+    let snapshot = match operation {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            let _ = state
+                .store
+                .update_session(id, |s| s.status = SessionStatus::Running)
+                .await;
+            let _ = state
+                .store
+                .append_event(
+                    id,
+                    "session.hibernate.failed",
+                    json!({"error": error.message.clone()}),
+                )
+                .await;
+            return Err(error);
+        }
+    };
+
+    let updated = state
+        .store
+        .update_session(id, |s| s.status = SessionStatus::Hibernated)
+        .await
+        .map_err(ApiError::internal)?;
+    state
+        .store
+        .append_event(
+            id,
+            "session.hibernated",
+            json!({"snapshot": snapshot.file_name().and_then(|s| s.to_str())}),
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(updated.into())
 }
 
 async fn resume_session(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> ApiResult<Json<SessionView>> {
@@ -315,6 +487,80 @@ async fn sync_session(state: &AppState, session: SessionRecord) -> Result<()> {
     Ok(())
 }
 
+pub async fn auto_hibernate_loop(state: Arc<AppState>) {
+    let interval = Duration::from_millis(state.config.idle_scan_interval_ms.max(250));
+    loop {
+        tokio::time::sleep(interval).await;
+        for session in state.store.list_sessions().await {
+            if session.status != SessionStatus::Running {
+                continue;
+            }
+            let agent = match state
+                .store
+                .get_agent_version(&session.agent, &session.agent_version)
+                .await
+            {
+                Ok(agent) => agent,
+                Err(error) => {
+                    tracing::warn!(session = %session.id, %error, "auto-hibernate skipped: agent version missing");
+                    continue;
+                }
+            };
+            let Some(idle_secs) = agent.manifest.idle_hibernate_seconds.filter(|v| *v > 0) else {
+                continue;
+            };
+            let idle_for = Utc::now()
+                .signed_duration_since(session.updated_at)
+                .num_seconds();
+            if idle_for < idle_secs as i64 {
+                continue;
+            }
+
+            // Never freeze an agent merely because it has been quiet. The guest
+            // explicitly reports `waiting` only while blocked in ctx.nextSteer().
+            let guest = match state
+                .fluxvm
+                .guest_request(
+                    session.sandbox_id,
+                    agent.manifest.runtime_port,
+                    Method::GET,
+                    "status",
+                    None,
+                )
+                .await
+                .and_then(|value| serde_json::from_value::<GuestStatusResponse>(value).map_err(anyhow::Error::from))
+            {
+                Ok(guest) => guest,
+                Err(_) => continue,
+            };
+            if guest.status != "waiting" {
+                continue;
+            }
+
+            match hibernate_session_inner(&state, session.id).await {
+                Ok(_) => tracing::info!(session = %session.id, idle_secs, "auto-hibernated waiting agent session"),
+                Err(error) if error.status == StatusCode::CONFLICT => {}
+                Err(error) => tracing::warn!(session = %session.id, error = %error.message, "auto-hibernate failed"),
+            }
+        }
+    }
+}
+
+fn validate_request_id(value: &str) -> ApiResult<()> {
+    if value.len() > 128 {
+        return Err(ApiError::bad_request("request_id must be at most 128 bytes"));
+    }
+    if !value
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b':'))
+    {
+        return Err(ApiError::bad_request(
+            "request_id may contain only ASCII letters, digits, '-', '_', '.', and ':'",
+        ));
+    }
+    Ok(())
+}
+
 fn random_capability() -> String {
     format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple())
 }
@@ -347,5 +593,12 @@ mod tests {
     fn brackets_ipv6_host() {
         assert_eq!(format_host("fd00::1"), "[fd00::1]");
         assert_eq!(format_host("10.0.0.1"), "10.0.0.1");
+    }
+
+    #[test]
+    fn validates_idempotency_keys() {
+        assert!(validate_request_id("ticket:INC-1042").is_ok());
+        assert!(validate_request_id("bad key").is_err());
+        assert!(validate_request_id(&"x".repeat(129)).is_err());
     }
 }

@@ -27,6 +27,7 @@ export interface CreateSessionRequest<TInput = unknown> {
   agent: string;
   input?: TInput;
   ttl_seconds?: number;
+  request_id?: string;
 }
 
 export interface SessionEvent {
@@ -44,6 +45,7 @@ export declare class Session {
   sandbox_id: string;
   status: string;
   last_event_seq: number;
+  request_id?: string | null;
   refresh(): Promise<this>;
   steer(message: unknown): Promise<unknown>;
   hibernate(): Promise<this>;
@@ -56,9 +58,10 @@ export declare class Session {
 
 export declare class Fabric {
   constructor(options?: FabricOptions);
-  agent(name: string): { run(input?: unknown, options?: { ttl_seconds?: number }): Promise<Session> };
+  agent(name: string): { run(input?: unknown, options?: { ttl_seconds?: number; request_id?: string }): Promise<Session> };
   sessions: {
     create(request: CreateSessionRequest): Promise<Session>;
+    createMany(requests: CreateSessionRequest[], options?: { concurrency?: number }): Promise<Session[]>;
     get(id: string): Promise<Session>;
     list(): Promise<Session[]>;
   };
