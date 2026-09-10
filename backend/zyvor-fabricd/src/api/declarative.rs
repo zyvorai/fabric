@@ -180,7 +180,7 @@ pub struct ApplyResult {
 
 /// Parse memory string like "2G", "512M", "4096" to MB.
 /// Returns an error on invalid input instead of silently defaulting.
-fn parse_memory_mb(s: &str) -> Result<u64, String> {
+pub(crate) fn parse_memory_mb(s: &str) -> Result<u64, String> {
     let s = s.trim();
     if let Some(gb) = s
         .strip_suffix('G')

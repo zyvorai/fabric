@@ -39,6 +39,7 @@ members = [
     "crates/lock-manager",
     "crates/cgroup",
     "crates/api-error",
+    "crates/k8s-pod-client",
     "network-policy",
     "service-mesh",
     "traffic-shaping",

@@ -40,6 +40,10 @@ pub struct AppState {
     pub net_monitor: Arc<net_monitor::NetMonitor>,
     pub secrets_manager: Arc<secrets_manager::SecretsManager>,
     pub dnsmasq_manager: Arc<zyvor_fabric_dnsmasq_manager::DnsmasqManager>,
+    /// `None` when `container_groups.enabled` is false, or the configured
+    /// target cluster couldn't be reached at startup — the ContainerGroup
+    /// API returns a clear "not configured" error rather than panicking.
+    pub k8s_pod_client: Option<Arc<k8s_pod_client::K8sPodClient>>,
     /// Per-VM mutex to serialize state-changing operations on the same VM.
     pub vm_locks:
         Arc<std::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
@@ -150,6 +154,30 @@ impl Server {
             zyvor_fabric_lock_manager::LockConfig::default(),
         ));
 
+        // ContainerGroup Kubernetes client — best-effort at startup so a
+        // misconfigured/unreachable cluster doesn't block the rest of the
+        // daemon; requests against the ContainerGroup API just fail clearly
+        // until it's fixed and the daemon restarted.
+        let k8s_pod_client = if config.container_groups.enabled {
+            let k8s_config = k8s_pod_client::K8sPodClientConfig {
+                kubeconfig_path: config.container_groups.kubeconfig_path.clone(),
+                namespace: config.container_groups.namespace.clone(),
+            };
+            match k8s_pod_client::K8sPodClient::connect(&k8s_config).await {
+                Ok(client) => Some(Arc::new(client)),
+                Err(e) => {
+                    tracing::error!(
+                        "ContainerGroup Kubernetes client failed to connect: {}. \
+                         ContainerGroup API will reject requests until this is fixed.",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         let state = Arc::new(AppState {
             store,
             config,
@@ -174,6 +202,7 @@ impl Server {
             dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(
                 "/run/zyvor-fabricd/dnsmasq",
             )),
+            k8s_pod_client,
             vm_locks: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             event_tx: {
                 let (tx, _) = tokio::sync::broadcast::channel(256);
@@ -244,6 +273,11 @@ impl Server {
         );
         spawn_bg!(self.state, "ha_monitor", run_ha_monitor);
         spawn_bg!(self.state, "vm_autohealer", run_vm_autohealer);
+        spawn_bg!(
+            self.state,
+            "container_group_autohealer",
+            run_container_group_autohealer
+        );
         spawn_bg!(self.state, "autoscaler", run_autoscaler);
         spawn_bg!(self.state, "policy_reconciler", run_policy_reconciler);
         spawn_bg!(
@@ -1062,6 +1096,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Declarative VM spec
         .route("/vms/apply", post(api::declarative::apply_vm_spec))
         .route("/vms/{name}/spec", get(api::declarative::export_vm_spec))
+        // Declarative ContainerGroup spec (FluxVM Secure Containers)
+        .route(
+            "/container-groups/apply",
+            post(api::container_declarative::apply_container_group_spec),
+        )
+        .route(
+            "/container-groups/{name}/spec",
+            get(api::container_declarative::export_container_group_spec),
+        )
+        .route(
+            "/container-groups/{name}",
+            delete(api::container_declarative::delete_container_group),
+        )
         // Auto-scaling
         .route(
             "/autoscale",
@@ -3574,6 +3621,135 @@ async fn run_vm_autohealer(state: Arc<AppState>) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/// Background task that reschedules ContainerGroups off a host once
+/// `run_stale_host_detector` has marked it `NotResponding` for longer than a
+/// short fencing grace period — opt-in per group (`PlacementSpec.auto_reschedule`)
+/// and skipped entirely for any group declaring volumes, since there's no
+/// volume-affinity-aware placement yet. A group with `auto_reschedule` off
+/// (or with volumes) is left in place and only logged — matching this
+/// feature's developer-preview rollout gate (`ContainerGroupsConfig`).
+async fn run_container_group_autohealer(state: Arc<AppState>) {
+    use crate::api::container_declarative::{ContainerGroupSpec, ContainerGroupStatus};
+    use chrono::Utc;
+    use datacenter::{HostInfo, HostStatus};
+
+    let Some(client) = state.k8s_pod_client.clone() else {
+        return;
+    };
+
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+    const FENCING_GRACE_SECS: i64 = 60;
+
+    loop {
+        interval.tick().await;
+
+        let groups: Vec<ContainerGroupSpec> =
+            state.store.list_entities("container_groups").unwrap_or_default();
+        if groups.is_empty() {
+            continue;
+        }
+
+        let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_default();
+
+        for spec in groups {
+            let status = match state
+                .store
+                .get_entity::<ContainerGroupStatus>("container_group_status", &spec.name)
+            {
+                Ok(Some(s)) => s,
+                _ => continue,
+            };
+
+            let host = match hosts.iter().find(|h| h.id == status.host_id) {
+                Some(h) => h,
+                None => continue,
+            };
+
+            if host.status != HostStatus::NotResponding {
+                continue;
+            }
+            let unresponsive_secs = (Utc::now() - host.updated_at).num_seconds();
+            if unresponsive_secs < FENCING_GRACE_SECS {
+                continue;
+            }
+
+            let has_volumes = spec
+                .containers
+                .iter()
+                .any(|c| !c.volume_mounts.is_empty());
+
+            // A `node_hint` is an explicit pin — `place_container_group`
+            // would just resolve back to this same (now-dead) host, so
+            // there's nowhere else auto-reschedule could move it to.
+            if !spec.placement.auto_reschedule || has_volumes || spec.placement.node_hint.is_some()
+            {
+                tracing::warn!(
+                    "ContainerGroup '{}' is on unresponsive host '{}' ({}s) but auto_reschedule \
+                     is off, the group has volumes, or it's pinned via node_hint — not \
+                     rescheduling automatically",
+                    spec.name,
+                    host.hostname,
+                    unresponsive_secs
+                );
+                continue;
+            }
+
+            tracing::warn!(
+                "ContainerGroup '{}': host '{}' unresponsive for {}s, rescheduling",
+                spec.name,
+                host.hostname,
+                unresponsive_secs
+            );
+
+            for pod in &status.pod_names {
+                if let Err(e) = client.delete_pod(pod).await {
+                    tracing::warn!("failed to delete stale pod '{}': {}", pod, e);
+                }
+            }
+
+            let placed = match crate::api::container_placement::place_container_group(&state, &spec) {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::error!(
+                        "ContainerGroup '{}': reschedule placement failed: {}",
+                        spec.name,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            let mut new_pod_names = Vec::new();
+            for i in 0..spec.replicas {
+                let name = crate::api::container_declarative::pod_name(&spec.name, spec.replicas, i);
+                let pod_req = crate::api::container_declarative::build_pod_request(
+                    &spec,
+                    &name,
+                    &placed.hostname,
+                );
+                match client.create_pod(&pod_req).await {
+                    Ok(_) => new_pod_names.push(name),
+                    Err(e) => tracing::error!("failed to recreate pod '{}': {}", name, e),
+                }
+            }
+
+            let new_status = ContainerGroupStatus {
+                host_id: placed.id,
+                host_name: placed.hostname,
+                pod_names: new_pod_names,
+                updated_at: Utc::now(),
+            };
+            if let Err(e) =
+                state
+                    .store
+                    .save_entity("container_group_status", &spec.name, &new_status)
+            {
+                tracing::error!("Failed to save: {}", e);
             }
         }
     }

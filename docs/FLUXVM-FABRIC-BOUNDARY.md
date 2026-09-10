@@ -21,6 +21,25 @@
 | Tenant/project/RBAC/quotas/billing | minimal node auth only | owns |
 | Kubernetes `MicroVM` ephemeral runtime | standalone FluxVM surface | no |
 | Kubernetes private-cloud `VirtualMachine` | no | Fabric operator |
+| Secure Containers shim + guest-agent + microVM lifecycle | owns mechanism | no |
+| `ContainerGroup` placement / scheduling / lifecycle API | no | owns |
+| Container Pod execution (CRI, `RuntimeClass fluxvm`, kubelet) | no | consumes only |
+
+### `ContainerGroup` (FluxVM Secure Containers)
+
+Fabric's `ContainerGroup` workload (`POST /api/container-groups/apply`) is a
+Kubernetes-native sibling to `VirtualMachine`, but with a different execution
+path: Fabric decides **placement** (`predictive_drs::DrsManager`, the same
+engine scoring VM placement, filtered to hosts with `secure_containers_ready`)
+and pins the host via a Pod's `spec.nodeName`, but Fabric never talks to
+FluxVM's Secure Containers shim or guest-agent directly — only to the target
+cluster's Kubernetes API (create/delete the Pod) and to FluxVM's `/readyz`
+for capability discovery. The shim (`containerd-shim-fluxvm-v2`), guest-agent,
+and the microVM it creates per Pod remain entirely FluxVM's mechanism,
+unchanged from the standalone `RuntimeClass fluxvm` path FluxVM already
+documents (`docs/secure-containers.md`, `docs/secure-containers-set3.md` in
+the fluxvm repo) — Fabric adds a placement/scheduling layer in front of it,
+it does not replace or re-implement it.
 
 ## Migration contract v1
 

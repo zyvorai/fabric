@@ -56,6 +56,7 @@ zyvor-fabric-vm = { path = "../crates/vm" }
 datacenter = { path = "../datacenter" }
 resource-pools = { path = "../resource-pools" }
 predictive-drs = { path = "../predictive-drs" }
+k8s-pod-client = { path = "../crates/k8s-pod-client" }
 distributed-storage = { path = "../distributed-storage" }
 encryption = { path = "../encryption" }
 network-policy = { path = "../network-policy" }

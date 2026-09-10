@@ -18,6 +18,40 @@ pub struct Config {
     pub driver: DriverConfig,
     #[serde(default)]
     pub tls: TlsConfig,
+    #[serde(default)]
+    pub container_groups: ContainerGroupsConfig,
+}
+
+/// Gates the `ContainerGroup` workload (FluxVM Secure Containers, scheduled
+/// by fabric's own placement onto a Kubernetes cluster). Default **off** —
+/// Secure Containers is developer-preview/non-conformance-tested upstream
+/// (see `docs/secure-containers-set3.md` in the fluxvm repo).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerGroupsConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Kubeconfig for the target cluster. `None` uses the ambient
+    /// in-cluster or default kubeconfig context. v1 supports exactly one
+    /// target cluster, matching the VM path's own single-`fluxvm_url`
+    /// maturity level today — multi-site resolution is a follow-up.
+    #[serde(default)]
+    pub kubeconfig_path: Option<String>,
+    #[serde(default = "default_container_groups_namespace")]
+    pub namespace: String,
+}
+
+impl Default for ContainerGroupsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            kubeconfig_path: None,
+            namespace: default_container_groups_namespace(),
+        }
+    }
+}
+
+fn default_container_groups_namespace() -> String {
+    "default".to_string()
 }
 
 /// Native TLS, on by default. Deliberately not a reverse-proxy config
@@ -421,6 +455,7 @@ impl Config {
             auth: AuthConfig::default(),
             driver: DriverConfig::default(),
             tls: TlsConfig::default(),
+            container_groups: ContainerGroupsConfig::default(),
         })
     }
 
@@ -469,6 +504,7 @@ mod tests {
                 enabled: tls,
                 ..TlsConfig::default()
             },
+            container_groups: ContainerGroupsConfig::default(),
         }
     }
 
