@@ -1,0 +1,24 @@
+{
+  "name": "@zyvor/fabric-agent",
+  "version": "0.2.0",
+  "description": "TypeScript/JavaScript SDK and deploy CLI for Zyvor Fabric Agent Runtime",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=20" },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "bin": {
+    "fabric-agent": "./src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "lint": "node --check src/index.js && node --check src/cli.js"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
