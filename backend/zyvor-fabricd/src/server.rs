@@ -1109,6 +1109,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/container-groups/{name}",
             delete(api::container_declarative::delete_container_group),
         )
+        .route(
+            "/container-group-events",
+            get(api::container_declarative::list_container_group_events),
+        )
         // Auto-scaling
         .route(
             "/autoscale",

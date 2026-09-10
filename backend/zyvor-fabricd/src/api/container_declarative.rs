@@ -78,6 +78,13 @@ pub struct ContainerGroupSpec {
     pub restart_policy: String,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Owning tenant. When the caller's JWT carries a `tenant` claim, this
+    /// must match it (or be unset) at create time — see
+    /// `tenant_scope::apply_create_tenant` — and `tenant_scope`'s
+    /// middleware then scopes all by-name reads/writes to it, the same way
+    /// VM routes are scoped via `tenant_scope::vm_tenant`.
+    #[serde(default)]
+    pub tenant: Option<String>,
 }
 
 fn default_replicas() -> u32 {
@@ -124,6 +131,59 @@ pub struct ContainerGroupApplyResult {
     pub host_name: String,
     pub replicas_created: usize,
     pub warnings: Vec<String>,
+}
+
+/// Audit trail for ContainerGroup lifecycle actions — mirrors `events::VMEvent`/
+/// `record_event`, persisted to its own `container_group_events` collection.
+/// Deliberately not wired into the SSE stream or notification rules (that's
+/// real-time alerting; this is queryable audit history) — a natural follow-up
+/// once ContainerGroup needs the same "notify on event" behavior VMs have.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerGroupEvent {
+    pub id: String,
+    pub event_type: ContainerGroupEventType,
+    pub container_group_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
+    /// `Claims.sub` of whoever triggered this action.
+    pub actor: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContainerGroupEventType {
+    Created,
+    Applied,
+    Deleted,
+    PlacementFailed,
+}
+
+fn record_container_group_event(
+    state: &Arc<AppState>,
+    event_type: ContainerGroupEventType,
+    container_group_name: &str,
+    tenant: Option<String>,
+    actor: String,
+    detail: Option<String>,
+) {
+    let event = ContainerGroupEvent {
+        id: uuid::Uuid::new_v4().to_string(),
+        event_type,
+        container_group_name: container_group_name.to_string(),
+        tenant,
+        actor,
+        detail,
+        timestamp: chrono::Utc::now(),
+    };
+    if let Err(e) = state
+        .store
+        .save_entity("container_group_events", &event.id, &event)
+    {
+        tracing::error!("Failed to record ContainerGroup event: {}", e);
+    }
 }
 
 fn err(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<serde_json::Value>) {
@@ -271,15 +331,25 @@ pub(crate) fn pod_name(group_name: &str, replicas: u32, index: u32) -> String {
 /// place it on a Secure-Containers-capable host, then create its Pod(s)
 /// there via the Kubernetes API.
 pub async fn apply_container_group_spec(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
-    Json(spec): Json<ContainerGroupSpec>,
+    Json(mut spec): Json<ContainerGroupSpec>,
 ) -> Result<(StatusCode, Json<ContainerGroupApplyResult>), (StatusCode, Json<serde_json::Value>)> {
     tracing::debug!(
         "container_declarative::{}",
         stringify!(apply_container_group_spec)
     );
     validate_spec(&spec)?;
+
+    spec.tenant = crate::tenant_scope::apply_create_tenant(&claims, spec.tenant.clone())
+        .map_err(|(s, m)| err(s, m))?;
+
+    let is_new = matches!(
+        state
+            .store
+            .get_entity::<ContainerGroupSpec>("container_groups", &spec.name),
+        Ok(None)
+    );
 
     let client = state.k8s_pod_client.clone().ok_or_else(|| {
         err(
@@ -289,8 +359,17 @@ pub async fn apply_container_group_spec(
         )
     })?;
 
-    let placed = container_placement::place_container_group(&state, &spec)
-        .map_err(|e| err(StatusCode::BAD_REQUEST, e))?;
+    let placed = container_placement::place_container_group(&state, &spec).map_err(|e| {
+        record_container_group_event(
+            &state,
+            ContainerGroupEventType::PlacementFailed,
+            &spec.name,
+            spec.tenant.clone(),
+            claims.sub.clone(),
+            Some(e.clone()),
+        );
+        err(StatusCode::BAD_REQUEST, e)
+    })?;
 
     let mut warnings = Vec::new();
     let mut created_pod_names = Vec::new();
@@ -319,6 +398,19 @@ pub async fn apply_container_group_spec(
         .store
         .save_entity("container_group_status", &spec.name, &status)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    record_container_group_event(
+        &state,
+        if is_new {
+            ContainerGroupEventType::Created
+        } else {
+            ContainerGroupEventType::Applied
+        },
+        &spec.name,
+        spec.tenant.clone(),
+        claims.sub.clone(),
+        None,
+    );
 
     Ok((
         StatusCode::OK,
@@ -355,7 +447,7 @@ pub async fn export_container_group_spec(
 /// DELETE /api/container-groups/:name — delete a ContainerGroup's Pod(s) and
 /// stored spec/status.
 pub async fn delete_container_group(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
@@ -363,6 +455,13 @@ pub async fn delete_container_group(
         "container_declarative::{}",
         stringify!(delete_container_group)
     );
+
+    let tenant = state
+        .store
+        .get_entity::<ContainerGroupSpec>("container_groups", &name)
+        .ok()
+        .flatten()
+        .and_then(|spec| spec.tenant);
 
     let status = state
         .store
@@ -390,5 +489,82 @@ pub async fn delete_container_group(
         .delete_entity("container_groups", &name)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    record_container_group_event(
+        &state,
+        ContainerGroupEventType::Deleted,
+        &name,
+        tenant,
+        claims.sub,
+        None,
+    );
+
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/container-group-events — list recent ContainerGroup audit events,
+/// scoped to the caller's tenant when their JWT carries one (closing the gap
+/// `events::list_events` itself has today).
+pub async fn list_container_group_events(
+    RequireRead(claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Json<Vec<ContainerGroupEvent>> {
+    tracing::debug!(
+        "container_declarative::{}",
+        stringify!(list_container_group_events)
+    );
+    let mut events: Vec<ContainerGroupEvent> = state
+        .store
+        .list_entities("container_group_events")
+        .unwrap_or_default();
+
+    if let Some(tenant) = claims.tenant.as_deref() {
+        events.retain(|e| e.tenant.as_deref() == Some(tenant));
+    }
+
+    events.sort_by_key(|e| std::cmp::Reverse(e.timestamp));
+    events.truncate(100);
+
+    Json(events)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn container_group_event_omits_absent_tenant_and_detail_from_json() {
+        let event = ContainerGroupEvent {
+            id: "e1".to_string(),
+            event_type: ContainerGroupEventType::Created,
+            container_group_name: "web".to_string(),
+            tenant: None,
+            actor: "user-1".to_string(),
+            detail: None,
+            timestamp: chrono::Utc::now(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("tenant"));
+        assert!(!obj.contains_key("detail"));
+        assert_eq!(json["actor"], "user-1");
+    }
+
+    #[test]
+    fn container_group_spec_tenant_defaults_to_none_when_omitted() {
+        let spec: ContainerGroupSpec = serde_json::from_str(
+            r#"{"name": "web", "containers": [{"name": "app", "image": "nginx", "resources": {"cpus": 1, "memory": "512M"}}]}"#,
+        )
+        .unwrap();
+        assert!(spec.tenant.is_none());
+    }
+
+    #[test]
+    fn pod_name_is_the_bare_group_name_for_a_single_replica() {
+        assert_eq!(pod_name("web", 1, 0), "web");
+    }
+
+    #[test]
+    fn pod_name_is_suffixed_by_index_for_multiple_replicas() {
+        assert_eq!(pod_name("web", 3, 2), "web-2");
+    }
 }
