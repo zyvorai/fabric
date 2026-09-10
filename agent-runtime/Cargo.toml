@@ -1,0 +1,32 @@
+[package]
+name = "zyvor-fabric-agent-runtime"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Durable TypeScript agent sessions backed by Zyvor FluxVM sandboxes"
+
+# This component intentionally stays outside backend/Cargo.toml's legacy workspace.
+# It can evolve independently without perturbing the main Fabric daemon lockfile.
+[workspace]
+
+[dependencies]
+anyhow = "1.0"
+async-stream = "0.3"
+axum = { version = "0.8", features = ["json", "http1", "tokio"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+futures-core = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tokio = { version = "1.44", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = "2.5"
+uuid = { version = "1.16", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
