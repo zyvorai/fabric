@@ -18,11 +18,24 @@ resolution).
 ## 1. Prerequisites
 
 - A Kubernetes cluster reachable from `zyvor-fabricd`, with `RuntimeClass
-  fluxvm` and the `containerd-shim-fluxvm-v2` + guest-agent installed on
-  every node that should run Secure Containers Pods. On the FluxVM side this
-  is `scripts/install-secure-containers.sh` (single-node, manual — see
-  fluxvm's own docs for the current install story; there's no fleet-wide
-  Helm/DaemonSet automation for this yet).
+  fluxvm` and the `containerd-shim-fluxvm-v2` + guest image installed on
+  every node that should run Secure Containers Pods.
+
+### Install FluxVM Secure Containers shim (node)
+
+On each capable node (see FluxVM `docs/secure-containers.md` /
+`docs/secure-containers-set3.md`):
+
+1. Run FluxVM `scripts/install-secure-containers.sh` (installs shim +
+   RuntimeClass + guest image paths).
+2. Confirm FluxVM `/readyz.secure_containers` reports:
+   `{ "available": true, "shim_installed": true, "guest_image_present": true }`.
+3. Fabric host-agent probes that object on each heartbeat and stores both
+   `secure_containers_ready` and the nested detail for the Datacenters UI.
+
+There is still no fleet-wide Helm automation for the shim — DaemonSet
+install remains FluxVM's responsibility; Fabric only consumes readiness.
+
 - A kubeconfig fabric can use to reach that cluster (a `ServiceAccount`
   token is the usual choice for a long-running daemon).
 
@@ -233,9 +246,13 @@ running Pod.
 
 - Multi-site placement, horizontal autoscaling, and `AffinityRule`
   cross-referencing (placement only understands `node_hint` today).
-- Automatic node-capability detection — `secure_containers_ready` is set by
-  whoever calls `register_host`/`heartbeat`, nothing on fabric's own
-  host-agent side probes for the shim/containerd config itself.
+- Nested readiness is probed by host-agent from FluxVM `/readyz` and shown
+  on the Datacenters host table; fleet-wide shim install automation still
+  lives in FluxVM, not Fabric charts.
+- Live Pod phase/node is exposed at `GET /api/container-groups/{name}/status`
+  and in the Container Groups UI; Kubernetes Event objects are not mirrored
+  yet (Fabric audit events cover apply/delete).
 - A CRD-native path for backup/quota management — those stay Fabric REST/CLI
   operations, not part of the `ContainerGroup` custom resource the operator
   reconciles (see the Helm chart under `operator/charts/`).
+- Replacing the FluxVM Secure Containers shim or guest image pipeline.

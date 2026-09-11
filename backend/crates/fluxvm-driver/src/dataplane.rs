@@ -62,6 +62,8 @@ fn to_status(s: client::DataplaneStatus) -> DataplaneStatus {
         schema_version: s.schema_version,
         schema_compatible: s.schema_compatible,
         policy_synced: s.policy_synced,
+        pod_ingress_required: s.pod_ingress_required,
+        pod_ingress_attached: s.pod_ingress_attached,
         policy: to_policy(s.policy),
     }
 }
@@ -72,6 +74,91 @@ fn to_stats(s: client::DataplaneStats) -> DataplaneStats {
         allowed_bytes: s.allowed_bytes,
         dropped_packets: s.dropped_packets,
         dropped_bytes: s.dropped_bytes,
+        pod_policy: s.pod_policy.map(|p| zyvor_fabric_driver_core::PodPolicyStats {
+            egress: zyvor_fabric_driver_core::PodDirectionCounters {
+                allowed: p.egress.allowed,
+                dropped: p.egress.dropped,
+                audited: p.egress.audited,
+            },
+            ingress: zyvor_fabric_driver_core::PodDirectionCounters {
+                allowed: p.ingress.allowed,
+                dropped: p.ingress.dropped,
+                audited: p.ingress.audited,
+            },
+            directional: p.directional,
+        }),
+    }
+}
+
+#[cfg(test)]
+mod mapping_tests {
+    use super::*;
+    use zyvor_fabric_fluxvm_client as client;
+
+    fn sample_policy() -> client::VmNetworkPolicy {
+        client::VmNetworkPolicy {
+            default_allow: false,
+            allow_cidrs: vec![],
+            allow_ports: vec![],
+            max_egress_mbps: None,
+            max_egress_pps: None,
+            sample_rate: 0,
+            deny_cidrs: vec![],
+            allow_icmp: true,
+            groups: vec![],
+            labels: vec![],
+            allow_fqdns: vec![],
+            entities: vec![],
+            audit_mode: false,
+        }
+    }
+
+    #[test]
+    fn to_status_copies_pod_ingress_fields() {
+        let mapped = to_status(client::DataplaneStatus {
+            mode: "ebpf".into(),
+            required: true,
+            attached: true,
+            interface: Some("tap0".into()),
+            identity: 9,
+            pin_dir: Some("/pin".into()),
+            schema_version: Some(9),
+            schema_compatible: true,
+            policy_synced: true,
+            pod_ingress_required: true,
+            pod_ingress_attached: false,
+            policy: sample_policy(),
+        });
+        assert!(mapped.pod_ingress_required);
+        assert!(!mapped.pod_ingress_attached);
+        assert_eq!(mapped.schema_version, Some(9));
+    }
+
+    #[test]
+    fn to_stats_copies_pod_policy() {
+        let mapped = to_stats(client::DataplaneStats {
+            allowed_packets: 1,
+            allowed_bytes: 2,
+            dropped_packets: 3,
+            dropped_bytes: 4,
+            pod_policy: Some(client::PodPolicyStats {
+                egress: client::PodDirectionCounters {
+                    allowed: 5,
+                    dropped: 6,
+                    audited: 7,
+                },
+                ingress: client::PodDirectionCounters {
+                    allowed: 8,
+                    dropped: 9,
+                    audited: 10,
+                },
+                directional: true,
+            }),
+        });
+        let pp = mapped.pod_policy.expect("pod_policy");
+        assert!(pp.directional);
+        assert_eq!(pp.egress.allowed, 5);
+        assert_eq!(pp.ingress.audited, 10);
     }
 }
 
@@ -329,6 +416,38 @@ impl VmDataplaneDriver for FluxVmDriver {
             .into_iter()
             .map(to_flow)
             .collect())
+    }
+
+    async fn dataplane_drop_reasons(
+        &self,
+        name: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<serde_json::Value>> {
+        let vm = self.resolve(name).await?;
+        let rows = self.client.network_drop_reasons(vm.id, limit).await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| serde_json::to_value(r).ok())
+            .collect())
+    }
+
+    async fn get_pod_network_policy(&self, name: &str) -> Result<Option<serde_json::Value>> {
+        let vm = self.resolve(name).await?;
+        match self.client.get_pod_network_policy(vm.id).await? {
+            None => Ok(None),
+            Some(p) => Ok(Some(serde_json::to_value(p)?)),
+        }
+    }
+
+    async fn set_pod_network_policy(&self, name: &str, policy: &serde_json::Value) -> Result<()> {
+        let vm = self.resolve(name).await?;
+        let policy: client::PodNetworkPolicy = serde_json::from_value(policy.clone())?;
+        self.client.set_pod_network_policy(vm.id, &policy).await
+    }
+
+    async fn delete_pod_network_policy(&self, name: &str) -> Result<()> {
+        let vm = self.resolve(name).await?;
+        self.client.delete_pod_network_policy(vm.id).await
     }
 
     async fn dataplane_effective(&self, name: &str) -> Result<serde_json::Value> {

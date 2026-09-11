@@ -416,6 +416,7 @@ pub async fn register_host(
         created_at: now,
         updated_at: now,
         secure_containers_ready: req.secure_containers_ready,
+        secure_containers: None,
     };
     match state.store.save_entity("hosts", &host.id, &host) {
         Ok(_) => (StatusCode::CREATED, Json(host)).into_response(),
@@ -576,10 +577,7 @@ pub async fn host_heartbeat(
                 .into_response()
         }
     };
-    host.cpu_usage_pct = hb.cpu_usage_pct;
-    host.memory_usage_pct = hb.memory_usage_pct;
-    host.vm_count = hb.vm_count;
-    host.secure_containers_ready = hb.secure_containers_ready;
+    apply_host_heartbeat_metrics(&mut host, &hb);
     host.last_heartbeat = Utc::now();
     host.updated_at = host.last_heartbeat;
     if let Err(e) = state.store.save_entity("hosts", &host.id, &host) {
@@ -880,4 +878,87 @@ pub async fn get_cluster_health(
         }),
     )
         .into_response()
+}
+
+/// Apply heartbeat metrics onto a host record (CPU/mem/VMs + Secure Containers).
+pub(crate) fn apply_host_heartbeat_metrics(host: &mut HostInfo, hb: &HostHeartbeat) {
+    host.cpu_usage_pct = hb.cpu_usage_pct;
+    host.memory_usage_pct = hb.memory_usage_pct;
+    host.vm_count = hb.vm_count;
+    host.secure_containers_ready = hb
+        .secure_containers
+        .as_ref()
+        .map(|d| d.available)
+        .unwrap_or(hb.secure_containers_ready);
+    host.secure_containers = hb.secure_containers.clone();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use datacenter::SecureContainersDetail;
+
+    fn blank_host() -> HostInfo {
+        HostInfo {
+            id: "h1".into(),
+            hostname: "h1".into(),
+            address: "10.0.0.1".into(),
+            cluster_id: "c1".into(),
+            datacenter_id: "d1".into(),
+            cpus: 8,
+            memory_mb: 16384,
+            status: HostStatus::Connected,
+            last_heartbeat: Utc::now(),
+            vm_count: 0,
+            cpu_usage_pct: 0.0,
+            memory_usage_pct: 0.0,
+            agent_version: "t".into(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            secure_containers_ready: false,
+            secure_containers: None,
+        }
+    }
+
+    #[test]
+    fn heartbeat_persists_nested_secure_containers_and_derives_ready() {
+        let mut host = blank_host();
+        let hb = HostHeartbeat {
+            cpu_usage_pct: 12.0,
+            memory_usage_pct: 34.0,
+            vm_count: 2,
+            uptime_secs: 99,
+            secure_containers_ready: false,
+            secure_containers: Some(SecureContainersDetail {
+                available: true,
+                shim_installed: true,
+                guest_image_present: false,
+            }),
+        };
+        apply_host_heartbeat_metrics(&mut host, &hb);
+        assert!(host.secure_containers_ready);
+        assert_eq!(
+            host.secure_containers.as_ref().map(|d| d.shim_installed),
+            Some(true)
+        );
+        assert_eq!(host.cpu_usage_pct, 12.0);
+        assert_eq!(host.vm_count, 2);
+    }
+
+    #[test]
+    fn heartbeat_falls_back_to_flat_ready_flag() {
+        let mut host = blank_host();
+        let hb = HostHeartbeat {
+            cpu_usage_pct: 1.0,
+            memory_usage_pct: 2.0,
+            vm_count: 0,
+            uptime_secs: 1,
+            secure_containers_ready: true,
+            secure_containers: None,
+        };
+        apply_host_heartbeat_metrics(&mut host, &hb);
+        assert!(host.secure_containers_ready);
+        assert!(host.secure_containers.is_none());
+    }
 }

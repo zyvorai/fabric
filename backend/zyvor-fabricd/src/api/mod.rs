@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod auth;
+pub mod agent_runtime;
 pub mod capabilities;
 pub mod instance;
 
@@ -22,6 +23,7 @@ pub mod network_cloud_discover;
 pub mod notifications;
 pub mod pools;
 pub mod profiles;
+pub mod qga;
 pub mod quotas;
 pub mod schedules;
 pub mod settings;

@@ -862,6 +862,84 @@ pub async fn export_container_group_spec(
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct ContainerGroupLivePod {
+    pub name: String,
+    pub phase: Option<String>,
+    pub node_name: Option<String>,
+    pub pod_ip: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ContainerGroupLiveStatus {
+    pub name: String,
+    pub host_id: Option<String>,
+    pub host_name: Option<String>,
+    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub pods: Vec<ContainerGroupLivePod>,
+}
+
+/// GET /api/container-groups/:name/status — placement host + live Pod phase/node.
+pub async fn get_container_group_status(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<ContainerGroupLiveStatus>, (StatusCode, Json<serde_json::Value>)> {
+    let spec = state
+        .store
+        .get_entity::<ContainerGroupSpec>("container_groups", &name)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "ContainerGroup not found"))?;
+
+    let stored = state
+        .store
+        .get_entity::<ContainerGroupStatus>("container_group_status", &name)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let namespace = container_group_namespace(&state, spec.tenant.as_deref());
+    let mut pods = Vec::new();
+    if let (Some(client), Some(status)) = (state.k8s_pod_client.clone(), stored.as_ref()) {
+        for pod_name in &status.pod_names {
+            match client.get_pod_status(pod_name, namespace.as_deref()).await {
+                Ok(Some(view)) => pods.push(ContainerGroupLivePod {
+                    name: pod_name.clone(),
+                    phase: view.phase,
+                    node_name: view.node_name,
+                    pod_ip: view.pod_ip,
+                }),
+                Ok(None) => pods.push(ContainerGroupLivePod {
+                    name: pod_name.clone(),
+                    phase: Some("NotFound".into()),
+                    node_name: None,
+                    pod_ip: None,
+                }),
+                Err(e) => {
+                    tracing::warn!(
+                        "failed to fetch pod '{}' for ContainerGroup '{}': {}",
+                        pod_name,
+                        name,
+                        e
+                    );
+                    pods.push(ContainerGroupLivePod {
+                        name: pod_name.clone(),
+                        phase: Some("Unknown".into()),
+                        node_name: None,
+                        pod_ip: None,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(Json(ContainerGroupLiveStatus {
+        name,
+        host_id: stored.as_ref().map(|s| s.host_id.clone()),
+        host_name: stored.as_ref().map(|s| s.host_name.clone()),
+        updated_at: stored.as_ref().map(|s| s.updated_at),
+        pods,
+    }))
+}
+
 /// DELETE /api/container-groups/:name — delete a ContainerGroup's Pod(s) and
 /// stored spec/status.
 pub async fn delete_container_group(

@@ -1,5 +1,3 @@
-Console guides below assume you are signed in. Public marketing routes are `/`, `/product`, `/platform`, `/security`; sign in at `/sign-in`.
-
 # Page-by-page guides
 
 Each guide follows: Purpose → When to use it → How to get there → What you can do → Related pages.
@@ -10,7 +8,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 | Page | What it covers |
 |------|----------------|
-| [Sign in](auth/login.md) | Sign in — the sign-in screen for the Zyvor Fabric dashboard. Authenticates against either the local admin account or a Linux (PAM) system account on the host. |
+| [Sign in](auth/login.md) | Sign-in screen for Zyvor Fabric. Authenticates against the local admin account or a configured identity provider / PAM user on the host. |
 
 ## Core
 
@@ -20,11 +18,11 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Datacenters](core/datacenters.md) | Datacenters — the physical inventory tree: datacenters, the clusters inside each one, and the hosts registered to each cluster, with live CPU/memory usage and VM counts per host. |
 | [Favorites](core/favorites.md) | Favorites — a personal, starred shortlist of VMs pulled from your full VM list, so the machines you use most are one click away instead of buried in a longer list. |
 | [Dashboard](core/home.md) | Dashboard — the fabric at a glance: how many VMs exist and in what state, live CPU/memory trends, and whether each backend subsystem is actually reachable. |
-| [Machines](core/machines.md) | **Removed** — use [Virtual Machines](core/vms.md) / FluxVM (`/app/vms`). |
+| [Machines (removed)](core/machines.md) |  |
 | [Profiles](core/profiles.md) | Profiles (shown in the UI as Instance Types) — a library of VM sizing presets (vCPUs, memory, disk, and optionally network bandwidth) you can pick instead of hand-tuning resources every time you create a VM. |
-| [Settings](core/settings.md) | Settings — Core product and console preferences. |
+| [Settings](core/settings.md) | Settings — Core product and console preferences: daemon identity and log level, auto-refresh, default bridge/DNS, default storage pool and disk format, snapshot retention, auth/TLS/session/audit toggles, and notification hooks (email / webhook / VM lifecycle events). |
 | [VM Browser](core/vm-browser.md) | VM Browser — a lightweight, read-only grid of every VM, for quickly scanning or searching without the bulk-action tooling of the full [Virtual Machines](core/vms.md) list. |
-| [VM Wizard](core/vm-wizard.md) | VM Wizard — guided VM creation flow. |
+| [VM Wizard](core/vm-wizard.md) | VM Wizard — legacy guided VM creation route. The console now uses the three-step Create VM wizard; `/app/vm-wizard` redirects there automatically. |
 | [VM Console](core/vms-name-console.md) | VM Console — a real, live console into a running VM, from the browser, without SSH or any other client installed. |
 | [Virtual Machines](core/vms.md) | Virtual Machines — the fleet view of every VM in the fabric, and the starting point for managing any one of them. |
 
@@ -33,18 +31,18 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | Page | What it covers |
 |------|----------------|
 | [Containers](infrastructure/containers.md) | Containers — a read-only, auto-refreshing view of container workloads running on the host (Docker/Podman-style containers, distinct from VMs), showing per-container state, image, CPU/memory usage, and network I/O. |
+| [VM Dataplane (Network Fabric schema v4)](infrastructure/dataplane.md) | Per-VM edge security and telemetry powered by FluxVM Network Fabric |
 | [Distributed Storage](infrastructure/distributed-storage.md) | Distributed Storage — the enterprise/clustered layer above a single storage backend: replicated pools spanning multiple hosts, storage policies (tiering, replication, encryption/dedup/compression), in-flight VM disk migrations between pools, and datastore clusters with automatic space/latency-based balancing. For creating and starting a single NFS/LVM/ZFS/Ceph pool, see [Storage Pools](infrastructure/storage-pools.md); for browsing volumes inside pools, see [Storage](infrastructure/storage.md). |
-| [Net Security](infrastructure/network-security.md) | Net Security — the advanced SDN and security control plane: network policies scoped to security identities, host firewall profiles/zones/VM assignments, exposed services, QoS traffic shaping, DNS zones/policies, WireGuard VPN tunnels and networks, traffic mirroring, NAT rules/pools/gateways, and bandwidth monitoring with alerts. For everyday per-VM networking mode and port forwards, see [Network](infrastructure/network.md). For per-VM TC/eBPF edge policy, see [VM Dataplane](infrastructure/dataplane.md). |
-| [Network](infrastructure/network.md) | Network — day-to-day VM networking: which mode a VM uses, its port forwards, and its assigned address. For the advanced SDN stack see [Net Security](infrastructure/network-security.md). For FluxVM Network Fabric eBPF edge see [VM Dataplane](infrastructure/dataplane.md). |
-| [VM Dataplane](infrastructure/dataplane.md) | VM Dataplane — per-VM TC/eBPF edge (Network Fabric schema v4): Status / Policy / Effective / Stats / Flows; orthogonal to host SDN. |
-| [Edge Dataplane](infrastructure/edge-dataplane.md) | Edge Dataplane — Maglev Services (Service Fabric v6) plus groups, CNP, identities, observe, health, ipcache (`/app/edge-dataplane`). |
+| [Edge Dataplane (cluster)](infrastructure/edge-dataplane.md) | Cluster-wide console for FluxVM Network Fabric schema v4 (security groups, |
+| [Net Security](infrastructure/network-security.md) | Net Security — the advanced SDN and security control plane: network policies scoped to security identities, host firewall profiles/zones/VM assignments, exposed services, QoS traffic shaping, DNS zones/policies, WireGuard VPN tunnels and networks, traffic mirroring, NAT rules/pools/gateways, and bandwidth monitoring with alerts. |
+| [Network](infrastructure/network.md) | Network — day-to-day VM networking: which mode a VM uses, its port forwards, and its assigned address. For the advanced SDN stack (policies, firewalls, VPN mesh, QoS, mirroring), see [Net Security](infrastructure/network-security.md). For per-VM TC/eBPF edge allowlists, rate limits, and flows, see [VM Dataplane](infrastructure/dataplane.md). |
 | [Resource Pools](infrastructure/resource-pools.md) | Resource Pools — hierarchical CPU/memory allocation pools (nested, with shares, reservations, and limits) that VMs draw from, plus an admission-control test to check whether a workload's requirements would fit before you commit to it. |
 | [Storage Pools](infrastructure/storage-pools.md) | Storage Pools — create, start/stop, and monitor the storage backends VM disks live on: local directories, NFS exports, LVM and LVM-thin volume groups, ZFS pools, or Ceph RBD pools. This is where a pool's lifecycle and health live; for the volumes (disks) inside those pools see [Storage](infrastructure/storage.md), and for multi-host replicated/policy-driven storage see [Distributed Storage](infrastructure/distributed-storage.md). |
 | [Storage](infrastructure/storage.md) | Storage — a consolidated view of every storage pool's capacity alongside a manual volume tracking ledger. To create or manage a pool itself, use [Storage Pools](infrastructure/storage-pools.md); for replicated/policy-driven storage across hosts, see [Distributed Storage](infrastructure/distributed-storage.md). |
 | [System Health](infrastructure/system-health.md) | System Health — a live, read-only dashboard of host resource utilization, refreshing every 2 seconds: CPU, memory, disk I/O, filesystems, network interfaces, and top processes, rolled up into a single health score. |
 | [System](infrastructure/system.md) | System — the physical host's hardware topology (CPU sockets/cores/threads, NUMA nodes, hugepages) plus topology-aware optimization recommendations for individual VMs. This is distinct from [System Health](infrastructure/system-health.md), which tracks live utilization rather than hardware layout. |
-| [VM Pools](infrastructure/vm-pools.md) | VM Pools — warm / capacity pools for fast provisioning. |
-| [Zones](infrastructure/zones.md) | Zones — Infrastructure surface for placement domains. |
+| [Warm Pools (VM Pools)](infrastructure/vm-pools.md) | Warm Pools — keep N VMs pre-booted and paused from a chosen disk image so you can claim one instantly instead of cold-creating. Each pool shows ready members vs size, vCPUs/memory, and the image path. |
+| [Availability Zones](infrastructure/zones.md) | Zones — availability / placement domains for the fabric: named zones (region, status, host count) plus spot instances (max price, priority, eviction policy) that can be requested, evicted, or deleted against those zones. |
 
 ## Monitoring
 
@@ -107,7 +105,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Replication](operations/replication.md) | Replication — register remote replication sites, configure per-VM replication to them with a target RPO (recovery point objective), and monitor sync health and RPO compliance across your fleet. |
 | [Schedules](operations/schedules.md) | VM Schedules — automate a recurring lifecycle action (start, stop, restart, or snapshot) for a single VM, on a one-time, daily, or weekly schedule. |
 | [Site Recovery](operations/site-recovery.md) | Site Recovery — define disaster recovery plans that group VMs by source and target site, then execute those plans as a test failover, a planned migration, or a full disaster recovery, and track how each execution unfolds. |
-| [Snapshots](operations/snapshots.md) | VM Snapshots — create point-in-time snapshots of a specific VM's disk (or disk + state), and revert or delete them. Unlike most Operations pages, this one is scoped to one VM at a time, entered by name. |
+| [Snapshots](operations/snapshots.md) | VM Snapshots — create point-in-time snapshots of a specific VM's disk (or disk + memory), and revert or delete them. Unlike most Operations pages, this one is scoped to one VM at a time, entered by name. |
 | [Templates](operations/templates.md) | VM Templates — reusable VM configurations (CPU/memory/disk, tags) that you save from an existing VM and use to stamp out new VMs quickly, instead of configuring resources from scratch each time. |
 
 ## Security
@@ -119,7 +117,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Compliance](security/compliance.md) | Compliance Dashboard — a security and configuration compliance scorecard: an overall score, pass/warning/fail counts by category, and remediation guidance for anything that isn't passing. |
 | [Encryption](security/encryption.md) | Encryption — manage VM disk and vMotion encryption: register key management providers (KMIP, HashiCorp Vault Transit, or local software keys), define reusable encryption policies, and see which VMs are encrypted under which policy. |
 | [Plugins](security/plugins.md) | Plugin Manager — enable, disable, and review the server extensions installed on Zyvor Fabric (storage, network, security, monitoring, and backup plugin types). |
-| [Security Dashboard](security/security-dashboard.md) | Security — a real-time security posture and threat-monitoring view: an overall risk score, active security alerts, recent failed login attempts, and listening network ports on the host. Data auto-refreshes every 5 seconds. This is distinct from [Compliance](security/compliance.md) (configuration checks) and [Certificates](security/certificates.md) (PKI health) — this page is about live threats and activity, not point-in-time audits. |
+| [Security Dashboard](security/security-dashboard.md) | Security — a real-time security posture and threat-monitoring view: an overall risk score, active security alerts, recent failed login attempts, and listening network ports on the host. Data auto-refreshes every 5 seconds. |
 
 ## Tools
 
@@ -127,11 +125,11 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 |------|----------------|
 | [Cost Estimator](tools/cost-estimator.md) | Storage Cost Estimator — a what-if calculator that projects cloud storage cost (AWS S3, Azure Blob, GCS) for your VM fleet and compares it against an on-premises baseline. It's a planning tool: figures come from the inputs you set, not from your actual billing or usage. |
 | [Notification Center](tools/notification-center.md) | Notification Center — a live, session-only tray of VM events and system alerts, polled from the server every 10 seconds. It's separate from Monitoring → Notifications, which manages persistent delivery channels, rules, and history; this page just surfaces what's firing right now and forgets everything when you reload. |
-| [API Playground](tools/playground.md) | API Playground — try Fabric APIs interactively. |
+| [API Playground](tools/playground.md) | API Playground — send authenticated, ad-hoc HTTP requests to the Zyvor Fabric API from the browser: pick a preset endpoint or type any path, choose method, optional JSON body, inspect status/headers/body, and keep a short in-session history. |
 | [VM Compare](tools/vm-compare.md) | VM Comparison — a side-by-side diff of two VMs' configurations, run on demand against the live VM list. |
 | [VM Health Check](tools/vm-healthcheck.md) | VM Health Check — runs a set of health verification checks against a single VM, on demand, and reports pass/warning/fail per check plus an overall status. |
 | [Webhooks](tools/webhooks.md) | Webhook Configuration — manage outbound webhooks that notify an external endpoint (generic HTTP, Slack, or Discord) when specific VM and backup events occur. |
 
 ---
 
-84 guides. Regenerate: `node scripts/user-docs/generate-guide-index.mjs`.
+86 guides. Regenerate: `node scripts/user-docs/generate-guide-index.mjs`.

@@ -30,7 +30,7 @@ pub struct CapabilitiesResponse {
     pub vm_driver: SubsystemStatus,
     pub storage: SubsystemStatus,
     pub network_security: SubsystemStatus,
-    /// FluxVM Network Fabric v3 (TC/eBPF VM-edge) — orthogonal to Fabric SDN.
+    /// FluxVM Network Fabric schema v4 (TC/eBPF VM-edge) — orthogonal to Fabric SDN.
     pub vm_dataplane: SubsystemStatus,
     pub auth: SubsystemStatus,
     pub events: SubsystemStatus,

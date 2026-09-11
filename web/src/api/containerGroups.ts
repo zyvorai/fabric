@@ -137,6 +137,27 @@ export async function deleteContainerGroup(name: string): Promise<void> {
   return apiDelete(`${API_BASE}/container-groups/${encodeURIComponent(name)}`)
 }
 
+export interface ContainerGroupLivePod {
+  name: string
+  phase: string | null
+  node_name: string | null
+  pod_ip: string | null
+}
+
+export interface ContainerGroupLiveStatus {
+  name: string
+  host_id: string | null
+  host_name: string | null
+  updated_at: string | null
+  pods: ContainerGroupLivePod[]
+}
+
+export async function getContainerGroupStatus(name: string): Promise<ContainerGroupLiveStatus> {
+  return apiGet<ContainerGroupLiveStatus>(
+    `${API_BASE}/container-groups/${encodeURIComponent(name)}/status`,
+  )
+}
+
 export async function listContainerGroupEvents(): Promise<ContainerGroupEvent[]> {
   return apiGet<ContainerGroupEvent[]>(`${API_BASE}/container-group-events`)
 }

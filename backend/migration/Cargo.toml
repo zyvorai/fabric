@@ -12,3 +12,9 @@ serde_json.workspace = true
 tracing.workspace = true
 zyvor-fabric-driver-core = { path = "../crates/driver-core" }
 zyvor-fabric-fluxvm-client = { path = "../crates/fluxvm-client" } # ZYVOR_RUNTIME_BOUNDARY_V1
+uuid.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+wiremock = "0.6"
+chrono = { workspace = true, features = ["serde"] }

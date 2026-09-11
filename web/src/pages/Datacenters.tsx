@@ -314,6 +314,7 @@ export default function Datacenters() {
                                 <th className="p-2">CPU Usage</th>
                                 <th className="p-2">Mem Usage</th>
                                 <th className="p-2">VMs</th>
+                                <th className="p-2">Secure Containers</th>
                                 <th className="p-2">Status</th>
                                 <th className="p-2">Actions</th>
                               </tr>
@@ -348,6 +349,32 @@ export default function Datacenters() {
                                     </div>
                                   </td>
                                   <td className="p-2 text-sm text-[var(--zf-ink)]">{host.vm_count}</td>
+                                  <td className="p-2">
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs font-medium border ${
+                                        host.secure_containers_ready || host.secure_containers?.available
+                                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                          : 'text-[var(--zf-muted)] bg-[var(--zf-canvas)] border-[var(--zf-hairline)]'
+                                      }`}
+                                      title={
+                                        host.secure_containers
+                                          ? `available=${host.secure_containers.available} shim=${host.secure_containers.shim_installed} guest_image=${host.secure_containers.guest_image_present}`
+                                          : host.secure_containers_ready
+                                            ? 'ready'
+                                            : 'not ready'
+                                      }
+                                    >
+                                      {host.secure_containers_ready || host.secure_containers?.available
+                                        ? 'ready'
+                                        : 'no'}
+                                      {host.secure_containers && (
+                                        <span className="ml-1 opacity-70">
+                                          (shim {host.secure_containers.shim_installed ? '✓' : '✗'} · img{' '}
+                                          {host.secure_containers.guest_image_present ? '✓' : '✗'})
+                                        </span>
+                                      )}
+                                    </span>
+                                  </td>
                                   <td className="p-2">
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusBadge(host.status)}`}>
                                       {host.status}

@@ -4,7 +4,7 @@ Marketing: `/`, `/product`, `/platform`, `/security`, `/sign-in`.
 
 Console routes under `/app` — every primary navigable ops route.
 
-_Generated: 2026-09-02 · 84 routes_
+_Generated: 2026-09-10 · 84 routes_
 
 Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 
@@ -25,7 +25,7 @@ Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 | Dashboard | `/app` | Dashboard — Core surface. | [Open](pages/core/home.md) |
 | Favorites | `/app/favorites` | Favorites — Core surface. | [Open](pages/core/favorites.md) |
 | Virtual Machines | `/app/vms` | Virtual Machines — Core surface. | [Open](pages/core/vms.md) |
-| Machines | `/app/machines` | **Removed** — use Virtual Machines `/app/vms`. | [Note](pages/core/machines.md) |
+| Machines | `/app/machines` | Machines — Core surface. | [Open](pages/core/machines.md) |
 | Profiles | `/app/profiles` | Profiles — Core surface. | [Open](pages/core/profiles.md) |
 | Datacenters | `/app/datacenters` | Datacenters — Core surface. | [Open](pages/core/datacenters.md) |
 | VM Browser | `/app/vm-browser` | VM Browser — Core surface. | [Open](pages/core/vm-browser.md) |
@@ -39,8 +39,6 @@ Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 | Page | Route | Purpose | Guide |
 |------|-------|---------|-------|
 | Network | `/app/network` | Network — Infrastructure surface. | [Open](pages/infrastructure/network.md) |
-| VM Dataplane | `/app/vms/:name` → Dataplane | Per-VM TC/eBPF edge (Network Fabric schema v4) — not host SDN. | [Open](pages/infrastructure/dataplane.md) |
-| Edge Dataplane | `/app/edge-dataplane` | Maglev Services (Service Fabric v6) + groups/CNP/health/observe (Network Fabric schema v4). | [Open](pages/infrastructure/edge-dataplane.md) |
 | Net Security | `/app/network-security` | Net Security — Infrastructure surface. | [Open](pages/infrastructure/network-security.md) |
 | Storage | `/app/storage` | Storage — Infrastructure surface. | [Open](pages/infrastructure/storage.md) |
 | Storage Pools | `/app/storage-pools` | Storage Pools — Infrastructure surface. | [Open](pages/infrastructure/storage-pools.md) |

@@ -104,6 +104,65 @@ jobs:
       - name: Build
         run: cd web && npm run build
 
+  # Explicit catch-up gate (FluxVM boundary contracts). Also covered by
+  # `test` / `web` / Fabric E2E; this job surfaces failures with a clear name.
+  catch-up:
+    name: Catch-up coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev clang pkg-config libssl-dev
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend -> target
+          shared-key: catch-up
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: FluxVM stub smoke
+        run: |
+          python3 tests/fixtures/fluxvm-stub.py &
+          echo $! > /tmp/fluxvm-stub.pid
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:7788/readyz >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -sf http://127.0.0.1:7788/readyz | tee /tmp/readyz.json
+          grep -q secure_containers /tmp/readyz.json
+          curl -sf http://127.0.0.1:7788/v1/vms/11111111-1111-1111-1111-111111111111/network/status | tee /tmp/dp-status.json
+          grep -q pod_ingress /tmp/dp-status.json
+          curl -sf http://127.0.0.1:7788/v1/vms/11111111-1111-1111-1111-111111111111/network/stats | tee /tmp/dp-stats.json
+          grep -q pod_policy /tmp/dp-stats.json
+          curl -sf -X POST http://127.0.0.1:7788/v1/vms/11111111-1111-1111-1111-111111111111/qga/ping | grep -q '"ok"'
+          kill "$(cat /tmp/fluxvm-stub.pid)" 2>/dev/null || true
+
+      - name: Rust catch-up contracts
+        run: |
+          cd backend
+          cargo test -p zyvor-fabric-fluxvm-client -p zyvor-fabric-fluxvm-driver -p migration -p datacenter --tests --lib
+          cargo test -p zyvor-fabricd --lib agent_runtime::tests
+          cargo test -p zyvor-fabricd --lib container_placement::tests
+          cargo test -p zyvor-fabricd --lib heartbeat_persists
+          cargo test -p zyvor-fabricd --lib heartbeat_falls_back
+
+      - name: Web catch-up API paths
+        run: |
+          cd web
+          npm ci
+          npx vitest run src/api/__tests__/api-files.test.ts -t "containerGroups|agents|dataplane catch-up"
+
   docs-stats:
     runs-on: ubuntu-latest
     steps:

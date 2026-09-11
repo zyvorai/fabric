@@ -29,11 +29,12 @@ bridge = "br0"
 [driver]
 # VM lifecycle is handled entirely by FluxVM (https://github.com/zyvorai/fluxvm),
 # a disposable-VM engine with no systemd dependency of its own. Bridged VMs use
-# per-VM netns taps. Network Fabric v3 (TC/eBPF edge dataplane) is proxied at
+# per-VM netns taps. Network Fabric schema v4 (TC/eBPF edge dataplane) is proxied at
 # /api/vms/{name}/dataplane/* when FluxVM runs with
 # [sandbox.dataplane] mode = "ebpf" (see configs/fluxvm-dataplane.toml).
-# Pluggable storage backends (LVM/NBD/Ceph) and agent-sandbox APIs are not yet
-# surfaced through this driver (see docs/guides/vm-drivers/fluxvm.md).
+# Pluggable storage backends (LVM/NBD/Ceph) are wired on create.
+# Agent sandboxes are productized via sibling agent-runtime
+# ([agent_runtime] below), not the classic VM driver.
 # FluxVM's REST API base URL.
 # fluxvm_url = "http://127.0.0.1:7788"
 # Bearer token for FluxVM's auth layer, if it has auth.tokens configured.
@@ -41,6 +42,11 @@ bridge = "br0"
 # FluxVM MicroVM Prometheus histograms (default http://127.0.0.1:9108/metrics).
 # microvm_metrics_url = "http://127.0.0.1:9108/metrics"
 # microvm_metrics_url = "off"
+
+# Optional proxy to zyvor-fabric-agent-runtime (Agents/Sessions UI).
+# [agent_runtime]
+# base_url = "http://127.0.0.1:9096"
+# token = "..."   # or ZYVOR_FABRICD_AGENT_RUNTIME_TOKEN
 
 [auth]
 # Enable JWT-based authentication (default: true)

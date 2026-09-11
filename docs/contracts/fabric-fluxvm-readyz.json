@@ -32,7 +32,13 @@
       "ok_status": [200],
       "not_ready_status": [503],
       "required_fields": ["ok"],
-      "optional_fields": ["kvm", "state_dir", "dataplane", "secure_containers"]
+      "optional_fields": ["kvm", "state_dir", "dataplane", "secure_containers"],
+      "secure_containers_shape": {
+        "available": "bool",
+        "shim_installed": "bool",
+        "guest_image_present": "bool"
+      },
+      "notes": "dataplane may report schema_version 9 locally; Fabric proxies aggregate DataplaneStats until FluxVM exposes per-direction ppstat on REST"
     }
   },
   "compose": {

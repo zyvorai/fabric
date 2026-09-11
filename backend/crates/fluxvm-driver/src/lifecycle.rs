@@ -9,7 +9,8 @@ use async_trait::async_trait;
 use vm_model::{VMStartOptions, VMState, VM};
 use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
 use zyvor_fabric_fluxvm_client::{
-    BackendKind, CreateVmRequest, NetworkSpec, PortForward, VmRecord, VmStatus,
+    BackendKind, CreateVmRequest, NetworkSpec, PortForward, QgaSpec, StorageBackend, VmRecord,
+    VmStatus,
 };
 
 use crate::FluxVmDriver;
@@ -80,6 +81,16 @@ impl VMDriver for FluxVmDriver {
         let vm = self.resolve(name).await?;
         self.client.stop_vm(vm.id).await?;
         self.client.start_vm(vm.id).await.map(|_| ())
+    }
+
+    async fn pause(&self, name: &str) -> Result<()> {
+        let vm = self.resolve(name).await?;
+        self.client.pause_vm(vm.id).await.map(|_| ())
+    }
+
+    async fn resume(&self, name: &str) -> Result<()> {
+        let vm = self.resolve(name).await?;
+        self.client.resume_vm(vm.id).await.map(|_| ())
     }
 
     async fn get_state(&self, name: &str) -> Result<VMState> {
@@ -154,6 +165,7 @@ pub(crate) fn map_status(status: VmStatus) -> VMState {
         VmStatus::Paused => VMState::Paused,
         VmStatus::Stopped => VMState::Stopped,
         VmStatus::Failed => VMState::Failed,
+        VmStatus::Receiving => VMState::Starting,
     }
 }
 
@@ -278,6 +290,8 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         image: PathBuf::from(&vm.image),
         vcpus,
         memory_mib: vm.memory,
+        max_vcpus: None,
+        max_memory_mib: None,
         disk_size_gib: if vm.disk > 0 { Some(vm.disk) } else { None },
         kernel: opts.linux.clone().map(PathBuf::from),
         initrd: opts.initrd.first().cloned().map(PathBuf::from),
@@ -287,6 +301,7 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         } else {
             Some(opts.extra_args.join(" "))
         },
+        loadvm_tag: None,
         network,
         // Always attach a cloud-init seed, even an empty one, not just when
         // there's an ssh key/hostname to inject -- without ANY NoCloud
@@ -327,6 +342,13 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
             enabled: true,
             ..Default::default()
         }),
+        qga: if opts.enable_qga {
+            Some(QgaSpec { enabled: true })
+        } else {
+            None
+        },
+        hyperv: opts.hyperv,
+        storage: parse_storage_backend(opts.storage.as_deref()),
         shared_folders: opts
             .bind_mounts
             .iter()
@@ -336,6 +358,12 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
                 read_only: bm.read_only,
             })
             .collect(),
+        numa_node: opts.numa_node,
+        cpuset: opts.cpuset.clone(),
+        hugepages: opts.hugepages,
+        vfio_devices: opts.vfio_devices.clone(),
+        pod_uid: None,
+        migration_incoming: false,
         // Prefer explicit label `tenant=…` so Fabric project/billing labels
         // flow into FluxVM's first-class tenant filter (`GET /v1/vms?tenant=`).
         tenant: vm
@@ -349,6 +377,16 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
                 })
             }),
     })
+}
+
+fn parse_storage_backend(raw: Option<&str>) -> StorageBackend {
+    match raw.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
+        None | Some("") | Some("default") => StorageBackend::Default,
+        Some("lvm-thin") | Some("lvm_thin") | Some("lvm") => StorageBackend::LvmThin,
+        Some("nbd") => StorageBackend::Nbd,
+        Some("ceph-rbd") | Some("ceph_rbd") | Some("ceph") | Some("rbd") => StorageBackend::CephRbd,
+        Some(_) => StorageBackend::Default,
+    }
 }
 
 #[cfg(test)]

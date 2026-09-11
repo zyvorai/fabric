@@ -1,6 +1,6 @@
 # FluxVM companion — mirrors docker-compose.yml fluxvm service.
 # hostNetwork + privileged so KVM, cgroup host, and /run/netns work like compose.
-# Network Fabric v3: bpffs + SYS_RESOURCE (memlock) + fluxvm-dataplane.toml.
+# Network Fabric schema v4: bpffs + SYS_RESOURCE (memlock) + fluxvm-dataplane.toml.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -120,7 +120,7 @@ metadata:
     app.kubernetes.io/component: fluxvm
 data:
   fluxvm.toml: |
-    # Network Fabric v3 — keep required=false until first green attach.
+    # Network Fabric schema v4 — keep required=false until first green attach.
     [sandbox.dataplane]
     mode = "ebpf"
     bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"

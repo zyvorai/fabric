@@ -7,7 +7,7 @@ import {
   HeartPulse, Container, GitBranch, Zap, RefreshCw, Activity, ArrowRightLeft, CheckCircle, Clock,
   FileText, Calendar, TrendingUp, Camera, Save, PackageCheck, Archive, Package, Bell, Terminal,
   BarChart3, AlertTriangle, Bug, HelpCircle, Radio, Lock, Key, Users, Settings, Globe, DollarSign,
-  Upload, Download, Disc, Workflow, FileUp, Map, Inbox, Boxes, Wrench, MoreHorizontal, Code,
+  Upload, Download, Disc, Workflow, FileUp, Map, Inbox, Boxes, Wrench, MoreHorizontal, Code, Bot,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -106,6 +106,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Snapshots', path: '/app/snapshots', icon: Camera },
       { label: 'Backups', path: '/app/backups', icon: Save },
       { label: 'Container Groups', path: '/app/container-groups', icon: Boxes },
+      { label: 'Agents', path: '/app/agents', icon: Bot },
+      { label: 'Sessions', path: '/app/sessions', icon: Activity },
       { label: 'Quotas', path: '/app/quotas', icon: Shield },
       { label: 'Lifecycle', path: '/app/lifecycle', icon: PackageCheck },
       { label: 'Bulk Operations', path: '/app/bulk-operations', icon: Layers },

@@ -44,10 +44,7 @@ pub fn place_container_group(
             .ok_or_else(|| format!("node_hint '{hint}' does not match any registered host"));
     }
 
-    let capable: Vec<&HostInfo> = hosts
-        .iter()
-        .filter(|h| h.status == HostStatus::Connected && h.secure_containers_ready)
-        .collect();
+    let capable: Vec<&HostInfo> = secure_containers_capable_hosts(&hosts);
 
     if capable.is_empty() {
         return Err(
@@ -100,4 +97,58 @@ pub fn place_container_group(
             hostname: result.host_name,
         })
         .map_err(|e| e.to_string())
+}
+
+/// Hosts eligible for ContainerGroup placement.
+pub(crate) fn secure_containers_capable_hosts(hosts: &[HostInfo]) -> Vec<&HostInfo> {
+    hosts
+        .iter()
+        .filter(|h| h.status == HostStatus::Connected && h.secure_containers_ready)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use datacenter::SecureContainersDetail;
+
+    fn host(id: &str, status: HostStatus, ready: bool) -> HostInfo {
+        HostInfo {
+            id: id.into(),
+            hostname: id.into(),
+            address: "127.0.0.1".into(),
+            cluster_id: "c1".into(),
+            datacenter_id: "d1".into(),
+            cpus: 4,
+            memory_mb: 8192,
+            status,
+            last_heartbeat: Utc::now(),
+            vm_count: 0,
+            cpu_usage_pct: 0.0,
+            memory_usage_pct: 0.0,
+            agent_version: "t".into(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            secure_containers_ready: ready,
+            secure_containers: ready.then_some(SecureContainersDetail {
+                available: true,
+                shim_installed: true,
+                guest_image_present: true,
+            }),
+        }
+    }
+
+    #[test]
+    fn capable_hosts_require_connected_and_ready() {
+        let hosts = vec![
+            host("a", HostStatus::Connected, true),
+            host("b", HostStatus::Connected, false),
+            host("c", HostStatus::Disconnected, true),
+            host("d", HostStatus::Maintenance, true),
+        ];
+        let capable = secure_containers_capable_hosts(&hosts);
+        assert_eq!(capable.len(), 1);
+        assert_eq!(capable[0].id, "a");
+    }
 }
