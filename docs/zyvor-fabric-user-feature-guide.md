@@ -151,8 +151,8 @@ _JWT auth, enterprise SSO, RBAC, multi-tenancy, and encryption on every endpoint
 
 _Live migration, fault tolerance, and multi-site recovery._
 
-- **Live Migration** — Move running VMs between hosts with iterative rsync pre-copy and cutover, with progress tracking and cancel. — _Drain a host for maintenance without stopping workloads._
-  - **How:** Migrate a running VM between hosts (iterative rsync pre-copy + cutover) via the migration REST endpoints with progress/cancel · Web Site Operations.
+- **Live Migration** — Move VMs between hosts: production **disk-copy** (iterative rsync pre-copy + cutover) with progress/cancel; **native** FluxVM VMM transport + receivers is **preview**. — _Drain a host for maintenance without stopping workloads._
+  - **How:** Disk-copy via `/api/migrations` · Web → Operations → Migrations. Native: `/api/vms/{name}/migration/native/*` + receivers (see FLUXVM-FABRIC-BOUNDARY) · CLI `zyvorctl runtime migrate`.
 - **Fault Tolerance & Fencing** — Continuous VM replication with automatic failover detection, fencing, and FT metrics. — _Survive a node loss with minimal recovery time._
   - **How:** Continuous replication + automatic failover detection + fencing via the fault-tolerance REST endpoints (FT metrics exposed) · Web Site Operations → Fault tolerance.
 - **Predictive DRS** — Distributed resource scheduling with demand forecasting, proactive placement, and affinity/anti-affinity rules. — _Keep clusters balanced before hotspots become outages._

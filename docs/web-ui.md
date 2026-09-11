@@ -12,6 +12,7 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 | Sign-in | `/sign-in` (legacy `/login` redirects here) — two-step: username → **Continue** → password |
 | Console | `/app/*` (dashboard, VMs, network, storage, ops, …) |
 | Container Groups | `/app/container-groups` — FluxVM Secure Containers workloads; see [container-groups.md](container-groups.md) |
+| Agents / Sessions | `/app/agents`, `/app/sessions` — agent-runtime proxy (503 unless `[agent_runtime]` configured) |
 
 ---
 
@@ -23,7 +24,8 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 - Cilium-style network security management with 9 tabs
 - **VM edge dataplane (Network Fabric schema v4)** — VM detail → **Dataplane** tab
   (Status / Policy / Effective / Stats / Flows), **Infrastructure → Edge Dataplane**
-  (`/app/edge-dataplane`), plus Dashboard **VM dataplane** capability card; see
+  (`/app/edge-dataplane`), plus Dashboard **VM dataplane** capability card; drop-reasons /
+  pod-policy APIs and `pod_ingress_*` / `pod_policy` fields when FluxVM reports them; see
   [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md)
 - **Service Fabric v6 (BPF schema 4 / gen 6)** — Edge Dataplane → **Services** tab for Maglev VIP
   LB (drain/health/ads/GC/flows/EDT/HA deltas/policy); see [ebpf-service-fabric.md](ebpf-service-fabric.md)

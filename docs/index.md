@@ -175,7 +175,7 @@ Detailed documentation for each major feature area.
 | [Host Maintenance Evacuation](host-lifecycle.md) | Preflight-checked workload evacuation before a host enters maintenance |
 | [Fabric Doctor](FABRIC_DOCTOR.md) | Production host preflight checks and safe support bundles (`tools/fabric-doctor`) |
 | Fault Tolerance | Automatic failover, fencing, and recovery |
-| Live Migration | Iterative rsync pre-copy migration with cutover |
+| Live Migration | Disk-copy: iterative rsync pre-copy + cutover; native FluxVM transport = preview (receivers) |
 | Site Recovery | Failover/reprotect workflows for disaster recovery |
 | Resource Overcommit | CPU/memory/storage overcommit policies |
 | Split-Brain Protection | Quorum-based fencing to prevent split-brain in clusters |

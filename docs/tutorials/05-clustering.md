@@ -388,12 +388,14 @@ Expected response:
 
 ## Step 5: VM Migration
 
-Move VMs between hosts within a cluster. Zyvor Fabric supports live migration
-(minimal downtime), offline migration, and storage migration.
+Move VMs between hosts within a cluster. Zyvor Fabric supports **disk-copy**
+live/offline/storage migration (`/api/migrations`, rsync over SSH) and a
+**native** FluxVM path (`…/migration/native/*`, preview — see
+[FLUXVM-FABRIC-BOUNDARY.md](../FLUXVM-FABRIC-BOUNDARY.md)).
 
-### Live Migration
+### Live Migration (disk-copy)
 
-Migrate a running VM to another host with near-zero downtime:
+Migrate a running VM to another host with a brief final-sync pause (rsync, not QEMU memory migration):
 
 ```bash
 curl -s -X POST "$FABRIC_HOST/api/migrations" \

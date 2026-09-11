@@ -263,15 +263,16 @@ Yes, several automation features:
 
 ### How does live migration work?
 
-VMs can be migrated between hosts via `POST /api/v1/migrations`. The migration
-process:
-1. Pre-copy memory pages to the destination
-2. Pause the VM briefly for final sync
-3. Resume on the destination host
-4. Clean up on the source host
+Two paths:
 
-Progress can be tracked via `GET /api/v1/migrations/{id}` and cancelled via
-`POST /api/v1/migrations/{id}/cancel`.
+1. **Disk-copy “live”** (`POST /api/migrations`) — iterative **rsync** of disk/config
+   while the guest runs, then a short pause for final sync and cutover. This is
+   *not* QEMU memory live migration. Track with `GET /api/migrations/{id}`;
+   cancel with `POST /api/migrations/{id}/cancel`. See [migration.md](../migration.md).
+
+2. **Native FluxVM** (`/api/vms/{name}/migration/native/*` + receivers) — VMM
+   transport with target receivers. **Preview** until shared-disk KVM e2e is
+   green; ownership and APIs: [FLUXVM-FABRIC-BOUNDARY.md](../FLUXVM-FABRIC-BOUNDARY.md).
 
 ### How do I enable 2FA?
 

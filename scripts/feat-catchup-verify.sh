@@ -302,6 +302,78 @@ else
   pass "fabric_prepare_receiver_route" "code=$CODE"
 fi
 
+# Shared-disk prepare → get → abort (single-host; no live cutover)
+# Requires qemu + explicit MAC on the source request (receiver contract v1).
+RECV_NAME="feat-recv-$(date +%s | tail -c 5)"
+RECV_MAC="52:54:00:$(printf '%02x:%02x:%02x' $((RANDOM % 256)) $((RANDOM % 256)) $((RANDOM % 256)))"
+RECV_DISK="/var/lib/fluxvm/images/${RECV_NAME}.qcow2"
+RECV_IMG="${RECV_IMG:-/var/lib/fluxvm/images/noble-server-cloudimg-amd64.img}"
+if [[ -x "$(command -v qemu-img)" && -f "$RECV_IMG" ]]; then
+  if sudo qemu-img create -f qcow2 "$RECV_DISK" 10G >/dev/null 2>&1; then
+    code_body POST "$FLUX/v1/vms" "${FAUTH[@]}" -d "{
+      \"name\": \"$RECV_NAME\",
+      \"backend\": \"qemu\",
+      \"vcpus\": 1,
+      \"memory_mib\": 512,
+      \"disk_size_gib\": 10,
+      \"image\": \"$RECV_IMG\",
+      \"storage\": \"default\",
+      \"network\": {\"mode\": \"tap\", \"mac\": \"$RECV_MAC\", \"netns\": true},
+      \"agent\": {\"enabled\": false}
+    }"
+    RECV_SRC_ID=$(echo "$BODY" | json_field 'd.get("id","")')
+    if [[ "$CODE" == "201" || "$CODE" == "200" ]] && [[ -n "$RECV_SRC_ID" ]]; then
+      pass "receiver_source_vm" "created $RECV_NAME ($RECV_SRC_ID)"
+      # Spec must include the explicit MAC; reuse FluxVM's stored request.
+      RECV_SPEC=$(echo "$BODY" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)["request"]))')
+      code_body POST "$FLUX/v1/migration/receivers" "${FAUTH[@]}" -d "{
+        \"spec\": $RECV_SPEC,
+        \"disk_path\": \"$RECV_DISK\",
+        \"receiver_ttl_seconds\": 90
+      }"
+      RECV_ID=$(echo "$BODY" | json_field 'd.get("id","")')
+      RECV_PORT=$(echo "$BODY" | json_field 'd.get("port","")')
+      if [[ "$CODE" == "200" || "$CODE" == "201" ]] && [[ -n "$RECV_ID" && -n "$RECV_PORT" ]]; then
+        pass "migration_receiver_create" "id=$RECV_ID port=$RECV_PORT"
+        code_body GET "$FLUX/v1/migration/receivers/$RECV_ID" "${FAUTH[@]}"
+        if [[ "$CODE" == "200" ]] && echo "$BODY" | grep -q "$RECV_ID"; then
+          pass "migration_receiver_get" "MigrationReceiverInfo ok"
+        else
+          fail "migration_receiver_get" "code=$CODE $BODY"
+        fi
+        code_body DELETE "$FLUX/v1/migration/receivers/$RECV_ID" "${FAUTH[@]}"
+        [[ "$CODE" == "204" || "$CODE" == "200" ]] \
+          && pass "migration_receiver_abort" "code=$CODE" \
+          || fail "migration_receiver_abort" "code=$CODE $BODY"
+
+        # Fabric proxy: prepare-receiver → abort (same shared disk)
+        code_body POST "$BASE/api/vms/$RECV_NAME/migration/native/prepare-receiver" "${AUTH[@]}" \
+          -d "{\"disk_path\":\"$RECV_DISK\",\"listen_host\":\"127.0.0.1\",\"receiver_ttl_seconds\":90}"
+        FAB_RID=$(echo "$BODY" | json_field 'd.get("receiver_id","")')
+        if [[ "$CODE" == "200" && -n "$FAB_RID" ]]; then
+          pass "fabric_prepare_receiver" "receiver_id=$FAB_RID $(echo "$BODY"|head -c 80)"
+          code_body DELETE "$BASE/api/migration/receivers/$FAB_RID" "${AUTH[@]}"
+          [[ "$CODE" == "204" || "$CODE" == "200" ]] \
+            && pass "fabric_abort_receiver" "code=$CODE" \
+            || fail "fabric_abort_receiver" "code=$CODE $BODY"
+        else
+          fail "fabric_prepare_receiver" "code=$CODE $BODY"
+        fi
+      else
+        fail "migration_receiver_create" "code=$CODE $BODY"
+      fi
+      code_body DELETE "$FLUX/v1/vms/$RECV_SRC_ID" "${FAUTH[@]}" || true
+    else
+      fail "receiver_source_vm" "code=$CODE $BODY"
+    fi
+    sudo rm -f "$RECV_DISK" || true
+  else
+    skip "migration_receiver_e2e" "could not create $RECV_DISK (qemu-img/sudo)"
+  fi
+else
+  skip "migration_receiver_e2e" "qemu-img or $RECV_IMG missing"
+fi
+
 # Source-side native status should work
 if [[ -n "$VM" ]]; then
   code_body GET "$BASE/api/vms/$VM/migration/native/status" "${AUTH[@]}"

@@ -25,6 +25,10 @@ Datacenters — the physical inventory tree: datacenters, the clusters inside ea
 5. Expand a cluster to see its HA and DRS status and a table of its hosts: hostname, address, CPUs, memory, live CPU/memory usage bars, VM count, and status (Connected, Disconnected, Maintenance).
 6. Click **+ Host** on a cluster to register a host (hostname, IP address, CPUs, memory in MB), or use the trash icon to remove one — removal is confirmed first.
 7. Toggle a host in or out of maintenance mode with the wrench icon next to it.
+8. Host rows also surface **Secure Containers readiness** when heartbeats /
+   FluxVM `/readyz.secure_containers` report it (`secure_containers_ready`).
+   Fabric uses that flag to place [Container Groups](../operations/container-groups.md)
+   — it does not talk to the Secure Containers shim directly.
 
 **Empty / fail:** Error banner, empty table, or failed toast — confirm you are signed in, `zyvor-fabricd` is healthy (`/readyz`), and any backend this page needs (FluxVM, storage, network) is reachable. See [Admin basics](../../admin-basics.md).
 
@@ -35,5 +39,6 @@ Datacenters — the physical inventory tree: datacenters, the clusters inside ea
 - [Dashboard](home.md)
 - [Virtual Machines](vms.md)
 - [Create VM](create.md)
+- [Container Groups](../operations/container-groups.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

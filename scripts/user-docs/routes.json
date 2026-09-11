@@ -55,6 +55,12 @@
       "legacy": false
     },
     {
+      "label": "Edge Dataplane",
+      "path": "/edge-dataplane",
+      "category": "Infrastructure",
+      "legacy": false
+    },
+    {
       "label": "Storage",
       "path": "/storage",
       "category": "Infrastructure",
@@ -165,6 +171,24 @@
     {
       "label": "Backups",
       "path": "/backups",
+      "category": "Operations",
+      "legacy": false
+    },
+    {
+      "label": "Container Groups",
+      "path": "/container-groups",
+      "category": "Operations",
+      "legacy": false
+    },
+    {
+      "label": "Agents",
+      "path": "/agents",
+      "category": "Operations",
+      "legacy": false
+    },
+    {
+      "label": "Sessions",
+      "path": "/sessions",
       "category": "Operations",
       "legacy": false
     },

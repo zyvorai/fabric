@@ -4,7 +4,7 @@ Marketing: `/`, `/product`, `/platform`, `/security`, `/sign-in`.
 
 Console routes under `/app` — every primary navigable ops route.
 
-_Generated: 2026-09-10 · 84 routes_
+_Generated: 2026-09-11 · 88 routes_
 
 Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 
@@ -40,6 +40,7 @@ Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 |------|-------|---------|-------|
 | Network | `/app/network` | Network — Infrastructure surface. | [Open](pages/infrastructure/network.md) |
 | Net Security | `/app/network-security` | Net Security — Infrastructure surface. | [Open](pages/infrastructure/network-security.md) |
+| Edge Dataplane | `/app/edge-dataplane` | Edge Dataplane — cluster Network Fabric / Service Fabric console. | [Open](pages/infrastructure/edge-dataplane.md) |
 | Storage | `/app/storage` | Storage — Infrastructure surface. | [Open](pages/infrastructure/storage.md) |
 | Storage Pools | `/app/storage-pools` | Storage Pools — Infrastructure surface. | [Open](pages/infrastructure/storage-pools.md) |
 | Distributed Storage | `/app/distributed-storage` | Distributed Storage — Infrastructure surface. | [Open](pages/infrastructure/distributed-storage.md) |
@@ -66,6 +67,9 @@ Regenerate: `node scripts/user-docs/generate-page-index.mjs`
 | Autoscale | `/app/autoscale` | Autoscale — Operations surface. | [Open](pages/operations/autoscale.md) |
 | Snapshots | `/app/snapshots` | Snapshots — Operations surface. | [Open](pages/operations/snapshots.md) |
 | Backups | `/app/backups` | Backups — Operations surface. | [Open](pages/operations/backups.md) |
+| Container Groups | `/app/container-groups` | Container Groups — Secure Containers workloads via Fabric. | [Open](pages/operations/container-groups.md) |
+| Agents | `/app/agents` | Agents — agent-runtime proxy list / deploy. | [Open](pages/operations/agents.md) |
+| Sessions | `/app/sessions` | Sessions — agent-runtime session control. | [Open](pages/operations/sessions.md) |
 | Quotas | `/app/quotas` | Quotas — Operations surface. | [Open](pages/operations/quotas.md) |
 | Lifecycle | `/app/lifecycle` | Lifecycle — Operations surface. | [Open](pages/operations/lifecycle.md) |
 | Bulk Operations | `/app/bulk-operations` | Bulk Operations — Operations surface. | [Open](pages/operations/bulk-operations.md) |

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-VM Migrations — move a VM from its current host to a different target host, and track the migration from start to finish. The list auto-refreshes every 5 seconds so in-flight migrations update live.
+VM Migrations — disk-copy move between hosts (`/api/migrations`: offline / live rsync / storage) with live progress. Native FluxVM transport is a separate preview API.
 
 ## When to use it
 
@@ -19,8 +19,8 @@ VM Migrations — move a VM from its current host to a different target host, an
 ## Operate from the console (UX)
 
 1. **Start Migration** — opens a dialog where you pick a VM from the dropdown (populated from your VM list), enter a target host (hostname or IP), and choose a migration type:
-   - **Offline** — stop the VM, copy its data, then start it on the target
-   - **Live** — migrate with minimal downtime
+   - **Offline** — stop the VM, rsync its data, then start it on the target
+   - **Live** — rsync while running, then a short pause for final sync/cutover (not QEMU memory migration)
    - **Storage** — migrate storage volumes only
 2. **Active Migrations** — each in-progress migration shows as a card with a live progress bar (percent complete), bytes transferred, its state badge (pending, precheck, syncing, switching), and a **Cancel** button. Any error from a failed migration is shown inline on the card.
 3. **Migration History** — a table of completed, failed, and cancelled migrations showing VM, target host, migration type, final status, and start time.
@@ -36,5 +36,6 @@ VM Migrations — move a VM from its current host to a different target host, an
 - [Snapshots](snapshots.md)
 - [Backups](backups.md)
 - [Migration Wizard](migration-wizard.md)
+- Operator: [migration.md](../../../migration.md) · [FLUXVM-FABRIC-BOUNDARY.md](../../../FLUXVM-FABRIC-BOUNDARY.md)
 - [Getting Started](../../getting-started.md)
 - [Page index](../../PAGE_INDEX.md)

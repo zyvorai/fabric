@@ -704,6 +704,73 @@ Custom VM image creation.
 
 ---
 
+## Migrations
+
+Disk-copy path (`rsync` over SSH) and native FluxVM transport (preview). See [migration.md](migration.md) and [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/migrations` | Start disk-copy migration (`live` / `offline` / `storage`) |
+| GET | `/migrations` | List migrations |
+| GET | `/migrations/{id}` | Migration status |
+| POST | `/migrations/{id}/cancel` | Cancel a migration |
+| GET | `/migrations/history` | Completed / failed history |
+| GET | `/migrations/readiness` | SSH + rsync preflight |
+| POST | `/vms/{name}/migration/native/prepare-receiver` | Arm target receiver (preview) |
+| POST | `/vms/{name}/migration/native/start` | Start native transport (preview) |
+| GET | `/vms/{name}/migration/native/status` | Native status (preview) |
+| POST | `/vms/{name}/migration/native/cancel` | Cancel native (preview) |
+| GET | `/vms/{name}/migration/native/network-state` | Dataplane migration phase |
+| POST | `/migration/receivers/{id}/activate` | Activate receiver |
+| DELETE | `/migration/receivers/{id}` | Abort receiver |
+
+## VM Dataplane & QGA
+
+Proxied FluxVM Network Fabric schema v4 and guest QGA. Operator detail: [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/vms/{name}/dataplane/status` | Attach/schema; may include `pod_ingress_*` |
+| GET/POST | `/vms/{name}/dataplane/policy` | Get / replace policy |
+| GET | `/vms/{name}/dataplane/stats` | Counters; may include `pod_policy` |
+| GET | `/vms/{name}/dataplane/flows` | LRU flows |
+| GET | `/vms/{name}/dataplane/effective` | Merged effective policy |
+| GET | `/vms/{name}/dataplane/drop-reasons` | Drop-reason histogram |
+| GET/POST/DELETE | `/vms/{name}/dataplane/pod-policy` | Pod-ingress policy |
+| GET/POST/DELETE | `/dataplane/groups[/{name}]` | Security groups |
+| GET/POST/DELETE | `/dataplane/cnp[/{name}]` | CNP |
+| GET | `/dataplane/{health,observe,identities,ipcache}` | Cluster dataplane |
+| POST | `/dataplane/refresh-dns` | Re-resolve FQDN allowlists |
+| POST | `/vms/{name}/qga/ping` | QGA ping |
+| POST | `/vms/{name}/qga/exec` | QGA exec |
+| * | `/vms/{name}/qga/firewall/*` | QGA firewall helpers |
+
+## Container Groups
+
+Secure Containers placement (Kubernetes Pod + `RuntimeClass fluxvm`). See [container-groups.md](container-groups.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/container-groups` | List groups |
+| POST | `/container-groups/apply` | Apply a ContainerGroup |
+| GET | `/container-groups/{name}/status` | Live status |
+| DELETE | `/container-groups/{name}` | Delete |
+
+## Agents & Sessions
+
+Proxied to **agent-runtime** when `[agent_runtime]` is set; otherwise **503**. See [tutorials/11-agent-runtime-quickstart.md](tutorials/11-agent-runtime-quickstart.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/agents` | List agents |
+| GET | `/sessions` | List sessions |
+| POST | `/sessions` | Create session |
+| GET | `/sessions/{id}` | Session detail |
+| POST | `/sessions/{id}/{hibernate\|resume\|cancel}` | Session actions |
+| DELETE | `/sessions/{id}` | Delete session |
+
+---
+
 ## WebSocket Endpoints
 
 WebSocket connections require the same authentication token, passed as a query parameter or via the initial HTTP upgrade headers.

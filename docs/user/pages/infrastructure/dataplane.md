@@ -43,7 +43,9 @@ This is **not** the same as [Net Security](network-security.md) network policies
 
 Confirm **Attached = yes**, **Mode = ebpf**, **Schema version = 4**, policy
 synced, identity, pin dir, and the **Active policy snapshot** (CIDRs, ports,
-deny, groups, ICMP, Mbps/PPS).
+deny, groups, ICMP, Mbps/PPS). When FluxVM reports them, note
+**pod_ingress_required** / **pod_ingress_attached** on status (Secure Containers
+/ pod-edge hooks).
 
 ### Policy
 
@@ -80,13 +82,17 @@ rate limits; fail-closed default).
 ### Stats / Flows
 
 Allow vs drop counters; LRU flow table with identity, family, 5-tuple, verdict.
+Stats may include nested **`pod_policy`** counters when FluxVM exposes them.
+Operators can also poll `GET /api/vms/{name}/dataplane/drop-reasons` and
+manage `…/dataplane/pod-policy` (see operator guide).
 
 ## API & CLI (quick)
 
 | Action | Surface |
 |--------|---------|
-| Status / policy / stats / flows / effective | `/api/vms/{name}/dataplane/…` |
+| Status / policy / stats / flows / effective / drop-reasons / pod-policy | `/api/vms/{name}/dataplane/…` |
 | Groups / CNP / health / observe / ipcache / refresh-dns | `/api/dataplane/…` |
+| QGA (Windows Kryton) | `/api/vms/{name}/qga/{ping,exec,firewall/…}` |
 | CLI | `zyvorctl dataplane policy guard\|audit\|open\|invert\|block\|allow` |
 
 Tutorials: [Tutorial 09](../../../tutorials/09-edge-dataplane.md) ·

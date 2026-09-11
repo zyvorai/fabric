@@ -65,7 +65,7 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 
 | Fabric | FluxVM | Role |
 | --- | --- | --- |
-| `GET /api/vms/{name}/dataplane/status` | `GET /v1/vms/{id}/network/status` | mode, attached, schema, identity, iface, policy snapshot |
+| `GET /api/vms/{name}/dataplane/status` | `GET /v1/vms/{id}/network/status` | mode, attached, schema, identity, iface, policy snapshot; `pod_ingress_required` / `pod_ingress_attached` when FluxVM reports them |
 | `GET /api/vms/{name}/dataplane/policy` | `GET /v1/vms/{id}/network/policy` | Durable policy |
 | `POST /api/vms/{name}/dataplane/policy` | `POST /v1/vms/{id}/network/policy` | Replace durable policy + live maps |
 | `POST /api/vms/{name}/dataplane/policy/control` | read-modify-write FluxVM policy | Guard / Audit / Open / Invert / Block / Allow |
@@ -73,8 +73,10 @@ Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
 | `GET /api/vms/{name}/dataplane/dry-run?limit=` | — | Live flows that would drop under Guard |
 | `GET /api/dataplane/templates` | — | Policy templates (open, guard, web, dns-only, no-world) |
 | `GET /api/vms/{name}/dataplane/effective` | `GET /v1/vms/{id}/network/effective` | Declared + group-merged policy |
-| `GET /api/vms/{name}/dataplane/stats` | `GET /v1/vms/{id}/network/stats` | allow/drop packets + bytes |
+| `GET /api/vms/{name}/dataplane/stats` | `GET /v1/vms/{id}/network/stats` | allow/drop packets + bytes; optional `pod_policy` counters |
 | `GET /api/vms/{name}/dataplane/flows?limit=` | `GET /v1/vms/{id}/network/flows` | LRU flows (`family` 4/6, identity, verdict) |
+| `GET /api/vms/{name}/dataplane/drop-reasons` | `GET /v1/vms/{id}/network/drop-reasons` | Aggregated drop-reason histogram |
+| `GET/POST/DELETE /api/vms/{name}/dataplane/pod-policy` | `…/network/pod-policy` | Per-VM pod-ingress policy |
 | `GET/POST/DELETE /api/dataplane/groups[/{name}]` | `/v1/network/groups…` | Security-group CRUD |
 | `GET/POST/DELETE /api/dataplane/cnp[/{name}]` | `/v1/network/cnp…` | CNP apply/list/delete |
 | `GET /api/dataplane/identities` | `GET /v1/network/identities` | Reserved + group identities |

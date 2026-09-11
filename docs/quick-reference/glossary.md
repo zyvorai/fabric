@@ -187,8 +187,9 @@ authentication against a directory service.
 **Lifecycle Manager**: Manages host software lifecycle: baseline definitions,
 compliance scanning, remediation, and rolling updates.
 
-**Live Migration**: Moving a running VM from one physical host to another with
-minimal downtime.
+**Live Migration**: Moving a VM between hosts. Fabric’s production disk-copy path
+uses iterative rsync (brief cutover pause). Native FluxVM VMM transport +
+receivers is preview until KVM shared-disk e2e gates pass.
 
 **Lock Manager**: Provides per-resource advisory locks with TTL to prevent
 concurrent conflicting operations.

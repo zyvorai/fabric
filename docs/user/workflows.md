@@ -10,6 +10,8 @@ Short operator paths for the jobs you run most often. Open the console at `https
 | Manage the fleet | `/app/vms` | [Virtual Machines](pages/core/vms.md) |
 | Per-VM Network Fabric (schema v4) | `/app/vms/:name` → **Dataplane** | [VM Dataplane](pages/infrastructure/dataplane.md) |
 | Edge Maglev / Service Fabric v6 | `/app/edge-dataplane` → **Services** | [Edge Dataplane](pages/infrastructure/edge-dataplane.md) |
+| Container Groups (Secure Containers) | `/app/container-groups` | [Container Groups](pages/operations/container-groups.md) |
+| Agents / Sessions | `/app/agents`, `/app/sessions` | [Agents](pages/operations/agents.md) · [Sessions](pages/operations/sessions.md) |
 | Snapshots | `/app/snapshots` or VM → **Snapshots** | [Snapshots](pages/operations/snapshots.md) |
 | Backups & restore | `/app/backups` | [Backups](pages/operations/backups.md) |
 

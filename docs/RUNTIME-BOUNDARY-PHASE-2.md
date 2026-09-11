@@ -4,6 +4,11 @@ This merge kit intentionally establishes the ownership boundary before adding mo
 
 ## 1. FluxVM target receiver
 
+**Status:** Wired in FluxVM and proxied by Fabric
+(`POST /api/vms/{name}/migration/native/prepare-receiver`, activate/abort). See
+[FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md). Native live migration
+remains **preview** until production gates below pass.
+
 Add a target-side operation that creates an **incoming** QEMU instance without first cold-booting the guest:
 
 - `POST /v1/migration/receivers`

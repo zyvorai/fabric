@@ -30,7 +30,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 | Page | What it covers |
 |------|----------------|
-| [Containers](infrastructure/containers.md) | Containers — a read-only, auto-refreshing view of container workloads running on the host (Docker/Podman-style containers, distinct from VMs), showing per-container state, image, CPU/memory usage, and network I/O. |
+| [Containers](infrastructure/containers.md) | Containers — a read-only Docker/Podman host view (not Container Groups / Secure Containers). Shows per-container state, image, CPU/memory, and network I/O. Monitoring-only (auto-refresh ~3s); no start/stop/delete. |
 | [VM Dataplane (Network Fabric schema v4)](infrastructure/dataplane.md) | Per-VM edge security and telemetry powered by FluxVM Network Fabric |
 | [Distributed Storage](infrastructure/distributed-storage.md) | Distributed Storage — the enterprise/clustered layer above a single storage backend: replicated pools spanning multiple hosts, storage policies (tiering, replication, encryption/dedup/compression), in-flight VM disk migrations between pools, and datastore clusters with automatic space/latency-based balancing. For creating and starting a single NFS/LVM/ZFS/Ceph pool, see [Storage Pools](infrastructure/storage-pools.md); for browsing volumes inside pools, see [Storage](infrastructure/storage.md). |
 | [Edge Dataplane (cluster)](infrastructure/edge-dataplane.md) | Cluster-wide console for FluxVM Network Fabric schema v4 (security groups, |
@@ -92,18 +92,21 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 | Page | What it covers |
 |------|----------------|
+| [Agents](operations/agents.md) | Deploy and list TypeScript agents via Fabric’s agent-runtime proxy (`/api/agents`); 503 unless `[agent_runtime]` is configured. Start sessions from a row. |
 | [Autoscale](operations/autoscale.md) | Autoscale — define per-VM policies that automatically grow or shrink a VM's vCPUs and memory within set bounds based on load, and review the history of scaling actions that were triggered. |
 | [Backups](operations/backups.md) | Backups & Restore — create full or incremental VM backups, track running backup/restore jobs, and restore a VM from a completed backup, either in place or as a new VM. |
 | [Bulk Operations](operations/bulk-operations.md) | Bulk Operations — select any number of VMs and start, stop, restart, or snapshot them together, with a per-VM progress log for the batch. |
+| [Container Groups](operations/container-groups.md) | Apply and manage ContainerGroup workloads on FluxVM Secure Containers (`RuntimeClass fluxvm`); placement uses hosts with `secure_containers_ready`. |
 | [Content Library](operations/content-library.md) | Content Library — a catalog of reusable provisioning building blocks: libraries of templates/ISOs/OVFs/scripts, guest customization specs (per-OS hostname/domain/DNS settings), and host compliance profiles. |
 | [DRS](operations/drs.md) | Distributed Resource Scheduler (DRS) — balances VM placement across the hosts in a cluster, surfaces migration recommendations, enforces affinity/anti-affinity rules, and can test where a new VM would land before you create it. |
 | [Fault Tolerance](operations/fault-tolerance.md) | Fault Tolerance (FT) — protect individual VMs with a live secondary replica on another host, so a host failure fails the VM over instead of taking it down, and monitor replication health. |
 | [Lifecycle](operations/lifecycle.md) | Lifecycle Manager — define patch/upgrade baselines, scan hosts for compliance against them, remediate non-compliant hosts, and track rolling updates across a host fleet. |
 | [Migration Wizard](operations/migration-wizard.md) | Migration Wizard — a three-step wizard (Source → Configure → Review) for converting an existing disk image (local file or remote host) into a new Zyvor Fabric VM. |
-| [Migrations](operations/migrations.md) | VM Migrations — move a VM from its current host to a different target host, and track the migration from start to finish. The list auto-refreshes every 5 seconds so in-flight migrations update live. |
+| [Migrations](operations/migrations.md) | VM Migrations — disk-copy move between hosts (`/api/migrations`: offline / live rsync / storage) with live progress. Native FluxVM transport is a separate preview API. |
 | [Quotas](operations/quotas.md) | Resource Quotas — cap CPU, memory, disk, and VM-count usage, applied either globally or to VMs matching specific tags, so a team or workload can't consume unlimited host resources. |
 | [Replication](operations/replication.md) | Replication — register remote replication sites, configure per-VM replication to them with a target RPO (recovery point objective), and monitor sync health and RPO compliance across your fleet. |
 | [Schedules](operations/schedules.md) | VM Schedules — automate a recurring lifecycle action (start, stop, restart, or snapshot) for a single VM, on a one-time, daily, or weekly schedule. |
+| [Sessions](operations/sessions.md) | Inspect and control agent-runtime sessions (`/api/sessions`); hibernate, resume, cancel, or delete. 503 unless `[agent_runtime]` is configured. |
 | [Site Recovery](operations/site-recovery.md) | Site Recovery — define disaster recovery plans that group VMs by source and target site, then execute those plans as a test failover, a planned migration, or a full disaster recovery, and track how each execution unfolds. |
 | [Snapshots](operations/snapshots.md) | VM Snapshots — create point-in-time snapshots of a specific VM's disk (or disk + memory), and revert or delete them. Unlike most Operations pages, this one is scoped to one VM at a time, entered by name. |
 | [Templates](operations/templates.md) | VM Templates — reusable VM configurations (CPU/memory/disk, tags) that you save from an existing VM and use to stamp out new VMs quickly, instead of configuring resources from scratch each time. |
@@ -132,4 +135,4 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 ---
 
-86 guides. Regenerate: `node scripts/user-docs/generate-guide-index.mjs`.
+89 guides. Regenerate: `node scripts/user-docs/generate-guide-index.mjs`.
