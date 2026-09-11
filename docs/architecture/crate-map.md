@@ -45,13 +45,14 @@ Zyvor Fabric's VM lifecycle is entirely owned by [FluxVM](https://github.com/zyv
 
 ## Networking
 
-Ten crates provide a full-featured software-defined networking stack.
+Twelve crates provide a full-featured software-defined networking stack.
 
 | Crate            | Path                         | Description                                              |
 |------------------|------------------------------|----------------------------------------------------------|
 | `networking`     | `backend/networking`         | Base networking utilities. Bridge, VLAN, TAP, bond, and VXLAN setup via direct netlink (`rtnetlink`) calls -- no config-file/reload step, no systemd-networkd dependency. |
 | `network-policy` | `backend/network-policy`     | L3/L4 network access control. Policy engine for identity-based traffic rules. Integrates with nftables for enforcement. |
 | `service-mesh`   | `backend/service-mesh`       | Service discovery and load balancing. Service registration, backend health checking, traffic routing. |
+| `service-lb`     | `backend/service-lb`         | Fabric-side orchestration for FluxVM Service Fabric v6+ -- service intent, node selection, rollout/rollback, multi-site `site_id`/`route_domain` fencing. Never touches bpffs/tc/bpftool directly; FluxVM owns every TC/XDP program and BPF map. |
 | `traffic-shaping`| `backend/traffic-shaping`    | Quality of Service (QoS) management. Bandwidth limits, priority queuing via Linux `tc` (traffic control). |
 | `dns-policy`     | `backend/dns-policy`         | DNS zone and record management. Per-VM DNS policies, zone delegation, integration with systemd-resolved. |
 | `vm-firewall`    | `backend/vm-firewall`        | Per-VM firewall management. Firewall profiles and zones. Rules enforcement via nftables. |
@@ -65,17 +66,17 @@ Ten crates provide a full-featured software-defined networking stack.
 
 | Crate                | Path                         | Description                                              |
 |----------------------|------------------------------|----------------------------------------------------------|
-| `Zyvor Fabric-storage`   | `backend/crates/storage`     | Storage pool and volume management. Supports Local, NFS, LVM, LVM-Thin, ZFS, and Ceph backends. Volume attach/detach, online resize. |
+| `zyvor-fabric-storage`   | `backend/crates/storage`     | Storage pool and volume management. Supports Local, NFS, LVM, LVM-Thin, ZFS, and Ceph backends. Volume attach/detach, online resize. |
 | `distributed-storage`| `backend/distributed-storage`| Distributed storage orchestration. Datastore clusters, storage migration, storage policies, SDRS recommendations, compliance checking. |
 
 ## System Internals
 
 | Crate                 | Path                          | Description                                              |
 |-----------------------|-------------------------------|----------------------------------------------------------|
-| `Zyvor Fabric-system`     | `backend/crates/system`       | System resource management. CPU topology, NUMA placement, memory balloon, hugepages, KSM deduplication, nested virtualization. |
-| `Zyvor Fabric-vm`         | `backend/crates/vm`           | VM-level utilities. Checkpoint/restore, VM forking, hotplug (CPU, memory, disk, NIC), firmware management (UEFI, Secure Boot, TPM). |
-| `Zyvor Fabric-lock-manager`| `backend/crates/lock-manager`| Distributed lock management. Per-resource advisory locks with configurable TTL and automatic renewal. |
-| `Zyvor Fabric-cgroup`     | `backend/crates/cgroup`       | Cgroup v2 integration. Resource accounting, CPU/memory/IO limits for VMs via the cgroup hierarchy. |
+| `zyvor-fabric-system`     | `backend/crates/system`       | System resource management. CPU topology, NUMA placement, memory balloon, hugepages, KSM deduplication, nested virtualization. |
+| `zyvor-fabric-vm`         | `backend/crates/vm`           | VM-level utilities. Checkpoint/restore, VM forking, hotplug (CPU, memory, disk, NIC), firmware management (UEFI, Secure Boot, TPM). |
+| `zyvor-fabric-lock-manager`| `backend/crates/lock-manager`| Distributed lock management. Per-resource advisory locks with configurable TTL and automatic renewal. |
+| `zyvor-fabric-cgroup`     | `backend/crates/cgroup`       | Cgroup v2 integration. Resource accounting, CPU/memory/IO limits for VMs via the cgroup hierarchy. |
 
 ## Management
 
@@ -107,6 +108,7 @@ Enterprise management features for large-scale VM deployments.
 | `fault-tolerance`  | `backend/fault-tolerance`  | High availability. Continuous VM replication, automatic failover detection, test failover, replication suspend/resume, FT metrics. |
 | `content-library` | `backend/content-library`  | Centralized content management. Image and template libraries, cross-site synchronization, customization specs, host profiles, compliance. |
 | `tpm-support`     | `backend/tpm-support`      | TPM 2.0 integration. Virtual TPM device management for Secure Boot and measured boot chains. |
+| `k8s-pod-client`  | `backend/crates/k8s-pod-client` | Outbound client for placing Container Group `Pod`s on a customer-owned Kubernetes cluster. Thin CRUD wrapper (`kube::Api<Pod>`) only -- no controller/watch loop, which belongs to `zyvor-fabricd-operator`. |
 
 ## Utilities
 
@@ -116,6 +118,7 @@ Enterprise management features for large-scale VM deployments.
 | `prometheus-exporter` | `backend/prometheus-exporter`  | Prometheus metrics. Exposes `zyvor_fabricd_vms_total`, `zyvor_fabricd_vms_running`, `zyvor_fabricd_vm_starts_total`, etc. via `/metrics` endpoint. |
 | `vnc-proxy`           | `backend/vnc-proxy`            | WebSocket-to-VNC proxy. Bridges browser-based noVNC client to QEMU VNC server for graphical VM console. |
 | `ova-tools`           | `backend/ova-tools`            | OVA/OVF export and import. Builds OVA archives from VM disk images and metadata, parses OVF descriptors for import. |
+| `api-error`           | `backend/crates/api-error`     | Shared HTTP/API error formatting -- consistent error labels and messages across the daemon and its web/CLI clients. |
 
 ## CLI and UI
 
@@ -128,7 +131,7 @@ Enterprise management features for large-scale VM deployments.
 
 | Component       | Path         | Description                                              |
 |-----------------|--------------|----------------------------------------------------------|
-| `Zyvor Fabric-web`  | `web/`      | React 19 + TypeScript web application. Vite build, Tailwind CSS, React Router, Recharts dashboards, xterm.js console, noVNC graphical console. |
+| `zyvor-fabric-web`  | `web/`      | React 19 + TypeScript web application. Vite build, Tailwind CSS, React Router, Recharts dashboards, xterm.js console, noVNC graphical console. |
 
 ---
 
@@ -167,15 +170,16 @@ Zyvor Fabric (main binary)
   |-- vm-model
   |-- state-store --> vm-model
   |-- security
+  |-- api-error
   |-- zyvor-fabric-vm-driver
   |-- zyvor-fabric-driver-core --> vm-model
   |-- zyvor-fabric-fluxvm-client
   |-- zyvor-fabric-fluxvm-driver --> zyvor-fabric-driver-core, zyvor-fabric-fluxvm-client
-  |-- Zyvor Fabric-storage
-  |-- Zyvor Fabric-system
-  |-- Zyvor Fabric-vm
-  |-- Zyvor Fabric-lock-manager
-  |-- Zyvor Fabric-cgroup
+  |-- zyvor-fabric-storage
+  |-- zyvor-fabric-system
+  |-- zyvor-fabric-vm
+  |-- zyvor-fabric-lock-manager
+  |-- zyvor-fabric-cgroup
   |-- networking
   |-- zyvor-fabric-dnsmasq-manager
   |-- network-policy
@@ -187,6 +191,7 @@ Zyvor Fabric (main binary)
   |-- packet-mirror
   |-- nat-gateway
   |-- net-monitor
+  |-- service-lb
   |-- cloud-init
   |-- prometheus-exporter
   |-- vnc-proxy
@@ -210,4 +215,5 @@ Zyvor Fabric (main binary)
   |-- enterprise-identity
   |-- openstack-compat
   |-- host-lifecycle
+  |-- k8s-pod-client
 ```

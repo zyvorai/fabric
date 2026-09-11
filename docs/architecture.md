@@ -40,7 +40,7 @@ Zyvor Fabric is a virtual machine management platform built in Rust. It provides
 
 ## Crate Structure
 
-The backend is a Cargo workspace with 40 crates organized into functional areas.
+The backend is a Cargo workspace with 53 crates organized into functional areas.
 
 ### Core
 

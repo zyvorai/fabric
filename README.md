@@ -1,32 +1,49 @@
 <div align="center">
 
-# Zyvor Fabric
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="web/public/zyvor-logo-on-dark.png">
+  <img src="web/public/zyvor-logo.png" alt="Zyvor Fabric" width="360">
+</picture>
 
 ### Private cloud control plane for Linux — VMs, networking, storage, and security from one daemon.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/zyvorai/fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?logo=rust&logoColor=white)](backend/)
+[![React](https://img.shields.io/badge/react-19.2-61DAFB?logo=react&logoColor=white)](web/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-326CE5?logo=kubernetes&logoColor=white)](docs/KUBERNETES.md)
 [![Built on FluxVM](https://img.shields.io/badge/VM%20engine-FluxVM-8a2be2)](https://github.com/zyvorai/fluxvm)
 [![Built on GuestKit](https://img.shields.io/badge/guest%20tooling-GuestKit-2ea44f)](https://github.com/zyvorai/guestkit)
 
-[Quick start](#quick-start) · [Deploy](#deploy) · [Kubernetes](#run-on-kubernetes) · [Why Fabric](#why-zyvor-fabric) · [Architecture](#built-on-fluxvm--guestkit) · [Network Fabric](#network-fabric-architecture-how-it-works) · [Ahead of other VMMs](#why-fabric--network-fabric-is-ahead-of-other-vmms) · [Docs](#documentation)
+**[Quick start](#quick-start)** · **[Screenshot](#see-it)** · **[Why Fabric](#why-zyvor-fabric)** · **[Deploy](#deploy)** · **[Architecture](#architecture-fluxvm--guestkit)** · **[Network Fabric deep dive](#network-fabric-architecture-how-it-works)** · **[Docs](#documentation)**
 
 </div>
 
 ---
 
-Run enterprise-grade virtual machines, software-defined networking, pluggable storage, and security policy on **any Linux server with KVM** — no vCenter, no heavyweight hypervisor stack, no systemd hard-requirement. One Rust daemon exposes **480+ REST endpoints** and live WebSocket channels; drive it from a **CLI, web dashboard, Kubernetes operator, or Terraform provider** — all four talk to the same daemon, so nothing drifts.
+## What is Zyvor Fabric?
 
-Zyvor Fabric doesn't implement VM execution itself. It's the orchestration, API, auth, and UX layer on top of two independent sibling projects — [FluxVM](https://github.com/zyvorai/fluxvm) (VM engine) and [GuestKit](https://github.com/zyvorai/guestkit) (offline disk tooling).
+**Zyvor Fabric** is a production-grade private cloud control plane for Linux. Deploy in minutes with a single daemon, manage everything through four interfaces — **CLI, Web, Kubernetes operator, Terraform** — and get enterprise features (RBAC, HA, live migration, GPU passthrough, network policy) without VMware complexity or OpenStack overhead.
 
-**Naming:** product is **Zyvor Fabric**; daemon/unit/paths stay `zyvor-fabricd`. Canonical repo: [zyvorai/fabric](https://github.com/zyvorai/fabric). See [docs/NAMING.md](docs/NAMING.md) and [docs/POSITIONING.md](docs/POSITIONING.md).
+Run enterprise-grade virtual machines, software-defined networking, pluggable storage, and security policy on **any Linux server with KVM** — no vCenter, no heavyweight hypervisor stack, no systemd hard-requirement. One Rust daemon exposes **480+ REST endpoints** and live WebSocket channels; all four interfaces talk to the same daemon, so nothing drifts.
 
-### Feature guides
+Fabric doesn't implement VM execution itself. It's the orchestration, API, auth, and UX layer on top of two independent sibling projects — **[FluxVM](https://github.com/zyvorai/fluxvm)** (the VM engine) and **[GuestKit](https://github.com/zyvorai/guestkit)** (offline disk tooling). Each layer is independently useful and Apache-2.0 licensed.
 
-- **[User Feature Guide](docs/zyvor-fabric-user-feature-guide.md)** — **55 features** across **9 areas** (also [PDF](docs/zyvor-fabric-user-feature-guide.pdf))
-- **[User manual](docs/user/README.md)** — every console surface, page by page
+> **Naming:** the product is **Zyvor Fabric**; the daemon/unit/paths stay `zyvor-fabricd`. Canonical repo: [zyvorai/fabric](https://github.com/zyvorai/fabric). See [docs/NAMING.md](docs/NAMING.md) and [docs/POSITIONING.md](docs/POSITIONING.md).
+
+**Feature guides:** **[User Feature Guide](docs/zyvor-fabric-user-feature-guide.md)** — 55 features across 9 areas (also [PDF](docs/zyvor-fabric-user-feature-guide.pdf)) · **[User manual](docs/user/README.md)** — every console surface, page by page.
+
+---
+
+## See it
+
+<div align="center">
+
+![Zyvor Fabric dashboard](docs/assets/dashboard.png)
+
+*The console dashboard — fleet health, capability status, and live VM metrics at a glance.*
+
+</div>
 
 ---
 
@@ -70,6 +87,19 @@ curl -sf http://127.0.0.1:7788/readyz | jq .
 # Multi-tenant: zyvorctl create … --tenant acme; JWT tenant claim scopes list/get/mutate
 # When FluxVM auth is on: set driver.fluxvm_token in zyvor-fabricd.toml
 ```
+
+---
+
+## Why Zyvor Fabric
+
+| Problem | Zyvor Fabric answer |
+|---------|---------------------|
+| Private cloud usually means a heavy hypervisor stack | A lightweight, disposable VM engine underneath ([FluxVM](https://github.com/zyvorai/fluxvm)) — no systemd dependency, no vCenter |
+| No unified API across interfaces | 480+ REST endpoints and 3 WebSocket channels, one daemon, four front doors |
+| Scripting vs. GUI is usually either/or | CLI (`zyvorctl`) + web console + Terraform + Kubernetes operator, all first-class |
+| Enterprise needs RBAC, audit, and encryption | JWT auth, roles, audit export, encryption at rest |
+| GPU passthrough is bolted on elsewhere | Generic PCI/VFIO passthrough REST API on Linux KVM |
+| Guest images ship without your tooling | Offline image customization via [GuestKit](https://github.com/zyvorai/guestkit) |
 
 ---
 
@@ -119,15 +149,11 @@ make docker-up                        # hostNetwork + /dev/kvm
 
 See [docs/DOCKER.md](docs/DOCKER.md) for host prerequisites (`nbd`, KVM, rootful engine, cgroup v2).
 
----
-
-## Run on Kubernetes
+### Run on Kubernetes
 
 Fabric on Kubernetes uses the same **lab packaging pattern as Ragnarok** (manifests, Helm, remote `k3s ctr import`), but workloads are **privileged `hostNetwork` DaemonSets** — required for nftables, KVM, and FluxVM on `127.0.0.1:7788` (same model as compose).
 
 > Full guide: **[docs/KUBERNETES.md](docs/KUBERNETES.md)**
-
-### Lab remote (recommended)
 
 ```bash
 # First time: build images on the node, import into k3s, apply manifests
@@ -148,7 +174,7 @@ Fabric on Kubernetes uses the same **lab packaging pattern as Ragnarok** (manife
 
 Open `http://HOST:30095/` after deploy. **Login:** `admin` + password from Secret `zyvor-fabric-secrets` (generated unless `FABRIC_ADMIN_PASSWORD` or `FABRIC_LAB_DEFAULTS=1`). Retrieve: `kubectl -n zyvor-fabric get secret zyvor-fabric-secrets -o jsonpath='{.data.admin-password}' | base64 -d; echo`.
 
-### Local kubectl / Helm
+**Local kubectl / Helm:**
 
 ```bash
 # Manifests (images must be visible to the cluster)
@@ -162,7 +188,7 @@ helm upgrade --install zyvor-fabric ./charts/zyvor-fabric \
   --set security.jwtSecret="$(openssl rand -base64 32)"
 ```
 
-### Platform chart vs operator
+**Platform chart vs. operator:**
 
 | Piece | What it does |
 |-------|----------------|
@@ -171,39 +197,16 @@ helm upgrade --install zyvor-fabric ./charts/zyvor-fabric \
 
 Point the operator at NodePort or the node IP (`ZYVOR_FABRICD_URL=http://NODE_IP:30095`). Do not expect ClusterIP DNS to replace `hostNetwork` across nodes.
 
-### Requirements (K8s)
-
-- Node with `/dev/kvm`
-- Namespace PSS **privileged** (cannot run restricted)
-- Rootful `podman` or `docker` on the build host for image builds
-- Optional: sibling checkouts `../FluxVM` and `../guestkit` for the FluxVM image
+**Requirements (K8s):** node with `/dev/kvm` · namespace PSS **privileged** (cannot run restricted) · rootful `podman` or `docker` on the build host for image builds · optional sibling checkouts `../FluxVM` and `../guestkit` for the FluxVM image.
 
 ---
 
-## Why Zyvor Fabric
-
-| Problem | Zyvor Fabric answer |
-|---------|---------------------|
-| Private cloud usually means a heavy hypervisor stack | A lightweight, disposable VM engine underneath ([FluxVM](https://github.com/zyvorai/fluxvm)) — no systemd dependency, no vCenter |
-| No unified API across interfaces | 480+ REST endpoints and 3 WebSocket channels, one daemon, four front doors |
-| Scripting vs. GUI is usually either/or | CLI (`zyvorctl`) + web console + Terraform + Kubernetes operator, all first-class |
-| Enterprise needs RBAC, audit, and encryption | JWT auth, roles, audit export, encryption at rest |
-| GPU passthrough is bolted on elsewhere | Generic PCI/VFIO passthrough REST API on Linux KVM |
-| Guest images ship without your tooling | Offline image customization via [GuestKit](https://github.com/zyvorai/guestkit) |
-
----
-
-## Built on FluxVM + GuestKit
+## Architecture: FluxVM + GuestKit
 
 Zyvor Fabric is a thin, opinionated layer. It doesn't own a hypervisor or a guest-filesystem library — it composes two sibling projects:
 
-### [FluxVM](https://github.com/zyvorai/fluxvm) — the VM engine
-
-`zyvor-fabricd` never touches QEMU directly. It talks to a local FluxVM instance over REST (`127.0.0.1:7788`) for VM process lifecycle, disks, console/VNC, cgroups, and per-VM network namespaces. Backends (QEMU, Cloud Hypervisor, Firecracker) are an FluxVM-side concern.
-
-### [GuestKit](https://github.com/zyvorai/guestkit) — guest-side tooling
-
-Before first boot, FluxVM uses GuestKit to reach inside disk images (NBD mount, chroot customize, bake in `fluxvm-guest-agent`) without a libguestfs appliance VM.
+- **[FluxVM](https://github.com/zyvorai/fluxvm) — the VM engine.** `zyvor-fabricd` never touches QEMU directly. It talks to a local FluxVM instance over REST (`127.0.0.1:7788`) for VM process lifecycle, disks, console/VNC, cgroups, and per-VM network namespaces. Backends (QEMU, Cloud Hypervisor, Firecracker) are an FluxVM-side concern.
+- **[GuestKit](https://github.com/zyvorai/guestkit) — guest-side tooling.** Before first boot, FluxVM uses GuestKit to reach inside disk images (NBD mount, chroot customize, bake in `fluxvm-guest-agent`) without a libguestfs appliance VM.
 
 ```mermaid
 flowchart TB
@@ -226,7 +229,85 @@ flowchart TB
   Flux -- TC eBPF --> Edge[VM edge dataplane<br/>Network Fabric schema v4]
 ```
 
-**Fabric decides what should exist; FluxVM makes it exist; GuestKit prepares the disk.** Each layer is independently useful and Apache-2.0 licensed.
+**Fabric decides what should exist; FluxVM makes it exist; GuestKit prepares the disk.**
+
+Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-edge dataplane**, so per-VM policy, rate limits, and telemetry are first-class — not afterthought scripts bolted onto a shared bridge. The full mechanics (kernel program flow, packet decision tree, control-plane sequence, and a head-to-head comparison against libvirt/nft, shared-bridge, QEMU usermode, and CNI microVMs) are one section down: **[Network Fabric architecture →](#network-fabric-architecture-how-it-works)**.
+
+---
+
+## Platform at a glance
+
+| Metric | Value |
+|--------|-------|
+| Rust crates | 53 |
+| REST endpoints | 480+ |
+| LOC | ~87K (60K Rust + 27K TS) |
+| Web stack | React 19.2 · Vite · Tailwind |
+| Interfaces | 4 (CLI, Web, Operator, Terraform) + Fabric Doctor |
+| Web pages | 80+ console routes + marketing |
+| Deploy modes | Bare metal · Docker · Kubernetes · Operator |
+
+---
+
+## Documentation
+
+| Get started | | Deploy | | Operate & reference | |
+|---|---|---|---|---|---|
+| Quick start (dev) | [QUICKSTART.md](QUICKSTART.md) | Kubernetes | [docs/KUBERNETES.md](docs/KUBERNETES.md) | API reference | [docs/api.md](docs/api.md) |
+| Features | [FEATURES.md](FEATURES.md) | Docker / Podman | [docs/DOCKER.md](docs/DOCKER.md) | Security policy | [SECURITY.md](SECURITY.md) |
+| Architecture | [docs/architecture.md](docs/architecture.md) | FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) | OIDC / SSO | [docs/oidc.md](docs/oidc.md) |
+| Docs index | [docs/README.md](docs/README.md) | Fabric Doctor (preflight) | [docs/FABRIC_DOCTOR.md](docs/FABRIC_DOCTOR.md) · [tools/fabric-doctor](tools/fabric-doctor/) | SCIM identity | [docs/scim-identity.md](docs/scim-identity.md) |
+| Naming / clone URL | [docs/NAMING.md](docs/NAMING.md) | | | Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
+| Product positioning | [docs/POSITIONING.md](docs/POSITIONING.md) | | | VM edge dataplane (Network Fabric v4) | [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) |
+| | | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
+| | | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
+| | | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
+| | | | | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |
+| | | | | Host maintenance | [docs/host-lifecycle.md](docs/host-lifecycle.md) |
+| | | | | User manuals | [docs/user/README.md](docs/user/README.md) |
+| | | | | Governance / branch protection | [docs/GOVERNANCE.md](docs/GOVERNANCE.md) |
+| | | | | Project stats (generated) | [docs/generated/project-stats.md](docs/generated/project-stats.md) |
+| | | | | Full catalog | [docs/index.md](docs/index.md) |
+| | | | | Integrations | [integrations/](integrations/) |
+| | | | | Operator | [operator/README.md](operator/README.md) |
+
+---
+
+## Zyvor platform stack
+
+| Product | Role |
+|---------|------|
+| **[FluxVM](https://github.com/zyvorai/fluxvm)** | Disposable compute engine — QEMU / Cloud Hypervisor / Firecracker |
+| **[GuestKit](https://github.com/zyvorai/guestkit)** | Offline VM disk inspection, repair, and customization |
+| **hypercluster** | Bare-metal Kubernetes bootstrap |
+| **machina** | Physical hypervisor OS (libvirt/KVM) |
+| **zeus-os** | Cloud / KubeVirt control plane |
+| **hermes** | Application layer for Kubernetes |
+| **forge** | AI infrastructure on Kubernetes |
+| **hypersdk / hyper2kvm** | Multi-cloud VM migration |
+| **packetwolf** | Kernel-native network intelligence |
+| **Axiom** | k8s-native private cloud control plane |
+| **Ragnarok** | AI-powered KubeVirt VM management |
+| **Veyron** | KubeVirt VM command center |
+| **IronWolf** | Metal3 bare-metal automation |
+| **Zyvor Fabric** | Private cloud control plane on FluxVM (**this repo**) |
+
+→ [zyvor.dev](https://zyvor.dev)
+
+---
+
+## Contributing
+
+Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for the development setup, code style, and PR process.
+
+```bash
+make build          # backend + web
+make test           # Rust + web tests
+make lint && make fmt
+make helm-lint      # charts/zyvor-fabric
+```
+
+Historical build summaries in the repo root are snapshots — **`docs/` and this README are authoritative.**
 
 ---
 
@@ -475,7 +556,7 @@ quadrantChart
 | Capability | libvirt / virsh + nft | Shared bridge + host FW | QEMU user NAT | Typical microVM + CNI | **Fabric + Network Fabric schema v4** |
 |---|---|---|---|---|---|
 | Per-VM L3/L4 egress allowlists | Manual chains | Host-wide rules | Soft / limited | Pod-oriented | **First-class** `allow_cidrs` + `tcp\|udp/PORT` |
-| Live policy without detach | Flush/reload gaps | Blast radius | Restart usernet | CNI reconcile | **In-place BPF map update** (~100–120 ms p50 in lab) |
+| Live policy without detach | Flush/reload gaps | Blast radius | Restart usernet | CNI reconcile | **In-place BPF map update** (~100–120 ms p50 in lab) |
 | Mbps / PPS egress caps | Separate tc/htb | Rare | Soft | Depends on CNI | **Maps on the same classifier** |
 | Dual-stack L3+L4 | Easy to drift | Often IPv4-only | Limited | Varies | **One TC program** |
 | Per-VM stats + LRU flows via API | tcpdump / conntrack | Host-centric | Almost none | Sidecar / Hubble-ish | **`/dataplane/stats` + `/flows`** |
@@ -492,93 +573,9 @@ quadrantChart
 | CLI | `zyvorctl dataplane …` (`ZYVOR_FABRIC_URL` + `ZYVOR_FABRIC_TOKEN` for HTTPS labs) |
 | Dashboard | **VM dataplane** capability card (`mode` / attached / schema) |
 
-Operator guide (enablement, create-bridged recipe, troubleshooting, UX checklist):
-[docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md).
-User console: [docs/user/pages/infrastructure/dataplane.md](docs/user/pages/infrastructure/dataplane.md).
+Operator guide (enablement, create-bridged recipe, troubleshooting, UX checklist): [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). User console: [docs/user/pages/infrastructure/dataplane.md](docs/user/pages/infrastructure/dataplane.md).
 
 Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com/zyvorai/fluxvm#why-network-fabric-is-faster-than-traditional-vm-networking).
-
----
-
-## Platform at a glance
-
-| Metric | Value |
-|--------|-------|
-| Rust crates | 48 |
-| REST endpoints | 480+ |
-| LOC | ~87K (60K Rust + 27K TS) |
-| Interfaces | 4 (CLI, Web, Operator, Terraform) + Fabric Doctor |
-| Web pages | 80+ console routes + marketing |
-| Deploy modes | Bare metal · Docker · Kubernetes · Operator |
-
----
-
-## Documentation
-
-| Goal | Document |
-|------|----------|
-| **Docs index** | [docs/README.md](docs/README.md) |
-| **Naming / clone URL** | [docs/NAMING.md](docs/NAMING.md) |
-| **Product positioning** | [docs/POSITIONING.md](docs/POSITIONING.md) |
-| **Kubernetes deploy** | [docs/KUBERNETES.md](docs/KUBERNETES.md) |
-| **Docker / Podman** | [docs/DOCKER.md](docs/DOCKER.md) |
-| Quick start (dev) | [QUICKSTART.md](QUICKSTART.md) |
-| Features | [FEATURES.md](FEATURES.md) |
-| Architecture | [docs/architecture.md](docs/architecture.md) |
-| Project stats (generated) | [docs/generated/project-stats.md](docs/generated/project-stats.md) |
-| Governance / branch protection | [docs/GOVERNANCE.md](docs/GOVERNANCE.md) |
-| OIDC / SSO | [docs/oidc.md](docs/oidc.md) |
-| Security policy | [SECURITY.md](SECURITY.md) |
-| **Fabric Doctor (preflight)** | [docs/FABRIC_DOCTOR.md](docs/FABRIC_DOCTOR.md) · [tools/fabric-doctor](tools/fabric-doctor/) |
-| FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) |
-| **VM edge dataplane (Network Fabric schema v4)** | [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) |
-| **Service Fabric v6 (Maglev VIP LB)** | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
-| Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
-| Web UX | [docs/web-ui.md](docs/web-ui.md) |
-| User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
-| SCIM identity | [docs/scim-identity.md](docs/scim-identity.md) |
-| OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |
-| Host maintenance | [docs/host-lifecycle.md](docs/host-lifecycle.md) |
-| User manuals | [docs/user/README.md](docs/user/README.md) |
-| Full catalog | [docs/index.md](docs/index.md) |
-| Integrations | [integrations/](integrations/) |
-| Operator | [operator/README.md](operator/README.md) |
-
----
-
-## Zyvor platform stack
-
-| Product | Role |
-|---------|------|
-| **[FluxVM](https://github.com/zyvorai/fluxvm)** | Disposable compute engine — QEMU / Cloud Hypervisor / Firecracker |
-| **[GuestKit](https://github.com/zyvorai/guestkit)** | Offline VM disk inspection, repair, and customization |
-| **hypercluster** | Bare-metal Kubernetes bootstrap |
-| **machina** | Physical hypervisor OS (libvirt/KVM) |
-| **zeus-os** | Cloud / KubeVirt control plane |
-| **hermes** | Application layer for Kubernetes |
-| **forge** | AI infrastructure on Kubernetes |
-| **hypersdk / hyper2kvm** | Multi-cloud VM migration |
-| **packetwolf** | Kernel-native network intelligence |
-| **Axiom** | k8s-native private cloud control plane |
-| **Ragnarok** | AI-powered KubeVirt VM management |
-| **Veyron** | KubeVirt VM command center |
-| **IronWolf** | Metal3 bare-metal automation |
-| **Zyvor Fabric** | Private cloud control plane on FluxVM (**this repo**) |
-
-→ [zyvor.dev](https://zyvor.dev)
-
----
-
-## Development
-
-```bash
-make build          # backend + web
-make test           # Rust + web tests
-make lint && make fmt
-make helm-lint      # charts/zyvor-fabric
-```
-
-Historical build summaries in the repo root are snapshots — **`docs/` and this README are authoritative.**
 
 ---
 

@@ -66,6 +66,7 @@ pub async fn create_test_app() -> Router {
             ..TlsConfig::default()
         },
         container_groups: zyvor_fabricd::config::ContainerGroupsConfig::default(),
+        agent_runtime: zyvor_fabricd::config::AgentRuntimeConfig::default(),
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();
@@ -162,6 +163,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
             ..TlsConfig::default()
         },
         container_groups: zyvor_fabricd::config::ContainerGroupsConfig::default(),
+        agent_runtime: zyvor_fabricd::config::AgentRuntimeConfig::default(),
     };
 
     let storage_manager = zyvor_fabric_storage::StorageManager::new(&storage_dir).unwrap();

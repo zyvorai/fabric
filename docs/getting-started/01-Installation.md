@@ -86,7 +86,7 @@ cd zyvor-fabric
 
 This command will:
 - Install any missing system dependencies
-- Build the Rust workspace (40 crates)
+- Build the Rust workspace (53 crates)
 - Install binaries (`Zyvor Fabric`, `zyvorctl`) to `/usr/local/bin/`
 - Install the systemd service unit
 - Create configuration directories
