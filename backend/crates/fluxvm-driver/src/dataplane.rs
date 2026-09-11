@@ -74,19 +74,21 @@ fn to_stats(s: client::DataplaneStats) -> DataplaneStats {
         allowed_bytes: s.allowed_bytes,
         dropped_packets: s.dropped_packets,
         dropped_bytes: s.dropped_bytes,
-        pod_policy: s.pod_policy.map(|p| zyvor_fabric_driver_core::PodPolicyStats {
-            egress: zyvor_fabric_driver_core::PodDirectionCounters {
-                allowed: p.egress.allowed,
-                dropped: p.egress.dropped,
-                audited: p.egress.audited,
-            },
-            ingress: zyvor_fabric_driver_core::PodDirectionCounters {
-                allowed: p.ingress.allowed,
-                dropped: p.ingress.dropped,
-                audited: p.ingress.audited,
-            },
-            directional: p.directional,
-        }),
+        pod_policy: s
+            .pod_policy
+            .map(|p| zyvor_fabric_driver_core::PodPolicyStats {
+                egress: zyvor_fabric_driver_core::PodDirectionCounters {
+                    allowed: p.egress.allowed,
+                    dropped: p.egress.dropped,
+                    audited: p.egress.audited,
+                },
+                ingress: zyvor_fabric_driver_core::PodDirectionCounters {
+                    allowed: p.ingress.allowed,
+                    dropped: p.ingress.dropped,
+                    audited: p.ingress.audited,
+                },
+                directional: p.directional,
+            }),
     }
 }
 

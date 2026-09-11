@@ -245,6 +245,21 @@ class Handler(BaseHTTPRequestHandler):
                         },
                     )
                     return
+                if "/migration/status" in path or path.endswith("/migration"):
+                    self._json(
+                        200,
+                        {
+                            "phase": "none",
+                            "status": "idle",
+                            "ram_transferred": None,
+                            "ram_remaining": None,
+                            "ram_total": None,
+                            "total_time_ms": None,
+                            "downtime_ms": None,
+                            "error": None,
+                        },
+                    )
+                    return
                 if path.endswith("/stats") or path.endswith("/pressure") or path.endswith("/cpuset"):
                     self._json(200, {"cpu_usage_percent": 1.0, "memory_usage_bytes": 1, "disk_read_bytes": 0, "disk_write_bytes": 0})
                     return

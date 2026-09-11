@@ -500,6 +500,7 @@ export default function EdgeDataplane() {
                 </button>
               </div>
               <TerminalTextarea
+                title="Maglev service JSON"
                 className="min-h-[180px] font-mono text-xs"
                 value={serviceJson}
                 onChange={(e) => setServiceJson(e.target.value)}

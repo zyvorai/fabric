@@ -28,6 +28,7 @@ fn not_configured() -> Response {
         .into_response()
 }
 
+#[allow(clippy::result_large_err)] // axum Response is intentionally large as Err
 fn upstream(state: &AppState) -> Result<(String, Option<String>), Response> {
     let base = agent_runtime_base_url(&state.config.agent_runtime).ok_or_else(not_configured)?;
     let token = std::env::var("ZYVOR_FABRICD_AGENT_RUNTIME_TOKEN")
@@ -205,10 +206,7 @@ pub async fn session_action(
     Path((id, action)): Path<(String, String)>,
     body: Result<Json<serde_json::Value>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
-    let allowed = matches!(
-        action.as_str(),
-        "steer" | "cancel" | "hibernate" | "resume"
-    );
+    let allowed = matches!(action.as_str(), "steer" | "cancel" | "hibernate" | "resume");
     if !allowed {
         return (
             StatusCode::BAD_REQUEST,

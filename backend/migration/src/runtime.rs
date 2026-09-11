@@ -14,8 +14,8 @@ use std::path::PathBuf;
 use uuid::Uuid;
 use zyvor_fabric_fluxvm_client::{
     BackendKind, CreateVmRequest, FluxVmClient, MigrationMode, MigrationPhase,
-    MigrationReceiverInfo, MigrationReceiverRequest, MigrationStartRequest, MigrationStatus,
-    MigrationStateStatus, RuntimeCapabilities, VmNetworkStateSnapshot, VmStatus,
+    MigrationReceiverInfo, MigrationReceiverRequest, MigrationStartRequest, MigrationStateStatus,
+    MigrationStatus, RuntimeCapabilities, VmNetworkStateSnapshot, VmStatus,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -199,7 +199,10 @@ impl RuntimeMigrationManager {
             .await
     }
 
-    pub async fn network_migration_resume(&self, receiver_id: Uuid) -> Result<MigrationStateStatus> {
+    pub async fn network_migration_resume(
+        &self,
+        receiver_id: Uuid,
+    ) -> Result<MigrationStateStatus> {
         self.target_client()?
             .network_migration_resume(receiver_id)
             .await
@@ -215,9 +218,7 @@ impl RuntimeMigrationManager {
         prepare: &PrepareReceiverOptions,
         options: &NativeMigrationOptions,
     ) -> Result<(PreparedTarget, MigrationStatus)> {
-        let prepared = self
-            .prepare_receiver(vm_name, listen_host, prepare)
-            .await?;
+        let prepared = self.prepare_receiver(vm_name, listen_host, prepare).await?;
 
         let network_snapshot = if options.transfer_network_state {
             self.network_migration_quiesce(vm_name).await?;
@@ -229,7 +230,7 @@ impl RuntimeMigrationManager {
         let status = self
             .start_prepared_target(vm_name, &prepared.target_uri, options)
             .await
-            .map_err(|e| {
+            .inspect_err(|_| {
                 // Best-effort abort of the unused receiver on failure to start.
                 let rid = prepared.receiver.id;
                 let target = self.target.clone();
@@ -238,22 +239,16 @@ impl RuntimeMigrationManager {
                         let _ = t.abort_migration_receiver(rid).await;
                     }
                 });
-                e
             })?;
 
         // Poll until completed/failed before activate — callers may also poll
         // separately; here we do a single status read after start returns.
-        if matches!(
-            status.phase,
-            MigrationPhase::Completed | MigrationPhase::Failed | MigrationPhase::Cancelled
-        ) {
-            if status.phase == MigrationPhase::Completed {
-                self.activate_receiver(prepared.receiver.id).await?;
-                if let Some(snap) = network_snapshot.as_ref() {
-                    self.network_migration_restore(prepared.receiver.id, snap)
-                        .await?;
-                    self.network_migration_resume(prepared.receiver.id).await?;
-                }
+        if status.phase == MigrationPhase::Completed {
+            self.activate_receiver(prepared.receiver.id).await?;
+            if let Some(snap) = network_snapshot.as_ref() {
+                self.network_migration_restore(prepared.receiver.id, snap)
+                    .await?;
+                self.network_migration_resume(prepared.receiver.id).await?;
             }
         }
 
@@ -457,7 +452,9 @@ mod tests {
 
         Mock::given(method("GET"))
             .and(path("/v1/vms"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"items": [sample_vm("src-vm")]})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"items": [sample_vm("src-vm")]})),
+            )
             .mount(&source)
             .await;
 

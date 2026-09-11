@@ -64,10 +64,12 @@ export default function DownloadDisk() {
     let list = [...images]
     if (search) { const q = search.toLowerCase(); list = list.filter((img) => img.name.toLowerCase().includes(q) || img.format.toLowerCase().includes(q) || img.path.toLowerCase().includes(q)) }
     list.sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'name') cmp = a.name.localeCompare(b.name)
-      else if (sortField === 'size_bytes') cmp = a.size_bytes - b.size_bytes
-      else cmp = new Date(a.mod_time).getTime() - new Date(b.mod_time).getTime()
+      const cmp =
+        sortField === 'name'
+          ? a.name.localeCompare(b.name)
+          : sortField === 'size_bytes'
+            ? a.size_bytes - b.size_bytes
+            : new Date(a.mod_time).getTime() - new Date(b.mod_time).getTime()
       return sortDir === 'asc' ? cmp : -cmp
     })
     return list

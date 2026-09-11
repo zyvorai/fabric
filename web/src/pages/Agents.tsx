@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { Bot, Plus, RefreshCw } from 'lucide-react'
 import { AgentRecord, createSession, listAgents } from '../api/agents'
 import { PageHeader, EmptyState, Card } from '../components/ui'
@@ -13,6 +13,7 @@ import { toastFailure } from '../utils/toastError'
 
 export default function Agents() {
   const toast = useToastContext()
+  const navigate = useNavigate()
   const [agents, setAgents] = useState<AgentRecord[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load agents')
 
@@ -31,7 +32,7 @@ export default function Agents() {
     try {
       const session = await createSession({ agent: name })
       toast.success(`Session ${session.id} created`)
-      window.location.href = `/app/sessions/${session.id}`
+      navigate(`/app/sessions/${session.id}`)
     } catch (e) {
       toastFailure(toast, 'Failed to create session', e)
     }
