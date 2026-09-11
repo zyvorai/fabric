@@ -385,7 +385,7 @@ export default function Analytics() {
                   borderRadius: '0.5rem',
                   color: 'var(--zf-ink)',
                 }}
-                labelFormatter={(v) => new Date(v).toLocaleString()}
+                labelFormatter={(v) => new Date(String(v ?? '')).toLocaleString()}
               />
               <Area type="monotone" dataKey="total_cpu_usage" name="CPU %" stroke="var(--zf-link)" fillOpacity={1} fill="url(#colorSysCpu)" />
               <Area type="monotone" dataKey="total_memory_usage" name="Memory %" stroke="var(--zf-ink)" fillOpacity={1} fill="url(#colorSysMem)" />

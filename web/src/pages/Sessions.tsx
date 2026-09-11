@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Activity, Trash2 } from 'lucide-react'
 import {
   SessionView,
@@ -19,6 +19,7 @@ import { toastFailure } from '../utils/toastError'
 
 export default function Sessions() {
   const toast = useToastContext()
+  const navigate = useNavigate()
   const { id } = useParams<{ id?: string }>()
   const [sessions, setSessions] = useState<SessionView[]>([])
   const [detail, setDetail] = useState<SessionView | null>(null)
@@ -55,7 +56,7 @@ export default function Sessions() {
     try {
       await deleteSession(sessionId)
       toast.success('Session deleted')
-      if (id) window.location.href = '/app/sessions'
+      if (id) navigate('/app/sessions')
       else void load()
     } catch (e) {
       toastFailure(toast, 'Failed to delete session', e)

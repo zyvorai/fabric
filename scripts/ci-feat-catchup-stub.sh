@@ -63,8 +63,17 @@ else
   pass "capabilities body ok (no dataplane keyword required)"
 fi
 
-# Dedicated catch-up VM (left running for dataplane/pause/qga/migration checks)
+# Dedicated catch-up VM. Fabric POST /api/vms only writes the store record —
+# FluxVM learns the VM on first start (lazy create). Dataplane/pause/QGA all
+# resolve via FluxVM find_by_name, so start is required before those checks.
 api POST /api/vms '{"name":"e2e-catchup","image":"test.qcow2","cpus":1,"memory":512}' 201 "POST /api/vms e2e-catchup"
+# start may be 200 (already) or 204/201 depending on handler — accept 2xx
+START_CODE=$(curl_auth -sk -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/vms/e2e-catchup/start" || echo 000)
+if [[ "$START_CODE" =~ ^2 ]]; then
+  pass "POST /api/vms/e2e-catchup/start ($START_CODE)"
+else
+  fail "POST /api/vms/e2e-catchup/start" "2xx" "$START_CODE"
+fi
 
 STATUS=$(get_body /api/vms/e2e-catchup/dataplane/status || true)
 CODE=$(curl_auth -sk -o /dev/null -w "%{http_code}" "$BASE_URL/api/vms/e2e-catchup/dataplane/status" || echo 000)

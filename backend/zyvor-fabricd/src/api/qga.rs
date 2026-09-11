@@ -19,9 +19,7 @@ use crate::server::AppState;
 use crate::validation::validate_vm_name;
 use security::{RequireAdmin, RequireRead, RequireWrite};
 
-fn fluxvm_client(
-    state: &AppState,
-) -> Result<FluxVmClient, (StatusCode, Json<serde_json::Value>)> {
+fn fluxvm_client(state: &AppState) -> Result<FluxVmClient, (StatusCode, Json<serde_json::Value>)> {
     let client = FluxVmClient::new(&state.config.driver.fluxvm_url).map_err(|e| {
         (
             StatusCode::BAD_GATEWAY,

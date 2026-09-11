@@ -105,6 +105,8 @@ jobs:
           # to find.
           mkdir -p /var/lib/zyvor-fabricd/images
           touch /var/lib/zyvor-fabricd/images/e2e-vm.qcow2
+          touch /var/lib/zyvor-fabricd/images/test.qcow2
+          touch /var/lib/zyvor-fabricd/images/e2e-catchup.qcow2
           export ZYVOR_FABRICD_CONFIG=/tmp/e2e-etc/zyvor-fabricd.toml
           ./backend/target/release/zyvor-fabricd \
             > /tmp/fabricd-e2e.log 2>&1 &

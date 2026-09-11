@@ -467,7 +467,7 @@ function MetricsTab({ vm }: { vm: VM }) {
                 width={40}
                 tickFormatter={(v) => `${v}%`}
               />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'CPU']} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${Number(v ?? 0)}%`, 'CPU']} />
               <Area type="monotone" dataKey="cpu" stroke="var(--zf-link)" strokeWidth={1.5} fill="url(#cpuGrad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
@@ -498,7 +498,7 @@ function MetricsTab({ vm }: { vm: VM }) {
                 width={40}
                 tickFormatter={(v) => `${v}%`}
               />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, 'Memory']} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${Number(v ?? 0)}%`, 'Memory']} />
               <Area type="monotone" dataKey="memory" stroke="var(--zf-success)" strokeWidth={1.5} fill="url(#memGrad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>

@@ -22,8 +22,7 @@ export default function SubsystemBanner({
 }) {
   const { capabilities, loading } = usePlatformInfo()
   const status = capabilities?.[subsystem]
-
-  if (loading || !status || status.phase === 'live') return null
+  if (loading || !status || typeof status === 'string' || status.phase === 'live') return null
 
   const phase = phaseLabel[status.phase] ?? status.phase
   const headline = status.detail ?? `${title} is ${phase}.`

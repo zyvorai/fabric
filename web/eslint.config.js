@@ -13,7 +13,12 @@ export default tseslint.config(
       'react-hooks': reactHooks,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // Classic hooks rules only. eslint-plugin-react-hooks >=7 folds React
+      // Compiler lint into `recommended`, which currently fails ~50 pages on
+      // patterns this app already uses (setState-in-effect, etc.). Re-enable
+      // compiler rules once pages are migrated.
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
     },

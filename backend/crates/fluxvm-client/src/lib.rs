@@ -1993,11 +1993,7 @@ impl FluxVmClient {
     }
 
     /// `POST /v1/vms/{id}/network/pod-policy`
-    pub async fn set_pod_network_policy(
-        &self,
-        id: Uuid,
-        policy: &PodNetworkPolicy,
-    ) -> Result<()> {
+    pub async fn set_pod_network_policy(&self, id: Uuid, policy: &PodNetworkPolicy) -> Result<()> {
         let resp = self
             .authed(
                 self.http

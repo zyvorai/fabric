@@ -70,6 +70,8 @@ export function collapseTerminalControls(raw: string): string {
 
 /** True for systemd wait-online spinner frames that drown boot logs. */
 export function isSpinnerNoise(text: string): boolean {
+  // ESC CSI sequences — control char is intentional
+  // eslint-disable-next-line no-control-regex
   const plain = text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/\r/g, '').trim()
   if (!plain) return true
   return /systemd-networkd-wait-online/i.test(plain) && /running \(/i.test(plain)

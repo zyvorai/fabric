@@ -14,8 +14,8 @@ use std::path::PathBuf;
 use uuid::Uuid;
 use zyvor_fabric_fluxvm_client::{
     BackendKind, CreateVmRequest, FluxVmClient, MigrationMode, MigrationPhase,
-    MigrationReceiverInfo, MigrationReceiverRequest, MigrationStartRequest, MigrationStatus,
-    MigrationStateStatus, RuntimeCapabilities, VmNetworkStateSnapshot, VmStatus,
+    MigrationReceiverInfo, MigrationReceiverRequest, MigrationStartRequest, MigrationStateStatus,
+    MigrationStatus, RuntimeCapabilities, VmNetworkStateSnapshot, VmStatus,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -199,7 +199,10 @@ impl RuntimeMigrationManager {
             .await
     }
 
-    pub async fn network_migration_resume(&self, receiver_id: Uuid) -> Result<MigrationStateStatus> {
+    pub async fn network_migration_resume(
+        &self,
+        receiver_id: Uuid,
+    ) -> Result<MigrationStateStatus> {
         self.target_client()?
             .network_migration_resume(receiver_id)
             .await
@@ -215,9 +218,7 @@ impl RuntimeMigrationManager {
         prepare: &PrepareReceiverOptions,
         options: &NativeMigrationOptions,
     ) -> Result<(PreparedTarget, MigrationStatus)> {
-        let prepared = self
-            .prepare_receiver(vm_name, listen_host, prepare)
-            .await?;
+        let prepared = self.prepare_receiver(vm_name, listen_host, prepare).await?;
 
         let network_snapshot = if options.transfer_network_state {
             self.network_migration_quiesce(vm_name).await?;
@@ -457,7 +458,9 @@ mod tests {
 
         Mock::given(method("GET"))
             .and(path("/v1/vms"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"items": [sample_vm("src-vm")]})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"items": [sample_vm("src-vm")]})),
+            )
             .mount(&source)
             .await;
 

@@ -344,7 +344,7 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--zf-hairline)" />
               <XAxis dataKey="time" stroke="var(--zf-muted)" fontSize={11} tickLine={false} axisLine={false} />
               <YAxis stroke="var(--zf-muted)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
-              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'CPU']} />
+              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value) => [`${Number(value ?? 0)}%`, 'CPU']} />
               <Area type="monotone" dataKey="cpu" stroke="var(--zf-link)" strokeWidth={2} fillOpacity={1} fill="url(#gradCpu)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
@@ -372,7 +372,7 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--zf-hairline)" />
               <XAxis dataKey="time" stroke="var(--zf-muted)" fontSize={11} tickLine={false} axisLine={false} />
               <YAxis stroke="var(--zf-muted)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} width={30} tickFormatter={(v) => `${v}%`} />
-              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'Memory']} />
+              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value) => [`${Number(value ?? 0)}%`, 'Memory']} />
               <Area type="monotone" dataKey="memory" stroke="var(--zf-ink)" strokeWidth={2} fillOpacity={1} fill="url(#gradMem)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>

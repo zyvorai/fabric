@@ -676,11 +676,7 @@ pub trait VmDataplaneDriver: Send + Sync {
     async fn get_pod_network_policy(&self, _name: &str) -> Result<Option<serde_json::Value>> {
         anyhow::bail!("pod-policy not supported by this backend")
     }
-    async fn set_pod_network_policy(
-        &self,
-        _name: &str,
-        _policy: &serde_json::Value,
-    ) -> Result<()> {
+    async fn set_pod_network_policy(&self, _name: &str, _policy: &serde_json::Value) -> Result<()> {
         anyhow::bail!("pod-policy not supported by this backend")
     }
     async fn delete_pod_network_policy(&self, _name: &str) -> Result<()> {

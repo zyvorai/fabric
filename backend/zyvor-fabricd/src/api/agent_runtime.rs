@@ -205,10 +205,7 @@ pub async fn session_action(
     Path((id, action)): Path<(String, String)>,
     body: Result<Json<serde_json::Value>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
-    let allowed = matches!(
-        action.as_str(),
-        "steer" | "cancel" | "hibernate" | "resume"
-    );
+    let allowed = matches!(action.as_str(), "steer" | "cancel" | "hibernate" | "resume");
     if !allowed {
         return (
             StatusCode::BAD_REQUEST,
