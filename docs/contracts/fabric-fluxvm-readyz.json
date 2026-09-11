@@ -38,7 +38,7 @@
         "shim_installed": "bool",
         "guest_image_present": "bool"
       },
-      "notes": "dataplane may report schema_version 9 locally; Fabric proxies aggregate DataplaneStats until FluxVM exposes per-direction ppstat on REST"
+      "notes": "dataplane may report schema_version 9 locally; Fabric proxies aggregate DataplaneStats until FluxVM exposes per-direction ppstat on REST. Catch-up fields: status.pod_ingress_required/attached, stats.pod_policy; QGA under /v1/vms/{id}/qga/*; migration receivers under /v1/migration/receivers."
     }
   },
   "compose": {

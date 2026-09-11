@@ -20,8 +20,8 @@ Canonical JSON: [contracts/fabric-fluxvm-readyz.json](contracts/fabric-fluxvm-re
 
 ## Environment promotion
 
-1. **PR** — contract unit tests + `scripts/test-devops-gate.sh` + proven-infra suites.
-2. **Lab** — `./scripts/ship sus@HOST` (FluxVM + Fabric + readiness). Full lab pack: `scripts/test-lab-verify.sh`.
+1. **PR** — contract unit tests + Catch-up coverage job + `scripts/test-devops-gate.sh` + proven-infra suites.
+2. **Lab** — `./scripts/ship sus@HOST` (FluxVM + Fabric + readiness). Full lab pack: `scripts/test-lab-verify.sh`. Optional catch-up verify: `scripts/feat-catchup-verify.sh`.
 3. **Prod** — snapshot (`scripts/upgrade-rollback.sh snapshot`) → `FABRIC_ADMIN_PASSWORD=… ./scripts/ship sus@HOST --prod` → keep snapshot.
 
 Pair FluxVM upgrades with [fluxvm `scripts/upgrade-snapshot.sh`](https://github.com/zyvorai/fluxvm) on the same change window.

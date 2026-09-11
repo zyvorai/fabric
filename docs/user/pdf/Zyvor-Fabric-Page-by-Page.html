@@ -24,7 +24,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <section class="cover"><div class="kicker">ZyvorAI Labs · User Documentation</div>
 <h1>Zyvor <span>Fabric</span></h1>
 <div class="sub">Page-by-Page Product Manual</div>
-<div class="badge">2026-09-10</div>
+<div class="badge">2026-09-11</div>
 <div class="foot">zyvor.dev · Apache License 2.0</div></section>
 <main><h2>Page-by-page guides</h2>
 <p>Each guide follows: Purpose → When to use it → How to get there → What you can do → Related pages.</p>
@@ -105,7 +105,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </thead>
 <tbody><tr>
 <td><a href="infrastructure/containers.md">Containers</a></td>
-<td>Containers — a read-only, auto-refreshing view of container workloads running on the host (Docker/Podman-style containers, distinct from VMs), showing per-container state, image, CPU/memory usage, and network I/O.</td>
+<td>Containers — a read-only Docker/Podman host view (not Container Groups / Secure Containers). Shows per-container state, image, CPU/memory, and network I/O. Monitoring-only (auto-refresh ~3s); no start/stop/delete.</td>
 </tr>
 <tr>
 <td><a href="infrastructure/dataplane.md">VM Dataplane (Network Fabric schema v4)</a></td>
@@ -319,6 +319,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </tr>
 </thead>
 <tbody><tr>
+<td><a href="operations/agents.md">Agents</a></td>
+<td>Deploy and list TypeScript agents via Fabric’s agent-runtime proxy (<code>/api/agents</code>); 503 unless <code>[agent_runtime]</code> is configured. Start sessions from a row.</td>
+</tr>
+<tr>
 <td><a href="operations/autoscale.md">Autoscale</a></td>
 <td>Autoscale — define per-VM policies that automatically grow or shrink a VM&#39;s vCPUs and memory within set bounds based on load, and review the history of scaling actions that were triggered.</td>
 </tr>
@@ -329,6 +333,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <tr>
 <td><a href="operations/bulk-operations.md">Bulk Operations</a></td>
 <td>Bulk Operations — select any number of VMs and start, stop, restart, or snapshot them together, with a per-VM progress log for the batch.</td>
+</tr>
+<tr>
+<td><a href="operations/container-groups.md">Container Groups</a></td>
+<td>Apply and manage ContainerGroup workloads on FluxVM Secure Containers (<code>RuntimeClass fluxvm</code>); placement uses hosts with <code>secure_containers_ready</code>.</td>
 </tr>
 <tr>
 <td><a href="operations/content-library.md">Content Library</a></td>
@@ -352,7 +360,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </tr>
 <tr>
 <td><a href="operations/migrations.md">Migrations</a></td>
-<td>VM Migrations — move a VM from its current host to a different target host, and track the migration from start to finish. The list auto-refreshes every 5 seconds so in-flight migrations update live.</td>
+<td>VM Migrations — disk-copy move between hosts (<code>/api/migrations</code>: offline / live rsync / storage) with live progress. Native FluxVM transport is a separate preview API.</td>
 </tr>
 <tr>
 <td><a href="operations/quotas.md">Quotas</a></td>
@@ -365,6 +373,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <tr>
 <td><a href="operations/schedules.md">Schedules</a></td>
 <td>VM Schedules — automate a recurring lifecycle action (start, stop, restart, or snapshot) for a single VM, on a one-time, daily, or weekly schedule.</td>
+</tr>
+<tr>
+<td><a href="operations/sessions.md">Sessions</a></td>
+<td>Inspect and control agent-runtime sessions (<code>/api/sessions</code>); hibernate, resume, cancel, or delete. 503 unless <code>[agent_runtime]</code> is configured.</td>
 </tr>
 <tr>
 <td><a href="operations/site-recovery.md">Site Recovery</a></td>
@@ -446,7 +458,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </tr>
 </tbody></table>
 <hr>
-<p>86 guides. Regenerate: <code>node scripts/user-docs/generate-guide-index.mjs</code>.</p>
+<p>89 guides. Regenerate: <code>node scripts/user-docs/generate-guide-index.mjs</code>.</p>
 <hr>
 <h2>Sign in</h2>
 <h3>Purpose</h3>
@@ -542,6 +554,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li>Expand a cluster to see its HA and DRS status and a table of its hosts: hostname, address, CPUs, memory, live CPU/memory usage bars, VM count, and status (Connected, Disconnected, Maintenance).</li>
 <li>Click <strong>+ Host</strong> on a cluster to register a host (hostname, IP address, CPUs, memory in MB), or use the trash icon to remove one — removal is confirmed first.</li>
 <li>Toggle a host in or out of maintenance mode with the wrench icon next to it.</li>
+<li>Host rows also surface <strong>Secure Containers readiness</strong> when heartbeats /
+FluxVM <code>/readyz.secure_containers</code> report it (<code>secure_containers_ready</code>).
+Fabric uses that flag to place <a href="../operations/container-groups.md">Container Groups</a>
+— it does not talk to the Secure Containers shim directly.</li>
 </ol>
 <p><strong>Empty / fail:</strong> Error banner, empty table, or failed toast — confirm you are signed in, <code>zyvor-fabricd</code> is healthy (<code>/readyz</code>), and any backend this page needs (FluxVM, storage, network) is reachable. See <a href="../../admin-basics.md">Admin basics</a>.</p>
 <p><strong>Success:</strong> Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.</p>
@@ -550,6 +566,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <li><a href="home.md">Dashboard</a></li>
 <li><a href="vms.md">Virtual Machines</a></li>
 <li><a href="create.md">Create VM</a></li>
+<li><a href="../operations/container-groups.md">Container Groups</a></li>
 <li><a href="../../getting-started.md">Getting Started</a></li>
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
@@ -886,8 +903,7 @@ backend is gone from Fabric.</p>
 <hr>
 <h2>Containers</h2>
 <h3>Purpose</h3>
-<p>Containers — a read-only, auto-refreshing view of container workloads running on the host (Docker/Podman-style containers, distinct from VMs), showing per-container state, image, CPU/memory usage, and network I/O.</p>
-<p>Monitoring-only — no start/stop/restart/delete actions here. Auto-refresh every 3 seconds.</p>
+<p>Containers — a read-only Docker/Podman host view (not Container Groups / Secure Containers). Shows per-container state, image, CPU/memory, and network I/O. Monitoring-only (auto-refresh ~3s); no start/stop/delete.</p>
 <h3>When to use it</h3>
 <ul>
 <li>To check whether container workloads on this host are running, restarting, or exited</li>
@@ -914,6 +930,7 @@ backend is gone from Fabric.</p>
 <p><strong>Success:</strong> Live data loads without error; creates/updates appear in the list or detail view and any confirmation toast clears cleanly.</p>
 <h3>Related pages</h3>
 <ul>
+<li><a href="../operations/container-groups.md">Container Groups</a> — Secure Containers workloads</li>
 <li><a href="../core/vms.md">Virtual Machines</a></li>
 <li><a href="../monitoring/processes.md">Processes</a></li>
 <li><a href="../monitoring/live-metrics.md">Live Metrics</a></li>
@@ -963,7 +980,9 @@ exists for TC attach.</li>
 <h4>Status</h4>
 <p>Confirm <strong>Attached = yes</strong>, <strong>Mode = ebpf</strong>, <strong>Schema version = 4</strong>, policy
 synced, identity, pin dir, and the <strong>Active policy snapshot</strong> (CIDRs, ports,
-deny, groups, ICMP, Mbps/PPS).</p>
+deny, groups, ICMP, Mbps/PPS). When FluxVM reports them, note
+<strong>pod_ingress_required</strong> / <strong>pod_ingress_attached</strong> on status (Secure Containers
+/ pod-edge hooks).</p>
 <h4>Policy</h4>
 <p>Cilium-style <strong>packet-flow control</strong> (VM edge only — no Cilium-private maps):</p>
 <table>
@@ -1012,7 +1031,10 @@ allow-all gap).</li>
 identities), and <strong>effective</strong> merged policy (union of CIDRs/ports; tightest
 rate limits; fail-closed default).</p>
 <h4>Stats / Flows</h4>
-<p>Allow vs drop counters; LRU flow table with identity, family, 5-tuple, verdict.</p>
+<p>Allow vs drop counters; LRU flow table with identity, family, 5-tuple, verdict.
+Stats may include nested <strong><code>pod_policy</code></strong> counters when FluxVM exposes them.
+Operators can also poll <code>GET /api/vms/{name}/dataplane/drop-reasons</code> and
+manage <code>…/dataplane/pod-policy</code> (see operator guide).</p>
 <h3>API &amp; CLI (quick)</h3>
 <table>
 <thead>
@@ -1022,12 +1044,16 @@ rate limits; fail-closed default).</p>
 </tr>
 </thead>
 <tbody><tr>
-<td>Status / policy / stats / flows / effective</td>
+<td>Status / policy / stats / flows / effective / drop-reasons / pod-policy</td>
 <td><code>/api/vms/{name}/dataplane/…</code></td>
 </tr>
 <tr>
 <td>Groups / CNP / health / observe / ipcache / refresh-dns</td>
 <td><code>/api/dataplane/…</code></td>
+</tr>
+<tr>
+<td>QGA (Windows Kryton)</td>
+<td><code>/api/vms/{name}/qga/{ping,exec,firewall/…}</code></td>
 </tr>
 <tr>
 <td>CLI</td>
@@ -2903,6 +2929,34 @@ optional <code>max_egress_mbps</code> / <code>flow_sample_rate</code> / <code>ho
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
 <hr>
+<h2>Agents</h2>
+<h3>Purpose</h3>
+<p>Deploy and list TypeScript agents via Fabric’s agent-runtime proxy (<code>/api/agents</code>); 503 unless <code>[agent_runtime]</code> is configured. Start sessions from a row.</p>
+<h3>When to use it</h3>
+<ul>
+<li>See which agents are deployed on this fabric</li>
+<li>Start a new session against an agent (opens Sessions)</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route: <code>/app/agents</code></li>
+<li>Nav: <strong>Operations → Agents</strong></li>
+</ul>
+<h3>What you can do</h3>
+<ol>
+<li>Refresh the agent list (<code>GET /api/agents</code> → agent-runtime <code>/v1/agents</code>).</li>
+<li><strong>Run session</strong> on a row → <code>POST /api/sessions</code> then navigate to
+<code>/app/sessions/{id}</code>.</li>
+</ol>
+<h3>Related</h3>
+<ul>
+<li><a href="sessions.md">Sessions</a></li>
+<li>Operator walkthrough: <a href="../../../tutorials/11-agent-runtime-quickstart.md">Agent Runtime Quickstart</a></li>
+<li>Daemon docs: <a href="../../../../agent-runtime/README.md">agent-runtime/README.md</a></li>
+<li>Config: <code>[agent_runtime] base_url</code> in <code>configs/zyvor-fabricd.toml</code></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
 <h2>Autoscale</h2>
 <h3>Purpose</h3>
 <p>Autoscale — define per-VM policies that automatically grow or shrink a VM&#39;s vCPUs and memory within set bounds based on load, and review the history of scaling actions that were triggered.</p>
@@ -3018,6 +3072,33 @@ optional <code>max_egress_mbps</code> / <code>flow_sample_rate</code> / <code>ho
 <li><a href="backups.md">Backups</a></li>
 <li><a href="migrations.md">Migrations</a></li>
 <li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Container Groups</h2>
+<h3>Purpose</h3>
+<p>Apply and manage ContainerGroup workloads on FluxVM Secure Containers (<code>RuntimeClass fluxvm</code>); placement uses hosts with <code>secure_containers_ready</code>.</p>
+<p>Fabric places Pods via <code>spec.nodeName</code> after DRS filters to ready hosts; it does not talk to the Secure Containers shim directly (heartbeat / <code>/readyz.secure_containers</code>).</p>
+<h3>When to use it</h3>
+<ul>
+<li>Run container workloads on FluxVM Secure Containers through Fabric</li>
+<li>Inspect live status for a named group</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>Route: <code>/app/container-groups</code></li>
+<li>Nav: <strong>Operations → Container Groups</strong></li>
+</ul>
+<h3>What you can do</h3>
+<ul>
+<li>List / apply / delete groups (<code>/api/container-groups…</code>)</li>
+<li>Expand a group for live status (<code>GET /api/container-groups/{name}/status</code>)</li>
+</ul>
+<h3>Related</h3>
+<ul>
+<li>Operator guide: <a href="../../../container-groups.md">container-groups.md</a></li>
+<li><a href="../core/datacenters.md">Datacenters</a> — host <code>secure_containers_ready</code> UX</li>
+<li><a href="../infrastructure/containers.md">Containers</a> — Docker/Podman host view (different)</li>
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
 <hr>
@@ -3207,7 +3288,7 @@ optional <code>max_egress_mbps</code> / <code>flow_sample_rate</code> / <code>ho
 <hr>
 <h2>Migrations</h2>
 <h3>Purpose</h3>
-<p>VM Migrations — move a VM from its current host to a different target host, and track the migration from start to finish. The list auto-refreshes every 5 seconds so in-flight migrations update live.</p>
+<p>VM Migrations — disk-copy move between hosts (<code>/api/migrations</code>: offline / live rsync / storage) with live progress. Native FluxVM transport is a separate preview API.</p>
 <h3>When to use it</h3>
 <ul>
 <li>To move a VM off a host for maintenance or to rebalance load</li>
@@ -3223,8 +3304,8 @@ optional <code>max_egress_mbps</code> / <code>flow_sample_rate</code> / <code>ho
 <h3>Operate from the console (UX)</h3>
 <ol>
 <li><strong>Start Migration</strong> — opens a dialog where you pick a VM from the dropdown (populated from your VM list), enter a target host (hostname or IP), and choose a migration type:<ul>
-<li><strong>Offline</strong> — stop the VM, copy its data, then start it on the target</li>
-<li><strong>Live</strong> — migrate with minimal downtime</li>
+<li><strong>Offline</strong> — stop the VM, rsync its data, then start it on the target</li>
+<li><strong>Live</strong> — rsync while running, then a short pause for final sync/cutover (not QEMU memory migration)</li>
 <li><strong>Storage</strong> — migrate storage volumes only</li>
 </ul>
 </li>
@@ -3240,6 +3321,7 @@ optional <code>max_egress_mbps</code> / <code>flow_sample_rate</code> / <code>ho
 <li><a href="snapshots.md">Snapshots</a></li>
 <li><a href="backups.md">Backups</a></li>
 <li><a href="migration-wizard.md">Migration Wizard</a></li>
+<li>Operator: <a href="../../../migration.md">migration.md</a> · <a href="../../../FLUXVM-FABRIC-BOUNDARY.md">FLUXVM-FABRIC-BOUNDARY.md</a></li>
 <li><a href="../../getting-started.md">Getting Started</a></li>
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
@@ -3361,6 +3443,51 @@ A checkbox enables the schedule immediately on creation.</li>
 <li><a href="backups.md">Backups</a></li>
 <li><a href="migrations.md">Migrations</a></li>
 <li><a href="../../getting-started.md">Getting Started</a></li>
+<li><a href="../../PAGE_INDEX.md">Page index</a></li>
+</ul>
+<hr>
+<h2>Sessions</h2>
+<h3>Purpose</h3>
+<p>Inspect and control agent-runtime sessions (<code>/api/sessions</code>); hibernate, resume, cancel, or delete. 503 unless <code>[agent_runtime]</code> is configured.</p>
+<h3>When to use it</h3>
+<ul>
+<li>Monitor session status / sandbox id / errors</li>
+<li>Hibernate, resume, cancel, or delete a session</li>
+</ul>
+<h3>How to get there</h3>
+<ul>
+<li>List: <code>/app/sessions</code> — <strong>Operations → Sessions</strong></li>
+<li>Detail: <code>/app/sessions/:id</code> (from Agents → Run session, or a list row)</li>
+</ul>
+<h3>What you can do</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>List</td>
+<td><code>GET /api/sessions</code></td>
+</tr>
+<tr>
+<td>Detail</td>
+<td><code>GET /api/sessions/{id}</code></td>
+</tr>
+<tr>
+<td>Hibernate / resume / cancel</td>
+<td><code>POST /api/sessions/{id}/{action}</code></td>
+</tr>
+<tr>
+<td>Delete</td>
+<td><code>DELETE /api/sessions/{id}</code></td>
+</tr>
+</tbody></table>
+<h3>Related</h3>
+<ul>
+<li><a href="agents.md">Agents</a></li>
+<li><a href="../../../tutorials/11-agent-runtime-quickstart.md">Agent Runtime Quickstart</a></li>
 <li><a href="../../PAGE_INDEX.md">Page index</a></li>
 </ul>
 <hr>
@@ -4029,7 +4156,7 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <h2>Zyvor Fabric — Complete page index</h2>
 <p>Marketing: <code>/</code>, <code>/product</code>, <code>/platform</code>, <code>/security</code>, <code>/sign-in</code>.</p>
 <p>Console routes under <code>/app</code> — every primary navigable ops route.</p>
-<p><em>Generated: 2026-09-10 · 84 routes</em></p>
+<p><em>Generated: 2026-09-11 · 88 routes</em></p>
 <p>Regenerate: <code>node scripts/user-docs/generate-page-index.mjs</code></p>
 <h3>Marketing &amp; auth</h3>
 <table>
@@ -4164,6 +4291,12 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <td><code>/app/network-security</code></td>
 <td>Net Security — Infrastructure surface.</td>
 <td><a href="pages/infrastructure/network-security.md">Open</a></td>
+</tr>
+<tr>
+<td>Edge Dataplane</td>
+<td><code>/app/edge-dataplane</code></td>
+<td>Edge Dataplane — cluster Network Fabric / Service Fabric console.</td>
+<td><a href="pages/infrastructure/edge-dataplane.md">Open</a></td>
 </tr>
 <tr>
 <td>Storage</td>
@@ -4301,6 +4434,24 @@ Plans can also be <strong>deleted</strong> (confirmation dialog).</li>
 <td><code>/app/backups</code></td>
 <td>Backups — Operations surface.</td>
 <td><a href="pages/operations/backups.md">Open</a></td>
+</tr>
+<tr>
+<td>Container Groups</td>
+<td><code>/app/container-groups</code></td>
+<td>Container Groups — Secure Containers workloads via Fabric.</td>
+<td><a href="pages/operations/container-groups.md">Open</a></td>
+</tr>
+<tr>
+<td>Agents</td>
+<td><code>/app/agents</code></td>
+<td>Agents — agent-runtime proxy list / deploy.</td>
+<td><a href="pages/operations/agents.md">Open</a></td>
+</tr>
+<tr>
+<td>Sessions</td>
+<td><code>/app/sessions</code></td>
+<td>Sessions — agent-runtime session control.</td>
+<td><a href="pages/operations/sessions.md">Open</a></td>
 </tr>
 <tr>
 <td>Quotas</td>

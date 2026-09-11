@@ -158,7 +158,7 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 - cloud-init integration (NoCloud datasource)
 - TPM/vTPM support (1.2 and 2.0 via swtpm)
 - GPU passthrough (NVIDIA, AMD — generic PCI/VFIO, no vGPU/Intel GVT-g)
-- **Live migration** with iterative rsync pre-copy and cutover
+- **Live migration** — disk-copy (iterative rsync pre-copy + cutover); native FluxVM transport is preview until KVM e2e
 - CPU pinning and NUMA optimization
 - **IPv6 support** — dual-stack nftables (ip + ip6)
 - **API versioning** — all endpoints under `/api/` and `/api/v1/`

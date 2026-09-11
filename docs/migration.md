@@ -1,17 +1,22 @@
 # VM Migration
 
-Zyvor Fabric migrates a VM between hosts by copying its disk and configuration over SSH with
-`rsync` -- there's no shared storage requirement and no memory-state transfer. `live` and `offline`
-are two modes of the same rsync-based copy, not two different technologies:
+Zyvor Fabric supports two migration paths:
 
-- **Offline** -- stop the VM, `rsync` its data to the target, done.
-- **Live** -- `rsync` the data across in the background while the VM keeps running, then pause it
-  briefly for a final sync and cutover. Downtime is whatever that last sync takes, not the whole
-  transfer.
+| Path | What it does | Status |
+|------|----------------|--------|
+| **Disk copy (`/api/migrations`)** | Copies disk + config over SSH with `rsync`. No shared storage; no guest memory transfer. | Production for host drain / rebalance when SSH + `rsync` are available |
+| **Native FluxVM (`…/migration/native/*`)** | VMM live-migration transport + target **receivers** (shared/identical disk, memory cutover). | **Preview** until a green KVM shared-disk e2e — see [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md) |
+
+`live` and `offline` on `/api/migrations` are two modes of the **same rsync-based copy**, not QEMU live migration:
+
+- **Offline** — stop the VM, `rsync` its data to the target, done.
+- **Live** — `rsync` in the background while the VM runs, then pause briefly for a final sync and cutover. Downtime is the last sync, not the whole transfer.
+
+For native transport (receivers, prepare/start/status/cancel), use the APIs below and `zyvorctl runtime migrate …`. Do **not** market native live migration as GA without the KVM e2e gate.
 
 ---
 
-## Start a Migration
+## Start a disk-copy migration
 
 ```bash
 curl -X POST http://localhost:9095/api/migrations \
@@ -38,6 +43,8 @@ curl http://localhost:9095/api/migrations/{id}          # one migration's status
 curl -X POST http://localhost:9095/api/migrations/{id}/cancel
 ```
 
+## Status Shape
+
 ```json
 {
   "id": "…",
@@ -62,7 +69,25 @@ on this host before you try).
 
 ---
 
-## Known Gap: Target-Side Start
+## Native migration (preview)
+
+Fabric proxies FluxVM receivers and source-side transport:
+
+| Fabric API | Role |
+|---|---|
+| `POST /api/vms/{name}/migration/native/prepare-receiver` | Arm target incoming QEMU |
+| `POST /api/vms/{name}/migration/native/start` | Start prepared-target transport |
+| `GET /api/vms/{name}/migration/native/status` | Poll progress |
+| `POST /api/vms/{name}/migration/native/cancel` | Cancel in-flight transport |
+| `GET /api/vms/{name}/migration/native/network-state` | Dataplane migration phase |
+| `POST /api/migration/receivers/{id}/activate` | Promote receiver after cutover |
+| `DELETE /api/migration/receivers/{id}` | Abort unused receiver |
+
+CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`. Full sequence and ownership: [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md).
+
+---
+
+## Known Gap: Target-Side Start (rsync path)
 
 Pausing the source VM for the final sync goes through the FluxVM `VmDriver` on
 this host. Starting the VM on the *target* node after cutover shells
@@ -72,7 +97,7 @@ the VM via `POST /api/vms/{name}/start` on the target Fabric API.
 
 ---
 
-## Requirements
+## Requirements (rsync path)
 
 - Key-based SSH from the source host to the target host (no shared storage, no cluster membership).
 - `rsync` installed on both ends.
@@ -96,4 +121,5 @@ the VM via `POST /api/vms/{name}/start` on the target Fabric API.
 | Migration fails at the pre-check step | Confirm `ssh <target_host> echo ok` works non-interactively (key-based, `BatchMode=yes`) |
 | Migration fails during sync | Check `journalctl -u zyvor-fabricd`, verify `rsync` is installed on both hosts |
 | Insufficient disk space | Check `df -h /var/lib/zyvor-fabricd` on the target node |
-| VM won't start on the target after cutover | See [Known Gap](#known-gap-target-side-start) above -- this step isn't driver-generic yet |
+| VM won't start on the target after cutover | See [Known Gap](#known-gap-target-side-start-rsync-path) above -- this step isn't driver-generic yet |
+| Native prepare/start fails | Confirm FluxVM receivers API, shared/identical disks, and preview status in the boundary doc |

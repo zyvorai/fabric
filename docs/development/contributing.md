@@ -113,6 +113,14 @@ cargo test -- --nocapture
 cargo test -p Zyvor Fabric --test '*'
 ```
 
+### Catch-up coverage (FluxVM boundary)
+
+CI also runs an explicit **Catch-up coverage** job (see root `CONTRIBUTING.md` and
+`.github/workflows/ci.yml`): FluxVM stub smoke, Rust serde/HTTP contracts for
+migration receivers / dataplane pod fields / QGA / agent-runtime, and Vitest API
+path filters. Fabric E2E sources `scripts/ci-feat-catchup-stub.sh` against the
+same stub. Lab-only verify: `scripts/feat-catchup-verify.sh`.
+
 ### Test Requirements
 
 - All tests must pass before submitting a PR

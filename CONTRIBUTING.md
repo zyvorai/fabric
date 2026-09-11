@@ -56,6 +56,21 @@ npm run lint
 npm run build
 ```
 
+## Catch-up coverage (FluxVM boundary)
+
+GitHub Actions job **Catch-up coverage** (`.github/workflows/ci.yml`) plus Fabric E2E
+(`fabric-e2e.yml` → `tests/e2e-api-test.sh` sourcing `scripts/ci-feat-catchup-stub.sh`)
+gates the FluxVM ↔ Fabric catch-up surface:
+
+- Stub: `tests/fixtures/fluxvm-stub.py` (`/readyz.secure_containers`, dataplane
+  `pod_ingress_*` / `pod_policy`, QGA, migration status)
+- Rust contracts: `fluxvm-client` / `fluxvm-driver` / `migration` / `datacenter` /
+  fabricd `agent_runtime` + container placement / heartbeat tests
+- Web path contracts: `npx vitest run src/api/__tests__/api-files.test.ts -t "containerGroups|agents|dataplane catch-up"`
+- Lab-only: `scripts/feat-catchup-verify.sh`
+
+When changing those APIs, keep the stub and Vitest paths in sync.
+
 ## Code Style
 
 - Rust: Follow `rustfmt` and `clippy` guidelines. Run `cargo fmt` before committing.

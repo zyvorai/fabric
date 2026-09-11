@@ -2,9 +2,7 @@
 
 ## Purpose
 
-Containers — a read-only, auto-refreshing view of container workloads running on the host (Docker/Podman-style containers, distinct from VMs), showing per-container state, image, CPU/memory usage, and network I/O.
-
-Monitoring-only — no start/stop/restart/delete actions here. Auto-refresh every 3 seconds.
+Containers — a read-only Docker/Podman host view (not Container Groups / Secure Containers). Shows per-container state, image, CPU/memory, and network I/O. Monitoring-only (auto-refresh ~3s); no start/stop/delete.
 
 ## When to use it
 
@@ -36,6 +34,7 @@ Operator tip: high container CPU/memory can starve VMs on the same host — corr
 
 ## Related pages
 
+- [Container Groups](../operations/container-groups.md) — Secure Containers workloads
 - [Virtual Machines](../core/vms.md)
 - [Processes](../monitoring/processes.md)
 - [Live Metrics](../monitoring/live-metrics.md)
