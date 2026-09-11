@@ -28,6 +28,7 @@ fn not_configured() -> Response {
         .into_response()
 }
 
+#[allow(clippy::result_large_err)] // axum Response is intentionally large as Err
 fn upstream(state: &AppState) -> Result<(String, Option<String>), Response> {
     let base = agent_runtime_base_url(&state.config.agent_runtime).ok_or_else(not_configured)?;
     let token = std::env::var("ZYVOR_FABRICD_AGENT_RUNTIME_TOKEN")

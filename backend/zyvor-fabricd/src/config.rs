@@ -27,7 +27,7 @@ pub struct Config {
 /// Optional proxy to the sibling `zyvor-fabric-agent-runtime` service
 /// (`/v1/agents`, `/v1/sessions`). When `base_url` is unset, agent APIs
 /// return 503.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentRuntimeConfig {
     #[serde(default)]
     pub base_url: Option<String>,
@@ -35,15 +35,6 @@ pub struct AgentRuntimeConfig {
     /// `ZYVOR_FABRICD_AGENT_RUNTIME_TOKEN` in production.
     #[serde(default)]
     pub token: Option<String>,
-}
-
-impl Default for AgentRuntimeConfig {
-    fn default() -> Self {
-        Self {
-            base_url: None,
-            token: None,
-        }
-    }
 }
 
 /// Gates the `ContainerGroup` workload (FluxVM Secure Containers, scheduled
