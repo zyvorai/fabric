@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -476,6 +476,8 @@ pub struct NativeMigrationStartRequest {
     /// Required when FluxVM advertises `requiresSharedStorage`.
     #[serde(default)]
     pub shared_storage_confirmed: bool,
+    #[serde(default)]
+    pub transfer_network_state: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -539,6 +541,165 @@ fn parse_mode(
     }
 }
 
+fn resolve_target_fluxvm_url(
+    state: &AppState,
+    target_node: Option<&str>,
+) -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+    match target_node {
+        None | Some("") => Ok(state.config.driver.fluxvm_url.clone()),
+        Some(name) => state
+            .config
+            .driver
+            .fluxvm_nodes
+            .iter()
+            .find(|n| n.name == name)
+            .map(|n| n.url.clone())
+            .ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "error": format!(
+                            "unknown target FluxVM node '{name}' (configure driver.fluxvm_nodes)"
+                        )
+                    })),
+                )
+            }),
+    }
+}
+
+fn runtime_mgr_with_target(
+    state: &AppState,
+    target_node: Option<&str>,
+) -> Result<migration::RuntimeMigrationManager, (StatusCode, Json<serde_json::Value>)> {
+    let target_url = resolve_target_fluxvm_url(state, target_node)?;
+    migration::RuntimeMigrationManager::with_target(
+        &state.config.driver.fluxvm_url,
+        &target_url,
+        state.config.driver.fluxvm_token.as_deref(),
+    )
+    .map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": format!("FluxVM runtime client: {e}") })),
+        )
+    })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PrepareReceiverRequest {
+    pub disk_path: String,
+    /// Hostname/IP embedded in `tcp:<host>:<port>` returned to the caller.
+    pub listen_host: String,
+    #[serde(default)]
+    pub receiver_ttl_seconds: Option<u64>,
+    /// Named entry from `driver.fluxvm_nodes`; default = primary `fluxvm_url`.
+    #[serde(default)]
+    pub target_node: Option<String>,
+}
+
+/// POST /api/vms/{name}/migration/native/prepare-receiver
+pub async fn prepare_native_receiver(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<PrepareReceiverRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name)
+        .map_err(|(_status, msg)| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
+    if req.disk_path.trim().is_empty() || req.listen_host.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "disk_path and listen_host are required" })),
+        ));
+    }
+    let mgr = runtime_mgr_with_target(&state, req.target_node.as_deref())?;
+    let prepared = mgr
+        .prepare_receiver(
+            &name,
+            req.listen_host.trim(),
+            &migration::PrepareReceiverOptions {
+                disk_path: std::path::PathBuf::from(req.disk_path.trim()),
+                receiver_ttl_seconds: req.receiver_ttl_seconds,
+                spec: None,
+            },
+        )
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+    Ok(Json(json!({
+        "receiver_id": prepared.receiver.id,
+        "port": prepared.receiver.port,
+        "status": prepared.receiver.status,
+        "expires_at": prepared.receiver.expires_at,
+        "target_uri": prepared.target_uri,
+    })))
+}
+
+/// POST /api/migration/receivers/{id}/activate
+pub async fn activate_native_receiver(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<uuid::Uuid>,
+    Json(req): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let target_node = req
+        .get("target_node")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let mgr = runtime_mgr_with_target(&state, target_node.as_deref())?;
+    let record = mgr.activate_receiver(id).await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(json!({
+        "id": record.id,
+        "name": record.name,
+        "status": record.status,
+    })))
+}
+
+/// DELETE /api/migration/receivers/{id}
+pub async fn abort_native_receiver(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<uuid::Uuid>,
+    Query(q): Query<std::collections::HashMap<String, String>>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let target_node = q.get("target_node").map(|s| s.as_str());
+    let mgr = runtime_mgr_with_target(&state, target_node)?;
+    mgr.abort_receiver(id).await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/vms/{name}/migration/native/network-state
+pub async fn native_network_migration_state(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name)
+        .map_err(|(_status, msg)| (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))))?;
+    let mgr = runtime_mgr(&state)?;
+    let status = mgr.network_migration_state(&name).await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::to_value(status).unwrap_or(json!({}))))
+}
+
 /// POST /api/vms/{name}/migration/native/start
 pub async fn start_native_migration(
     RequireAdmin(_claims): RequireAdmin,
@@ -560,8 +721,17 @@ pub async fn start_native_migration(
         max_downtime_ms: req.max_downtime_ms.or(Some(300)),
         multifd_channels: req.multifd_channels.or(Some(4)),
         shared_storage_confirmed: req.shared_storage_confirmed,
+        transfer_network_state: req.transfer_network_state,
     };
     let mgr = runtime_mgr(&state)?;
+    if options.transfer_network_state {
+        let _ = mgr.network_migration_quiesce(&name).await.map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+    }
     let status = mgr
         .start_prepared_target(&name, req.target_uri.trim(), &options)
         .await

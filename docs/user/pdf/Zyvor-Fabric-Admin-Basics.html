@@ -24,9 +24,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 <section class="cover"><div class="kicker">ZyvorAI Labs · User Documentation</div>
 <h1>Zyvor <span>Fabric</span></h1>
 <div class="sub">Admin Basics</div>
-<div class="badge">2026-09-01</div>
+<div class="badge">2026-09-10</div>
 <div class="foot">zyvor.dev · Apache License 2.0</div></section>
-<main><h2>Ports / access</h2>
+<main><p>Operator reference for ports, auth, remote deploy, TLS, and the FluxVM dependency. For the first-hour UI path, see <a href="getting-started.md">Getting Started</a>.</p>
+<h2>Ports / access</h2>
 <table>
 <thead>
 <tr>
@@ -36,20 +37,27 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
 </thead>
 <tbody><tr>
 <td><strong>9095</strong></td>
-<td>Daemon / API / production web UI</td>
+<td><code>zyvor-fabricd</code> — API + production web UI (same origin)</td>
+</tr>
+<tr>
+<td><strong>7788</strong></td>
+<td>FluxVM (node-local VM engine; Fabric proxies it)</td>
 </tr>
 <tr>
 <td><strong>5173</strong></td>
-<td>Vite UI (dev)</td>
+<td>Vite UI (dev only)</td>
 </tr>
 </tbody></table>
 <p>Web routes: marketing <code>/</code>, <code>/product</code>, <code>/platform</code>, <code>/security</code>; sign-in <code>/sign-in</code>; console <code>/app/*</code>.</p>
-<h2>Auth</h2>
-<p>JWT bearer (local admin by default). Optional LDAP/OIDC.</p>
-<p>Sign in at <code>http://127.0.0.1:9095/sign-in</code>, then open <code>/app</code>.</p>
+<p>Open the UI at <code>https://&lt;host&gt;:9095</code> or <code>http://127.0.0.1:9095</code> on the host. Never publish lab IPs in docs or tickets — use <code>&lt;host&gt;</code>.</p>
+<p>Health check:</p>
+<pre><code class="language-bash">curl -sf http://127.0.0.1:9095/readyz | jq &#39;{ok, store, fluxvm_ok: .fluxvm.ok}&#39;
+</code></pre>
+<h2>Auth and admin password</h2>
+<p>JWT bearer auth (local admin by default). Optional LDAP/OIDC/PAM for system users.</p>
+<p>Sign in at <code>https://&lt;host&gt;:9095/sign-in</code> with username <code>admin</code>, then open <code>/app</code>.</p>
 <h3>JWT secret and admin password</h3>
-<p>Both are auto-generated (cryptographically random, 64 chars) on first start if unset, and
-persisted to disk so they survive restarts — never a hardcoded or predictable default:</p>
+<p>Both are auto-generated (cryptographically random) on first start if unset, and persisted so they survive restarts:</p>
 <table>
 <thead>
 <tr>
@@ -60,33 +68,74 @@ persisted to disk so they survive restarts — never a hardcoded or predictable 
 </thead>
 <tbody><tr>
 <td><code>ZYVOR_FABRICD_JWT_SECRET</code></td>
-<td>Random, generated once</td>
+<td>Random, once</td>
 <td><code>/var/lib/zyvor-fabricd/.jwt_secret</code> (mode 0600)</td>
 </tr>
 <tr>
 <td><code>ZYVOR_FABRICD_ADMIN_PASSWORD</code></td>
-<td>Random, generated once — never defaults to <code>admin</code></td>
+<td>Random, once — never defaults to <code>admin</code></td>
 <td><code>/var/lib/zyvor-fabricd/.admin_password</code></td>
 </tr>
 </tbody></table>
-<p>Retrieve the generated admin password:</p>
-<pre><code class="language-bash">cat /var/lib/zyvor-fabricd/.admin_password
+<p>Retrieve or manage the password with the ctl:</p>
+<pre><code class="language-bash">./zyvor-fabricd-ctl password          # show
+sudo cat /var/lib/zyvor-fabricd/.admin_password
+./zyvor-fabricd-ctl password --lab-reset [PASSWORD]   # reseed (lab only)
 </code></pre>
-<p>Set your own at deploy time instead by exporting the env var before first start — once a
-value is persisted to disk, it&#39;s reused across restarts even if the env var is later
-unset, so set it before the very first run if you want a specific value from day one.</p>
+<p>Set <code>ZYVOR_FABRICD_ADMIN_PASSWORD</code> (or <code>FABRIC_ADMIN_PASSWORD</code>) <strong>before first start</strong> if you want a known value from day one — once persisted, the file wins even if the env var is later unset.</p>
+<h2>Deploy (local and remote)</h2>
+<p>From a Fabric checkout:</p>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Local full deploy</td>
+<td><code>./zyvor-fabricd-ctl deploy</code> (deps → build → install → start)</td>
+</tr>
+<tr>
+<td>Bare-metal remote</td>
+<td><code>./scripts/deploy remote USER@HOST</code></td>
+</tr>
+<tr>
+<td>Remote, skip OS deps</td>
+<td><code>./scripts/deploy remote USER@HOST --quick</code></td>
+</tr>
+<tr>
+<td>Kubernetes lab</td>
+<td><code>./scripts/deploy k8s USER@HOST</code></td>
+</tr>
+</tbody></table>
+<p>Remote bare-metal install opens <code>0.0.0.0:9095</code> (HTTPS with a self-signed cert by default). Admin password is generated on deploy unless you set <code>FABRIC_ADMIN_PASSWORD</code> / <code>ZYVOR_FABRICD_ADMIN_PASSWORD</code>, or <code>FABRIC_LAB_DEFAULTS=1</code> for a convenient lab default. Force reseed: <code>FORCE_ADMIN_RESET=1 ./scripts/deploy remote USER@HOST --quick</code>.</p>
+<p>Useful ctl commands after install: <code>status</code>, <code>logs</code>, <code>verify</code>, <code>doctor</code>, <code>restart</code>.</p>
+<h2>TLS</h2>
+<pre><code class="language-bash">./zyvor-fabricd-ctl tls    # generate self-signed server cert (auto-sudo)
+</code></pre>
+<p>Enable the paths the ctl prints in <code>/etc/zyvor-fabricd/zyvor-fabricd.toml</code> (typically under <code>/etc/zyvor-fabricd/tls/</code>). Browsers will warn on self-signed certs in lab — replace with a real cert for production. For local HTTP-only testing, <code>http://127.0.0.1:9095</code> is fine when TLS is off.</p>
+<h2>FluxVM dependency</h2>
+<p>Fabric does <strong>not</strong> run QEMU itself. It orchestrates VMs through a local <a href="https://github.com/zyvorai/fluxvm">FluxVM</a> instance on <code>127.0.0.1:7788</code> (lifecycle, disks, console/VNC, cgroups, per-VM netns, Network Fabric eBPF).</p>
+<ul>
+<li>Dashboard <strong>VM driver</strong> / readiness must show FluxVM reachable (<code>fluxvm.ok</code> on <code>/readyz</code>).</li>
+<li>VM Dataplane (schema v4) and Edge Maglev Services (Service Fabric v6) require FluxVM dataplane features enabled — see <a href="pages/infrastructure/dataplane.md">VM Dataplane</a> and <a href="pages/infrastructure/edge-dataplane.md">Edge Dataplane</a>.</li>
+<li>If FluxVM auth is enabled, set <code>driver.fluxvm_token</code> in <code>zyvor-fabricd.toml</code>.</li>
+</ul>
+<p>Sibling checkouts of FluxVM (and GuestKit for image tooling) are expected for full image builds; see the product <a href="../../README.md">README</a>.</p>
 <h2>Install sketch</h2>
-<p>Follow the product README and deploy/Helm docs in the repository. Verify health endpoints or CLI status before opening the UI.</p>
+<ol>
+<li>Deploy locally or <code>./scripts/deploy remote USER@HOST</code>.</li>
+<li>Confirm <code>./zyvor-fabricd-ctl status</code> and <code>/readyz</code>.</li>
+<li>Retrieve admin password → open <code>https://&lt;host&gt;:9095/sign-in</code> → <code>/app</code>.</li>
+<li>Follow <a href="getting-started.md">Getting Started</a>.</li>
+</ol>
+<p>More detail: <a href="../getting-started/01-Installation.md">Installation</a> · <a href="../getting-started/04-Web-UI.md">Web UI</a> · <a href="../deployment/production.md">Production</a>.</p>
 <h2>Related</h2>
 <ul>
 <li><a href="getting-started.md">Getting Started</a></li>
+<li><a href="using-the-dashboard.md">Using the Dashboard</a></li>
+<li><a href="workflows.md">Common workflows</a></li>
+<li><a href="PAGE_INDEX.md">Complete page index</a></li>
 </ul>
-<h2>Operate from the console (UX)</h2>
-<ol>
-<li>Open this route from the nav or command palette and wait for live API data.</li>
-<li>Use filters/search when present; drill into a row for detail.</li>
-<li>For mutating actions: confirm role gates and impact before applying.</li>
-<li><strong>Empty / fail:</strong> Check service health, auth, and that required CRDs/backends for this domain are installed.</li>
-<li><strong>Success:</strong> Live data loads; created/updated objects appear without error toasts.</li>
-</ol>
 </main></body></html>

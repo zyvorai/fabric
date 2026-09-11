@@ -473,6 +473,11 @@ api GET /api/events "" 200 "GET /api/events (list)"
 section "Settings"
 api GET /api/settings "" 200 "GET /api/settings"
 
+# ─── FluxVM catch-up (stub) ───────────────────────────────────────────────────
+
+# shellcheck source=../scripts/ci-feat-catchup-stub.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../scripts/ci-feat-catchup-stub.sh"
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 
 TOTAL=$((PASS + FAIL))

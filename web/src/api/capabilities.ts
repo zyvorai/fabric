@@ -14,7 +14,7 @@ export interface Capabilities {
   vm_driver: SubsystemStatus
   storage: SubsystemStatus
   network_security: SubsystemStatus
-  /** FluxVM Network Fabric v3 (TC/eBPF) — not Fabric SDN network-policies */
+  /** FluxVM Network Fabric schema v4 (TC/eBPF) — not Fabric SDN network-policies */
   vm_dataplane: SubsystemStatus
   auth: SubsystemStatus
   events: SubsystemStatus

@@ -10,7 +10,10 @@ use zyvor_fabric_driver_core::VmDriver;
 
 // ZYVOR_RUNTIME_BOUNDARY_V1
 pub mod runtime;
-pub use runtime::{progress_percent, NativeMigrationOptions, RuntimeMigrationManager};
+pub use runtime::{
+    progress_percent, NativeMigrationOptions, PrepareReceiverOptions, PreparedTarget,
+    RuntimeMigrationManager,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationConfig {

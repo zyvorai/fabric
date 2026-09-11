@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, Fragment } from 'react'
 import { Plus, Trash2, Save, RotateCcw, Boxes, FileText } from 'lucide-react'
 import {
   listContainerGroups,
@@ -12,9 +12,11 @@ import {
   createContainerGroupBackup,
   deleteContainerGroupBackup,
   restoreContainerGroupBackup,
+  getContainerGroupStatus,
   ContainerGroupSpec,
   ContainerGroupEvent,
   ContainerGroupBackup,
+  ContainerGroupLiveStatus,
 } from '../api/containerGroups'
 import { useToastContext } from '../contexts/ToastContext'
 import { useConfirm } from '../hooks/useConfirm'
@@ -122,6 +124,8 @@ export default function ContainerGroups() {
   const [backups, setBackups] = useState<ContainerGroupBackup[]>([])
   const { loading, loadError, run } = usePageLoader('Failed to load ContainerGroups')
   const [showApplyDialog, setShowApplyDialog] = useState(false)
+  const [statusByName, setStatusByName] = useState<Record<string, ContainerGroupLiveStatus>>({})
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const loadData = useCallback(() => {
     return run(async () => {
@@ -133,6 +137,20 @@ export default function ContainerGroups() {
       setGroups(groupsData)
       setEvents(eventsData)
       setBackups(backupsData)
+      const statuses = await Promise.all(
+        groupsData.map(async (g) => {
+          try {
+            return [g.name, await getContainerGroupStatus(g.name)] as const
+          } catch {
+            return null
+          }
+        }),
+      )
+      const next: Record<string, ContainerGroupLiveStatus> = {}
+      for (const row of statuses) {
+        if (row) next[row[0]] = row[1]
+      }
+      setStatusByName(next)
     })
   }, [run])
 
@@ -235,6 +253,8 @@ export default function ContainerGroups() {
               <tr className="text-left text-[var(--zf-muted)] border-b border-[var(--zf-hairline)]">
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Tenant</th>
+                <th className="px-4 py-3 font-medium">Host</th>
+                <th className="px-4 py-3 font-medium">Phase</th>
                 <th className="px-4 py-3 font-medium">Replicas</th>
                 <th className="px-4 py-3 font-medium">Restart Policy</th>
                 <th className="px-4 py-3 font-medium">Containers</th>
@@ -243,10 +263,28 @@ export default function ContainerGroups() {
               </tr>
             </thead>
             <tbody>
-              {groups.map((g) => (
-                <tr key={g.name} className="border-b border-[var(--zf-hairline)] last:border-0">
-                  <td className="px-4 py-3 font-medium text-[var(--zf-ink)]">{g.name}</td>
+              {groups.map((g) => {
+                const st = statusByName[g.name]
+                const phases = st?.pods.map((p) => p.phase).filter(Boolean) as string[] | undefined
+                const phaseSummary =
+                  !phases || phases.length === 0
+                    ? '—'
+                    : [...new Set(phases)].join(', ')
+                return (
+                <Fragment key={g.name}>
+                <tr className="border-b border-[var(--zf-hairline)] last:border-0">
+                  <td className="px-4 py-3 font-medium text-[var(--zf-ink)]">
+                    <button
+                      type="button"
+                      className="text-left hover:underline"
+                      onClick={() => setExpanded(expanded === g.name ? null : g.name)}
+                    >
+                      {g.name}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-[var(--zf-muted)]">{g.tenant ?? '—'}</td>
+                  <td className="px-4 py-3 text-[var(--zf-muted)]">{st?.host_name ?? '—'}</td>
+                  <td className="px-4 py-3 text-[var(--zf-muted)]">{phaseSummary}</td>
                   <td className="px-4 py-3">{g.replicas ?? 1}</td>
                   <td className="px-4 py-3">{g.restart_policy ?? 'Always'}</td>
                   <td className="px-4 py-3">{g.containers.map((c) => c.image).join(', ')}</td>
@@ -278,7 +316,43 @@ export default function ContainerGroups() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                {expanded === g.name && st && (
+                  <tr key={`${g.name}-detail`} className="bg-[var(--zf-canvas)]/60">
+                    <td colSpan={9} className="px-4 py-3 text-sm text-[var(--zf-muted)]">
+                      {st.pods.length === 0 ? (
+                        <span>No live Pod status yet.</span>
+                      ) : (
+                        <ul className="space-y-1">
+                          {st.pods.map((p) => (
+                            <li key={p.name} className="font-mono text-xs">
+                              {p.name} · phase={p.phase ?? '—'} · node={p.node_name ?? '—'} · ip=
+                              {p.pod_ip ?? '—'}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {events.filter((e) => e.container_group_name === g.name).length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-xs font-medium text-[var(--zf-ink)] mb-1">Recent events</div>
+                          <ul className="space-y-0.5">
+                            {events
+                              .filter((e) => e.container_group_name === g.name)
+                              .slice(0, 5)
+                              .map((e) => (
+                                <li key={e.id} className="text-xs">
+                                  {e.event_type}
+                                  {e.detail ? `: ${e.detail}` : ''}
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </Card>

@@ -27,6 +27,7 @@ use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::api::{Api, DeleteParams, PatchParams, PostParams};
 use kube::config::{KubeConfigOptions, Kubeconfig};
 use kube::{Client, Config};
+use serde::Serialize;
 
 /// The `RuntimeClass` FluxVM's Secure Containers shim registers as
 /// (`deploy/containerd/runtimeclass.yaml` in the fluxvm repo).
@@ -126,6 +127,7 @@ pub struct PodRequest {
     pub image_pull_secrets: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
 pub struct PodStatusView {
     pub phase: Option<String>,
     pub pod_ip: Option<String>,

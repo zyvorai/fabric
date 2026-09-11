@@ -20,6 +20,30 @@ pub struct Config {
     pub tls: TlsConfig,
     #[serde(default)]
     pub container_groups: ContainerGroupsConfig,
+    #[serde(default)]
+    pub agent_runtime: AgentRuntimeConfig,
+}
+
+/// Optional proxy to the sibling `zyvor-fabric-agent-runtime` service
+/// (`/v1/agents`, `/v1/sessions`). When `base_url` is unset, agent APIs
+/// return 503.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRuntimeConfig {
+    #[serde(default)]
+    pub base_url: Option<String>,
+    /// Bearer token for agent-runtime. Prefer env
+    /// `ZYVOR_FABRICD_AGENT_RUNTIME_TOKEN` in production.
+    #[serde(default)]
+    pub token: Option<String>,
+}
+
+impl Default for AgentRuntimeConfig {
+    fn default() -> Self {
+        Self {
+            base_url: None,
+            token: None,
+        }
+    }
 }
 
 /// Gates the `ContainerGroup` workload (FluxVM Secure Containers, scheduled
@@ -468,6 +492,7 @@ impl Config {
             driver: DriverConfig::default(),
             tls: TlsConfig::default(),
             container_groups: ContainerGroupsConfig::default(),
+            agent_runtime: AgentRuntimeConfig::default(),
         })
     }
 
@@ -517,6 +542,7 @@ mod tests {
                 ..TlsConfig::default()
             },
             container_groups: ContainerGroupsConfig::default(),
+            agent_runtime: AgentRuntimeConfig::default(),
         }
     }
 

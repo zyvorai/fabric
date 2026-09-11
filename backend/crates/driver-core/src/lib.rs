@@ -95,6 +95,12 @@ pub trait VMDriver: Send + Sync {
     /// Reboot a machine.
     async fn reboot(&self, name: &str) -> Result<()>;
 
+    /// Guest pause (VMM pause) — prefer over cgroup freeze for `/api/vms/.../pause`.
+    async fn pause(&self, name: &str) -> Result<()>;
+
+    /// Guest resume after [`Self::pause`].
+    async fn resume(&self, name: &str) -> Result<()>;
+
     /// Query the current state of a machine.
     async fn get_state(&self, name: &str) -> Result<VMState>;
 
@@ -594,7 +600,25 @@ pub struct DataplaneStatus {
     pub schema_version: Option<u32>,
     pub schema_compatible: bool,
     pub policy_synced: bool,
+    #[serde(default)]
+    pub pod_ingress_required: bool,
+    #[serde(default)]
+    pub pod_ingress_attached: bool,
     pub policy: VmNetworkPolicy,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PodDirectionCounters {
+    pub allowed: u64,
+    pub dropped: u64,
+    pub audited: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PodPolicyStats {
+    pub egress: PodDirectionCounters,
+    pub ingress: PodDirectionCounters,
+    pub directional: bool,
 }
 
 /// Allow/drop counters from the attached eBPF program.
@@ -604,6 +628,8 @@ pub struct DataplaneStats {
     pub allowed_bytes: u64,
     pub dropped_packets: u64,
     pub dropped_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pod_policy: Option<PodPolicyStats>,
 }
 
 /// One sampled flow from the dataplane flow exporter.
@@ -636,6 +662,30 @@ pub trait VmDataplaneDriver: Send + Sync {
     ) -> Result<VmNetworkPolicy>;
     async fn dataplane_stats(&self, name: &str) -> Result<DataplaneStats>;
     async fn dataplane_flows(&self, name: &str, limit: Option<usize>) -> Result<Vec<FlowRecord>>;
+
+    /// Drop-reason histogram (`GET …/network/drop-reasons`).
+    async fn dataplane_drop_reasons(
+        &self,
+        _name: &str,
+        _limit: Option<usize>,
+    ) -> Result<Vec<serde_json::Value>> {
+        anyhow::bail!("edge dataplane drop-reasons not supported by this backend")
+    }
+
+    /// Secure Containers pod NetworkPolicy (`GET …/network/pod-policy`).
+    async fn get_pod_network_policy(&self, _name: &str) -> Result<Option<serde_json::Value>> {
+        anyhow::bail!("pod-policy not supported by this backend")
+    }
+    async fn set_pod_network_policy(
+        &self,
+        _name: &str,
+        _policy: &serde_json::Value,
+    ) -> Result<()> {
+        anyhow::bail!("pod-policy not supported by this backend")
+    }
+    async fn delete_pod_network_policy(&self, _name: &str) -> Result<()> {
+        anyhow::bail!("pod-policy not supported by this backend")
+    }
 
     /// Declared + group-merged policy (`GET …/network/effective`).
     async fn dataplane_effective(&self, _name: &str) -> Result<serde_json::Value> {

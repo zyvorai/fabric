@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: fluxvm
 data:
   fluxvm.toml: |
-    # Network Fabric v3 — keep required=false until first green attach.
+    # Network Fabric schema v4 — keep required=false until first green attach.
     [sandbox.dataplane]
     mode = "ebpf"
     bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"

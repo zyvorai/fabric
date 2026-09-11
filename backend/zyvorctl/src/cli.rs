@@ -696,6 +696,32 @@ enum RuntimeMigrateCmd {
         bandwidth_mbps: Option<u64>,
         #[arg(long)]
         multifd_channels: Option<u8>,
+        #[arg(long)]
+        transfer_network_state: bool,
+    },
+    /// Arm an incoming QEMU receiver on the target FluxVM node
+    PrepareReceiver {
+        name: String,
+        #[arg(long)]
+        disk_path: String,
+        #[arg(long)]
+        listen_host: String,
+        #[arg(long)]
+        target_node: Option<String>,
+        #[arg(long)]
+        receiver_ttl_seconds: Option<u64>,
+    },
+    /// Activate a prepared receiver after VMM transport completes
+    ActivateReceiver {
+        id: String,
+        #[arg(long)]
+        target_node: Option<String>,
+    },
+    /// Abort a prepared receiver
+    AbortReceiver {
+        id: String,
+        #[arg(long)]
+        target_node: Option<String>,
     },
     Status {
         name: String,
@@ -1155,6 +1181,9 @@ impl Cli {
                     port_forwards: Vec::new(),
                     network_tap: false,
                     network_static_ip: false,
+                    storage: None,
+                    enable_qga: false,
+                    hyperv: false,
                 };
                 let vm: VM = client
                     .post(format!("{}/vms", api_base()))
@@ -2061,6 +2090,7 @@ impl Cli {
                         shared_storage,
                         bandwidth_mbps,
                         multifd_channels,
+                        transfer_network_state,
                     } => {
                         let body = serde_json::json!({
                             "target_uri": uri,
@@ -2068,6 +2098,7 @@ impl Cli {
                             "shared_storage_confirmed": shared_storage,
                             "bandwidth_mbps": bandwidth_mbps,
                             "multifd_channels": multifd_channels,
+                            "transfer_network_state": transfer_network_state,
                         });
                         let val = api_post(
                             &client,
@@ -2079,6 +2110,47 @@ impl Cli {
                         if !matches!(fmt, OutputFormat::Table) {
                             print_value(&val, fmt);
                         }
+                    }
+                    RuntimeMigrateCmd::PrepareReceiver {
+                        name,
+                        disk_path,
+                        listen_host,
+                        target_node,
+                        receiver_ttl_seconds,
+                    } => {
+                        let body = serde_json::json!({
+                            "disk_path": disk_path,
+                            "listen_host": listen_host,
+                            "target_node": target_node,
+                            "receiver_ttl_seconds": receiver_ttl_seconds,
+                        });
+                        let val = api_post(
+                            &client,
+                            &format!("/vms/{}/migration/native/prepare-receiver", name),
+                            &body,
+                        )
+                        .await?;
+                        println!("Prepared migration receiver for '{}'", name);
+                        print_value(&val, fmt);
+                    }
+                    RuntimeMigrateCmd::ActivateReceiver { id, target_node } => {
+                        let body = serde_json::json!({ "target_node": target_node });
+                        let val = api_post(
+                            &client,
+                            &format!("/migration/receivers/{}/activate", id),
+                            &body,
+                        )
+                        .await?;
+                        println!("Activated migration receiver '{}'", id);
+                        print_value(&val, fmt);
+                    }
+                    RuntimeMigrateCmd::AbortReceiver { id, target_node } => {
+                        let path = match target_node {
+                            Some(n) => format!("/migration/receivers/{}?target_node={}", id, n),
+                            None => format!("/migration/receivers/{}", id),
+                        };
+                        api_delete(&client, &path).await?;
+                        println!("Aborted migration receiver '{}'", id);
                     }
                     RuntimeMigrateCmd::Status { name } => {
                         let val =

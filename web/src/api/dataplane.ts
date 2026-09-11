@@ -29,7 +29,21 @@ export interface DataplaneStatus {
   schema_version: number | null
   schema_compatible: boolean
   policy_synced: boolean
+  pod_ingress_required?: boolean
+  pod_ingress_attached?: boolean
   policy: VmNetworkPolicy
+}
+
+export interface PodDirectionCounters {
+  allowed: number
+  dropped: number
+  audited: number
+}
+
+export interface PodPolicyStats {
+  egress: PodDirectionCounters
+  ingress: PodDirectionCounters
+  directional: boolean
 }
 
 export interface DataplaneStats {
@@ -37,6 +51,7 @@ export interface DataplaneStats {
   allowed_bytes: number
   dropped_packets: number
   dropped_bytes: number
+  pod_policy?: PodPolicyStats | null
 }
 
 export interface FlowRecord {
@@ -177,6 +192,31 @@ export function getDataplaneStats(name: string): Promise<DataplaneStats> {
 
 export function getDataplaneFlows(name: string, limit = 100): Promise<FlowList> {
   return apiGet(`/api/vms/${encodeURIComponent(name)}/dataplane/flows?limit=${limit}`)
+}
+
+export interface DropReasonRecord {
+  identity: number
+  family: number
+  source: string
+  destination: string
+  source_port: number
+  destination_port: number
+  protocol: number
+  reason_code: number
+  reason: string
+  action: string
+  packets: number
+  bytes: number
+  last_seen_ns: number
+}
+
+export function getDataplaneDropReasons(
+  name: string,
+  limit = 100,
+): Promise<{ items: DropReasonRecord[] }> {
+  return apiGet(
+    `/api/vms/${encodeURIComponent(name)}/dataplane/drop-reasons?limit=${limit}`,
+  )
 }
 
 export function getDataplaneEffective(name: string): Promise<Record<string, unknown>> {

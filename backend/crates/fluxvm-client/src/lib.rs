@@ -21,14 +21,15 @@
 //! empty (auth off — today's default posture, see the migration plan's
 //! "Auth boundary" note).
 //!
-//! As of FluxVM v0.1.0, `CreateVmRequest`/`VmRecord` here are missing the
-//! fields behind its newer per-VM storage backends (`storage`: LVM thin/NBD/
-//! Ceph RBD) and the Firecracker-jailer/vsock-proxy bookkeeping (`jail_path`,
-//! `vsock_socket`, `lvm_lv`, `nbd_pid`) — see `fluxvm-driver`'s crate doc
-//! comment for the full gap list. Network Fabric schema v4 wire types
-//! (`VmNetworkPolicy`, groups/CNP/health/ipcache, …) and
-//! `NetworkSpec::Tap.netns` are mirrored here.
+//! Wire types track FluxVM 0.4.x (`CreateVmRequest.storage`, jailer/vsock/
+//! QGA bookkeeping on `VmRecord`, migration receivers, network-migration
+//! state, pod-policy, drop-reasons, QGA). Network Fabric schema v4 REST
+//! types (`VmNetworkPolicy`, groups/CNP/health/ipcache, …) and
+//! `NetworkSpec::Tap.netns` are mirrored here. Per-direction schema-v9
+//! `ppstat` counters are BPF/observer-only until FluxVM exposes them on
+//! `/v1/vms/{id}/network/stats`.
 
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
@@ -160,6 +161,24 @@ pub struct CloudInitFile {
     pub permissions: Option<String>,
 }
 
+/// Pluggable disk backend for FluxVM create (`CreateVmRequest.storage`).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum StorageBackend {
+    #[default]
+    Default,
+    LvmThin,
+    Nbd,
+    CephRbd,
+}
+
+/// QEMU Guest Agent enablement at create time.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct QgaSpec {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateVmRequest {
     pub name: String,
@@ -169,6 +188,10 @@ pub struct CreateVmRequest {
     pub vcpus: u8,
     #[serde(default = "default_memory")]
     pub memory_mib: u64,
+    #[serde(default)]
+    pub max_vcpus: Option<u8>,
+    #[serde(default)]
+    pub max_memory_mib: Option<u64>,
     #[serde(default)]
     pub disk_size_gib: Option<u64>,
     #[serde(default)]
@@ -180,6 +203,8 @@ pub struct CreateVmRequest {
     #[serde(default)]
     pub kernel_args: Option<String>,
     #[serde(default)]
+    pub loadvm_tag: Option<String>,
+    #[serde(default)]
     pub network: NetworkSpec,
     #[serde(default)]
     pub cloud_init: Option<CloudInitSpec>,
@@ -190,7 +215,26 @@ pub struct CreateVmRequest {
     #[serde(default)]
     pub agent: Option<AgentSpec>,
     #[serde(default)]
+    pub qga: Option<QgaSpec>,
+    #[serde(default)]
+    pub hyperv: bool,
+    #[serde(default)]
+    pub storage: StorageBackend,
+    #[serde(default)]
     pub shared_folders: Vec<SharedFolder>,
+    #[serde(default)]
+    pub numa_node: Option<u8>,
+    #[serde(default)]
+    pub cpuset: Option<String>,
+    #[serde(default)]
+    pub hugepages: Option<bool>,
+    #[serde(default)]
+    pub vfio_devices: Vec<String>,
+    #[serde(default)]
+    pub pod_uid: Option<String>,
+    /// Server-forced for migration receivers; callers must leave false.
+    #[serde(default)]
+    pub migration_incoming: bool,
     /// First-class FluxVM tenant id (optional). Prefer this over stuffing
     /// `tenant=` into labels when talking to schema-aware FluxVM builds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -224,6 +268,8 @@ pub enum VmStatus {
     Paused,
     Stopped,
     Failed,
+    /// Incoming QEMU migration receiver (not yet activated).
+    Receiving,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,6 +306,38 @@ pub struct VmRecord {
     /// handshake. Mirrors `fluxvm_core::model::VmRecord.guest_ip`.
     #[serde(default)]
     pub guest_ip: Option<String>,
+    #[serde(default)]
+    pub jail_path: Option<PathBuf>,
+    #[serde(default)]
+    pub vsock_socket: Option<PathBuf>,
+    #[serde(default)]
+    pub qga_socket: Option<PathBuf>,
+    #[serde(default)]
+    pub lvm_lv: Option<PathBuf>,
+    #[serde(default)]
+    pub nbd_pid: Option<u32>,
+    #[serde(default)]
+    pub virtiofsd_pids: Vec<u32>,
+    #[serde(default)]
+    pub dhcp_leasefile: Option<PathBuf>,
+}
+
+/// `POST /v1/migration/receivers` — arm a prepared-target QEMU incoming.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MigrationReceiverRequest {
+    pub spec: CreateVmRequest,
+    pub disk_path: PathBuf,
+    #[serde(default)]
+    pub receiver_ttl_seconds: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MigrationReceiverInfo {
+    pub id: Uuid,
+    pub status: VmStatus,
+    /// Local TCP port for `tcp:<host>:<port>` migration URI.
+    pub port: u16,
+    pub expires_at: DateTime<Utc>,
 }
 
 /// cgroup v2 resource-control settings to apply to a running VM. Mirrors
@@ -481,7 +559,25 @@ pub struct DataplaneStatus {
     pub schema_version: Option<u32>,
     pub schema_compatible: bool,
     pub policy_synced: bool,
+    #[serde(default)]
+    pub pod_ingress_required: bool,
+    #[serde(default)]
+    pub pod_ingress_attached: bool,
     pub policy: VmNetworkPolicy,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PodDirectionCounters {
+    pub allowed: u64,
+    pub dropped: u64,
+    pub audited: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PodPolicyStats {
+    pub egress: PodDirectionCounters,
+    pub ingress: PodDirectionCounters,
+    pub directional: bool,
 }
 
 /// Allow/drop counters from the attached eBPF program.
@@ -491,6 +587,8 @@ pub struct DataplaneStats {
     pub allowed_bytes: u64,
     pub dropped_packets: u64,
     pub dropped_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pod_policy: Option<PodPolicyStats>,
 }
 
 /// One sampled flow from the dataplane flow exporter.
@@ -512,6 +610,161 @@ pub struct FlowRecord {
 #[derive(Debug, Deserialize)]
 struct FlowListResponse {
     items: Vec<FlowRecord>,
+}
+
+/// Drop-reason histogram row from `GET …/network/drop-reasons`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DropReasonRecord {
+    pub identity: u32,
+    pub family: u8,
+    pub source: String,
+    pub destination: String,
+    pub source_port: u16,
+    pub destination_port: u16,
+    pub protocol: u8,
+    pub reason_code: u32,
+    pub reason: String,
+    pub action: String,
+    pub packets: u64,
+    pub bytes: u64,
+    pub last_seen_ns: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct DropReasonListResponse {
+    items: Vec<DropReasonRecord>,
+}
+
+/// Secure Containers / NetworkPolicy v2 pod edge policy.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PodPolicyProtocol {
+    Tcp,
+    Udp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PodPeerPortRule {
+    pub address: IpAddr,
+    pub protocol: PodPolicyProtocol,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PodPolicyRule {
+    pub direction: String,
+    pub cidr: String,
+    #[serde(default)]
+    pub protocol: String,
+    #[serde(default)]
+    pub port_start: u16,
+    #[serde(default)]
+    pub port_end: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct PodNetworkPolicy {
+    #[serde(default)]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub default_deny: bool,
+    #[serde(default)]
+    pub audit_mode: bool,
+    #[serde(default)]
+    pub allow_addresses: Vec<IpAddr>,
+    #[serde(default)]
+    pub deny_addresses: Vec<IpAddr>,
+    #[serde(default)]
+    pub allow_port_rules: Vec<PodPeerPortRule>,
+    #[serde(default)]
+    pub egress_isolated: bool,
+    #[serde(default)]
+    pub ingress_isolated: bool,
+    #[serde(default)]
+    pub rules: Vec<PodPolicyRule>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum DataplaneMigrationPhase {
+    Running,
+    Quiescing,
+    Restoring,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RawMapEntry {
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VmNetworkStateSnapshot {
+    pub schema_version: u32,
+    pub vm_id: Uuid,
+    pub identity: u32,
+    pub dataplane_schema_version: u32,
+    pub exported_at_unix_ms: u64,
+    #[serde(default)]
+    pub policy_fingerprint: Option<u64>,
+    pub conntrack: Vec<RawMapEntry>,
+    #[serde(default)]
+    pub flows: Vec<RawMapEntry>,
+    #[serde(default)]
+    pub drop_reasons: Vec<RawMapEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MigrationStateStatus {
+    pub vm_id: Uuid,
+    pub identity: u32,
+    pub phase: DataplaneMigrationPhase,
+    pub generation: u32,
+    #[serde(default)]
+    pub dataplane_schema_version: Option<u32>,
+    pub schema_compatible: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct QgaExecRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub powershell: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct QgaFirewallOpenRequest {
+    pub name: String,
+    pub port: u16,
+    #[serde(default = "default_tcp")]
+    pub protocol: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct QgaFirewallCloseRequest {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QgaExecResult {
+    pub exit_code: i64,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct OkResponse {
+    ok: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -693,6 +946,27 @@ pub struct DataplaneHealth {
     pub ok: bool,
     #[serde(default)]
     pub notes: Vec<String>,
+}
+
+/// Typed `GET /readyz` body (optional fields may be absent).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReadyzResponse {
+    pub ok: bool,
+    #[serde(default)]
+    pub kvm: Option<bool>,
+    #[serde(default)]
+    pub state_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub dataplane: Option<DataplaneHealth>,
+    #[serde(default)]
+    pub secure_containers: Option<SecureContainersStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SecureContainersStatus {
+    pub available: bool,
+    pub shim_installed: bool,
+    pub guest_image_present: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -946,6 +1220,12 @@ impl FluxVmClient {
         Self::parse(resp).await
     }
 
+    /// Typed `GET /readyz` (same path as [`Self::readyz`]).
+    pub async fn readyz_typed(&self) -> Result<ReadyzResponse> {
+        let resp = self.http.get(self.url("/readyz")?).send().await?;
+        Self::parse(resp).await
+    }
+
     /// `GET /readyz` boolean convenience for probes.
     pub async fn ready(&self) -> bool {
         match self.readyz().await {
@@ -996,6 +1276,55 @@ impl FluxVmClient {
             .authed(
                 self.http
                     .post(self.url(&format!("/v1/vms/{id}/migration/cancel"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/migration/receivers` — prepare an incoming QEMU target.
+    pub async fn create_migration_receiver(
+        &self,
+        req: &MigrationReceiverRequest,
+    ) -> Result<MigrationReceiverInfo> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/migration/receivers")?))
+            .json(req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/migration/receivers/{id}`
+    pub async fn get_migration_receiver(&self, id: Uuid) -> Result<MigrationReceiverInfo> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/migration/receivers/{id}"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `DELETE /v1/migration/receivers/{id}`
+    pub async fn abort_migration_receiver(&self, id: Uuid) -> Result<()> {
+        let resp = self
+            .authed(
+                self.http
+                    .delete(self.url(&format!("/v1/migration/receivers/{id}"))?),
+            )
+            .send()
+            .await?;
+        Self::expect_no_content(resp).await
+    }
+
+    /// `POST /v1/migration/receivers/{id}/activate`
+    pub async fn activate_migration_receiver(&self, id: Uuid) -> Result<VmRecord> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/migration/receivers/{id}/activate"))?),
             )
             .send()
             .await?;
@@ -1621,6 +1950,198 @@ impl FluxVmClient {
         Self::parse(resp).await
     }
 
+    /// `GET /v1/vms/{id}/network/drop-reasons?limit=`
+    pub async fn network_drop_reasons(
+        &self,
+        id: Uuid,
+        limit: Option<usize>,
+    ) -> Result<Vec<DropReasonRecord>> {
+        let mut url = self.url(&format!("/v1/vms/{id}/network/drop-reasons"))?;
+        if let Some(limit) = limit {
+            url.query_pairs_mut()
+                .append_pair("limit", &limit.to_string());
+        }
+        let resp = self.authed(self.http.get(url)).send().await?;
+        let body: DropReasonListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/vms/{id}/network/pod-policy` — may be JSON `null`.
+    pub async fn get_pod_network_policy(&self, id: Uuid) -> Result<Option<PodNetworkPolicy>> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/network/pod-policy"))?),
+            )
+            .send()
+            .await?;
+        let status = resp.status();
+        let bytes = resp
+            .bytes()
+            .await
+            .context("failed to read FluxVM response body")?;
+        if !status.is_success() {
+            let body = String::from_utf8_lossy(&bytes);
+            bail!("FluxVM request failed: {status} — {body}");
+        }
+        if bytes.as_ref() == b"null" || bytes.is_empty() {
+            return Ok(None);
+        }
+        serde_json::from_slice(&bytes)
+            .map(Some)
+            .with_context(|| format!("failed to parse FluxVM pod-policy ({status})"))
+    }
+
+    /// `POST /v1/vms/{id}/network/pod-policy`
+    pub async fn set_pod_network_policy(
+        &self,
+        id: Uuid,
+        policy: &PodNetworkPolicy,
+    ) -> Result<()> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/network/pod-policy"))?),
+            )
+            .json(policy)
+            .send()
+            .await?;
+        let _: OkResponse = Self::parse(resp).await?;
+        Ok(())
+    }
+
+    /// `DELETE /v1/vms/{id}/network/pod-policy`
+    pub async fn delete_pod_network_policy(&self, id: Uuid) -> Result<()> {
+        let resp = self
+            .authed(
+                self.http
+                    .delete(self.url(&format!("/v1/vms/{id}/network/pod-policy"))?),
+            )
+            .send()
+            .await?;
+        let _: OkResponse = Self::parse(resp).await?;
+        Ok(())
+    }
+
+    /// `GET /v1/vms/{id}/network/migration/state`
+    pub async fn network_migration_state(&self, id: Uuid) -> Result<MigrationStateStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/network/migration/state"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/network/migration/quiesce`
+    pub async fn network_migration_quiesce(&self, id: Uuid) -> Result<MigrationStateStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/network/migration/quiesce"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `GET /v1/vms/{id}/network/migration/export`
+    pub async fn network_migration_export(&self, id: Uuid) -> Result<VmNetworkStateSnapshot> {
+        let resp = self
+            .authed(
+                self.http
+                    .get(self.url(&format!("/v1/vms/{id}/network/migration/export"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/network/migration/restore`
+    pub async fn network_migration_restore(
+        &self,
+        id: Uuid,
+        snapshot: &VmNetworkStateSnapshot,
+    ) -> Result<MigrationStateStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/network/migration/restore"))?),
+            )
+            .json(snapshot)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/network/migration/resume`
+    pub async fn network_migration_resume(&self, id: Uuid) -> Result<MigrationStateStatus> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/network/migration/resume"))?),
+            )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/qga/ping`
+    pub async fn qga_ping(&self, id: Uuid) -> Result<()> {
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/qga/ping"))?))
+            .send()
+            .await?;
+        let _: OkResponse = Self::parse(resp).await?;
+        Ok(())
+    }
+
+    /// `POST /v1/vms/{id}/qga/exec`
+    pub async fn qga_exec(&self, id: Uuid, req: &QgaExecRequest) -> Result<QgaExecResult> {
+        let resp = self
+            .authed(self.http.post(self.url(&format!("/v1/vms/{id}/qga/exec"))?))
+            .json(req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/qga/firewall/open`
+    pub async fn qga_firewall_open(
+        &self,
+        id: Uuid,
+        req: &QgaFirewallOpenRequest,
+    ) -> Result<QgaExecResult> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/qga/firewall/open"))?),
+            )
+            .json(req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/qga/firewall/close`
+    pub async fn qga_firewall_close(
+        &self,
+        id: Uuid,
+        req: &QgaFirewallCloseRequest,
+    ) -> Result<QgaExecResult> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/qga/firewall/close"))?),
+            )
+            .json(req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
     /// `GET /v1/network/groups`
     pub async fn list_network_groups(&self) -> Result<Vec<SecurityGroup>> {
         let resp = self
@@ -2025,5 +2546,129 @@ mod runtime_boundary_contract_tests {
         }))
         .unwrap();
         assert_eq!(status.phase, MigrationPhase::PostcopyActive);
+    }
+
+    #[test]
+    fn decodes_dataplane_status_with_pod_ingress_fields() {
+        let status: DataplaneStatus = serde_json::from_value(serde_json::json!({
+            "mode": "ebpf",
+            "required": true,
+            "attached": true,
+            "interface": "tap0",
+            "identity": 7,
+            "pin_dir": "/sys/fs/bpf/fluxvm/vms/x",
+            "schema_version": 9,
+            "schema_compatible": true,
+            "policy_synced": true,
+            "pod_ingress_required": true,
+            "pod_ingress_attached": false,
+            "policy": {
+                "default_allow": false,
+                "allow_cidrs": [],
+                "allow_ports": []
+            }
+        }))
+        .unwrap();
+        assert!(status.pod_ingress_required);
+        assert!(!status.pod_ingress_attached);
+        assert_eq!(status.schema_version, Some(9));
+    }
+
+    #[test]
+    fn dataplane_status_pod_ingress_defaults_when_absent() {
+        let status: DataplaneStatus = serde_json::from_value(serde_json::json!({
+            "mode": "legacy",
+            "required": false,
+            "attached": false,
+            "interface": null,
+            "identity": 1,
+            "pin_dir": null,
+            "schema_version": null,
+            "schema_compatible": true,
+            "policy_synced": true,
+            "policy": {
+                "default_allow": true,
+                "allow_cidrs": [],
+                "allow_ports": []
+            }
+        }))
+        .unwrap();
+        assert!(!status.pod_ingress_required);
+        assert!(!status.pod_ingress_attached);
+    }
+
+    #[test]
+    fn decodes_dataplane_stats_with_pod_policy() {
+        let stats: DataplaneStats = serde_json::from_value(serde_json::json!({
+            "allowed_packets": 10,
+            "allowed_bytes": 100,
+            "dropped_packets": 1,
+            "dropped_bytes": 8,
+            "pod_policy": {
+                "egress": {"allowed": 4, "dropped": 1, "audited": 0},
+                "ingress": {"allowed": 6, "dropped": 0, "audited": 2},
+                "directional": true
+            }
+        }))
+        .unwrap();
+        let pp = stats.pod_policy.expect("pod_policy");
+        assert!(pp.directional);
+        assert_eq!(pp.egress.allowed, 4);
+        assert_eq!(pp.ingress.audited, 2);
+    }
+
+    #[test]
+    fn decodes_drop_reason_list() {
+        let list: DropReasonListResponse = serde_json::from_value(serde_json::json!({
+            "items": [{
+                "identity": 1,
+                "family": 4,
+                "source": "10.0.0.1",
+                "destination": "10.0.0.2",
+                "source_port": 1,
+                "destination_port": 80,
+                "protocol": 6,
+                "reason_code": 8,
+                "reason": "default-deny",
+                "action": "drop",
+                "packets": 2,
+                "bytes": 64,
+                "last_seen_ns": 9
+            }]
+        }))
+        .unwrap();
+        assert_eq!(list.items[0].reason, "default-deny");
+    }
+
+    #[test]
+    fn decodes_migration_receiver_info_not_vm_record() {
+        // Regression: GET /v1/migration/receivers/{id} returns MigrationReceiverInfo,
+        // not a full VmRecord.
+        let info: MigrationReceiverInfo = serde_json::from_value(serde_json::json!({
+            "id": "00000000-0000-0000-0000-000000000001",
+            "status": "receiving",
+            "port": 4444,
+            "expires_at": "2026-01-01T01:00:00Z"
+        }))
+        .unwrap();
+        assert_eq!(info.port, 4444);
+        assert_eq!(info.status, VmStatus::Receiving);
+    }
+
+    #[test]
+    fn decodes_readyz_secure_containers_nested() {
+        let rz: ReadyzResponse = serde_json::from_value(serde_json::json!({
+            "ok": true,
+            "kvm": true,
+            "secure_containers": {
+                "available": true,
+                "shim_installed": true,
+                "guest_image_present": false
+            }
+        }))
+        .unwrap();
+        let sc = rz.secure_containers.expect("secure_containers");
+        assert!(sc.available && sc.shim_installed);
+        assert!(!sc.guest_image_present);
     }
 }

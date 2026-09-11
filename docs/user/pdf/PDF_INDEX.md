@@ -1,6 +1,6 @@
 # Zyvor Fabric user PDFs
 
-Generated: 2026-09-01
+Generated: 2026-09-10
 
 Rebuild: `node scripts/user-docs/build-user-pdfs.mjs`
 

@@ -50,32 +50,40 @@ source runtime through typed endpoints. The legacy Fabric migration path that
 used iterative `rsync` and finally `machinectl start` is fail-closed for
 `live=true`; it must not be used with the FluxVM-only architecture.
 
-The new `migration::RuntimeMigrationManager` is deliberately a
-**prepared-target** API. Before calling `start_prepared_target`, Fabric must:
+The `migration::RuntimeMigrationManager` prepared-target API:
 
 1. select and reserve the target node;
 2. validate CPU/device/network compatibility;
 3. confirm shared storage or prepare identical target storage;
-4. create/arm the target FluxVM incoming receiver;
-5. select a protected migration network/URI;
-6. call source-side migration and monitor status;
-7. atomically update Fabric inventory after completion;
-8. roll back/fence on failure according to HA policy.
+4. create/arm the target FluxVM incoming receiver (`POST /v1/migration/receivers`);
+5. select a protected migration network/URI (`tcp:<host>:<port>` from the receiver);
+6. optionally quiesce/export VM-edge network state;
+7. call source-side migration and monitor status;
+8. activate the receiver, restore/resume network state, update Fabric inventory;
+9. roll back/fence on failure according to HA policy.
 
-Step 4 is the next FluxVM runtime contract revision. Until that receiver API
-lands and an end-to-end KVM-host test passes, Fabric must not market native
-live migration as GA.
+Step 4 is implemented in FluxVM and proxied by Fabric
+(`POST /api/vms/{name}/migration/native/prepare-receiver`,
+`POST /api/migration/receivers/{id}/activate`,
+`DELETE /api/migration/receivers/{id}`). Native live migration remains
+**preview** until an end-to-end KVM-host test passes; do not market it as GA
+without that gate.
 
-Fabric exposes the source-side contract on the control plane:
+Fabric exposes the control-plane contract:
 
 | Fabric API | Role |
 |---|---|
 | `GET /api/runtime/capabilities` | Proxy FluxVM runtime contract |
+| `POST /api/vms/{name}/migration/native/prepare-receiver` | Arm target incoming QEMU |
 | `POST /api/vms/{name}/migration/native/start` | Start prepared-target transport |
 | `GET /api/vms/{name}/migration/native/status` | Poll progress |
 | `POST /api/vms/{name}/migration/native/cancel` | Cancel in-flight transport |
+| `GET /api/vms/{name}/migration/native/network-state` | Dataplane migration phase |
+| `POST /api/migration/receivers/{id}/activate` | Promote receiver after cutover |
+| `DELETE /api/migration/receivers/{id}` | Abort unused receiver |
 
-CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`.
+CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`
+(`prepare-receiver`, `activate-receiver`, `abort-receiver`, `start`, `status`, `cancel`).
 
 ## Service Fabric fan-out (v6)
 
@@ -106,3 +114,23 @@ Examples: [examples/service-fabric-v3/](examples/service-fabric-v3/).
 `fluxvm-agent` stays useful as a lightweight standalone multi-host option. It
 is not the home for Fabric-class etcd HA, DRS, datacenters, fencing, site
 recovery, tenant placement or enterprise content-library semantics.
+
+## Optional FluxVM co-deploy (MicroVM / DisposableVm CRDs)
+
+Fabric's k8s-native path is its own operator CRDs (`VirtualMachine`,
+`ContainerGroup`) → Fabric REST → FluxVM `serve :7788`. FluxVM also ships
+standalone CRDs (`DisposableVm`, `MicroVM`) and `fluxvm-agent :7799` under
+`deploy/k8s/` in the FluxVM repo.
+
+**Do not copy those CRDs into the Fabric Helm chart** — that would create dual
+control planes. After installing the Fabric chart (which may already ship a
+FluxVM DaemonSet for `:7788`), operators who also want kubectl-driven
+ephemeral MicroVMs can optionally:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/zyvorai/fluxvm/main/deploy/k8s/crd.yaml
+# plus microvm CRDs / node-agent manifests as documented in FluxVM
+```
+
+Fabric multi-host placement continues to use `[[driver.fluxvm_nodes]]` + DRS,
+not `fluxvm-agent` central.

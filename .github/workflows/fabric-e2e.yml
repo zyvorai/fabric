@@ -1,4 +1,5 @@
-# Live API E2E: build zyvor-fabricd, stub FluxVM HTTP, run tests/e2e-api-test.sh.
+# Live API E2E: build zyvor-fabricd, stub FluxVM HTTP, run tests/e2e-api-test.sh
+# (includes scripts/ci-feat-catchup-stub.sh catch-up assertions).
 # Full QEMU/KVM FluxVM is skipped on ubuntu-latest (no /dev/kvm guarantee).
 name: Fabric E2E
 
@@ -49,52 +50,17 @@ jobs:
 
       - name: Start FluxVM HTTP stub
         run: |
-          python3 - <<'PY' &
-          from http.server import BaseHTTPRequestHandler, HTTPServer
-          class H(BaseHTTPRequestHandler):
-              def do_GET(self):
-                  # fluxvm-client's find_by_name/list_vms deserialize this
-                  # as VmListResponse { items: [...] } -- the old generic
-                  # {"status":"ok"} body doesn't match that shape, so it
-                  # fails to parse (not a clean 404), and that parse-error
-                  # message doesn't match routes.rs's soft_miss allowlist,
-                  # so *every* driver.delete() (which resolves name -> id
-                  # via this same GET first) 500s before it ever reaches
-                  # do_DELETE below. Empty items list = a clean "FluxVM
-                  # doesn't know this VM", which soft_miss does recognize.
-                  if self.path.startswith("/v1/vms"):
-                      body = b'{"items":[]}'
-                  else:
-                      body = b'{"status":"ok","version":"stub"}'
-                  self.send_response(200)
-                  self.send_header("Content-Type", "application/json")
-                  self.send_header("Content-Length", str(len(body)))
-                  self.end_headers()
-                  self.wfile.write(body)
-              def do_POST(self):
-                  length = int(self.headers.get("Content-Length", 0))
-                  _ = self.rfile.read(length) if length else b""
-                  body = b'{"status":"ok"}'
-                  self.send_response(200)
-                  self.send_header("Content-Type", "application/json")
-                  self.send_header("Content-Length", str(len(body)))
-                  self.end_headers()
-                  self.wfile.write(body)
-              def do_DELETE(self):
-                  # BaseHTTPRequestHandler has no default DELETE handler --
-                  # without this, zyvor-fabricd's DELETE /api/vms/:name
-                  # sees a 501 from this stub, which its soft_miss allowlist
-                  # (routes.rs) doesn't recognize, so every VM-delete e2e
-                  # check fails even though the daemon side is fine.
-                  self.send_response(204)
-                  self.end_headers()
-              def log_message(self, *args):
-                  pass
-          HTTPServer(("127.0.0.1", 7788), H).serve_forever()
-          PY
+          python3 tests/fixtures/fluxvm-stub.py &
           echo $! > /tmp/fluxvm-stub.pid
-          sleep 1
-          curl -sf http://127.0.0.1:7788/ || true
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:7788/readyz >/dev/null; then
+              echo "fluxvm-stub ready"
+              exit 0
+            fi
+            sleep 0.25
+          done
+          echo "fluxvm-stub failed to start"
+          exit 1
 
       - name: Prepare data dirs and config
         run: |
@@ -121,6 +87,7 @@ jobs:
 
           [driver]
           fluxvm_url = "http://127.0.0.1:7788"
+          # agent_runtime intentionally unset — e2e asserts /api/agents → 503
           EOF
 
       - name: Start zyvor-fabricd
@@ -132,8 +99,8 @@ jobs:
           # path first (get_disk_path) and only falls back to guessing a
           # path by naming convention (validation::find_vm_image, one of
           # its own hardcoded IMAGE_ALLOWED_PREFIXES) if that fails -- which
-          # it always does against this stateless stub, since nothing was
-          # ever really created on the FluxVM side. Pre-seed the fallback's
+          # it always does against this stub when the VM was never really
+          # created on the FluxVM side. Pre-seed the fallback's
           # naming-convention path so the e2e clone test has something real
           # to find.
           mkdir -p /var/lib/zyvor-fabricd/images
@@ -153,13 +120,13 @@ jobs:
           cat /tmp/fabricd-e2e.log || true
           exit 1
 
-      - name: Run E2E API suite
+      - name: Run E2E API suite (includes catch-up)
         env:
           BASE_URL: http://127.0.0.1:9095
           ADMIN_USER: admin
           ADMIN_PASSWORD: e2e-ci-only-not-a-secret
         run: |
-          chmod +x tests/e2e-api-test.sh
+          chmod +x tests/e2e-api-test.sh scripts/ci-feat-catchup-stub.sh
           ./tests/e2e-api-test.sh
 
       - name: Upload logs on failure

@@ -17,12 +17,9 @@
 //! FluxVM's console WebSocket, itself backed by the vsock guest agent's
 //! `OpenShell` op.
 //!
-//! **Known gap as of FluxVM v0.1.0**: `fluxvm-client`'s wire types are a
-//! hand-synced mirror of `fluxvm-core::model` (see that crate's own doc
-//! comment for why), and haven't yet picked up several fields/capabilities
-//! FluxVM has since grown — `CreateVmRequest.storage` (LVM thin/NBD/Ceph
-//! RBD backends) and `VmRecord`'s `jail_path`/`vsock_socket`/`lvm_lv`/
-//! `nbd_pid` fields. Bridged VMs already use `NetworkSpec::Tap { netns:
+//! **Wire sync:** `fluxvm-client` mirrors FluxVM 0.4.x models (storage backends,
+//! jailer/vsock/QGA fields, migration receivers, network-migration state,
+//! pod-policy, drop-reasons). Bridged VMs use `NetworkSpec::Tap { netns:
 //! true }`, and Network Fabric schema v4 (`VmDataplaneDriver`) proxies FluxVM's
 //! `/v1/vms/{id}/network/*` and `/v1/network/{groups,cnp,…}` when FluxVM runs with
 //! `[sandbox.dataplane] mode = "ebpf"`. Also orthogonal to this driver:
@@ -89,7 +86,7 @@ impl CapabilityProvider for FluxVmDriver {
     }
 
     fn has_vm_dataplane(&self) -> bool {
-        // Proxies FluxVM Network Fabric v3; effective when FluxVM runs with
+        // Proxies FluxVM Network Fabric schema v4; effective when FluxVM runs with
         // `[sandbox.dataplane] mode = "ebpf"` (or `cilium`).
         true
     }

@@ -73,6 +73,13 @@ pub struct VM {
     /// `write_files`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cloud_init_write_files: Vec<CloudInitFile>,
+    /// FluxVM storage backend: `default` | `lvm-thin` | `nbd` | `ceph-rbd`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<String>,
+    #[serde(default)]
+    pub enable_qga: bool,
+    #[serde(default)]
+    pub hyperv: bool,
 }
 
 /// A file to write into the guest before first boot via cloud-init.
@@ -120,6 +127,14 @@ pub struct CreateVMRequest {
     pub network_tap: bool,
     #[serde(default)]
     pub network_static_ip: bool,
+    /// FluxVM storage backend: `default` | `lvm-thin` | `nbd` | `ceph-rbd`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<String>,
+    /// Enable QEMU Guest Agent at create (Windows Kryton).
+    #[serde(default)]
+    pub enable_qga: bool,
+    #[serde(default)]
+    pub hyperv: bool,
 }
 
 fn default_disk_size() -> u64 {
@@ -439,6 +454,24 @@ pub struct VMStartOptions {
     // -- Extra kernel command line arguments --
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extra_args: Vec<String>,
+
+    /// FluxVM pluggable storage backend: `default`, `lvm-thin`, `nbd`, `ceph-rbd`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<String>,
+    /// Enable QEMU Guest Agent channel at create time (Windows Kryton path).
+    #[serde(default)]
+    pub enable_qga: bool,
+    /// Expose Hyper-V enlightenments to the guest (Windows).
+    #[serde(default)]
+    pub hyperv: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numa_node: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpuset: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hugepages: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vfio_devices: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -919,6 +952,9 @@ impl VM {
             cloud_init_packages: Vec::new(),
             cloud_init_runcmd: Vec::new(),
             cloud_init_write_files: Vec::new(),
+            storage: None,
+            enable_qga: false,
+            hyperv: false,
         }
     }
 
@@ -953,6 +989,9 @@ impl VM {
             cloud_init_packages: Vec::new(),
             cloud_init_runcmd: Vec::new(),
             cloud_init_write_files: Vec::new(),
+            storage: req.storage.clone(),
+            enable_qga: req.enable_qga,
+            hyperv: req.hyperv,
         }
     }
 }
@@ -996,6 +1035,9 @@ mod tests {
             port_forwards: Vec::new(),
             network_tap: false,
             network_static_ip: false,
+            storage: None,
+            enable_qga: false,
+            hyperv: false,
         };
         let vm = VM::from_request(&req);
         assert_eq!(vm.name, "web-01");

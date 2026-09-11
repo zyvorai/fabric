@@ -444,6 +444,16 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::vm_dataplane::dataplane_effective),
         )
         .route(
+            "/vms/{name}/dataplane/drop-reasons",
+            get(api::vm_dataplane::dataplane_drop_reasons),
+        )
+        .route(
+            "/vms/{name}/dataplane/pod-policy",
+            get(api::vm_dataplane::get_pod_policy)
+                .post(api::vm_dataplane::set_pod_policy)
+                .delete(api::vm_dataplane::delete_pod_policy),
+        )
+        .route(
             "/dataplane/groups",
             get(api::vm_dataplane::list_groups).post(api::vm_dataplane::upsert_group),
         )
@@ -947,6 +957,32 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/vms/{name}/migration/native/cancel",
             post(api::migration::cancel_native_migration),
         )
+        .route(
+            "/vms/{name}/migration/native/prepare-receiver",
+            post(api::migration::prepare_native_receiver),
+        )
+        .route(
+            "/vms/{name}/migration/native/network-state",
+            get(api::migration::native_network_migration_state),
+        )
+        .route(
+            "/migration/receivers/{id}/activate",
+            post(api::migration::activate_native_receiver),
+        )
+        .route(
+            "/migration/receivers/{id}",
+            axum::routing::delete(api::migration::abort_native_receiver),
+        )
+        .route("/vms/{name}/qga/ping", post(api::qga::qga_ping))
+        .route("/vms/{name}/qga/exec", post(api::qga::qga_exec))
+        .route(
+            "/vms/{name}/qga/firewall/open",
+            post(api::qga::qga_firewall_open),
+        )
+        .route(
+            "/vms/{name}/qga/firewall/close",
+            post(api::qga::qga_firewall_close),
+        )
         .route("/images/upload", post(api::ux_extensions::upload_image))
         .route("/images/convert", post(api::ux_extensions::start_convert))
         .route(
@@ -1110,12 +1146,38 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::container_declarative::export_container_group_spec),
         )
         .route(
+            "/container-groups/{name}/status",
+            get(api::container_declarative::get_container_group_status),
+        )
+        .route(
             "/container-groups/{name}",
             delete(api::container_declarative::delete_container_group),
         )
         .route(
             "/container-group-events",
             get(api::container_declarative::list_container_group_events),
+        )
+        // Agent-runtime proxy (sibling zyvor-fabric-agent-runtime)
+        .route(
+            "/agents",
+            get(api::agent_runtime::list_agents).post(api::agent_runtime::deploy_agent),
+        )
+        .route("/agents/{name}", get(api::agent_runtime::get_agent))
+        .route(
+            "/sessions",
+            get(api::agent_runtime::list_sessions).post(api::agent_runtime::create_session),
+        )
+        .route(
+            "/sessions/{id}",
+            get(api::agent_runtime::get_session).delete(api::agent_runtime::delete_session),
+        )
+        .route(
+            "/sessions/{id}/events",
+            get(api::agent_runtime::session_events),
+        )
+        .route(
+            "/sessions/{id}/{action}",
+            post(api::agent_runtime::session_action),
         )
         // ContainerGroup volume backup/restore
         .route(

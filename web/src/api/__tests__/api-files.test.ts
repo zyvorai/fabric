@@ -575,6 +575,12 @@ describe('containerGroups', () => {
     })
   })
 
+  it('getContainerGroupStatus calls apiGet with encoded name', async () => {
+    const { getContainerGroupStatus } = await import('../containerGroups')
+    await getContainerGroupStatus('web app')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/container-groups/web%20app/status')
+  })
+
   it('deleteContainerGroupBackup calls apiDelete with the encoded id', async () => {
     const { deleteContainerGroupBackup } = await import('../containerGroups')
     await deleteContainerGroupBackup('backup-1')
@@ -2423,5 +2429,49 @@ describe('system', () => {
     const { optimizeVM } = await import('../system')
     await optimizeVM('vm1')
     expect(mockApiPost).toHaveBeenCalledWith('/api/vms/vm1/optimize')
+  })
+})
+
+// ─── agents.ts (catch-up) ─────────────────────────────────────────────────────
+
+describe('agents', () => {
+  it('listAgents calls apiGet', async () => {
+    const { listAgents } = await import('../agents')
+    await listAgents()
+    expect(mockApiGet).toHaveBeenCalledWith('/api/agents')
+  })
+
+  it('listSessions calls apiGet', async () => {
+    const { listSessions } = await import('../agents')
+    await listSessions()
+    expect(mockApiGet).toHaveBeenCalledWith('/api/sessions')
+  })
+
+  it('sessionAction posts to the action path', async () => {
+    const { sessionAction } = await import('../agents')
+    await sessionAction('sess-1', 'cancel')
+    expect(mockApiPost).toHaveBeenCalledWith('/api/sessions/sess-1/cancel', {})
+  })
+})
+
+// ─── dataplane.ts (catch-up) ──────────────────────────────────────────────────
+
+describe('dataplane catch-up paths', () => {
+  it('getDataplaneStatus calls apiGet', async () => {
+    const { getDataplaneStatus } = await import('../dataplane')
+    await getDataplaneStatus('vm 1')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/vms/vm%201/dataplane/status')
+  })
+
+  it('getDataplaneStats calls apiGet', async () => {
+    const { getDataplaneStats } = await import('../dataplane')
+    await getDataplaneStats('vm1')
+    expect(mockApiGet).toHaveBeenCalledWith('/api/vms/vm1/dataplane/stats')
+  })
+
+  it('getDataplaneDropReasons calls apiGet with limit', async () => {
+    const { getDataplaneDropReasons } = await import('../dataplane')
+    await getDataplaneDropReasons('vm1', 50)
+    expect(mockApiGet).toHaveBeenCalledWith('/api/vms/vm1/dataplane/drop-reasons?limit=50')
   })
 })

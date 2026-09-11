@@ -15,10 +15,12 @@ import {
   DataplaneStats,
   DataplaneStatus,
   FlowRecord,
+  DropReasonRecord,
   VmNetworkPolicy,
   emptyPolicy,
   getDataplaneEffective,
   getDataplaneFlows,
+  getDataplaneDropReasons,
   getDataplanePolicy,
   getDataplaneStats,
   getDataplaneStatus,
@@ -37,7 +39,7 @@ import CiliumFlowControls from '../../components/CiliumFlowControls'
 import { fromRawFlow } from '../../lib/packetflow'
 import { templatePolicy, type ControlAction } from '../../lib/policyControls'
 
-type PanelTab = 'status' | 'policy' | 'effective' | 'stats' | 'flows'
+type PanelTab = 'status' | 'policy' | 'effective' | 'stats' | 'flows' | 'drops'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -57,6 +59,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
   const [status, setStatus] = useState<DataplaneStatus | null>(null)
   const [stats, setStats] = useState<DataplaneStats | null>(null)
   const [flows, setFlows] = useState<FlowRecord[]>([])
+  const [drops, setDrops] = useState<DropReasonRecord[]>([])
   const [policy, setPolicy] = useState<VmNetworkPolicy>(emptyPolicy())
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -78,16 +81,20 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [st, pol, stStats, fl, eff] = await Promise.all([
+      const [st, pol, stStats, fl, dr, eff] = await Promise.all([
         getDataplaneStatus(vmName),
         getDataplanePolicy(vmName).catch(() => null),
         getDataplaneStats(vmName).catch(() => null),
         getDataplaneFlows(vmName, flowLimit).catch(() => ({ items: [] as FlowRecord[] })),
+        getDataplaneDropReasons(vmName, flowLimit).catch(() => ({
+          items: [] as DropReasonRecord[],
+        })),
         getDataplaneEffective(vmName).catch(() => null),
       ])
       setStatus(st)
       setStats(stStats)
       setFlows(fl.items)
+      setDrops(dr.items)
       setEffective(eff)
       if (!dirty) {
         const p = { ...emptyPolicy(), ...(pol ?? st.policy ?? {}) }
@@ -273,6 +280,7 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
     { id: 'effective', label: 'Effective' },
     { id: 'stats', label: 'Stats' },
     { id: 'flows', label: 'Flows' },
+    { id: 'drops', label: 'Drops' },
   ]
 
   const dropRate = useMemo(() => {
@@ -387,6 +395,17 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                 schema incompatible
               </span>
             )}
+            {status.pod_ingress_required && (
+              <span
+                className={`text-xs px-2 py-1 rounded-full border ${
+                  status.pod_ingress_attached
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}
+              >
+                pod ingress {status.pod_ingress_attached ? 'attached' : 'required'}
+              </span>
+            )}
           </div>
           <div className="bg-white rounded-xl border border-[#d2d2d7] p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <Stat label="Attached" value={status.attached ? 'yes' : 'no'} />
@@ -397,6 +416,14 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
             <Stat label="Required" value={status.required ? 'yes' : 'no'} />
             <Stat label="Interface" value={status.interface ?? '—'} />
             <Stat label="Identity" value={String(status.identity)} />
+            <Stat
+              label="Pod ingress required"
+              value={status.pod_ingress_required ? 'yes' : 'no'}
+            />
+            <Stat
+              label="Pod ingress attached"
+              value={status.pod_ingress_attached ? 'yes' : 'no'}
+            />
             <Stat label="Pin dir" value={status.pin_dir ?? '—'} mono />
           </div>
           {!status.attached && status.mode === 'legacy' && (
@@ -762,6 +789,42 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                 <Stat label="Dropped bytes" value={formatBytes(stats.dropped_bytes)} />
                 <Stat label="Drop rate" value={dropRate ?? '—'} />
               </div>
+              {stats.pod_policy && (
+                <div className="space-y-2">
+                  <p className="text-sm text-[#6e6e73]">
+                    Pod policy counters
+                    {stats.pod_policy.directional
+                      ? ' (per-direction from Set 17 rule telemetry)'
+                      : ' (shared Set 14/15 map mirrored to both directions)'}
+                  </p>
+                  <div className="bg-white rounded-xl border border-[#d2d2d7] p-4 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                    <Stat
+                      label="Egress allowed"
+                      value={stats.pod_policy.egress.allowed.toLocaleString()}
+                    />
+                    <Stat
+                      label="Egress dropped"
+                      value={stats.pod_policy.egress.dropped.toLocaleString()}
+                    />
+                    <Stat
+                      label="Egress audited"
+                      value={stats.pod_policy.egress.audited.toLocaleString()}
+                    />
+                    <Stat
+                      label="Ingress allowed"
+                      value={stats.pod_policy.ingress.allowed.toLocaleString()}
+                    />
+                    <Stat
+                      label="Ingress dropped"
+                      value={stats.pod_policy.ingress.dropped.toLocaleString()}
+                    />
+                    <Stat
+                      label="Ingress audited"
+                      value={stats.pod_policy.ingress.audited.toLocaleString()}
+                    />
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => void load()}
@@ -828,6 +891,57 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
                   : undefined
               }
             />
+          )}
+        </div>
+      )}
+
+      {tab === 'drops' && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-[#d2d2d7] bg-white"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Reload drops
+            </button>
+            <p className="text-xs text-[#6e6e73] pb-2">
+              {drops.length} drop reason{drops.length === 1 ? '' : 's'}
+            </p>
+          </div>
+          {drops.length === 0 ? (
+            <div className="bg-white rounded-xl border border-[#d2d2d7] p-6 text-center text-sm text-[#6e6e73]">
+              No drop-reason samples yet.
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-[#d2d2d7] overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[#f5f5f7] text-left text-xs text-[#6e6e73]">
+                  <tr>
+                    <th className="px-3 py-2">Reason</th>
+                    <th className="px-3 py-2">Src</th>
+                    <th className="px-3 py-2">Dst</th>
+                    <th className="px-3 py-2">Pkts</th>
+                    <th className="px-3 py-2">Bytes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drops.map((d, i) => (
+                    <tr key={i} className="border-t border-[#e8e8ed]">
+                      <td className="px-3 py-2 font-mono text-xs">{d.reason}</td>
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {d.source}:{d.source_port}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {d.destination}:{d.destination_port}
+                      </td>
+                      <td className="px-3 py-2">{d.packets.toLocaleString()}</td>
+                      <td className="px-3 py-2">{d.bytes.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

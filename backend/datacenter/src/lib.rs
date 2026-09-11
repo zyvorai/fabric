@@ -100,6 +100,18 @@ pub struct HostInfo {
     /// `ContainerGroup` placement. Reported by the host agent on heartbeat.
     #[serde(default)]
     pub secure_containers_ready: bool,
+    /// Nested FluxVM `/readyz.secure_containers` fields when the agent
+    /// probes the local daemon. Kept optional for older agents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secure_containers: Option<SecureContainersDetail>,
+}
+
+/// Nested Secure Containers readiness from FluxVM `/readyz`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SecureContainersDetail {
+    pub available: bool,
+    pub shim_installed: bool,
+    pub guest_image_present: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,6 +137,8 @@ pub struct HostHeartbeat {
     pub uptime_secs: u64,
     #[serde(default)]
     pub secure_containers_ready: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secure_containers: Option<SecureContainersDetail>,
 }
 
 // ---------------------------------------------------------------------------
@@ -513,6 +527,7 @@ impl DatacenterManager {
             created_at: now,
             updated_at: now,
             secure_containers_ready: req.secure_containers_ready,
+            secure_containers: None,
         };
 
         cluster.hosts.push(host.id.clone());
@@ -617,6 +632,12 @@ impl DatacenterManager {
         host.cpu_usage_pct = metrics.cpu_usage_pct;
         host.memory_usage_pct = metrics.memory_usage_pct;
         host.vm_count = metrics.vm_count;
+        host.secure_containers_ready = metrics
+            .secure_containers
+            .as_ref()
+            .map(|d| d.available)
+            .unwrap_or(metrics.secure_containers_ready);
+        host.secure_containers = metrics.secure_containers.clone();
         host.last_heartbeat = Utc::now();
         host.updated_at = host.last_heartbeat;
 
@@ -916,6 +937,7 @@ mod tests {
                 vm_count: 12,
                 uptime_secs: 86400,
                 secure_containers_ready: false,
+                secure_containers: None,
             },
         )
         .unwrap();
@@ -925,6 +947,34 @@ mod tests {
         assert!((updated.memory_usage_pct - 71.3).abs() < f64::EPSILON);
         assert_eq!(updated.vm_count, 12);
         assert!(updated.last_heartbeat > host.last_heartbeat);
+    }
+
+    #[test]
+    fn test_host_heartbeat_persists_secure_containers() {
+        let (mgr, _dc, _cluster, host) = setup_with_host();
+
+        mgr.update_host_heartbeat(
+            &host.id,
+            HostHeartbeat {
+                cpu_usage_pct: 10.0,
+                memory_usage_pct: 20.0,
+                vm_count: 1,
+                uptime_secs: 100,
+                secure_containers_ready: false,
+                secure_containers: Some(SecureContainersDetail {
+                    available: true,
+                    shim_installed: true,
+                    guest_image_present: true,
+                }),
+            },
+        )
+        .unwrap();
+
+        let updated = mgr.get_host(&host.id).unwrap().unwrap();
+        assert!(updated.secure_containers_ready);
+        let sc = updated.secure_containers.expect("nested secure_containers");
+        assert!(sc.shim_installed);
+        assert!(sc.guest_image_present);
     }
 
     #[test]
@@ -954,6 +1004,7 @@ mod tests {
                 vm_count: 5,
                 uptime_secs: 3600,
                 secure_containers_ready: false,
+                secure_containers: None,
             },
         )
         .unwrap();
@@ -1048,6 +1099,7 @@ mod tests {
                     vm_count: 0,
                     uptime_secs: 0,
                     secure_containers_ready: false,
+                    secure_containers: None,
                 }
             )
             .is_err());

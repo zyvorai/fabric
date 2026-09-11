@@ -349,6 +349,9 @@ pub async fn apply_vm_spec(
             port_forwards: Vec::new(),
             network_tap: false,
             network_static_ip: false,
+            storage: None,
+            enable_qga: false,
+            hyperv: false,
         };
 
         let vm = vm_model::VM::from_request(&req);

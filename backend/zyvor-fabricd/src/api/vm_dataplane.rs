@@ -306,6 +306,92 @@ pub async fn dataplane_effective(
     Ok(Json(body))
 }
 
+/// GET /api/vms/:name/dataplane/drop-reasons?limit=
+pub async fn dataplane_drop_reasons(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Query(q): Query<FlowsQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    let items = state
+        .driver
+        .dataplane_drop_reasons(&name, q.limit)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Dataplane drop-reasons for VM '{name}'"),
+                e,
+            )
+        })?;
+    Ok(Json(serde_json::json!({ "items": items })))
+}
+
+/// GET /api/vms/:name/dataplane/pod-policy
+pub async fn get_pod_policy(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    let policy = state
+        .driver
+        .get_pod_network_policy(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Pod policy for VM '{name}'"),
+                e,
+            )
+        })?;
+    Ok(Json(policy.unwrap_or(serde_json::Value::Null)))
+}
+
+/// POST /api/vms/:name/dataplane/pod-policy
+pub async fn set_pod_policy(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(policy): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    state
+        .driver
+        .set_pod_network_policy(&name, &policy)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::BAD_REQUEST,
+                &format!("Set pod policy for VM '{name}'"),
+                e,
+            )
+        })?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// DELETE /api/vms/:name/dataplane/pod-policy
+pub async fn delete_pod_policy(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_vm_name(&name).map_err(|(s, m)| crate::api_error::json_error(s, m))?;
+    state
+        .driver
+        .delete_pod_network_policy(&name)
+        .await
+        .map_err(|e| {
+            map_driver_err(
+                StatusCode::NOT_FOUND,
+                &format!("Delete pod policy for VM '{name}'"),
+                e,
+            )
+        })?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
 /// GET /api/dataplane/groups
 pub async fn list_groups(
     RequireRead(_claims): RequireRead,

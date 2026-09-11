@@ -11,6 +11,9 @@ This page covers what's wired up today, what isn't yet, and how to configure it.
 fluxvm_url = "http://127.0.0.1:7788"   # FluxVM's REST API base URL
 # fluxvm_token = "..."                  # only if FluxVM has auth.tokens configured
 # microvm_metrics_url = "http://127.0.0.1:9108/metrics"
+# [[driver.fluxvm_nodes]]               # extra nodes for Service Fabric + migration receivers
+# name = "node-b"
+# url = "http://10.0.0.2:7788"
 ```
 
 See [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` itself.
@@ -41,6 +44,27 @@ and [production tutorials](https://github.com/zyvorai/fluxvm/blob/main/docs/tuto
 
 The FluxVM image must include the BPF `.o` files; the DaemonSet/compose also mounts host `/sys/fs/bpf` and raises memlock (`SYS_RESOURCE` / `ulimit memlock=-1`).
 
+## Wired vs missing (FluxVM 0.4.x catch-up)
+
+| Area | Fabric status |
+| --- | --- |
+| VM lifecycle, agent shell/console/files, resources, freeze/thaw | Wired |
+| Guest **pause/resume** (`/api/vms/{name}/pause\|resume`) | Wired → FluxVM pause/resume |
+| Image catalog + warm pools | Wired |
+| Network Fabric schema v4 (policy/status/stats/flows/effective/groups/CNP/…) | Wired |
+| Drop-reasons + pod-policy proxies | Wired |
+| Service Fabric Maglev + remote ipcache fan-out | Wired |
+| CEP endpoints + MicroVM metrics + Hubble flows proxy | Wired |
+| Runtime capabilities + source-side native migration | Wired |
+| Migration **receivers** + network migration state | Wired (client + prepare/activate/abort APIs) |
+| Storage backends (`default`/`lvm-thin`/`nbd`/`ceph-rbd`) + jailer fields on wire | Wired through create |
+| QGA (Windows Kryton) | Wired (`/api/vms/{name}/qga/*`) |
+| Secure Containers placement (`ContainerGroup` + `/readyz.secure_containers`) | Wired (placement + host nested readiness UX) |
+| Pod-ingress hooks on `DataplaneStatus` | Wired (`pod_ingress_required` / `pod_ingress_attached`) |
+| Per-direction Pod-policy counters on REST | Wired (`DataplaneStats.pod_policy` via `ppstat`/`prhit`) |
+| Agent-sandbox product UI | Wired via **agent-runtime** (`/api/agents`, `/api/sessions` + web Agents/Sessions). FLUXKVM1 snapshot engine stays FluxVM lab-only |
+| `fluxvm-kube` MicroVM CRDs / `fluxvm-agent` fleet | FluxVM co-deploy only — not absorbed into Fabric charts (see boundary doc) |
+
 ## What's wired today
 
 The `fluxvm-driver`/`fluxvm-client` crates (`backend/crates/`) implement `driver-core`'s trait family against FluxVM's REST API. Every VM this driver creates requests FluxVM's vsock guest agent (`CreateVmRequest.agent.enabled: true`) by default, so shell exec, console, and file copy below work without any extra opt-in — FluxVM bakes in the agent and its auth token at create time, transparent to the caller.
@@ -64,7 +88,11 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | SSH info | — | Resolves the VM's MAC (pinned at create time) to an IP via zyvor-fabricd's own DHCP lease file — no vsock/FluxVM call at all. `key_path` is always `null`; key management is the operator's own responsibility (e.g. cloud-init) |
 | Bind-mount replacement (virtiofs) | `VMStartOptions.bind_mounts` (create-time only) | `CreateVmRequest.shared_folders` — one `virtiofsd` per share, auto-mounted in-guest via a generated cloud-init `/etc/fstab` entry |
 | Image catalog CRUD, incl. read-only flag + orphaned-download cleanup | `ImageDriver` | `/v1/images/catalog` add/remove/rename/clone/export/read-only/clean |
-| **Network Fabric schema v4 (VM edge dataplane)** | `VmDataplaneDriver` | `/v1/vms/{id}/network/{policy,status,stats,flows,effective}` + `/v1/network/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` — proxied as Fabric `/api/vms/{name}/dataplane/*` and `/api/dataplane/*` |
+| Pluggable storage + QGA enable | create path | `CreateVmRequest.storage` / `qga` / jailer fields on `VmRecord` |
+| Native migration receivers | — | `/v1/migration/receivers` (+ activate); Fabric `…/migration/native/prepare-receiver` |
+| Network migration state | — | `/v1/vms/{id}/network/migration/{state,quiesce,export,restore,resume}` |
+| QGA | — | `/v1/vms/{id}/qga/{ping,exec,firewall/*}` via Fabric `/api/vms/{name}/qga/*` |
+| **Network Fabric schema v4 (VM edge dataplane)** | `VmDataplaneDriver` | `/v1/vms/{id}/network/{policy,status,stats,flows,effective,drop-reasons,pod-policy}` + `/v1/network/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` — proxied as Fabric `/api/vms/{name}/dataplane/*` and `/api/dataplane/*` |
 | **Service Fabric v6 (BPF schema 4 — Maglev VIP LB)** | `service-lb` + FluxVM services API | `/v1/network/services…` — proxied as `/api/dataplane/services…` (status/health/ads/GC/flows/delta/policy); see [ebpf-service-fabric.md](../../ebpf-service-fabric.md) |
 
 ### Fabric API and CLI for the dataplane
@@ -76,6 +104,8 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | `GET /api/vms/{name}/dataplane/effective` | `…/network/effective` |
 | `GET /api/vms/{name}/dataplane/stats` | `…/network/stats` |
 | `GET /api/vms/{name}/dataplane/flows?limit=` | `…/network/flows` |
+| `GET /api/vms/{name}/dataplane/drop-reasons` | `…/network/drop-reasons` |
+| `GET/POST/DELETE /api/vms/{name}/dataplane/pod-policy` | `…/network/pod-policy` |
 | `GET/POST/DELETE /api/dataplane/groups[/{name}]` | `/v1/network/groups…` |
 | `GET/POST/DELETE /api/dataplane/cnp[/{name}]` | `/v1/network/cnp…` |
 | `GET /api/dataplane/{identities,observe,health,ipcache}` | matching `/v1/network/…` |
@@ -108,26 +138,30 @@ Operator UX detail: [fluxvm-dataplane.md](fluxvm-dataplane.md) ·
 [Tutorial 09](../../tutorials/09-edge-dataplane.md).
 Log streaming's one fidelity reduction: raw serial console output has no journald-equivalent per-line priority/unit metadata, so every entry is stamped uniformly rather than carrying real per-line priority. Image catalog's `pull-tar`/`import-tar`/`export-tar` are permanently unsupported, not just for now — a tar rootfs isn't a bootable disk image for a real hardware VM, so building that would mean writing a full tar-to-bootable-image converter, a different project from wiring up an existing capability.
 
-## Known gaps (as of FluxVM v0.1.0)
+## Remaining gaps
 
-`fluxvm-client`'s wire types are a **hand-synced mirror** of `fluxvm-core::model` — integration is out-of-process (REST, not a Cargo dependency on FluxVM's own crates), a deliberate trade for not coupling this repo's build to FluxVM's crate versions. That means new FluxVM capabilities don't automatically show up here. As of FluxVM v0.1.0, this driver does **not** yet expose:
+`fluxvm-client`'s wire types are a **hand-synced mirror** of `fluxvm-core::model` — integration is out-of-process (REST, not a Cargo dependency on FluxVM's own crates), a deliberate trade for not coupling this repo's build to FluxVM's crate versions.
 
-- **Pluggable storage backends** — `CreateVmRequest.storage` (LVM thin snapshots, NBD-exported disks, Ceph RBD). Every VM created through this driver gets FluxVM's default qcow2 CoW overlay / raw reflink.
-- **Firecracker jailer / vsock-proxy bookkeeping** — `VmRecord.jail_path`, `vsock_socket`, plus `lvm_lv`/`nbd_pid` (the storage-backend cleanup fields above).
-- **Agent-sandbox / FLUXKVM1** — FluxVM's `/v1/sandboxes`, in-tree KVM
-  `FLUXKVM1` memory snapshots, AutoPause, L7 egress, and `/console` ops UI stay
-  on FluxVM's API / lab scripts (`bench-density.sh`, `test-kvm-snapshot-smoke.sh`).
-  Fabric Snapshot Manager remains QMP Disk/Full for classic VMs.
-- **CEP endpoints** — Fabric proxies `GET /api/dataplane/endpoints` (incl.
-  `identity_source`) and scrapes/proxies MicroVM histograms
-  (`/api/dataplane/microvm-metrics`, Prometheus job `fluxvm-microvm`).
+Still deferred / out of scope for Fabric:
 
-**Already wired (no longer gaps):** per-VM netns taps, and Network Fabric **schema v4** dataplane proxy (per-VM + groups/CNP/health/ipcache/refresh-dns) when FluxVM runs with `mode = "ebpf"`.
+- **Agent-sandbox / FLUXKVM1 product surface in fabricd** — FluxVM's `/v1/sandboxes`, in-tree KVM memory snapshots, AutoPause, L7 egress, and `/console` ops UI stay on FluxVM / [`agent-runtime`](../../../agent-runtime/). Fabric Snapshot Manager remains QMP Disk/Full for classic VMs.
+- **Native live migration GA marketing** — receivers are wired; GA still requires a green e2e KVM-host test (see [FLUXVM-FABRIC-BOUNDARY.md](../../FLUXVM-FABRIC-BOUNDARY.md)).
+- **Policy Observer `:9091`** — optional Prometheus scrape (see below); not a Fabric product UI.
+- **Not applicable to this driver** — FluxVM's `fluxvm-kube` Kubernetes `DisposableVm` CRD/operator, and its `fluxvm-agent` distributed fleet registry.
 
-**Not applicable to this driver at all** (separate ways to run FluxVM, not something a REST-client driver consumes): FluxVM's `fluxvm-kube` Kubernetes `DisposableVm` CRD/operator, and its `fluxvm-agent` distributed fleet registry for multi-host placement. Those are alternatives to embedding FluxVM behind Zyvor Fabric, not features this driver would wrap.
+### Policy Observer scrape (optional)
+
+FluxVM Secure Containers Set 15 ships a read-only Policy Observer on `:9091`. Add a Prometheus job when running Sentinel:
+
+```yaml
+- job_name: fluxvm-policy-observer
+  static_configs:
+    - targets: ["127.0.0.1:9091"]
+```
 
 ## See also
 
 - [FluxVM README](https://github.com/zyvorai/fluxvm#readme) — the full feature set, storage backends, agent-sandbox track, Kubernetes operator, and distributed node-agent.
 - [VM edge dataplane](fluxvm-dataplane.md) — SDN vs VM-edge, lab verify steps.
 - [Operations guide](../operations/README.md) — the driver in the broader operational context.
+- [Ownership boundary](../../FLUXVM-FABRIC-BOUNDARY.md)

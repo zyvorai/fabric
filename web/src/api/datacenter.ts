@@ -28,6 +28,12 @@ export interface Cluster {
   updated?: string
 }
 
+export interface SecureContainersDetail {
+  available: boolean
+  shim_installed: boolean
+  guest_image_present: boolean
+}
+
 export interface HostInfo {
   id: string
   hostname: string
@@ -44,6 +50,8 @@ export interface HostInfo {
   agent_version?: string
   created: string
   updated?: string
+  secure_containers_ready?: boolean
+  secure_containers?: SecureContainersDetail | null
 }
 
 export interface DatacenterSummary {

@@ -120,6 +120,15 @@ struct HeartbeatPayload {
     vm_count: u32,
     uptime_secs: u64,
     secure_containers_ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    secure_containers: Option<SecureContainersDetail>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SecureContainersDetail {
+    available: bool,
+    shim_installed: bool,
+    guest_image_present: bool,
 }
 
 /// Wrapper the controller uses when returning a list of pending commands.
@@ -248,22 +257,22 @@ impl Agent {
     /// than propagated -- a heartbeat must still go out even when FluxVM is
     /// temporarily unreachable, just reporting this host as not currently
     /// Secure-Containers-capable.
-    async fn secure_containers_ready(&self) -> bool {
+    async fn secure_containers_detail(&self) -> Option<SecureContainersDetail> {
         let url = format!("{}/readyz", self.fluxvm_url);
         let body = match self.http_client.get(&url).send().await {
             Ok(resp) => match resp.json::<serde_json::Value>().await {
                 Ok(body) => body,
                 Err(e) => {
                     tracing::debug!(error = %e, "failed to parse FluxVM /readyz response");
-                    return false;
+                    return None;
                 }
             },
             Err(e) => {
                 tracing::debug!(error = %e, "failed to reach FluxVM /readyz");
-                return false;
+                return None;
             }
         };
-        extract_secure_containers_available(&body)
+        Some(extract_secure_containers_detail(&body))
     }
 
     async fn send_heartbeat(&self) -> Result<()> {
@@ -272,7 +281,11 @@ impl Agent {
             self.controller_url, self.host_id
         );
         let metrics = self.collect_system_metrics().await;
-        let secure_containers_ready = self.secure_containers_ready().await;
+        let secure_containers = self.secure_containers_detail().await;
+        let secure_containers_ready = secure_containers
+            .as_ref()
+            .map(|d| d.available)
+            .unwrap_or(false);
 
         let payload = HeartbeatPayload {
             cpu_usage_pct: metrics.cpu_usage_pct,
@@ -280,6 +293,7 @@ impl Agent {
             vm_count: metrics.vm_count,
             uptime_secs: metrics.uptime_secs,
             secure_containers_ready,
+            secure_containers,
         };
 
         let resp = self
@@ -594,17 +608,26 @@ fn read_loadavg() -> Result<[f64; 3]> {
     ])
 }
 
-/// Pulls `secure_containers.available` out of a FluxVM `/readyz` response
-/// body (see `docs/contracts/fabric-fluxvm-readyz.json`). Missing/malformed
-/// shapes (an older FluxVM without this optional field, or an unexpected
-/// response) resolve to `false` rather than erroring -- "not currently
-/// known to be Secure-Containers-capable" is the safe default for
-/// placement to filter on.
-fn extract_secure_containers_available(body: &serde_json::Value) -> bool {
-    body.get("secure_containers")
-        .and_then(|v| v.get("available"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
+/// Pull nested Secure Containers readiness out of a FluxVM `/readyz`
+/// response. Missing/malformed shapes resolve to all-false rather than
+/// erroring — "not currently known to be Secure-Containers-capable" is the
+/// safe default for placement to filter on.
+fn extract_secure_containers_detail(body: &serde_json::Value) -> SecureContainersDetail {
+    let sc = body.get("secure_containers");
+    SecureContainersDetail {
+        available: sc
+            .and_then(|v| v.get("available"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        shim_installed: sc
+            .and_then(|v| v.get("shim_installed"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        guest_image_present: sc
+            .and_then(|v| v.get("guest_image_present"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -765,7 +788,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extract_secure_containers_available_reads_the_nested_flag() {
+    fn extract_secure_containers_detail_reads_nested_flags() {
         let body = serde_json::json!({
             "ok": true,
             "kvm": true,
@@ -775,11 +798,12 @@ mod tests {
                 "guest_image_present": true
             }
         });
-        assert!(extract_secure_containers_available(&body));
+        let d = extract_secure_containers_detail(&body);
+        assert!(d.available && d.shim_installed && d.guest_image_present);
     }
 
     #[test]
-    fn extract_secure_containers_available_is_false_when_not_available() {
+    fn extract_secure_containers_detail_is_false_when_not_available() {
         let body = serde_json::json!({
             "ok": true,
             "secure_containers": {
@@ -788,20 +812,24 @@ mod tests {
                 "guest_image_present": true
             }
         });
-        assert!(!extract_secure_containers_available(&body));
+        let d = extract_secure_containers_detail(&body);
+        assert!(!d.available);
+        assert!(!d.shim_installed);
+        assert!(d.guest_image_present);
     }
 
     #[test]
-    fn extract_secure_containers_available_defaults_to_false_when_the_field_is_absent() {
-        // Older FluxVM without the optional `secure_containers` field.
+    fn extract_secure_containers_detail_defaults_when_absent() {
         let body = serde_json::json!({"ok": true, "kvm": true});
-        assert!(!extract_secure_containers_available(&body));
+        let d = extract_secure_containers_detail(&body);
+        assert!(!d.available && !d.shim_installed && !d.guest_image_present);
     }
 
     #[test]
-    fn extract_secure_containers_available_defaults_to_false_on_malformed_shape() {
+    fn extract_secure_containers_detail_defaults_on_malformed_shape() {
         let body = serde_json::json!({"secure_containers": "not an object"});
-        assert!(!extract_secure_containers_available(&body));
+        let d = extract_secure_containers_detail(&body);
+        assert!(!d.available);
     }
 
     #[test]
@@ -812,16 +840,22 @@ mod tests {
             vm_count: 3,
             uptime_secs: 86400,
             secure_containers_ready: true,
+            secure_containers: Some(SecureContainersDetail {
+                available: true,
+                shim_installed: true,
+                guest_image_present: false,
+            }),
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
         // Regression guard: this used to be `{"timestamp": ..., "metrics": {...}}`,
         // a shape the controller's `HostHeartbeat` extractor rejects outright.
-        assert_eq!(obj.len(), 5);
+        assert_eq!(obj.len(), 6);
         assert_eq!(json["cpu_usage_pct"], 12.5);
         assert_eq!(json["memory_usage_pct"], 40.0);
         assert_eq!(json["vm_count"], 3);
         assert_eq!(json["uptime_secs"], 86400);
         assert_eq!(json["secure_containers_ready"], true);
+        assert_eq!(json["secure_containers"]["shim_installed"], true);
     }
 }

@@ -536,6 +536,9 @@ pub async fn add_port_forward(
             cloud_init_packages: vm.cloud_init_packages.clone(),
             cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
             cloud_init_write_files: vm.cloud_init_write_files.clone(),
+            storage: vm.storage.clone(),
+            enable_qga: vm.enable_qga,
+            hyperv: vm.hyperv,
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -647,6 +650,9 @@ pub async fn remove_port_forward(
             cloud_init_packages: vm.cloud_init_packages.clone(),
             cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
             cloud_init_write_files: vm.cloud_init_write_files.clone(),
+            storage: vm.storage.clone(),
+            enable_qga: vm.enable_qga,
+            hyperv: vm.hyperv,
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -803,6 +809,9 @@ pub async fn start_vm(
             cloud_init_packages: vm.cloud_init_packages.clone(),
             cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
             cloud_init_write_files: vm.cloud_init_write_files.clone(),
+            storage: vm.storage.clone(),
+            enable_qga: vm.enable_qga,
+            hyperv: vm.hyperv,
             ..Default::default()
         });
         let result = state_clone.driver.start_with_options(&vm, &opts).await;
@@ -967,6 +976,9 @@ pub async fn restart_vm(
         cloud_init_packages: vm.cloud_init_packages.clone(),
         cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
         cloud_init_write_files: vm.cloud_init_write_files.clone(),
+        storage: vm.storage.clone(),
+        enable_qga: vm.enable_qga,
+        hyperv: vm.hyperv,
         ..Default::default()
     };
 
@@ -1012,7 +1024,7 @@ pub async fn pause_vm(
 
     let _lock = state.vm_lock(&name).lock_owned().await;
 
-    let result = state.driver.freeze(&name).await;
+    let result = state.driver.pause(&name).await;
 
     match result {
         Ok(_) => {
@@ -1054,7 +1066,7 @@ pub async fn resume_vm(
 
     let _lock = state.vm_lock(&name).lock_owned().await;
 
-    let result = state.driver.thaw(&name).await;
+    let result = state.driver.resume(&name).await;
 
     match result {
         Ok(_) => {
