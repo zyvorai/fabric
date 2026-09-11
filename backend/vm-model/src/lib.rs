@@ -1227,6 +1227,13 @@ mod tests {
             }],
             display: None,
             extra_args: vec!["enforcing=0".into()],
+            storage: Some("default".into()),
+            enable_qga: true,
+            hyperv: false,
+            numa_node: Some(0),
+            cpuset: Some("0-1".into()),
+            hugepages: Some(false),
+            vfio_devices: vec![],
         };
 
         let json = serde_json::to_string(&opts).unwrap();
