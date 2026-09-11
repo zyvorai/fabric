@@ -812,6 +812,12 @@ mod tests {
         async fn terminate(&self, _name: &str) -> Result<()> {
             Ok(())
         }
+        async fn pause(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn resume(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
         async fn delete(&self, _name: &str) -> Result<()> {
             Ok(())
         }
