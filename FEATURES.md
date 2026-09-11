@@ -2,7 +2,7 @@
 
 ## Project Statistics
 
-- 40 backend crates
+- 53 backend crates
 - 165 Rust source files, 130 TypeScript files
 - ~87,000 lines of code (60K Rust + 27K TypeScript)
 - 480+ REST API endpoints + 3 WebSocket endpoints

@@ -239,7 +239,7 @@ Authentication and authorization are handled by the `security` crate:
 
 ## Crate Dependency Graph
 
-The workspace contains 48 crates organized into the following domains.
+The workspace contains 53 crates organized into the following domains.
 See [crate-map.md](crate-map.md) for the complete listing.
 
 ```
@@ -257,23 +257,23 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 ### Domain Groups
 
-**Core** (5 crates): `Zyvor Fabric`, `vm-model`, `state-store`, `security`, `Zyvor Fabric-vm`
+**Core** (4 crates): `zyvor-fabricd`, `vm-model`, `state-store`, `security`
 
 **Drivers** (4 crates): `zyvor-fabric-vm-driver` (mkosi image building only), `zyvor-fabric-driver-core`, `zyvor-fabric-fluxvm-client`, `zyvor-fabric-fluxvm-driver`
 
-**Networking** (10 crates): `networking`, `network-policy`, `service-mesh`, `traffic-shaping`, `dns-policy`, `vm-firewall`, `vpn-mesh`, `packet-mirror`, `nat-gateway`, `net-monitor`
+**Networking** (12 crates): `networking`, `network-policy`, `service-mesh`, `service-lb`, `traffic-shaping`, `dns-policy`, `vm-firewall`, `vpn-mesh`, `packet-mirror`, `nat-gateway`, `net-monitor`, `zyvor-fabric-dnsmasq-manager`
 
-**Storage** (2 crates): `Zyvor Fabric-storage`, `distributed-storage`
+**Storage** (2 crates): `zyvor-fabric-storage`, `distributed-storage`
 
-**System** (3 crates): `Zyvor Fabric-system`, `Zyvor Fabric-cgroup`, `Zyvor Fabric-lock-manager`
+**System** (4 crates): `zyvor-fabric-system`, `zyvor-fabric-vm`, `zyvor-fabric-lock-manager`, `zyvor-fabric-cgroup`
 
-**Management** (8 crates): `lifecycle-manager`, `certificate-manager`, `resource-pools`, `encryption`, `site-recovery`, `replication`, `migration`, `predictive-drs`
+**Management** (14 crates): `lifecycle-manager`, `certificate-manager`, `resource-pools`, `encryption`, `site-recovery`, `replication`, `migration`, `predictive-drs`, `secrets-manager`, `compliance`, `billing`, `enterprise-identity`, `openstack-compat`, `host-lifecycle`
 
-**Infrastructure** (5 crates): `datacenter`, `host-agent`, `fault-tolerance`, `content-library`, `tpm-support`
+**Infrastructure** (6 crates): `datacenter`, `host-agent`, `fault-tolerance`, `content-library`, `tpm-support`, `k8s-pod-client`
 
-**Utilities** (4 crates): `cloud-init`, `prometheus-exporter`, `vnc-proxy`, `zyvorctl`
+**Utilities** (5 crates): `cloud-init`, `prometheus-exporter`, `vnc-proxy`, `ova-tools`, `api-error`
 
-**UI**: `zyvorctl` CLI + React web (`web/`)
+**CLI and UI** (2 crates + web): `zyvorctl`, `zyvor-fabric-sdk`, plus the React web console (`web/`, not a Rust crate)
 
 ---
 
@@ -468,7 +468,7 @@ The `Zyvor Fabric-storage` crate supports multiple storage backends:
 
 ## Networking Stack
 
-Zyvor Fabric includes a comprehensive networking stack spread across 10 crates:
+Zyvor Fabric includes a comprehensive networking stack spread across 12 crates:
 
 ```
 +------------------------------------------------------+
@@ -510,6 +510,11 @@ Zyvor Fabric includes a comprehensive networking stack spread across 10 crates:
 |  | Alerting policies    |  | Interface management   ||
 |  | Per-VM metrics       |  +-----------------------+ |
 |  +---------------------+                             |
+|                                                       |
+|  +-- service-lb --------+  +-- dnsmasq-manager -----+|
+|  | Service Fabric v6+   |  | Per-bridge DHCP server ||
+|  | node select/rollout  |  | (supervised dnsmasq)   ||
+|  +---------------------+  +-----------------------+  |
 +------------------------------------------------------+
 |                    Kernel Layer                       |
 |                                                       |

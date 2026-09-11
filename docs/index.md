@@ -227,7 +227,7 @@ Detailed documentation for each major feature area.
 | Document | Description |
 |----------|-------------|
 | [Architecture Overview](architecture.md) | System architecture and component diagram |
-| Crate Structure | 48 backend crates and their responsibilities |
+| Crate Structure | 53 backend crates and their responsibilities |
 | Data Model | VM, VMStartOptions, VMMetrics, VMPressure |
 | Driver Model | VMDriver and ResourceStatsDriver traits |
 | State Store | SQLite-based persistent state management |
@@ -331,7 +331,7 @@ VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`
 |----------|-------------|
 | Development Setup | Rust toolchain, IDE, and local development |
 | Build and Test | `cargo check`, `cargo test`, CI pipeline |
-| Crate Map | 48 crates and their dependencies |
+| Crate Map | 53 crates and their dependencies |
 | Adding an API Endpoint | Step-by-step guide for new endpoints |
 | Adding a Storage Backend | Driver trait implementation guide |
 | Adding a Network Feature | Integration with the netlink-based networking crate |

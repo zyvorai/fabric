@@ -89,7 +89,7 @@ The old `/api/machines` / machinectl UI is gone — use **Virtual Machines**
 (`/app/vms`) and `/api/vms`. The `machinectl-driver` / `machined-dbus` crates
 were deleted.
 
-### Why are there 48 crates?
+### Why are there 53 crates?
 
 The workspace is organized into fine-grained crates to enforce clear module
 boundaries, enable independent compilation and testing, and prevent circular
