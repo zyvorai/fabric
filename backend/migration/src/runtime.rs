@@ -230,7 +230,7 @@ impl RuntimeMigrationManager {
         let status = self
             .start_prepared_target(vm_name, &prepared.target_uri, options)
             .await
-            .map_err(|e| {
+            .inspect_err(|_| {
                 // Best-effort abort of the unused receiver on failure to start.
                 let rid = prepared.receiver.id;
                 let target = self.target.clone();
@@ -239,22 +239,16 @@ impl RuntimeMigrationManager {
                         let _ = t.abort_migration_receiver(rid).await;
                     }
                 });
-                e
             })?;
 
         // Poll until completed/failed before activate — callers may also poll
         // separately; here we do a single status read after start returns.
-        if matches!(
-            status.phase,
-            MigrationPhase::Completed | MigrationPhase::Failed | MigrationPhase::Cancelled
-        ) {
-            if status.phase == MigrationPhase::Completed {
-                self.activate_receiver(prepared.receiver.id).await?;
-                if let Some(snap) = network_snapshot.as_ref() {
-                    self.network_migration_restore(prepared.receiver.id, snap)
-                        .await?;
-                    self.network_migration_resume(prepared.receiver.id).await?;
-                }
+        if status.phase == MigrationPhase::Completed {
+            self.activate_receiver(prepared.receiver.id).await?;
+            if let Some(snap) = network_snapshot.as_ref() {
+                self.network_migration_restore(prepared.receiver.id, snap)
+                    .await?;
+                self.network_migration_resume(prepared.receiver.id).await?;
             }
         }
 
