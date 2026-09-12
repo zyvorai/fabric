@@ -104,6 +104,23 @@ jobs:
       - name: Build
         run: cd web && npm run build
 
+  website:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: cd website && npm ci
+
+      - name: Build
+        run: cd website && npm run build
+
   # Explicit catch-up gate (FluxVM boundary contracts). Also covered by
   # `test` / `web` / Fabric E2E; this job surfaces failures with a clear name.
   catch-up:

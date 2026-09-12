@@ -1,0 +1,30 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* Zyvor brand orange (shared across the Zyvor docs-site family). */
+:root {
+  --ifm-color-primary: #ff5a15;
+  --ifm-color-primary-dark: #e64f0e;
+  --ifm-color-primary-darker: #cc420a;
+  --ifm-color-primary-darkest: #a83606;
+  --ifm-color-primary-light: #ff7238;
+  --ifm-color-primary-lighter: #ff8752;
+  --ifm-color-primary-lightest: #ffab85;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #ff8752;
+  --ifm-color-primary-dark: #ff7238;
+  --ifm-color-primary-darker: #ff6524;
+  --ifm-color-primary-darkest: #e64f0e;
+  --ifm-color-primary-light: #ff9c6d;
+  --ifm-color-primary-lighter: #ffab85;
+  --ifm-color-primary-lightest: #ffc7ab;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}

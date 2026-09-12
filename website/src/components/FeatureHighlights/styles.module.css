@@ -1,0 +1,29 @@
+.features {
+  padding: 3rem 0;
+  width: 100%;
+}
+
+.card {
+  display: block;
+  height: 100%;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--ifm-color-primary);
+  transform: translateY(-2px);
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+}
+
+.card p {
+  margin-bottom: 0;
+  color: var(--ifm-color-emphasis-700);
+}
