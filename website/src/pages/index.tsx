@@ -5,6 +5,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 import FeatureHighlights from '@site/src/components/FeatureHighlights';
+import Reveal from '@site/src/components/Reveal';
 
 import styles from './index.module.css';
 
@@ -13,39 +14,41 @@ function HomepageHeader() {
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
-        <div className={styles.heroGrid}>
-          <div>
-            <Heading as="h1" className="hero__title">
-              Private cloud control plane
-              <br />
-              for Linux.
-            </Heading>
-            <p className="hero__subtitle">
-              One 15MB Rust daemon gives you VM lifecycle, software-defined
-              networking, pluggable storage, and security policy — managed
-              through CLI, Web, Kubernetes operator, and Terraform, all
-              talking to the same 780+-endpoint API.
-            </p>
-            <div className={styles.buttons}>
-              <Link
-                className="button button--secondary button--lg"
-                to="/docs/getting-started/02-Quick-Start">
-                Get Started
-              </Link>
-              <Link
-                className="button button--outline button--lg button--secondary"
-                to="https://github.com/zyvorai/fabric">
-                View on GitHub
-              </Link>
-            </div>
-          </div>
-          <div className={styles.heroMedia}>
-            <img src={dashboard} alt="Zyvor Fabric console dashboard — fleet health, capability status, and live VM metrics" />
-            <p className={styles.heroMediaCaption}>
-              The console dashboard — a real deployment, not a mockup.
-            </p>
+        <div className={clsx(styles.heroText, 'text--center')}>
+          <Heading as="h1" className="hero__title">
+            Private cloud control plane
+            <br />
+            for Linux.
+          </Heading>
+          <p className="hero__subtitle">
+            One 15MB Rust daemon gives you VM lifecycle, software-defined
+            networking, pluggable storage, and security policy — managed
+            through CLI, Web, Kubernetes operator, and Terraform, all
+            talking to the same 780+-endpoint API.
+          </p>
+          <div className={styles.buttons}>
+            <Link
+              className="button button--secondary button--lg"
+              to="/docs/getting-started/02-Quick-Start">
+              Get Started
+            </Link>
+            <Link
+              className="button button--outline button--lg button--secondary"
+              to="https://github.com/zyvorai/fabric">
+              View on GitHub
+            </Link>
           </div>
         </div>
+      </div>
+      <div className={styles.heroMediaWrap}>
+        <img
+          className={styles.heroMedia}
+          src={dashboard}
+          alt="Zyvor Fabric console dashboard — fleet health, capability status, and live VM metrics"
+        />
+        <p className={styles.heroMediaCaption}>
+          The console dashboard — a real deployment, not a mockup.
+        </p>
       </div>
     </header>
   );
@@ -55,9 +58,11 @@ function ProblemStatement() {
   return (
     <section className={styles.problem}>
       <div className="container">
-        <div className="row">
+        <Reveal className="row">
           <div className="col col--8 col--offset-2 text--center">
-            <Heading as="h2">Why Zyvor Fabric</Heading>
+            <Heading as="h2" className={styles.sectionHeading}>
+              Why Zyvor Fabric
+            </Heading>
             <p>
               Private-cloud tooling usually forces a choice: <strong>too
               heavy</strong> (VMware vSphere, Proxmox, OpenStack — complex
@@ -79,7 +84,7 @@ function ProblemStatement() {
               engine.
             </p>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -89,9 +94,11 @@ function TrustBand() {
   return (
     <section className={styles.trust}>
       <div className="container">
-        <div className={styles.trustGrid}>
+        <Reveal className={styles.trustGrid}>
           <div>
-            <Heading as="h3">Open, and honest about its limits</Heading>
+            <Heading as="h3" className={styles.sectionHeading}>
+              Open, and honest about its limits
+            </Heading>
             <p>
               Apache-2.0 core. The entire codebase has been through a
               31-round security audit — 194 issues identified and fixed, 0
@@ -111,7 +118,7 @@ function TrustBand() {
               alt="Apache 2.0 license"
             />
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -121,18 +128,22 @@ function EnterpriseCTA() {
   return (
     <section className={styles.enterprise}>
       <div className="container text--center">
-        <Heading as="h2">Need production support or SLAs?</Heading>
-        <p>
-          Zyvor Fabric's core is Apache-2.0 and free to run in personal, lab,
-          and commercial production use at no charge. Zyvor Enterprise adds
-          production support, SLAs, and additional products for teams that
-          need them.
-        </p>
-        <Link
-          className="button button--primary button--lg"
-          to="mailto:sales@zyvor.dev">
-          Contact sales@zyvor.dev
-        </Link>
+        <Reveal>
+          <Heading as="h2" className={styles.sectionHeading}>
+            Need production support or SLAs?
+          </Heading>
+          <p className={styles.enterpriseCopy}>
+            Zyvor Fabric's core is Apache-2.0 and free to run in personal,
+            lab, and commercial production use at no charge. Zyvor
+            Enterprise adds production support, SLAs, and additional
+            products for teams that need them.
+          </p>
+          <Link
+            className="button button--primary button--lg"
+            to="mailto:sales@zyvor.dev">
+            Contact sales@zyvor.dev
+          </Link>
+        </Reveal>
       </div>
     </section>
   );
@@ -146,7 +157,9 @@ export default function Home(): ReactNode {
       <HomepageHeader />
       <main>
         <ProblemStatement />
-        <FeatureHighlights />
+        <Reveal>
+          <FeatureHighlights />
+        </Reveal>
         <TrustBand />
         <EnterpriseCTA />
       </main>

@@ -70,21 +70,17 @@ const config: Config = {
         alt: 'Zyvor Fabric',
         src: 'img/favicon.svg',
       },
+      hideOnScroll: false,
       items: [
         {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
-          position: 'left',
+          position: 'right',
           label: 'Docs',
         },
         {
           href: 'https://github.com/zyvorai/fabric',
           label: 'GitHub',
-          position: 'right',
-        },
-        {
-          href: 'https://zyvor.dev',
-          label: 'Enterprise',
           position: 'right',
         },
       ],

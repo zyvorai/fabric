@@ -1,61 +1,62 @@
 .heroBanner {
-  padding: 4rem 0;
+  padding: var(--zv-hero-space) 0 0;
   position: relative;
   overflow: hidden;
 }
 
 @media screen and (max-width: 996px) {
   .heroBanner {
-    padding: 2rem;
+    padding: clamp(3rem, 14vw, 6rem) 1.5rem 0;
   }
 }
 
-.heroGrid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 2.5rem;
-  align-items: center;
-}
-
-@media screen and (max-width: 996px) {
-  .heroGrid {
-    grid-template-columns: 1fr;
-    text-align: center;
-  }
+.heroText {
+  max-width: 46rem;
+  margin: 0 auto;
 }
 
 .buttons {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 1rem;
   flex-wrap: wrap;
+  margin-top: 2.5rem;
 }
 
-@media screen and (max-width: 996px) {
-  .buttons {
-    justify-content: center;
-  }
+.heroMediaWrap {
+  max-width: 1100px;
+  margin: clamp(3rem, 7vw, 5.5rem) auto 0;
+  padding: 0 1.5rem;
 }
 
-.heroMedia img {
+.heroMedia {
+  display: block;
   width: 100%;
-  border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--ifm-color-emphasis-200);
 }
 
 .heroMediaCaption {
   text-align: center;
   font-size: 0.85rem;
-  opacity: 0.8;
-  margin-top: 0.75rem;
+  opacity: 0.7;
+  margin-top: 1rem;
+}
+
+.sectionHeading {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 1.25rem;
 }
 
 .problem {
-  padding: 4rem 0;
+  padding: var(--zv-section-space) 0;
 }
 
 .trust {
-  padding: 3rem 0;
+  padding: var(--zv-section-space) 0;
   background: var(--ifm-color-emphasis-100);
 }
 
@@ -86,5 +87,11 @@
 }
 
 .enterprise {
-  padding: 4rem 0;
+  padding: var(--zv-section-space) 0;
+}
+
+.enterpriseCopy {
+  max-width: 38rem;
+  margin: 0 auto 2rem;
+  color: var(--ifm-color-emphasis-700);
 }
