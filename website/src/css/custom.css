@@ -10,15 +10,16 @@
  * of this file.
  */
 
-/* Zyvor brand orange (shared across the Zyvor docs-site family). */
+/* Monochrome, apple.com-style palette (black/white, no brand-orange accent).
+   Shared across the whole Zyvor docs-site family. */
 :root {
-  --ifm-color-primary: #ff5a15;
-  --ifm-color-primary-dark: #e64f0e;
-  --ifm-color-primary-darker: #cc420a;
-  --ifm-color-primary-darkest: #a83606;
-  --ifm-color-primary-light: #ff7238;
-  --ifm-color-primary-lighter: #ff8752;
-  --ifm-color-primary-lightest: #ffab85;
+  --ifm-color-primary: #1d1d1f;
+  --ifm-color-primary-dark: #000000;
+  --ifm-color-primary-darker: #000000;
+  --ifm-color-primary-darkest: #000000;
+  --ifm-color-primary-light: #333336;
+  --ifm-color-primary-lighter: #424245;
+  --ifm-color-primary-lightest: #6e6e73;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 
@@ -35,25 +36,65 @@
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #ff8752;
-  --ifm-color-primary-dark: #ff7238;
-  --ifm-color-primary-darker: #ff6524;
-  --ifm-color-primary-darkest: #e64f0e;
-  --ifm-color-primary-light: #ff9c6d;
-  --ifm-color-primary-lighter: #ffab85;
-  --ifm-color-primary-lightest: #ffc7ab;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-color-primary: #f5f5f7;
+  --ifm-color-primary-dark: #d2d2d7;
+  --ifm-color-primary-darker: #a1a1a6;
+  --ifm-color-primary-darkest: #86868b;
+  --ifm-color-primary-light: #ffffff;
+  --ifm-color-primary-lighter: #ffffff;
+  --ifm-color-primary-lightest: #ffffff;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* The hero band itself stays pure black with white text regardless of
+   site theme — apple.com's product-page hero treatment, not a
+   light/dark-mode-dependent color. */
+.hero--primary {
+  --ifm-hero-text-color: #f5f5f7;
+  background: #000;
+}
+
+.hero--primary .button--secondary {
+  color: #000;
+  background: #f5f5f7;
+  border-color: #f5f5f7;
+}
+
+.hero--primary .button--secondary:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+.hero--primary .button--outline.button--secondary {
+  color: #f5f5f7;
+  background: transparent;
+  border-color: rgba(245, 245, 247, 0.4);
+}
+
+.hero--primary .button--outline.button--secondary:hover {
+  border-color: #f5f5f7;
 }
 
 /* ---------------------------------------------------------------------
- * Minimal nav: thin, translucent, no heavy border/shadow.
+ * Minimal nav: apple.com's persistent black top bar — thin, translucent,
+ * always dark regardless of the page's light/dark theme.
  * ------------------------------------------------------------------- */
 .navbar {
   height: 4.5rem;
   box-shadow: none;
-  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: saturate(180%) blur(12px);
-  background: color-mix(in srgb, var(--ifm-navbar-background-color) 82%, transparent);
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.navbar__brand,
+.navbar__link,
+.navbar__title {
+  color: #f5f5f7;
+}
+
+.navbar__link:hover {
+  color: #ffffff;
 }
 
 .navbar__brand {
@@ -63,6 +104,12 @@
 
 .navbar__items--right .navbar__link {
   font-weight: 500;
+}
+
+/* Docusaurus's light/dark toggle icon defaults to a dark glyph — force it
+   light so it's visible on the always-black navbar. */
+.navbar [class*='toggle'] svg {
+  color: #f5f5f7;
 }
 
 /* ---------------------------------------------------------------------
@@ -79,7 +126,9 @@
   font-size: clamp(1.05rem, 1.6vw, 1.375rem);
   font-weight: 400;
   line-height: 1.5;
-  color: var(--ifm-color-emphasis-700);
+  /* Always on the forced-black hero background (see .hero--primary above),
+     so this stays a fixed light gray rather than a theme-dependent token. */
+  color: #a1a1a6;
   max-width: 42rem;
   margin-left: auto;
   margin-right: auto;
