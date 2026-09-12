@@ -5,8 +5,8 @@
 - 53 backend crates
 - 165 Rust source files, 130 TypeScript files
 - ~87,000 lines of code (60K Rust + 27K TypeScript)
-- 480+ REST API endpoints + 3 WebSocket endpoints
-- 80+ console pages under `/app` + marketing routes
+- 780+ REST API endpoints + 3 WebSocket endpoints
+- 92 web pages (87 console under `/app` + 5 marketing routes)
 - 4 interfaces (CLI, Web, Operator, Terraform) — terminal UI removed
 - 3 RBAC roles (Admin, User, Viewer)
 - 4 disk formats (qcow2, raw, vmdk, vdi)
@@ -49,7 +49,7 @@
 
 - Hybrid: public marketing (`/`, `/product`, `/platform`, `/security`) + light Apple-style console under `/app`
 - Sign-in at `/sign-in` (`/login` redirects)
-- 80+ console pages + network/security sub-tabs
+- 87 console pages + network/security sub-tabs
 - Command palette (Ctrl/Cmd+K), sequence shortcuts, left nav
 - Dashboard with real-time statistics and capabilities health
 - Cilium-style network security page with 9 tabs
@@ -316,7 +316,7 @@ The former terminal UI (`zyvorctl-tui`) has been removed.
 - Operation counters (starts, stops, creates, deletes)
 - Grafana dashboard and alert rules
 
-## REST API (480+ Endpoints)
+## REST API (780+ Endpoints)
 
 ### WebSocket Endpoints
 

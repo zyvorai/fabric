@@ -20,7 +20,7 @@ Cross-reference: [Documentation index](README.md) · [Main README](../README.md)
 
 | Criterion | Notes |
 |-----------|-------|
-| Core capability | 480+ REST endpoints |
+| Core capability | 780+ REST endpoints |
 
 ---
 

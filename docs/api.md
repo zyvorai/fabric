@@ -32,7 +32,7 @@ Unauthenticated requests receive a `401 Unauthorized` response. The `/api/auth/l
 
 ## Overview
 
-The API exposes 480+ REST endpoints and 3 WebSocket endpoints organized into the categories below. This document lists the key endpoints in each category. All request and response bodies use JSON.
+The API exposes 780+ REST endpoints and 3 WebSocket endpoints organized into the categories below. This document lists the key endpoints in each category. All request and response bodies use JSON.
 
 ---
 

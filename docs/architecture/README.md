@@ -46,7 +46,7 @@ web UI, and CLI for managing the full lifecycle of virtual machines.
                          |                      |
                          |  +----------------+  |
                          |  | REST API       |  |
-                         |  | 480+ endpoints |  |
+                         |  | 780+ endpoints |  |
                          |  +----------------+  |
                          |  | WebSocket      |  |
                          |  | Console / VNC  |  |
@@ -120,7 +120,7 @@ structured as an Axum web server running on Tokio with the following subsystems:
 
 | Subsystem         | Description                                                |
 |-------------------|------------------------------------------------------------|
-| REST API          | 480+ endpoints across 53 API modules                       |
+| REST API          | 780+ endpoints across 53 API modules                       |
 | WebSocket         | Real-time VM console access via FluxVM's vsock guest agent |
 | SSE Events        | Server-Sent Events for real-time VM state change delivery  |
 | Auth Middleware    | JWT token validation with RBAC (Admin/User/Viewer)         |
@@ -380,7 +380,7 @@ State transitions:
 ```
 1. Client POSTs to /api/v1/vms with CreateVMRequest
 2. Handler validates name (regex: ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$)
-3. Handler validates resource limits (CPUs 1-256, Memory 64MB-1TB, Disk 1-10TB)
+3. Handler validates resource limits (CPUs 1-256, Memory 64MB-1TB, Disk 1GB-64TB)
 4. Handler checks quota availability (if quotas configured)
 5. VM model is created with state=Stopped, timestamps set
 6. State persisted to /var/lib/zyvor-fabricd/vms/{name}.json

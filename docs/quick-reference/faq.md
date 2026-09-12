@@ -155,7 +155,7 @@ All user-supplied input is validated before use:
   alphanumeric
 - Entity names: 1-128 characters, alphanumeric plus `.`, `-`, `_`, space
 - Entity IDs: No `/`, `\`, `..`, or null bytes (prevents path traversal)
-- Resource limits: CPUs 1-256, memory 64MB-1TB, disk 1-10TB
+- Resource limits: CPUs 1-256, memory 64MB-1TB, disk 1GB-64TB
 - Error messages are sanitized for non-admin users to prevent information leakage
 
 ---

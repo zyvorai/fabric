@@ -2,9 +2,9 @@
 
 > **A private cloud control plane with no systemd dependency.**
 
-Zyvor Fabric is a complete Rust control plane giving you Proxmox- and KubeVirt-class capabilities without the heavyweight stack. Manage the same infrastructure four ways — CLI, web dashboard, Kubernetes operator, or Terraform — over a single daemon exposing 480+ REST endpoints and live WebSocket channels. VM lifecycle runs through [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency of its own (`driver.fluxvm_url` in `zyvor-fabricd.toml`). There are no custom hypervisor patches or kernel modules to maintain, and the daemon itself runs fine under systemd or any other supervisor — it's no longer a hard requirement.
+Zyvor Fabric is a complete Rust control plane giving you Proxmox- and KubeVirt-class capabilities without the heavyweight stack. Manage the same infrastructure four ways — CLI, web dashboard, Kubernetes operator, or Terraform — over a single daemon exposing 780+ REST endpoints and live WebSocket channels. VM lifecycle runs through [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency of its own (`driver.fluxvm_url` in `zyvor-fabricd.toml`). There are no custom hypervisor patches or kernel modules to maintain, and the daemon itself runs fine under systemd or any other supervisor — it's no longer a hard requirement.
 
-**480+** REST API endpoints · **4** management interfaces · **40+** Rust backend crates · **6** storage backends · **37+** web dashboard pages · **1** binary, one config, one service
+**780+** REST API endpoints · **4** management interfaces · **53** Rust backend crates · **6** storage backends · **90+** web dashboard pages · **1** binary, one config, one service
 
 This is the user-facing onboarding guide — how to access the product, your first workflows, and how to use every feature. A print-ready PDF of the same content sits alongside this file.
 
@@ -27,7 +27,7 @@ This is the user-facing onboarding guide — how to access the product, your fir
 
 - **Web:** React dashboard served by the `zyvor-fabricd` daemon at http://localhost:9095 — light Apple-style console with marketing site.  It shares the daemon's origin (no separate web server); generate the TLS cert with `./zyvor-fabricd-ctl tls`.
 - **CLI:** `zyvorctl` — scriptable client with table/JSON/YAML output (`--output json`). Examples: `zyvorctl list`, `zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096`, `zyvorctl start web-01`, `zyvorctl apply -f config.yaml`. 
-- **API:** REST + WebSocket exposed by the `zyvor-fabricd` daemon (480+ endpoints under `/api/...`). Obtain a token with `POST /api/auth/login`, then pass `Authorization: Bearer ` on every call. The same API also backs the Terraform provider, the Kubernetes `VirtualMachine` CRD operator, and the Rust/Python/Ansible SDKs.
+- **API:** REST + WebSocket exposed by the `zyvor-fabricd` daemon (780+ endpoints under `/api/...`). Obtain a token with `POST /api/auth/login`, then pass `Authorization: Bearer ` on every call. The same API also backs the Terraform provider, the Kubernetes `VirtualMachine` CRD operator, and the Rust/Python/Ansible SDKs.
 - **Login:** Username `admin`; the initial password is auto-generated on first run — read it with `./zyvor-fabricd-ctl password` (or `sudo cat /var/lib/zyvor-fabricd/.admin_password`). JWT tokens last 24h by default (`auth.token_expiration_hours`); 3-tier RBAC (admin/user/viewer) is enforced on every endpoint, with optional TOTP 2FA.
 - **Needs:** A Linux host with systemd 256+ and KVM; install and bring the daemon up with `sudo systemctl enable --now zyvor-fabric`.
 
@@ -203,7 +203,7 @@ _Four first-class ways to drive the same daemon — pick per task, not per produ
 | Interface | Best for | Highlights |
 |---|---|---|
 | zyvorctl CLI | Scripting & automation | JSON/YAML/table output, apply -f |
-| Web dashboard | Operators & teams | 80+ console pages under `/app` plus marketing routes, Ctrl+K palette, bulk ops |
+| Web dashboard | Operators & teams | 85+ console pages under `/app` plus marketing routes, Ctrl+K palette, bulk ops |
 | K8s operator | GitOps / K8s shops | VirtualMachine CRD reconciliation |
 | Terraform / SDK | Infra-as-code | plan/apply, typed Rust + Python + Ansible |
 
@@ -211,7 +211,7 @@ _Four first-class ways to drive the same daemon — pick per task, not per produ
   - **How:** Install the `zyvorctl` binary and point it at the daemon: `zyvorctl list`, `zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096`, `zyvorctl apply -f config.yaml`, with `--output json|yaml|table` (or `-o`).
 
 - **Web Dashboard** — Hybrid marketing + `/app` console, Ctrl+K palette, light Apple UI, live WebSocket updates, and bulk operations. — _Give operators a full GUI without giving up the API._
-  - **How:** Browse to http://localhost:9095, sign in at `/sign-in`, open `/app` and log in as `admin`; `Ctrl+K` command palette, 80+ console pages under `/app` plus marketing routes, bulk ops, and live WebSocket/SSE updates — served by the daemon itself. A fresh install with no VMs yet shows a "Getting Started" panel instead of an empty table, linking straight to VM creation, templates, the playground, and access control. Deleting a VM is undoable for a few seconds via an Undo bar before the delete actually fires.
+  - **How:** Browse to http://localhost:9095, sign in at `/sign-in`, open `/app` and log in as `admin`; `Ctrl+K` command palette, 85+ console pages under `/app` plus marketing routes, bulk ops, and live WebSocket/SSE updates — served by the daemon itself. A fresh install with no VMs yet shows a "Getting Started" panel instead of an empty table, linking straight to VM creation, templates, the playground, and access control. Deleting a VM is undoable for a few seconds via an Undo bar before the delete actually fires.
 - **Console & VNC** — Browser terminal via xterm.js over WebSocket and graphical VNC via a noVNC proxy, authenticated with the same JWT. — _Reach any VM's console without exposing raw ports._
   - **How:** Web VM Console (xterm.js) / VNC (noVNC) buttons · WebSocket `ws:///api/vms/:name/console?token=` (also `/ws/vnc/:name`) · `websocat` from the CLI.
 - **Kubernetes Operator** — Manage VMs as VirtualMachine CRDs with continuous reconciliation via a Helm-installable operator. — _Define VMs alongside containers in the same GitOps flow._
@@ -244,7 +244,7 @@ _Datacenter hierarchy, resource pools, chargeback, and lifecycle compliance at s
 4. **Open your interface of choice** — Open the web dashboard at http://localhost:9095 to manage the fleet.
 5. **Verify and monitor** — Run ./zyvor-fabricd-ctl verify and ./zyvor-fabricd-ctl health, then scrape /metrics into Prometheus and import the bundled Grafana dashboard.
 
-> **Good to know:** Zyvor Fabric requires Linux with systemd 256+ (Fedora, Ubuntu, Debian, RHEL, or SUSE) and KVM; it is not a hosted or Windows-server product. Some enterprise capabilities carry environmental prerequisites — swtpm for vTPM, an etcd cluster and shared/replicated storage for HA and live migration, and matching hardware/IOMMU for GPU passthrough. Multi-node HA is designed for 3+ nodes; single-server deployments run standalone. The published endpoint and page counts (480+ REST endpoints, 37+ web pages) reflect current documentation and may vary by release, and the macOS Machina workbench is a separate desktop product that consumes the Fabric API rather than part of this daemon.
+> **Good to know:** Zyvor Fabric requires Linux with systemd 256+ (Fedora, Ubuntu, Debian, RHEL, or SUSE) and KVM; it is not a hosted or Windows-server product. Some enterprise capabilities carry environmental prerequisites — swtpm for vTPM, an etcd cluster and shared/replicated storage for HA and live migration, and matching hardware/IOMMU for GPU passthrough. Multi-node HA is designed for 3+ nodes; single-server deployments run standalone. The published endpoint and page counts (780+ REST endpoints, 90+ web pages) reflect current documentation and may vary by release, and the macOS Machina workbench is a separate desktop product that consumes the Fabric API rather than part of this daemon.
 
 ---
 _Zyvor Fabric is developed by ZyvorAI Labs. Contact **info@zyvor.dev** · Apache License 2.0._

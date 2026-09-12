@@ -9,6 +9,9 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | **Product README** | [README.md](../README.md) |
 | **Naming / clone URL** | [NAMING.md](NAMING.md) |
 | **Product positioning** | [POSITIONING.md](POSITIONING.md) |
+| **Product overview + metrics** | [PRODUCT_OVERVIEW.md](PRODUCT_OVERVIEW.md) |
+| **Comparison matrix** (vs. libvirt/virsh, Proxmox VE) | [guides/decision-support/comparison-matrix.md](guides/decision-support/comparison-matrix.md) |
+| **FAQ** | [quick-reference/faq.md](quick-reference/faq.md) |
 | **Kubernetes** (DaemonSets, Helm, lab deploy) | [KUBERNETES.md](KUBERNETES.md) |
 | **Docker / Podman** | [DOCKER.md](DOCKER.md) |
 | **Quick start** (dev build) | [QUICKSTART.md](../QUICKSTART.md) |

@@ -1,4 +1,6 @@
-# Zyvor Fabric — Enterprise Infrastructure Control Plane
+# Zyvor Fabric — Product Overview
+
+This doc is the capability tour and the one authoritative metrics table for Zyvor Fabric. For the pitch and quick start, see the [README](../README.md); for who this is (and isn't) for, see [POSITIONING.md](POSITIONING.md); for the exhaustive feature checklist, see [FEATURES.md](../FEATURES.md).
 
 ## The Problem
 
@@ -8,7 +10,7 @@ Organizations running Linux infrastructure need a unified control plane for virt
 - **Too basic** — Manual QEMU/KVM management with shell scripts doesn't scale and lacks security, monitoring, or multi-user access
 - **Too locked-in** — Cloud-only solutions (AWS, Azure, GCP) create vendor dependency with unpredictable costs
 
-**Zyvor Fabric fills the gap** — a VM operations fabric that runs on any Linux server, with or without systemd, providing enterprise features without enterprise complexity.
+Zyvor Fabric fills the gap: a VM operations fabric that runs on any Linux server, with or without systemd, providing enterprise features without enterprise complexity.
 
 ---
 
@@ -17,14 +19,9 @@ Organizations running Linux infrastructure need a unified control plane for virt
 Zyvor Fabric is a production-grade private cloud control plane built in Rust. It provides a complete management layer over [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency:
 
 - **One binary, one config file** — deploys in under 5 minutes (`zyvor-fabricd`), with systemd support built in but not required
-- **520+ REST API endpoints** with JWT authentication, RBAC, and audit logging
+- **780+ REST API endpoints** with JWT authentication, RBAC, and audit logging
 - **4 management interfaces** — CLI, web dashboard, Kubernetes operator, Terraform provider
 - **Enterprise features** — HA clustering, live migration, GPU passthrough, backup/restore, network policies
-
-```
-sudo systemctl enable --now zyvor-fabricd
-# Or just run the binary directly -- systemd is optional. Either way, Zyvor Fabric is running.
-```
 
 ---
 
@@ -40,17 +37,17 @@ Zyvor Fabric runs entirely without systemd via [FluxVM](https://github.com/zyvor
 
 ### 2. Single Binary, Zero Dependencies
 
-| Zyvor Fabric (`Zyvor Fabric`) | Proxmox | OpenStack |
-|----------|---------|-----------|
-| 1 binary (15MB) | 200+ packages | 1000+ packages |
-| 1 config file | 50+ config files | 100+ config files |
-| 5 min setup | 2+ hours | 2+ days |
-| Runs on any Linux | Debian only | Ubuntu/RHEL |
-| SQLite user store | PostgreSQL required | MySQL + RabbitMQ + Memcached |
+| | Zyvor Fabric | Proxmox | OpenStack |
+|----------|---------|---------|-----------|
+| Deployment unit | 1 binary (15MB) | 200+ packages | 1000+ packages |
+| Config | 1 config file | 50+ config files | 100+ config files |
+| Setup time | 5 min | 2+ hours | 2+ days |
+| OS support | Runs on any Linux | Debian only | Ubuntu/RHEL |
+| User store | SQLite | PostgreSQL required | MySQL + RabbitMQ + Memcached |
 
 ### 3. Security-First Architecture
 
-The entire codebase has undergone a **31-round security audit** with 194 issues identified and fixed (production-ready):
+The entire codebase has undergone a **31-round security audit**: 194 issues identified and fixed, 0 outstanding ([full report](SECURITY_AUDIT_REPORT.md)):
 
 - **Zero unsafe Rust** — memory-safe by construction
 - **Zero shell pipelines** — all subprocess calls use safe argument passing
@@ -62,106 +59,34 @@ The entire codebase has undergone a **31-round security audit** with 194 issues 
 - **Path traversal protection** with canonicalization
 - **SQL injection prevention** — all queries parameterized
 
-### 4. Rust Performance
+### 4. Rust's Structural Advantages
 
-- **Sub-millisecond API response times** — async Axum + Tokio runtime
-- **Low memory footprint** — ~20MB RSS for the daemon
-- **No garbage collection pauses** — predictable latency
-- **Safe concurrency** — per-VM mutexes prevent race conditions
+- **Memory safety by construction** — zero `unsafe` Rust in the codebase, so whole classes of memory-corruption bugs (use-after-free, buffer overflow) aren't possible the way they are in a C/C++ control plane
+- **No garbage-collection pauses** — Rust has no GC, so there's no stop-the-world latency spike under load the way there can be in a JVM- or Python-based equivalent
+- **Safe concurrency** — per-VM mutexes prevent race conditions, checked at compile time
+- We have **not** published a benchmarked API-latency or memory-footprint figure with a documented method, load profile, and hardware environment — so unlike the items above (which are structurally true of the language and codebase), we don't cite a specific number here. If you need real numbers for a sizing decision, ask — we'd rather point you at a repeatable benchmark than a marketing figure.
 
 ---
 
-## Feature Overview
+## Capability Tour
 
-### VM Lifecycle
-- Create, start, stop, restart, pause, resume, delete, **per-VM backup**
-- Full and linked cloning with CoW support
-- **Hibernate (suspend-to-disk)** and resume from snapshot
-- Templates for rapid deployment
-- Declarative config via YAML (`zyvorctl apply -f config.yaml`)
-- Multiple disk formats: qcow2, raw, vmdk, vdi
-- **VM import** from VMDK, VDI, VHD (auto-convert to qcow2)
-- **Online disk resize** (qemu-img + QMP block_resize)
+The exhaustive, line-by-line checklist lives in **[FEATURES.md](../FEATURES.md)**. This section is the skim version — one paragraph per area.
 
-### Storage
-- **6 backends**: Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD
-- Volume CRUD with attach/detach, resize, clone
-- Snapshot create/restore with retention policies
-- ZFS replication with incremental send/receive
-- Ceph cluster health monitoring and RBD image management
-- **Storage live migration** — move VM disks between pools without downtime
-- **Cloud image downloader** — built-in catalog (Ubuntu, Fedora, Debian, Alma)
-- **ISO management** — download, list, delete ISO images
+**VM lifecycle** — create, start, stop, restart, pause, resume, delete, hibernate (suspend-to-disk), full/linked cloning with CoW, templates, declarative config (`zyvorctl apply -f config.yaml`), VM import from VMDK/VDI/VHD, online disk resize.
 
-### Networking
-- **Network Policies** — Cilium-style label-based ingress/egress rules
-- **VM edge dataplane (Network Fabric v3)** — FluxVM TC/eBPF per-VM allowlists, Mbps/PPS, stats/flows via Dataplane tab / `/api/vms/{name}/dataplane/*` (orthogonal to host SDN)
-- **VM Firewall** — Per-VM firewall profiles and zones via nftables
-- **Service Mesh** — Virtual IP load balancing (round-robin, least-conn, random, IP-hash)
-- **QoS / Traffic Shaping** — Guaranteed/max rate, burst, priority-based bandwidth
-- **DNS Policy** — Zone management, upstream servers, domain blocking
-- **VPN Mesh** — WireGuard tunnels (point-to-point, hub-spoke, full-mesh)
-- **Packet Mirror** — Traffic capture for debugging
-- **NAT Gateway** — Masquerade, SNAT, DNAT, hairpin NAT
-- **Network Monitor** — Per-VM bandwidth tracking with threshold alerts
+**Storage** — 6 backends (Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD), volume CRUD, snapshots with retention, ZFS incremental replication, Ceph cluster health/RBD management, live storage migration between pools, built-in cloud image catalog (Ubuntu/Fedora/Debian/Alma).
 
-### Security & Identity
-- JWT authentication with configurable token expiration
-- **LDAP and OIDC/OAuth2** integration for enterprise SSO
-- 3-tier RBAC (Admin / User / Viewer) enforced on every endpoint
-- **Multi-tenancy** — project isolation with member roles and quotas
-- API keys for service-to-service authentication
-- TLS/HTTPS with certificate management
-- Audit logging with JSON/CSV export
-- Encryption at rest
-- Rate limiting on authentication and API keys
-- **31-round security audit** — 194 issues fixed, production-ready
-- **Storage pool name validation** — LVM, ZFS, Ceph pool names validated
-- **SSRF prevention** on all user-provided URLs
-- **Entity ID sanitization** in state store
-- **Credential redaction** in API responses
-- **WebSocket authentication** on console and VNC endpoints
+**Networking** — Cilium-style label-based network policies; a separate VM-edge dataplane (FluxVM Network Fabric schema v4, TC/eBPF per-VM allowlists + Mbps/PPS + flow stats — see [network-fabric-architecture.md](network-fabric-architecture.md)); per-VM firewall profiles; virtual-IP service mesh; QoS/traffic shaping; DNS policy; WireGuard VPN mesh; packet mirroring; NAT gateway; per-VM bandwidth monitoring with alerts.
 
-### High Availability
-- etcd-based clustering with leader election
-- Predictive DRS (Distributed Resource Scheduling)
-- **Affinity / anti-affinity rules** for VM placement constraints
-- Fault tolerance with automatic failover and fencing
-- Distributed storage replication
-- Site recovery with failover/reprotect workflows
-- **Resource overcommit policies** (CPU/memory/storage ratios)
+**Security & identity** — JWT auth, LDAP/OIDC/OAuth2 SSO, 3-tier RBAC on every endpoint, multi-tenancy with project isolation and quotas, API keys for service-to-service auth, TLS/HTTPS, audit logging with JSON/CSV export, encryption at rest, SCIM 2.0 provisioning.
 
-### Monitoring & Automation
-- Prometheus metrics exporter (`/metrics` endpoint)
-- **Metrics retention policies** with configurable cleanup
-- Analytics dashboard with historical data
-- Multi-channel notifications: Email, Slack, **Webhook with retry + backoff**, Microsoft Teams
-- VM scheduling (once, daily, weekly)
-- Backup/restore with retention policies and incremental backups
-- **Per-VM backup** from web UI (single or bulk)
-- **Automated daily backups** via systemd timer (configurable schedule, retention, cleanup)
-- **Automated weekly state store cleanup** via systemd timer (events, audit logs, webhook deliveries, history)
-- **Backup configuration** via `[backup]` section in config file or `ZYVOR_FABRICD_BACKUP_DIR`/`ZYVOR_FABRICD_BACKUP_RETAIN`/`ZYVOR_FABRICD_BACKUP_TYPE` env vars
-- **Post-install auto-verify** — smoke test runs automatically after deploy/reinstall (API, auth, VM CRUD, backups)
-- **Deep health check** — API, disk space, DB integrity, credentials, timers, memory, KVM
-- **TLS certificate generation** — self-signed certs with SAN via `zyvor-fabricd-ctl tls`
-- **Shell completions** — Bash tab completion for `zyvorctl` and `zyvor-fabricd-ctl`
-- Resource quotas, pools, and datacenter abstractions
-- **Database schema migrations** with version tracking
+**High availability** — etcd-based clustering with leader election, predictive DRS, affinity/anti-affinity placement rules, automatic failover and fencing, distributed storage replication, site recovery, resource overcommit policies.
 
-### Console Access
-- WebSocket terminal via xterm.js (browser-based SSH)
-- VNC graphical console via noVNC proxy
-- Authenticated with same JWT tokens as API
+**Monitoring & automation** — Prometheus metrics, analytics dashboard, multi-channel notifications (Email/Slack/Webhook with retry/Teams), VM scheduling, automated backups with retention, post-install smoke tests, deep health checks, database schema migrations.
 
-### Cloud & Virtualization
-- cloud-init integration (NoCloud datasource)
-- TPM/vTPM support (1.2 and 2.0 via swtpm)
-- GPU passthrough (NVIDIA, AMD — generic PCI/VFIO, no vGPU/Intel GVT-g)
-- **Live migration** — disk-copy (iterative rsync pre-copy + cutover); native FluxVM transport is preview until KVM e2e
-- CPU pinning and NUMA optimization
-- **IPv6 support** — dual-stack nftables (ip + ip6)
-- **API versioning** — all endpoints under `/api/` and `/api/v1/`
+**Console access** — browser-based terminal (xterm.js over the FluxVM vsock agent) and VNC via noVNC, both authenticated with the same JWT tokens as the API.
+
+**Cloud & virtualization** — cloud-init (NoCloud), TPM/vTPM 1.2/2.0, GPU passthrough (NVIDIA/AMD PCI/VFIO), live migration (disk-copy path GA; native FluxVM transport preview), CPU pinning/NUMA optimization, dual-stack IPv6.
 
 ---
 
@@ -180,20 +105,16 @@ zyvorctl policy list
 zyvorctl ceph health my-pool
 ```
 
-### Terminal UI (removed)
-
-The former `zyvorctl-tui` terminal dashboard has been removed. Use the web console under `/app` or the `zyvorctl` CLI.
-
 ### Web Dashboard
 
-Hybrid UI: public marketing pages (`/`, `/product`, `/platform`, `/security`) and a light Apple-style console under `/app` (React 19, SF Pro / system UI fonts, command palette Ctrl+K, WebSocket updates, bulk operations). Sign in at `/sign-in`.
+Hybrid UI: public marketing pages (`/`, `/product`, `/platform`, `/security`) and a light Apple-style console under `/app` (React 19, SF Pro / system UI fonts, command palette Ctrl+K, WebSocket updates, bulk operations). Sign in at `/sign-in`. The former `zyvorctl-tui` terminal dashboard has been removed — use the web console or `zyvorctl`.
 
 ### Kubernetes Operator
 
 Manage VMs as `VirtualMachine` CRDs with automatic reconciliation:
 
 ```yaml
-apiVersion: Zyvor Fabric.io/v1
+apiVersion: zyvorfabric.io/v1
 kind: VirtualMachine
 metadata:
   name: web-server
@@ -265,17 +186,16 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | Feature | Zyvor Fabric | Proxmox VE | OpenStack | libvirt/virsh |
 |---------|:--------:|:----------:|:---------:|:-------------:|
 | Single-binary deployment | Yes | No | No | N/A |
-| REST API | 520+ endpoints | ~50 | ~200 | XML-RPC |
+| REST API | 780+ endpoints | ~50 | ~200 | XML-RPC |
 | Web UI | Yes | Yes | Yes (Horizon) | No |
 | CLI | Yes | Yes | Yes | Yes |
-| Terminal UI | No (removed) | No | No | No |
 | Kubernetes Operator | Yes | No | Yes | No |
 | Terraform Provider | Yes | Yes | Yes | Yes |
 | Network Policies | Cilium-style | Basic | Neutron | No |
 | Service Mesh | Yes | No | No | No |
 | VPN Mesh | WireGuard | No | No | No |
 | GPU Passthrough | Yes | Yes | Yes | Yes |
-| Live Migration | Yes | Yes | Yes | Yes |
+| Live Migration | Yes (disk-copy GA, native preview) | Yes | Yes | Yes |
 | LDAP/OIDC SSO | Yes | Yes | Yes (Keystone) | No |
 | Multi-tenancy | Yes | Yes | Yes | No |
 | RBAC | 3-tier | 3-tier | Keystone | No |
@@ -284,9 +204,11 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | VM Import (VMDK/VDI) | Yes | Yes | Limited | qemu-img |
 | Audit Logging | Yes | Yes | Yes | No |
 | Written in | Rust | Perl/C | Python | C |
-| Memory Safety | Guaranteed | No | N/A | No |
+| Memory Safety | Guaranteed (no `unsafe`) | No | N/A | No |
 | Setup Time | 5 min | 2 hours | 2 days | Manual |
-| License | MIT | AGPL | Apache 2.0 | LGPL |
+| License | Apache-2.0 | AGPL | Apache-2.0 | LGPL |
+
+For the deeper, independently-verifiable version of this table (package counts, config file counts, and where Fabric currently loses to the alternatives — not just where it wins), see the [Comparison Matrix](guides/decision-support/comparison-matrix.md).
 
 ---
 
@@ -297,7 +219,6 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 | Language | Rust (2021 edition) |
 | Async Runtime | Tokio 1.44 |
 | Web Framework | Axum 0.8 |
-| Web UI | React 19 + Vite |
 | Web UI | React 19 + TypeScript + Vite + TailwindCSS |
 | VM Backend | FluxVM (no systemd dependency) |
 | Monitoring | Prometheus |
@@ -306,92 +227,44 @@ Zyvor Fabric nodes managed by the Kubernetes operator. VMs defined as CRDs along
 
 ## Project Statistics
 
-| Metric | Value |
-|--------|-------|
-| Backend crates | 40 |
-| Rust source files | 165 |
-| TypeScript source files | 130 |
-| Total lines of code | ~87,000 |
-| REST API endpoints | 520+ |
-| WebSocket endpoints | 3 |
-| Web pages | 37+ |
-| Security audit rounds | 31 (production-ready) |
-| Security issues fixed | 174 |
-| Test suite | Passing |
+Every figure below is counted directly from source, not estimated — see the method column.
+
+| Metric | Value | Method |
+|--------|-------|--------|
+| Backend crates | 53 | `backend/Cargo.toml` workspace `members` count |
+| Rust source files | 165 | file count |
+| TypeScript source files | 130 | file count |
+| Total lines of code | ~87,000 (60K Rust + 27K TypeScript) | line count |
+| REST API endpoints (main API) | 780+ | deduped (path, HTTP method) pairs parsed from `backend/zyvor-fabricd/src/server.rs`'s route registrations (785 exact at time of writing) |
+| REST API endpoints (incl. OpenStack-compat shim) | 824 | adds 39 endpoints from `backend/openstack-compat/` |
+| WebSocket endpoints | 3 | console, VNC, events |
+| Web pages | 92 (87 console + 5 marketing) | React Router route entries in `web/src/App.tsx`, excluding redirects and catch-alls |
+| Security audit rounds | 31 | [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) |
+| Security issues fixed | 194 (0 outstanding) | [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) — 19 critical + 42 high + 84 medium + 49 low |
+| Test suite | Passing | CI |
+
+Endpoint and page counts will drift a little release to release; treat the "+"-suffixed headline numbers as safe lower bounds and the exact figures in the Method column as the snapshot at time of writing.
 
 ---
 
 ## License
 
-MIT — free for commercial use, modification, and distribution.
+Apache License 2.0 — free for commercial use, modification, and distribution, for the entire repository. There is no separately-licensed core component. See [README.md — License](../README.md#license) for the full text and how Enterprise support fits alongside it.
 
 ---
 
 ## Getting Started
 
-### One-Command Deployment
+See the [README Quick Start](../README.md#quick-start) for the primary install path (`git clone` + `make build && sudo make install`, or `./scripts/ship`). The `zyvor-fabricd-ctl` wrapper below is an alternative entry point some environments use for one-command deploy plus day-2 operations:
 
 ```bash
-# Deploy everything (auto-sudo — no manual sudo needed)
-./zyvor-fabricd-ctl deploy
-
-# That's it. Zyvor Fabric is running.
+./zyvor-fabricd-ctl deploy    # deploy everything, auto-sudo
+./zyvor-fabricd-ctl verify    # post-install smoke test (API, auth, VM CRUD, backups)
+./zyvor-fabricd-ctl health    # deep health check (disk, DB, timers, resources)
+./zyvor-fabricd-ctl backup now
 ```
 
-### Step-by-Step
-
-```bash
-# Install dependencies (auto-sudo)
-./zyvor-fabricd-ctl deps
-
-# Build
-./zyvor-fabricd-ctl build
-
-# Run tests
-./zyvor-fabricd-ctl test
-
-# Install and start (auto-sudo)
-./zyvor-fabricd-ctl install
-./zyvor-fabricd-ctl start
-
-# Read admin password
-./zyvor-fabricd-ctl password
-
-# Run interactive demo
-./zyvor-fabricd-ctl demo
-
-# Create your first VM
-zyvorctl create myvm --image=/path/to/image.qcow2 --cpus=4 --memory=4096
-zyvorctl start myvm
-
-# Open web dashboard
-open http://localhost:9095
-```
-
-### Management Commands
-
-```bash
-./zyvor-fabricd-ctl status      # Check service status
-./zyvor-fabricd-ctl verify      # Post-install smoke test (API, auth, VM CRUD, backups)
-./zyvor-fabricd-ctl health      # Deep health check (disk, DB, timers, resources)
-./zyvor-fabricd-ctl logs        # Follow logs
-./zyvor-fabricd-ctl restart     # Restart service (auto-sudo)
-./zyvor-fabricd-ctl reinstall   # Rebuild + reinstall + auto-verify (auto-sudo)
-./zyvor-fabricd-ctl upgrade     # Git pull + reinstall (auto-sudo)
-./zyvor-fabricd-ctl uninstall   # Remove everything (auto-sudo)
-./zyvor-fabricd-ctl doctor      # System readiness check
-./zyvor-fabricd-ctl tls         # Generate self-signed TLS certificate
-```
-
-### Backup Commands
-
-```bash
-./zyvor-fabricd-ctl backup now      # Run backup immediately
-./zyvor-fabricd-ctl backup enable   # Enable daily backup timer (2:00 AM)
-./zyvor-fabricd-ctl backup disable  # Disable backup timer
-./zyvor-fabricd-ctl backup status   # Show timer state + storage info
-./zyvor-fabricd-ctl backup logs     # Follow backup logs
-```
+Full command reference: `./zyvor-fabricd-ctl --help`.
 
 ---
 

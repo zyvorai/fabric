@@ -104,7 +104,7 @@ The backend is a Cargo workspace with 53 crates organized into functional areas.
 
 ## API Surface
 
-- **480+ REST endpoints** covering VM management, snapshots, storage, networking, auth, quotas, schedules, audit, analytics, backups, notifications, templates, tags, cloning, DRS, fault tolerance, replication, site recovery, content library, lifecycle, certificates, encryption, resource pools, distributed storage, datacenters, events, autoscaling, hotplug, and image building.
+- **780+ REST endpoints** covering VM management, snapshots, storage, networking, auth, quotas, schedules, audit, analytics, backups, notifications, templates, tags, cloning, DRS, fault tolerance, replication, site recovery, content library, lifecycle, certificates, encryption, resource pools, distributed storage, datacenters, events, autoscaling, hotplug, and image building.
 - **3 WebSocket endpoints** for console access, VNC proxying, and live event streaming.
 - **OpenStack compatibility** prefixes on the same listen port: `/identity`, `/compute`, `/image`, `/network`, `/volume` (experimental façade — see [openstack-compat.md](openstack-compat.md)).
 - **SCIM 2.0** at `/scim/v2` for enterprise provisioning (see [scim-identity.md](scim-identity.md)).

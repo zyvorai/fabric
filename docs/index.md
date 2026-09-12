@@ -342,6 +342,8 @@ VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`
 
 ## Quick Reference
 
+See also the standalone quick-reference docs: **[FAQ](quick-reference/faq.md)** · [Glossary](quick-reference/glossary.md) · [Quick reference cheatsheet](quick-reference/quick-reference.md).
+
 ### API Endpoint Categories
 
 The REST API is organized into the following endpoint groups:

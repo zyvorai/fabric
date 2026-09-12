@@ -42,7 +42,7 @@ Feature-by-feature comparison of Zyvor Fabric against alternative VM management 
 
 | Feature | Zyvor Fabric | libvirt/virsh | Proxmox VE |
 |---------|---------|---------------|------------|
-| **REST API** | 480+ endpoints, JSON | No native REST (XML-RPC) | REST API available |
+| **REST API** | 780+ endpoints, JSON | No native REST (XML-RPC) | REST API available |
 | **API authentication** | JWT + PAM | SASL, polkit | Ticket-based + PAM |
 | **CLI tool** | curl / any HTTP client | virsh | pvesh / pvecm |
 | **Language bindings** | Any (HTTP/JSON) | C, Python, Go, Java, Perl | Perl, Python (community) |
@@ -178,7 +178,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 ### Choose Zyvor Fabric when:
 
 - You want **VM lifecycle with no systemd dependency** -- FluxVM supervises each VM's process directly, with resource control in standard cgroup hierarchies and no systemd unit involved.
-- You need a **comprehensive REST API** (480+ endpoints) for automation-first infrastructure management.
+- You need a **comprehensive REST API** (780+ endpoints) for automation-first infrastructure management.
 - You want **built-in networking** (direct netlink, no systemd-networkd dependency) including bridges, VLANs, bonds, VXLAN overlays, SR-IOV, network policies, and traffic shaping -- all manageable via API.
 - You prefer a **modern technology stack** (Rust backend, React frontend) with strong type safety and memory safety.
 - You need **real-time observability** via SSE events and multi-channel notifications (Email, Slack, Webhook, Teams) with webhook retry.

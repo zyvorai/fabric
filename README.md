@@ -15,7 +15,7 @@
 [![Built on FluxVM](https://img.shields.io/badge/VM%20engine-FluxVM-8a2be2)](https://github.com/zyvorai/fluxvm)
 [![Built on GuestKit](https://img.shields.io/badge/guest%20tooling-GuestKit-2ea44f)](https://github.com/zyvorai/guestkit)
 
-**[Quick start](#quick-start)** · **[Screenshot](#see-it)** · **[Why Fabric](#why-zyvor-fabric)** · **[Deploy](#deploy)** · **[Architecture](#architecture-fluxvm--guestkit)** · **[Network Fabric deep dive](#network-fabric-architecture-how-it-works)** · **[Docs](#documentation)**
+**[Quick start](#quick-start)** · **[Is this for you?](#is-this-for-you)** · **[Compare](docs/guides/decision-support/comparison-matrix.md)** · **[FAQ](docs/quick-reference/faq.md)** · **[Deploy](#deploy)** · **[Docs](#documentation)**
 
 </div>
 
@@ -23,11 +23,11 @@
 
 ## What is Zyvor Fabric?
 
-**Zyvor Fabric** is a production-grade private cloud control plane for Linux. Deploy in minutes with a single daemon, manage everything through four interfaces — **CLI, Web, Kubernetes operator, Terraform** — and get enterprise features (RBAC, HA, live migration, GPU passthrough, network policy) without VMware complexity or OpenStack overhead.
+**Zyvor Fabric** is a production-grade private cloud control plane for Linux. One 15MB Rust daemon (`zyvor-fabricd`) gives you VM lifecycle, software-defined networking, pluggable storage, and security policy — managed through four interfaces (**CLI, Web, Kubernetes operator, Terraform**) that all talk to the same API, so nothing drifts between them.
 
-Run enterprise-grade virtual machines, software-defined networking, pluggable storage, and security policy on **any Linux server with KVM** — no vCenter, no heavyweight hypervisor stack, no systemd hard-requirement. One Rust daemon exposes **480+ REST endpoints** and live WebSocket channels; all four interfaces talk to the same daemon, so nothing drifts.
+It targets the gap between two extremes: **manual QEMU/KVM + shell scripts** (no security, no multi-user access, doesn't scale) and **VMware/OpenStack-class stacks** (hundreds to thousands of packages, dedicated ops teams, days to stand up). Fabric deploys in about 5 minutes, runs on any Linux server with KVM — no vCenter, no systemd hard-requirement — and still ships the things enterprise buyers actually ask for: RBAC, audit logging, HA clustering, live migration, GPU passthrough, and a 780+-endpoint REST API for automation.
 
-Fabric doesn't implement VM execution itself. It's the orchestration, API, auth, and UX layer on top of two independent sibling projects — **[FluxVM](https://github.com/zyvorai/fluxvm)** (the VM engine) and **[GuestKit](https://github.com/zyvorai/guestkit)** (offline disk tooling). Each layer is independently useful and Apache-2.0 licensed.
+Fabric doesn't implement VM execution itself — that's a deliberate design choice, not a gap. It's the orchestration, API, auth, and UX layer on top of two independent sibling projects: **[FluxVM](https://github.com/zyvorai/fluxvm)** (the VM engine) and **[GuestKit](https://github.com/zyvorai/guestkit)** (offline disk tooling). Each is independently useful, Apache-2.0 licensed, and separately adoptable.
 
 > **Naming:** the product is **Zyvor Fabric**; the daemon/unit/paths stay `zyvor-fabricd`. Canonical repo: [zyvorai/fabric](https://github.com/zyvorai/fabric). See [docs/NAMING.md](docs/NAMING.md) and [docs/POSITIONING.md](docs/POSITIONING.md).
 
@@ -95,11 +95,32 @@ curl -sf http://127.0.0.1:7788/readyz | jq .
 | Problem | Zyvor Fabric answer |
 |---------|---------------------|
 | Private cloud usually means a heavy hypervisor stack | A lightweight, disposable VM engine underneath ([FluxVM](https://github.com/zyvorai/fluxvm)) — no systemd dependency, no vCenter |
-| No unified API across interfaces | 480+ REST endpoints and 3 WebSocket channels, one daemon, four front doors |
+| No unified API across interfaces | 780+ REST endpoints and 3 WebSocket channels, one daemon, four front doors |
 | Scripting vs. GUI is usually either/or | CLI (`zyvorctl`) + web console + Terraform + Kubernetes operator, all first-class |
-| Enterprise needs RBAC, audit, and encryption | JWT auth, roles, audit export, encryption at rest |
+| Enterprise needs RBAC, audit, and encryption | JWT auth, 3-tier RBAC, audit export, encryption at rest |
 | GPU passthrough is bolted on elsewhere | Generic PCI/VFIO passthrough REST API on Linux KVM |
 | Guest images ship without your tooling | Offline image customization via [GuestKit](https://github.com/zyvorai/guestkit) |
+
+Full capability tour and metrics: **[docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md)**. Every feature, exhaustively: **[FEATURES.md](FEATURES.md)**.
+
+---
+
+## Is this for you?
+
+Zyvor Fabric is a strong fit when:
+
+- **You don't want a systemd hard-requirement for VM lifecycle** — VMs run under [FluxVM](https://github.com/zyvorai/fluxvm)'s own process supervision, not as systemd units; host networking uses direct netlink calls. systemd stays fully supported as one option for supervising the `zyvor-fabricd` daemon process itself, for operators who want it.
+- **You need API-first automation** — a 780+-endpoint REST API for infrastructure-as-code, CI/CD pipelines, or custom tooling, not a GUI-only or XML-RPC-only product.
+- **You're running single-host or small-cluster deployments** — lightweight VM management without the operational overhead of full cluster orchestration platforms.
+- **You're security-conscious** — PAM/LDAP/OIDC authentication, role-based access control, audit logging, and network policy enforcement are built in, not bolted on.
+
+Look elsewhere when:
+
+- **You need large multi-host clusters with mature live migration today** — Proxmox VE or oVirt offer more battle-tested shared-storage live migration out of the box; Fabric's native live-migration transport is still preview (see [Comparison Matrix](docs/guides/decision-support/comparison-matrix.md)).
+- **You're deep in an existing libvirt ecosystem** — Fabric talks to FluxVM's own REST API, not libvirt's XML domain definitions; migrating existing libvirt tooling means API adaptation, not a drop-in swap.
+- **You need first-class Windows guest support** — Fabric focuses on Linux guests via QEMU/KVM; for mixed Windows/Linux fleets, Proxmox or full libvirt access is more mature there.
+
+Full comparison against libvirt/virsh and Proxmox VE: **[docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md)**. Common questions: **[FAQ](docs/quick-reference/faq.md)**.
 
 ---
 
@@ -231,7 +252,7 @@ flowchart TB
 
 **Fabric decides what should exist; FluxVM makes it exist; GuestKit prepares the disk.**
 
-Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-edge dataplane**, so per-VM policy, rate limits, and telemetry are first-class — not afterthought scripts bolted onto a shared bridge. The full mechanics (kernel program flow, packet decision tree, control-plane sequence, and a head-to-head comparison against libvirt/nft, shared-bridge, QEMU usermode, and CNI microVMs) are one section down: **[Network Fabric architecture →](#network-fabric-architecture-how-it-works)**.
+Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-edge dataplane**, so per-VM policy, rate limits, and telemetry are first-class — not afterthought scripts bolted onto a shared bridge. The full mechanics (kernel program flow, packet decision tree, control-plane sequence, and a head-to-head comparison against libvirt/nft, shared-bridge, QEMU usermode, and CNI microVMs) live in their own doc: **[Network Fabric architecture →](docs/network-fabric-architecture.md)**.
 
 ---
 
@@ -240,12 +261,15 @@ Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-
 | Metric | Value |
 |--------|-------|
 | Rust crates | 53 |
-| REST endpoints | 480+ |
+| REST endpoints | 780+ (main API) — 824 combined with the OpenStack-compatibility layer |
 | LOC | ~87K (60K Rust + 27K TS) |
 | Web stack | React 19.2 · Vite · Tailwind |
 | Interfaces | 4 (CLI, Web, Operator, Terraform) + Fabric Doctor |
-| Web pages | 80+ console routes + marketing |
+| Web pages | 92 (87 console + 5 marketing) |
+| Security | 31-round audit, 194 issues found and fixed, 0 outstanding ([report](docs/SECURITY_AUDIT_REPORT.md)) |
 | Deploy modes | Bare metal · Docker · Kubernetes · Operator |
+
+All figures above are counted directly from source (route definitions, router config, crate manifest, audit report) — see [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) for the methodology.
 
 ---
 
@@ -258,10 +282,10 @@ Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-
 | Architecture | [docs/architecture.md](docs/architecture.md) | FluxVM driver | [docs/guides/vm-drivers/fluxvm.md](docs/guides/vm-drivers/fluxvm.md) | OIDC / SSO | [docs/oidc.md](docs/oidc.md) |
 | Docs index | [docs/README.md](docs/README.md) | Fabric Doctor (preflight) | [docs/FABRIC_DOCTOR.md](docs/FABRIC_DOCTOR.md) · [tools/fabric-doctor](tools/fabric-doctor/) | SCIM identity | [docs/scim-identity.md](docs/scim-identity.md) |
 | Naming / clone URL | [docs/NAMING.md](docs/NAMING.md) | | | Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
-| Product positioning | [docs/POSITIONING.md](docs/POSITIONING.md) | | | VM edge dataplane (Network Fabric v4) | [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) |
-| | | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
-| | | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
-| | | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
+| Product positioning | [docs/POSITIONING.md](docs/POSITIONING.md) | | | VM edge dataplane (Network Fabric v4) | [docs/network-fabric-architecture.md](docs/network-fabric-architecture.md) · [operator guide](docs/guides/vm-drivers/fluxvm-dataplane.md) |
+| Product overview + metrics | [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
+| Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
+| FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | | | | | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |
 | | | | | Host maintenance | [docs/host-lifecycle.md](docs/host-lifecycle.md) |
 | | | | | User manuals | [docs/user/README.md](docs/user/README.md) |
@@ -311,279 +335,11 @@ Historical build summaries in the repo root are snapshots — **`docs/` and this
 
 ---
 
-## Network Fabric architecture (how it works)
-
-Fabric exposes FluxVM **Network Fabric schema v4** (TC/eBPF VM-edge dataplane) as first-class API, CLI, and UI — while keeping Fabric's own host SDN separate. Operator guide: [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). Kernel program source of truth: [FluxVM Network Fabric](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works).
-
-### Two policy planes (do not conflate)
-
-| Plane | Owns | API / UX |
-|-------|------|----------|
-| **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · Security → Network Policies |
-| **VM edge (Network Fabric schema v4)** | Per-VM allowlists, Mbps/PPS, stats/flows on the TAP/netns edge | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** tab · `zyvorctl dataplane …` |
-| **Service Fabric v6** (BPF schema 4 / gen 6) | Maglev VIP LB + EDT/FluxScope/host-routing + leases + HA deltas + identity/L7 policy | `/api/dataplane/services…` · Edge Dataplane → **Services** · [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
-
-```mermaid
-flowchart LR
-  UI[Web / zyvorctl / Terraform]
-  Fabricd[zyvor-fabricd]
-  Client[fluxvm-client]
-  FluxVM["fluxvm serve"]
-  TC[TC eBPF VM edge]
-  SDN[Fabric network-policies nftables]
-
-  UI --> Fabricd
-  Fabricd -->|"/api/vms/name/dataplane/*"| Client
-  Client -->|"/v1/vms/id/network/*"| FluxVM
-  FluxVM --> TC
-  Fabricd --> SDN
-```
-
-### Big picture (Fabric + FluxVM + kernel)
-
-```mermaid
-flowchart TB
-  subgraph fabricCtrl [Fabric control plane]
-    WebTab[VM Dataplane tab]
-    Zctl[zyvorctl dataplane]
-    FabAPI["/api/vms/name/dataplane\nstatus policy stats flows"]
-    Driver[VmDataplaneDriver]
-    FClient[fluxvm-client]
-    WebTab --> FabAPI
-    Zctl --> FabAPI
-    FabAPI --> Driver --> FClient
-  end
-
-  subgraph fluxCtrl [FluxVM control plane]
-    NetAPI["/v1/vms/id/network"]
-    Sched[fluxvm-scheduler]
-    DP[fluxvm-network dataplane]
-    NetAPI --> Sched --> DP
-  end
-
-  subgraph durable [Durable + runtime state]
-    PolJSON["/var/lib/fluxvm/network-policy/uuid.json"]
-    Pins["/sys/fs/bpf/fluxvm/vms/uuid/\nprogs + maps"]
-    Meta["/run/fluxvm/ebpf/vms/uuid/\niface prog_id schema fingerprint"]
-  end
-
-  subgraph guestPath [Guest packet path]
-    Guest[Guest OS]
-    TAP[TAP / macvtap / netns]
-    HostEdge["Host-visible iface\nvh-star or tap"]
-    TC["TC ingress\nfluxvm_egress"]
-    HostRt[Host routing / Cilium / Fabric SDN]
-    Guest --> TAP --> HostEdge --> TC --> HostRt
-  end
-
-  FClient --> NetAPI
-  DP -->|configure maps before attach| Pins
-  DP -->|fsync policy + fingerprint| PolJSON
-  DP -->|ownership sidecars| Meta
-  DP -->|tc filter add / reconfigure| TC
-  Sched -->|reconcile heal + orphan GC| DP
-```
-
-### Namespaced TAP path (what Fabric bridged VMs use)
-
-Fabric creates bridged VMs with `NetworkSpec::Tap { netns: true }`. The classifier attaches on the **host** veth (`vh-…`), not inside the guest:
-
-```mermaid
-flowchart LR
-  VM[Guest]
-  TapNs[TAP in netns]
-  Br[netns bridge]
-  VethNs[veth in netns]
-  VethHost["host veth vh-id"]
-  TcHook["TC ingress FluxVM eBPF"]
-  Out[Host stack / Cilium / SDN]
-
-  VM --> TapNs --> Br --> VethNs --> VethHost --> TcHook --> Out
-```
-
-Direct TAP/macvtap (non-netns) attaches on the host-visible TAP/macvtap itself.
-
-### Packet decision inside the TC program
-
-```mermaid
-flowchart TD
-  In[Packet on ingress] --> Look{fluxvm_id<br/>ifindex lookup}
-  Look -->|miss| Pass[TC_ACT_OK / pass]
-  Look -->|hit| Boot{ARP/DHCP/NDP/DHCPv6?}
-  Boot -->|yes| Allow[allow + stats/flows]
-  Boot -->|no| Fam{IPv4 or IPv6?}
-  Fam -->|other| Def{default_allow?}
-  Def -->|true| Allow
-  Def -->|false| Drop[drop + stats/events]
-  Fam -->|v4/v6| Cidr{enforce_cidr?}
-  Cidr -->|yes| Lpm["LPM fluxvm_v4 / fluxvm_v6"]
-  Lpm -->|miss| Drop
-  Lpm -->|hit| L4
-  Cidr -->|no| L4{enforce_l4?}
-  L4 -->|yes| Port["fluxvm_l4 proto+port"]
-  Port -->|miss| Drop
-  Port -->|hit| Rate
-  L4 -->|no| Rate{Mbps/PPS set?}
-  Rate -->|yes| Win["fluxvm_rate fixed 1s window"]
-  Win -->|over| Drop
-  Win -->|ok| Allow
-  Rate -->|no| Allow
-```
-
-### Control-plane lifecycle (through Fabric)
-
-```mermaid
-sequenceDiagram
-  participant Op as Operator Web or CLI
-  participant Fab as zyvor-fabricd
-  participant Fv as FluxVM scheduler
-  participant Dp as dataplane eBPF
-  participant Kern as Kernel TC maps
-
-  Op->>Fab: create or start bridged VM
-  Fab->>Fv: POST v1 vms Tap netns true
-  Fv->>Dp: apply_sandbox_policy
-  Dp->>Kern: load and pin prog maps
-  Dp->>Kern: write fluxvm_id CIDR L4 rate maps
-  Dp->>Kern: tc filter add after maps ready
-  Dp->>Dp: write run meta and fingerprint
-
-  Op->>Fab: POST dataplane policy
-  Fab->>Fv: POST network policy
-  Fv->>Dp: reconfigure_sandbox_policy
-  Dp->>Kern: deny-all on iface
-  Dp->>Kern: replace CIDR L4 rate maps
-  Dp->>Kern: publish final iface config
-  Note over Dp,Kern: Brief over-deny window only never allow-all
-
-  Op->>Fab: GET dataplane status stats flows
-  Fab->>Fv: GET network status stats flows
-  Fv-->>Fab: JSON
-  Fab-->>Op: same shape
-
-  Fv->>Dp: reconcile tick
-  alt needsRepair
-    Dp->>Kern: ensure_sandbox_policy reload
-  end
-  Dp->>Dp: reconcile_orphan_pins for dead UUIDs
-```
-
-### Where state lives
-
-| Location | Contents |
-|----------|----------|
-| Fabric API | Name-keyed proxy; resolves VM name → FluxVM UUID via `fluxvm-client` |
-| `/sys/fs/bpf/fluxvm/vms/<uuid>/` | Pinned TC program + maps (`fluxvm_id`, `v4`, `v6`, `l4`, `rate`, `stats`, `flows`, `events`) |
-| `/run/fluxvm/ebpf/vms/<uuid>/` | `iface`, `prog_id`, `schema_version`, `policy_fingerprint` (not on bpffs) |
-| `/run/fluxvm/xdp/` | Optional XDP `iface` + `prog_id` |
-| `/var/lib/fluxvm/network-policy/<uuid>.json` | Durable per-VM policy (fsync + rename) |
-
-### Modes vs ownership
-
-```mermaid
-flowchart TB
-  Mode{sandbox.dataplane.mode}
-  Mode -->|legacy| Nft[nftables only]
-  Mode -->|ebpf| Edge[FluxVM TC on VM edge]
-  Mode -->|cilium| Check[Require cilium.sock + bpffs]
-  Check --> Edge
-  Edge --> Own["Pins only under /sys/fs/bpf/fluxvm\nnever Cilium private maps"]
-  Xdp[Optional XDP on uplink]
-  Edge -.->|refused when cilium| Xdp
-  FabSDN[Fabric /network-policies]
-  FabSDN -.->|independent host SDN| HostNft[host nftables]
-```
-
-### REST surface (Fabric ↔ FluxVM)
-
-| Fabric | FluxVM | Role |
-|--------|--------|------|
-| `GET …/dataplane/status` | `GET …/network/status` | mode, attached, schema_version, policy_synced, iface |
-| `GET/POST …/dataplane/policy` | `GET/POST …/network/policy` | Read / replace durable policy (+ live map update) |
-| `GET …/dataplane/stats` | `GET …/network/stats` | allow/drop packet + byte counters |
-| `GET …/dataplane/flows?limit=` | `GET …/network/flows?limit=` | LRU flows with `family` 4/6 |
-
-```bash
-zyvorctl dataplane status <name>
-zyvorctl dataplane policy get|set <name> [--file policy.json]
-zyvorctl dataplane stats <name>
-zyvorctl dataplane flows <name> [--limit 100]
-```
-
-HTTPS labs: `export ZYVOR_FABRIC_URL=https://127.0.0.1:9095` and `export ZYVOR_FABRIC_TOKEN=<jwt>` (from `/api/auth/login`).
-
-### Enable packaging
-
-Ship [`configs/fluxvm-dataplane.toml`](configs/fluxvm-dataplane.toml) (`mode = "ebpf"`). Compose/k8s mount it as `/etc/fluxvm.toml`, mount host `/sys/fs/bpf`, and raise memlock (`SYS_RESOURCE` / `ulimit memlock=-1`). Image must include `/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o`. After first green attach (`schema_version=4`, `attached=true`), set `required = true` for fail-closed production.
-
-### Why Fabric + Network Fabric is ahead of other VMMs
-
-Most hypervisor stacks still treat VM egress as **host netfilter theater**: libvirt/iptables chains, a shared bridge + firewall, or QEMU user-mode NAT. Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-edge dataplane**, so policy, rate limits, and telemetry are first-class — not afterthought scripts.
-
-```mermaid
-flowchart LR
-  subgraph traditional [Traditional VMM path]
-    TGuest[Guest] --> TTap[TAP / bridge]
-    TTap --> TNft[iptables / nft / virbr0]
-    TNft --> TOut[Host / WAN]
-  end
-
-  subgraph fabricPath [Fabric + FluxVM Network Fabric schema v4]
-    FGuest[Guest] --> FTap[TAP / netns veth]
-    FTap --> FEbpf["TC eBPF on VM edge\nLPM · L4 · Mbps/PPS · flows"]
-    FEbpf --> FOut[Host / Cilium / Fabric SDN]
-    UX[Web Dataplane tab · zyvorctl · REST] -.->|live map rewrite| FEbpf
-  end
-```
-
-```mermaid
-quadrantChart
-    title Control-plane maturity vs packet-path speed
-    x-axis Slow / rebuild-heavy --> Fast / in-kernel maps
-    y-axis Scripted / host-only --> API + UI + telemetry
-    quadrant-1 Ahead today
-    quadrant-2 UX without speed
-    quadrant-3 Legacy baseline
-    quadrant-4 Fast but opaque
-    Libvirt nft: [0.25, 0.30]
-    Shared bridge FW: [0.35, 0.35]
-    QEMU usernet: [0.15, 0.20]
-    Cloud hypervisor raw: [0.55, 0.25]
-    Firecracker CNI: [0.60, 0.40]
-    Fabric plus Network Fabric schema v4: [0.88, 0.90]
-```
-
-| Capability | libvirt / virsh + nft | Shared bridge + host FW | QEMU user NAT | Typical microVM + CNI | **Fabric + Network Fabric schema v4** |
-|---|---|---|---|---|---|
-| Per-VM L3/L4 egress allowlists | Manual chains | Host-wide rules | Soft / limited | Pod-oriented | **First-class** `allow_cidrs` + `tcp\|udp/PORT` |
-| Live policy without detach | Flush/reload gaps | Blast radius | Restart usernet | CNI reconcile | **In-place BPF map update** (~100–120 ms p50 in lab) |
-| Mbps / PPS egress caps | Separate tc/htb | Rare | Soft | Depends on CNI | **Maps on the same classifier** |
-| Dual-stack L3+L4 | Easy to drift | Often IPv4-only | Limited | Varies | **One TC program** |
-| Per-VM stats + LRU flows via API | tcpdump / conntrack | Host-centric | Almost none | Sidecar / Hubble-ish | **`/dataplane/stats` + `/flows`** |
-| Operator UX | virsh + shell | Same | Same | kubectl-heavy | **VM → Dataplane tab · `zyvorctl dataplane` · 4 REST verbs** |
-| Host SDN still available | You build it | You build it | N/A | NetworkPolicy | **Fabric `/network-policies` orthogonal** |
-| Cilium coexistence | iptables fights | Same | N/A | Native | **`mode=cilium` — FluxVM owns VM edge only** |
-
-**Shipped in Fabric UX (all wired; lab UX verified):**
-
-| Surface | Status · Policy · Stats · Flows |
-|---------|----------------------------------|
-| Web | VM details → **Dataplane** (presets, JSON, identity column, auto-refresh) |
-| REST | `/api/vms/{name}/dataplane/{status,policy,stats,flows}` |
-| CLI | `zyvorctl dataplane …` (`ZYVOR_FABRIC_URL` + `ZYVOR_FABRIC_TOKEN` for HTTPS labs) |
-| Dashboard | **VM dataplane** capability card (`mode` / attached / schema) |
-
-Operator guide (enablement, create-bridged recipe, troubleshooting, UX checklist): [docs/guides/vm-drivers/fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md). User console: [docs/user/pages/infrastructure/dataplane.md](docs/user/pages/infrastructure/dataplane.md).
-
-Kernel program SoT: [FluxVM — Why Network Fabric is faster](https://github.com/zyvorai/fluxvm#why-network-fabric-is-faster-than-traditional-vm-networking).
-
----
-
 ## License
 
 ### Open source (Apache-2.0)
 
-This repository is licensed under the [Apache License, Version 2.0](LICENSE).
+This repository is licensed under the [Apache License, Version 2.0](LICENSE), in full — there is no dual-licensing or separately-licensed core component.
 You may use, modify, and run it for personal, lab, and commercial production
 use at no charge, subject to Apache-2.0 (preserve notices / NOTICE where required).
 See [NOTICE](NOTICE).

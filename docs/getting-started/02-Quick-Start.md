@@ -255,7 +255,7 @@ Returns `204 No Content` on success.
 
 - [Configuration Reference](03-Configuration.md) -- customize Zyvor Fabric settings (`listen`, `public_url`)
 - [Web UI Guide](04-Web-UI.md) -- explore the full web dashboard
-- [API Reference](../api.md) -- learn the 520+ API endpoints
+- [API Reference](../api.md) -- learn the 780+ API endpoints
 - [Tutorial 08: OpenStack clients](../tutorials/08-openstack-clients.md) -- point `openstack` CLI at Fabric
 - [OpenStack Compatibility](../openstack-compat.md) -- optional façade reference
 - [Networking Guide](../networking.md) -- configure VM networking

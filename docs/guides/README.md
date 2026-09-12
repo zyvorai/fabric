@@ -8,7 +8,7 @@ This directory contains practical guides for installing, operating, and making i
 
 Command-line interface reference and API usage guide for interacting with the Zyvor Fabric REST API.
 
-- **[API Reference](cli/api-reference.md)** -- Complete REST API reference with 480+ endpoints organized by category. Includes request/response formats, authentication details, and curl examples for every endpoint group.
+- **[API Reference](cli/api-reference.md)** -- Complete REST API reference with 780+ endpoints organized by category. Includes request/response formats, authentication details, and curl examples for every endpoint group.
 
 ### [Operations Guide](operations/)
 

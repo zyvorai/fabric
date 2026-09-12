@@ -67,7 +67,7 @@ A comprehensive multi-round security audit was performed on the Zyvor Fabric cod
 
 The audit covered the entire Zyvor Fabric backend:
 
-- **Core daemon** (`Zyvor Fabric`) — REST API server with 480+ endpoints
+- **Core daemon** (`Zyvor Fabric`) — REST API server with 780+ endpoints
 - **VM driver** (`zyvor-fabric-vm-driver`) — FluxVM VM lifecycle integration
 - **Security** (`security`) — JWT authentication, RBAC, user management
 - **Storage** (`Zyvor Fabric-storage`) — LVM, ZFS, NFS, Ceph backends

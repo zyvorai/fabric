@@ -27,7 +27,7 @@ These crates form the foundation of the Zyvor Fabric platform.
 
 | Crate          | Path                    | Description                                              |
 |----------------|-------------------------|----------------------------------------------------------|
-| `zyvor-fabricd`    | `backend/zyvor-fabricd`     | Main daemon binary. Axum HTTP server, 480+ REST endpoints, WebSocket console, SSE events, background task orchestrator, plugin system. |
+| `zyvor-fabricd`    | `backend/zyvor-fabricd`     | Main daemon binary. Axum HTTP server, 780+ REST endpoints, WebSocket console, SSE events, background task orchestrator, plugin system. |
 | `vm-model`     | `backend/vm-model`      | Core data structures: `VM`, `VMState`, `CreateVMRequest`, `VMStartOptions`, `VMMetrics`. Shared across all crates. |
 | `state-store`  | `backend/state-store`   | File-based persistent storage. Atomic JSON writes, in-memory VM cache, paginated queries, path traversal protection. |
 | `security`     | `backend/security`      | Authentication and authorization. JWT token management, PAM integration, RBAC (Admin/User/Viewer), user database (SQLite), audit logging, Axum extractors. |

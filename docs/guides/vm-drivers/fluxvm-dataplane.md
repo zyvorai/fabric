@@ -14,8 +14,8 @@ Kernel program and safety properties live in FluxVM:
 [docs/network-fabric.md](https://github.com/zyvorai/fluxvm/blob/main/docs/network-fabric.md).
 
 Fabric-side diagrams (control plane, packet path, modes, vs other VMMs):
-[README — Network Fabric](../../README.md#network-fabric-architecture-how-it-works) ·
-[Why Fabric is ahead of other VMMs](../../README.md#why-fabric--network-fabric-is-ahead-of-other-vmms).
+[Network Fabric architecture](../network-fabric-architecture.md) ·
+[Why Fabric is ahead of other VMMs](../network-fabric-architecture.md#why-fabric--network-fabric-is-ahead-of-other-vmms).
 
 ---
 
