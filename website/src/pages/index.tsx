@@ -6,6 +6,8 @@ import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 import FeatureHighlights from '@site/src/components/FeatureHighlights';
 import Reveal from '@site/src/components/Reveal';
+import ParallaxImage from '@site/src/components/ParallaxImage';
+import StatBand from '@site/src/components/StatBand';
 
 import styles from './index.module.css';
 
@@ -41,11 +43,13 @@ function HomepageHeader() {
         </div>
       </div>
       <div className={styles.heroMediaWrap}>
-        <img
-          className={styles.heroMedia}
-          src={dashboard}
-          alt="Zyvor Fabric console dashboard — fleet health, capability status, and live VM metrics"
-        />
+        <ParallaxImage>
+          <img
+            className={styles.heroMedia}
+            src={dashboard}
+            alt="Zyvor Fabric console dashboard — fleet health, capability status, and live VM metrics"
+          />
+        </ParallaxImage>
         <p className={styles.heroMediaCaption}>
           The console dashboard — a real deployment, not a mockup.
         </p>
@@ -157,6 +161,9 @@ export default function Home(): ReactNode {
       <HomepageHeader />
       <main>
         <ProblemStatement />
+        <Reveal>
+          <StatBand />
+        </Reveal>
         <Reveal>
           <FeatureHighlights />
         </Reveal>

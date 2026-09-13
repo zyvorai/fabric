@@ -77,6 +77,35 @@
 }
 
 /* ---------------------------------------------------------------------
+ * Pill-shaped CTA buttons with a soft hover glow — apple.com's button
+ * treatment, applied to every `.button` site-wide.
+ * ------------------------------------------------------------------- */
+.button {
+  border-radius: 980px;
+  font-weight: 500;
+  transition: transform 0.2s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.button:hover {
+  transform: scale(1.03);
+}
+
+.button--primary:hover {
+  box-shadow: 0 8px 24px rgba(0, 113, 227, 0.35);
+}
+
+.hero--primary .button--secondary:hover {
+  box-shadow: 0 8px 24px rgba(245, 245, 247, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button:hover {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
  * Minimal nav: apple.com's persistent black top bar — thin, translucent,
  * always dark regardless of the page's light/dark theme.
  * ------------------------------------------------------------------- */
@@ -111,6 +140,25 @@
    light so it's visible on the always-black navbar. */
 .navbar [class*='toggle'] svg {
   color: #f5f5f7;
+}
+
+/* Local search bar (docusaurus-search-local): a translucent pill on the
+   always-black navbar, matching the rest of the nav chrome. */
+.navbar__search-input {
+  border-radius: 980px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f5f5f7;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.navbar__search-input::placeholder {
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.navbar__search-input:focus {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 /* ---------------------------------------------------------------------
@@ -196,4 +244,69 @@ article .markdown li {
 
 .theme-doc-markdown {
   max-width: 46rem;
+}
+
+/* ---------------------------------------------------------------------
+ * Docs content polish: code blocks, admonitions, TOC, breadcrumbs, and
+ * anchor-link affordances — otherwise unstyled Infima defaults.
+ * ------------------------------------------------------------------- */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+article .markdown h1,
+article .markdown h2,
+article .markdown h3,
+article .markdown h4 {
+  scroll-margin-top: 5.5rem;
+}
+
+div[class*='codeBlockContainer'] {
+  border-radius: 12px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  box-shadow: none;
+}
+
+.admonition {
+  border-radius: 12px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-left-width: 4px;
+  box-shadow: none;
+}
+
+.admonition-icon svg {
+  color: var(--ifm-color-primary);
+}
+
+.table-of-contents {
+  font-size: 0.85rem;
+  border-left: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.table-of-contents__link--active {
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+
+.theme-doc-breadcrumbs {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.hash-link {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+h1:hover .hash-link,
+h2:hover .hash-link,
+h3:hover .hash-link,
+h4:hover .hash-link {
+  opacity: 0.6;
 }

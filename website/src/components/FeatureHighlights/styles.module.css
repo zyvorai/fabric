@@ -5,6 +5,8 @@
 
 .card {
   display: block;
+  position: relative;
+  overflow: hidden;
   height: 100%;
   padding: 2rem 1.75rem;
   margin-bottom: 1.5rem;
@@ -16,6 +18,20 @@
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(0, 113, 227, 0.12),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
 .card:hover {
   border-color: var(--ifm-color-primary);
   transform: translateY(-2px);
@@ -24,7 +40,27 @@
   text-decoration: none;
 }
 
+.card:hover::before {
+  opacity: 1;
+}
+
+.cardIcon {
+  display: inline-flex;
+  margin-bottom: 1.25rem;
+  color: var(--ifm-color-primary);
+}
+
+.cardIcon svg {
+  width: 30px;
+  height: 30px;
+}
+
 .card p {
+  position: relative;
   margin-bottom: 0;
   color: var(--ifm-color-emphasis-700);
+}
+
+.card :global(h3) {
+  position: relative;
 }

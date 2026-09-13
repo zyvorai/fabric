@@ -40,6 +40,32 @@ const config: Config = {
   // duplicating it into website/static — see website/README.md.
   staticDirectories: ['static', '../docs/assets'],
 
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'apple-touch-icon',
+        sizes: '180x180',
+        href: '/fabric/img/apple-touch-icon.png',
+      },
+    },
+  ],
+
+  plugins: [
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        // Self-hosted, build-time index — no external Algolia account/API
+        // keys needed. See website/README.md.
+        hashed: true,
+        indexDocs: true,
+        indexPages: false,
+        docsRouteBasePath: '/docs',
+        language: 'en',
+      },
+    ],
+  ],
+
   presets: [
     [
       'classic',
@@ -61,6 +87,7 @@ const config: Config = {
   ],
 
   themeConfig: {
+    image: 'img/social-card.png',
     colorMode: {
       respectPrefersColorScheme: true,
     },
