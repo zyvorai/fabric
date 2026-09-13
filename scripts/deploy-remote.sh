@@ -88,6 +88,7 @@ Examples:
   deploy-remote.sh check sus@host
 
 Env: DEPLOY_HOST DEPLOY_USER DEPLOY_DIR SSH_PORT SSHPASS HEALTH_URL STRICT SYNC_ONLY
+     FABRIC_ADMIN_PASSWORD ZYVOR_FABRICD_ADMIN_PASSWORD FABRIC_LAB_DEFAULTS FORCE_ADMIN_RESET
 
 After each rsync, sudo chown on the deploy tree so interrupted sudo builds cannot
 leave root-owned target/ (cargo EACCES on --quick).
@@ -513,6 +514,22 @@ ok "Rust binaries built"
 install_step=$((install_step + 1))
 
 phase "$install_step" "$TOTAL_STEPS" "Install binaries and systemd units" "config · directories · zyvorctl · restart service"
+
+# The daemon only seeds the admin account's password when auth.db has no
+# users yet (backend/security/src/db.rs seed_admin) -- on every normal
+# start it's a no-op if an admin already exists. So a password we resolve
+# below only actually takes effect when auth.db doesn't exist yet, or when
+# FORCE_ADMIN_RESET=1 wipes it first. Detect that up front so we don't
+# overwrite .admin_password with a value that silently never applies.
+AUTH_DB_EXISTS=false
+if ssh_r_bash "$REMOTE" "[ -f /var/lib/zyvor-fabricd/auth.db ] && echo yes || echo no" | tr -d '\r' | grep -q '^yes$'; then
+    AUTH_DB_EXISTS=true
+fi
+ADMIN_APPLIES=true
+if $AUTH_DB_EXISTS && [ "${FORCE_ADMIN_RESET:-0}" != 1 ]; then
+    ADMIN_APPLIES=false
+fi
+
 # Password: explicit env > FABRIC_LAB_DEFAULTS=1 (Admin@321) > random (never silent Admin@321)
 GENERATED_ADMIN_PASS=false
 if [[ -n "${FABRIC_ADMIN_PASSWORD:-}" ]]; then
@@ -539,6 +556,7 @@ BIND='${BIND}'
 OPEN_FW='${OPEN_FW}'
 NO_START='${NO_START}'
 API_PORT='${API_PORT}'
+ADMIN_APPLIES='${ADMIN_APPLIES}'
 cd \"\$REMOTE_DIR\"
 
 for bin in zyvor-fabricd zyvorctl; do
@@ -558,7 +576,8 @@ fi
 
 # Admin password (resolved on deploy host; never silent Admin@321).
 # FABRIC_ADMIN_PASSWORD / ZYVOR_FABRICD_ADMIN_PASSWORD, or FABRIC_LAB_DEFAULTS=1 → Admin@321.
-# FORCE_ADMIN_RESET=1 wipes auth.db and reseeds.
+# FORCE_ADMIN_RESET=1 wipes auth.db and reseeds -- note this deletes ALL
+# accounts (auth.db is a single `users` table), not just admin.
 ADMIN_PASS='${ADMIN_PASS}'
 ENV_FILE=/etc/zyvor-fabricd/zyvor-fabricd.env
 if [ ! -f \"\$ENV_FILE\" ] && [ -f configs/zyvor-fabricd.env ]; then
@@ -570,14 +589,20 @@ if \$SUDO grep -q '^ZYVOR_FABRICD_ADMIN_PASSWORD=' \"\$ENV_FILE\" 2>/dev/null; t
 else
     echo \"ZYVOR_FABRICD_ADMIN_PASSWORD=\${ADMIN_PASS}\" | \$SUDO tee -a \"\$ENV_FILE\" >/dev/null
 fi
-printf '%s' \"\$ADMIN_PASS\" | \$SUDO tee /var/lib/zyvor-fabricd/.admin_password >/dev/null
-\$SUDO chmod 600 /var/lib/zyvor-fabricd/.admin_password
+if [ \"\$ADMIN_APPLIES\" = true ]; then
+    printf '%s' \"\$ADMIN_PASS\" | \$SUDO tee /var/lib/zyvor-fabricd/.admin_password >/dev/null
+    \$SUDO chmod 600 /var/lib/zyvor-fabricd/.admin_password
+fi
 if [ '${FORCE_ADMIN_RESET:-0}' = 1 ]; then
     \$SUDO systemctl stop zyvor-fabricd 2>/dev/null || true
     \$SUDO rm -f /var/lib/zyvor-fabricd/auth.db /var/lib/zyvor-fabricd/auth.db-wal /var/lib/zyvor-fabricd/auth.db-shm
-    echo '  ✅ Reset auth.db — admin will be reseeded on start'
+    echo '  ✅ Reset auth.db (all accounts wiped) — admin will be reseeded on start'
 fi
-echo '  ✅ Admin password set (admin · see /var/lib/zyvor-fabricd/.admin_password)'
+if [ \"\$ADMIN_APPLIES\" = true ]; then
+    echo '  ✅ Admin password set (admin · see /var/lib/zyvor-fabricd/.admin_password)'
+else
+    echo '  ⚠️  auth.db already existed — admin password NOT changed (daemon only seeds a password into an empty auth.db). Rerun with FORCE_ADMIN_RESET=1 to reset it (wipes ALL accounts, not just admin).'
+fi
 
 if [ -n \"\$BIND\" ] && [ -f /etc/zyvor-fabricd/zyvor-fabricd.toml ]; then
     \$SUDO sed -i \"s/listen = \\\"127.0.0.1:/listen = \\\"\${BIND}:/\" /etc/zyvor-fabricd/zyvor-fabricd.toml
@@ -690,11 +715,15 @@ fabric_save_deploy_last "$REPO" "$HOST" "$USER" "$MODE_SAVE"
 deploy_ui_highlight "📋 Post-deploy checklist"
 deploy_ui_checklist "zyvor-fabricd" "$(ssh_r_bash "$REMOTE" 'systemctl is-active zyvor-fabricd 2>/dev/null || echo unknown' | tr -d '\r')"
 deploy_ui_checklist "health" "$(curl -skf --connect-timeout 5 "https://${HOST}:${API_PORT}/health" >/dev/null && echo 200 || echo fail)"
+deploy_ui_checklist "admin login" "$([ "${ADMIN_APPLIES:-true}" = true ] && echo ok || echo warn)"
 
 deploy_ui_celebrate "Ship it!"
 fabric_print_success "$HOST" "$ELAPSED" "$USER"
 deploy_ui_kv "🔗" "SSH" "ssh ${USER}@${HOST}"
-if [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]] && [[ -z "${FABRIC_ADMIN_PASSWORD:-}" ]] && [[ -z "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
+if [[ "${ADMIN_APPLIES:-true}" != true ]]; then
+    warn "auth.db already existed on this host — admin credentials were NOT changed by this deploy"
+    tip "Live login is whatever was last seeded here. To set a new password now: rerun with FORCE_ADMIN_RESET=1 (wipes auth.db — deletes ALL accounts, not just admin)"
+elif [[ "${FABRIC_LAB_DEFAULTS:-}" == "1" ]] && [[ -z "${FABRIC_ADMIN_PASSWORD:-}" ]] && [[ -z "${ZYVOR_FABRICD_ADMIN_PASSWORD:-}" ]]; then
     deploy_ui_kv "🔑" "Login" "admin / Admin@321  (FABRIC_LAB_DEFAULTS=1 · reset: FORCE_ADMIN_RESET=1)"
 elif $GENERATED_ADMIN_PASS; then
     deploy_ui_kv "🔑" "Login" "admin / (generated · sudo cat /var/lib/zyvor-fabricd/.admin_password)"
