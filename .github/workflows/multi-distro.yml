@@ -62,7 +62,7 @@ jobs:
       - name: Install ${{ matrix.name }} system dependencies
         run: ${{ matrix.install }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust
         run: |
