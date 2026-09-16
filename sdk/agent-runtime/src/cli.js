@@ -3,69 +3,104 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { build } from "esbuild";
-import { readFile } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { basename, dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 function usage(exitCode = 0) {
-  console.log(`fabric-agent deploy <agent.ts> --name <name> --template <fluxvm-template> [options]\n\nOptions:\n  --allow-host <host>       repeatable egress allow host\n  --credential <name>       repeatable host-side credential grant\n  --allow-private-network  permit brokered private/link-local destinations\n  --runtime-port <port>     guest worker port (default 8080)\n  --ttl <seconds>           default session TTL\n  --max-concurrency <n>     cap non-terminal sessions for this agent\n  --idle-hibernate <sec>    hibernate only while blocked in ctx.nextSteer()\n  --warm-pool <n>           keep n single-use sandboxes prewarmed\n  --url <url>               Fabric Agent Runtime URL\n  --token <token>           Fabric Agent Runtime bearer token`);
+  console.log(`fabric-agent deploy <agent.ts> --name <name> --template <fluxvm-template> [options]
+fabric-agent build <agent.ts> [--out <file>]
+
+Options (deploy):
+  --allow-host <host>       repeatable egress allow host
+  --credential <name>       repeatable host-side credential grant
+  --allow-private-network  permit brokered private/link-local destinations
+  --runtime-port <port>     guest worker port (default 8080)
+  --ttl <seconds>           default session TTL
+  --max-concurrency <n>     cap non-terminal sessions for this agent
+  --idle-hibernate <sec>    hibernate only while blocked in ctx.nextSteer()
+  --warm-pool <n>           keep n single-use sandboxes prewarmed
+  --url <url>               Fabric Agent Runtime URL
+  --token <token>           Fabric Agent Runtime bearer token
+
+Options (build):
+  --out <file>              output path for the bundled .mjs file (default: <entry>.bundle.mjs)
+
+"build" runs the same esbuild bundling step as "deploy" but writes the
+bundle to disk instead of deploying it, so it can be uploaded through the
+Fabric web console's Deploy agent dialog without running agent-runtime
+locally.`);
   process.exit(exitCode);
 }
 
 const args = process.argv.slice(2);
-if (args[0] !== "deploy" || !args[1]) usage(1);
+const command = args[0];
+if ((command !== "deploy" && command !== "build") || !args[1]) usage(1);
 const entry = resolve(args[1]);
 const flags = parseFlags(args.slice(2));
-if (!flags.name || !flags.template) usage(1);
 
-await readFile(entry); // fail with a clear local path error before invoking esbuild
-const output = await build({
-  entryPoints: [entry],
-  bundle: true,
-  write: false,
-  platform: "node",
-  format: "esm",
-  target: "node20",
-  sourcemap: "inline",
-  legalComments: "inline",
-  // Resolve the SDK by its published package name against this local
-  // checkout's own source -- the deployed bundle only ever needs the
-  // ctx helpers inlined, and requiring a real npm publish before anyone
-  // can deploy an agent would make the documented workflow unusable.
-  alias: { "@zyvor/fabric-agent": resolve(dirname(fileURLToPath(import.meta.url)), "index.js") },
-});
-const bundle = output.outputFiles[0].contents;
-const baseUrl = (flags.url || process.env.FABRIC_AGENT_URL || "http://127.0.0.1:9096").replace(/\/$/, "");
-const token = flags.token || process.env.FABRIC_AGENT_TOKEN;
-const response = await fetch(`${baseUrl}/v1/agents`, {
-  method: "POST",
-  headers: {
-    "content-type": "application/json",
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-  },
-  body: JSON.stringify({
-    name: flags.name,
-    bundle_base64: Buffer.from(bundle).toString("base64"),
-    manifest: {
-      template: flags.template,
-      credentials: flags.credential,
-      egress_allow_hosts: flags.allowHost,
-      allow_private_networks: flags.allowPrivateNetwork,
-      runtime_port: Number(flags.runtimePort || 8080),
-      ttl_seconds: flags.ttl ? Number(flags.ttl) : null,
-      max_concurrent_sessions: flags.maxConcurrency ? Number(flags.maxConcurrency) : null,
-      idle_hibernate_seconds: flags.idleHibernate ? Number(flags.idleHibernate) : null,
-      warm_pool_size: flags.warmPool ? Number(flags.warmPool) : 0,
+if (command === "deploy") {
+  if (!flags.name || !flags.template) usage(1);
+  const { bundle } = await buildBundle(entry);
+  const baseUrl = (flags.url || process.env.FABRIC_AGENT_URL || "http://127.0.0.1:9096").replace(/\/$/, "");
+  const token = flags.token || process.env.FABRIC_AGENT_TOKEN;
+  const response = await fetch(`${baseUrl}/v1/agents`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-  }),
-});
-const result = await response.json().catch(() => ({}));
-if (!response.ok) {
-  console.error(result.error || `deploy failed with HTTP ${response.status}`);
-  process.exit(1);
+    body: JSON.stringify({
+      name: flags.name,
+      bundle_base64: Buffer.from(bundle).toString("base64"),
+      manifest: {
+        template: flags.template,
+        credentials: flags.credential,
+        egress_allow_hosts: flags.allowHost,
+        allow_private_networks: flags.allowPrivateNetwork,
+        runtime_port: Number(flags.runtimePort || 8080),
+        ttl_seconds: flags.ttl ? Number(flags.ttl) : null,
+        max_concurrent_sessions: flags.maxConcurrency ? Number(flags.maxConcurrency) : null,
+        idle_hibernate_seconds: flags.idleHibernate ? Number(flags.idleHibernate) : null,
+        warm_pool_size: flags.warmPool ? Number(flags.warmPool) : 0,
+      },
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error(result.error || `deploy failed with HTTP ${response.status}`);
+    process.exit(1);
+  }
+  console.log(`Deployed ${result.name}@${result.version} (${basename(entry)})`);
+  console.log(`sha256:${result.digest_sha256}`);
+} else {
+  const { bundle } = await buildBundle(entry);
+  const ext = extname(entry);
+  const defaultOut = `${basename(entry, ext)}.bundle.mjs`;
+  const outPath = resolve(flags.out || defaultOut);
+  await writeFile(outPath, bundle);
+  console.log(`Built ${outPath} (${bundle.length} bytes)`);
 }
-console.log(`Deployed ${result.name}@${result.version} (${basename(entry)})`);
-console.log(`sha256:${result.digest_sha256}`);
+
+async function buildBundle(entryPath) {
+  await readFile(entryPath); // fail with a clear local path error before invoking esbuild
+  const output = await build({
+    entryPoints: [entryPath],
+    bundle: true,
+    write: false,
+    platform: "node",
+    format: "esm",
+    target: "node20",
+    sourcemap: "inline",
+    legalComments: "inline",
+    // Resolve the SDK by its published package name against this local
+    // checkout's own source -- the deployed bundle only ever needs the
+    // ctx helpers inlined, and requiring a real npm publish before anyone
+    // can deploy an agent would make the documented workflow unusable.
+    alias: { "@zyvor/fabric-agent": resolve(dirname(fileURLToPath(import.meta.url)), "index.js") },
+  });
+  return { entry: entryPath, bundle: output.outputFiles[0].contents };
+}
 
 function parseFlags(argv) {
   const out = { credential: [], allowHost: [], allowPrivateNetwork: false };
@@ -90,6 +125,7 @@ function parseFlags(argv) {
       case "--warm-pool": out.warmPool = value; break;
       case "--url": out.url = value; break;
       case "--token": out.token = value; break;
+      case "--out": out.out = value; break;
       default: console.error(`unknown option: ${arg}`); usage(1);
     }
   }

@@ -18,6 +18,18 @@ npm install
 
 `fanout.ts` shows retry-safe, bounded-concurrency multi-session orchestration with one stable `request_id` per target.
 
+## Ops/automation example
+
+`ops-agent.ts` is a contrasting example that needs no credential grant and no `egress_allow_hosts` entry: it's a plain Node.js health check (disk/memory/load via `node:fs`/`node:os`, `uptime` via `node:child_process`) that never leaves the sandbox. Deploy it the same way, dropping the credential/allow-host flags:
+
+```bash
+./src/cli.js deploy ../../examples/agent-runtime/ops-agent.ts \
+  --name ops-healthcheck \
+  --template node22-agent
+```
+
+To deploy either example from the web console instead of the CLI, build a bundle first with `fabric-agent build` and upload it via **Agents → Deploy agent** — see [Tutorial 13](../../docs/tutorials/13-deploy-agent-from-console.md).
+
 ## Warm-pool example
 
 Deploy the agent with `--warm-pool 4`, then run `warm-pool.ts` to inspect/reconcile the pool and start a TTL-bounded session while printing its `start_mode` and `startup_ms`.

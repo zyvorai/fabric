@@ -48,26 +48,17 @@ jobs:
         run: cd sdk/agent-runtime && npm pack --dry-run
       - name: Guest worker syntax
         run: node --check agent-runtime/src/worker.mjs
-      - name: TypeScript deploy smoke build
+      # Exercises the actual `fabric-agent build` CLI subcommand (not a
+      # hand-rolled copy of its esbuild call) against both example agents --
+      # the LLM-calling one and the credential-free ops one -- so the CI log
+      # doubles as a live example of how to build a deployable bundle before
+      # uploading it via the web console (docs/tutorials/13-deploy-agent-from-console.md).
+      - name: fabric-agent build smoke (examples)
         run: |
           cd sdk/agent-runtime
-          node --input-type=module - <<'NODE'
-          import { build } from 'esbuild';
-          import { resolve } from 'node:path';
-          const result = await build({
-            entryPoints: ['../../examples/agent-runtime/agent.ts'],
-            bundle: true,
-            write: false,
-            platform: 'node',
-            format: 'esm',
-            target: 'node20',
-            // The example imports the SDK by its published package name, but
-            // this smoke build runs before that package is ever published --
-            // point esbuild at the local source so it resolves the same way
-            // a real agent project (with @zyvor/fabric-agent installed from
-            // npm) would.
-            alias: { '@zyvor/fabric-agent': resolve('src/index.js') }
-          });
-          if (!result.outputFiles?.[0]?.contents?.length) process.exit(1);
-          console.log(`bundle bytes=${result.outputFiles[0].contents.length}`);
-          NODE
+          ./src/cli.js build ../../examples/agent-runtime/agent.ts --out /tmp/research-agent.bundle.mjs
+          ./src/cli.js build ../../examples/agent-runtime/ops-agent.ts --out /tmp/ops-agent.bundle.mjs
+          test -s /tmp/research-agent.bundle.mjs
+          test -s /tmp/ops-agent.bundle.mjs
+          node --check /tmp/research-agent.bundle.mjs
+          node --check /tmp/ops-agent.bundle.mjs

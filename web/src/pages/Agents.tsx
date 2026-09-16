@@ -10,11 +10,13 @@ import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
+import DeployAgentModal from './agents/DeployAgentModal'
 
 export default function Agents() {
   const toast = useToastContext()
   const navigate = useNavigate()
   const [agents, setAgents] = useState<AgentRecord[]>([])
+  const [showDeploy, setShowDeploy] = useState(false)
   const { loading, loadError, run } = usePageLoader('Failed to load agents')
 
   const load = useCallback(() => {
@@ -45,6 +47,11 @@ export default function Agents() {
         description="TypeScript agents deployed via agent-runtime onto FluxVM sandboxes"
         onRefresh={() => void load()}
         refreshing={loading}
+        primaryAction={
+          <button type="button" className="zf-btn zf-btn-primary zf-btn-sm" onClick={() => setShowDeploy(true)}>
+            <Plus className="w-3.5 h-3.5" /> Deploy agent
+          </button>
+        }
         actions={
           <Link to="/app/sessions" className="zf-btn zf-btn-ghost">
             Sessions
@@ -56,7 +63,12 @@ export default function Agents() {
         <EmptyState
           icon={<Bot className="w-8 h-8" />}
           title="No agents deployed"
-          description="Deploy an agent with the agent-runtime CLI or POST /api/agents (requires [agent_runtime] in zyvor-fabricd.toml)."
+          description="Build a bundle with `fabric-agent build` and deploy it here, or use the agent-runtime CLI directly (requires [agent_runtime] in zyvor-fabricd.toml)."
+          action={
+            <button type="button" className="zf-btn zf-btn-primary" onClick={() => setShowDeploy(true)}>
+              <Plus className="w-3.5 h-3.5" /> Deploy agent
+            </button>
+          }
         />
       ) : (
         <Card className="overflow-x-auto">
@@ -95,6 +107,14 @@ export default function Agents() {
       <p className="mt-4 text-xs text-[var(--zf-muted)] flex items-center gap-1">
         <RefreshCw className="w-3 h-3" /> Proxied through fabricd → agent-runtime (:9096)
       </p>
+      <DeployAgentModal
+        open={showDeploy}
+        onClose={() => setShowDeploy(false)}
+        onDeployed={() => {
+          setShowDeploy(false)
+          void load()
+        }}
+      />
     </div>
   )
 }

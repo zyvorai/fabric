@@ -185,6 +185,8 @@ FABRIC_AGENT_URL=http://127.0.0.1:9096 \
 
 The deploy command uses esbuild to produce one Node 20 ESM bundle. The deployment version hashes both the executable bundle and its security manifest, so changing an egress/credential grant always creates a new immutable version.
 
+Prefer deploying from the web console instead of the CLI? Build the bundle locally with `fabric-agent build agent.ts --out agent.bundle.mjs` (same esbuild step as `deploy`, minus the POST), then upload it via **Agents → Deploy agent** in the Fabric console. See [Tutorial 13](../docs/tutorials/13-deploy-agent-from-console.md) for the full walkthrough.
+
 ## Start, stream and steer
 
 ```ts

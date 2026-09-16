@@ -12,6 +12,7 @@ export interface AgentManifest {
   ttl_seconds?: number
   max_concurrent_sessions?: number
   idle_hibernate_seconds?: number
+  warm_pool_size?: number
 }
 
 export interface AgentRecord {

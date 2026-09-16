@@ -41,6 +41,7 @@ curl -sk "$FABRIC_HOST/readyz" | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 | 10 | [Service Fabric Maglev VIP](10-service-fabric.md) | Intermediate | 35 min | Maglev VIP + v6 identity/L7 policy via Edge Dataplane Services.   |
 | 11 | [Agent Runtime Quickstart](11-agent-runtime-quickstart.md) | Intermediate | 40 min | Build a Node.js FluxVM template, deploy an agent, drive a session. |
 | 12 | [Container Groups](../container-groups.md)       | Intermediate | 30 min | Kubernetes-style Pod groups on FluxVM Secure Containers, end to end. |
+| 13 | [Deploy an Agent from the Console](13-deploy-agent-from-console.md) | Beginner | 20 min | Build a bundle with `fabric-agent build`, deploy and run it from the web console. |
 
 Deep-dive series (groups, CNP, observe, UX):
 [edge-dataplane/](edge-dataplane/README.md).
