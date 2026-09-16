@@ -92,3 +92,13 @@ time = "0.3"
 totp-rs = { version = "6", features = ["gen_secret", "otpauth"] }
 base32 = "0.5"
 quick-xml = "0.42"
+
+# `users` (pulled transitively via the `pam` crate, which hardcodes
+# `users = "^0.10"`) is unmaintained and has two open advisories with no
+# upstream fix. `uzers` is the actively maintained fork the advisories
+# themselves recommend, but it never published a 0.10.x release, so it
+# can't satisfy `^0.10` as a direct version-renamed patch. vendor/users-shim
+# is a two-line local crate, versioned 0.10.0, that just re-exports uzers --
+# see its own doc comment for details.
+[patch.crates-io]
+users = { path = "vendor/users-shim" }
