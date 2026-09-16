@@ -3,6 +3,34 @@
 ## Unreleased
 
 ### Added
+- **Deploy Agent from the web console** — the Agents page can now deploy a
+  new agent directly (upload a bundle built with the new `fabric-agent
+  build` CLI subcommand, set template/credentials/egress hosts/warm pool
+  etc.), instead of requiring the agent-runtime CLI. New credential-free
+  `ops-agent.ts` example alongside the existing LLM-calling one, and
+  [Tutorial 13](docs/tutorials/13-deploy-agent-from-console.md) walking
+  through the whole flow. `sdk/agent-runtime`'s CI now smoke-builds both
+  examples through the real `fabric-agent build` command.
+- Weekly + on-demand CI smoke test for NousResearch/hermes-agent's
+  installer, as a candidate real-world agent workload for Fabric-hosted
+  VMs/sandboxes ([.github/workflows/hermes-agent.yml](.github/workflows/hermes-agent.yml)).
+
+### Fixed
+- Backend integration tests hardcoded FluxVM's real default port (7788)
+  for the test driver, so a host that also runs a real, auth-enabled
+  FluxVM instance there got a genuine 401 instead of the expected
+  connection-refused. Now uses an OS-assigned ephemeral port.
+
+### Security
+- Removed `web-legacy/`, the pre-consolidation dashboard superseded in
+  May 2026 and unreferenced by any build/CI since — resolved ~20 open
+  Dependabot alerts in dead code rather than patching it.
+- Patched the unmaintained `users` crate (pulled in transitively via
+  `pam`) to `uzers`, its actively maintained fork, via a small local
+  shim crate (`backend/vendor/users-shim`).
+- Upgraded `website/`'s vulnerable transitive deps (`qs`, `uuid`,
+  `serialize-javascript`) via npm `overrides`, and `integrations/machina`'s
+  `serde_with`.
 - **Agent Runtime** — standalone component (`agent-runtime/`, `sdk/agent-runtime/`)
   for deploying durable TypeScript agent sessions, each in its own FluxVM
   sandbox: immutable content-addressed agent deployments, durable event
