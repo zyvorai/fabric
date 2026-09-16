@@ -19,6 +19,6 @@
     "lint": "node --check src/index.js && node --check src/cli.js"
   },
   "dependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.28.2"
   }
 }
