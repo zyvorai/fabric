@@ -20,6 +20,15 @@
   for the test driver, so a host that also runs a real, auth-enabled
   FluxVM instance there got a genuine 401 instead of the expected
   connection-refused. Now uses an OS-assigned ephemeral port.
+- **agent-runtime**: session creation held a single *global* lock across
+  the entire sandbox resume/create flow, including the outbound FluxVM
+  HTTP call. A hung FluxVM call permanently blocked session creation for
+  every agent until the process was restarted. The lock is now scoped
+  per agent name, and the FluxVM call is bounded by a 120s
+  `tokio::time::timeout`, so a hang becomes a bounded, lock-releasing
+  error instead of blocking forever. Verified live: a genuinely-hung
+  attempt was cut off at exactly 120001ms with the service staying
+  responsive throughout.
 
 ### Security
 - Removed `web-legacy/`, the pre-consolidation dashboard superseded in
