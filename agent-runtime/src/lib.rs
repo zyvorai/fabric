@@ -24,8 +24,10 @@ pub struct AppState {
     pub fluxvm: FluxVm,
     pub credentials: CredentialVault,
     pub egress_http: reqwest::Client,
-    /// Serializes the idempotency/quota reservation section of session creation.
-    pub session_create_lock: tokio::sync::Mutex<()>,
+    /// Serializes the idempotency/quota reservation section of session creation,
+    /// one lock per agent name so a slow or hung FluxVM call for one agent can
+    /// never block session creation for every other agent on the process.
+    pub session_create_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// Prevents concurrent pool reconcilers from overfilling the same deployment.
     pub warm_pool_reconcile_lock: tokio::sync::Mutex<()>,
     /// Per-session operation locks serialize steer/hibernate/resume/cancel/delete/expiry.
@@ -48,7 +50,7 @@ impl AppState {
             fluxvm,
             credentials,
             egress_http,
-            session_create_lock: tokio::sync::Mutex::new(()),
+            session_create_locks: Mutex::new(HashMap::new()),
             warm_pool_reconcile_lock: tokio::sync::Mutex::new(()),
             session_locks: Mutex::new(HashMap::new()),
         }))
@@ -61,6 +63,20 @@ impl AppState {
         }
         locks
             .entry(id)
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone()
+    }
+
+    pub fn session_create_lock(&self, agent: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut locks = self
+            .session_create_locks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if locks.len() > 10_000 {
+            locks.retain(|_, lock| Arc::strong_count(lock) > 1);
+        }
+        locks
+            .entry(agent.to_string())
             .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
             .clone()
     }

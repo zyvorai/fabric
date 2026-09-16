@@ -29,6 +29,33 @@ use uuid::Uuid;
 
 pub(crate) const WORKER: &[u8] = include_bytes!("worker.mjs");
 
+/// Upper bound on how long a single FluxVM resume/create call may run while
+/// holding a session's per-agent creation lock. Strictly less than the
+/// FluxVm HTTP client's own 180s request timeout, so this fires first and
+/// deterministically: a hung FluxVM call becomes a bounded, lock-releasing
+/// error instead of blocking every future session creation for that agent
+/// until the process is restarted.
+const SANDBOX_START_TIMEOUT: Duration = Duration::from_secs(120);
+
+async fn with_start_timeout<T>(
+    fut: impl std::future::Future<Output = anyhow::Result<T>>,
+) -> anyhow::Result<T> {
+    with_timeout(SANDBOX_START_TIMEOUT, fut).await
+}
+
+async fn with_timeout<T>(
+    duration: Duration,
+    fut: impl std::future::Future<Output = anyhow::Result<T>>,
+) -> anyhow::Result<T> {
+    match tokio::time::timeout(duration, fut).await {
+        Ok(result) => result,
+        Err(_) => Err(anyhow::anyhow!(
+            "FluxVM did not respond to a sandbox resume/create within {}s",
+            duration.as_secs()
+        )),
+    }
+}
+
 #[derive(Debug)]
 struct ApiError {
     status: StatusCode,
@@ -262,9 +289,13 @@ async fn create_session(
 
     // The lock protects idempotency, quota admission and single-use warm-pool
     // claims. Warm starts only perform a cheap resume while locked; cold starts
-    // still preserve the existing duplicate-VM safety contract.
+    // still preserve the existing duplicate-VM safety contract. Scoped per
+    // agent (not a single global lock) so a slow/hung FluxVM call for one
+    // agent can't block session creation for every other agent, and bounded
+    // by `with_start_timeout` so a hang can't hold this lock forever either.
     let (record, input, prewarmed, _session_guard) = {
-        let _guard = state.session_create_lock.lock().await;
+        let agent_lock = state.session_create_lock(&agent.name);
+        let _guard = agent_lock.lock().await;
 
         if let Some(value) = request_id.as_deref() {
             if let Some(existing) = state
@@ -322,7 +353,7 @@ async fn create_session(
         }
 
         let (sandbox_id, start_mode, prewarmed) = if let Some(warm) = warm {
-            match state.fluxvm.resume(warm.sandbox_id).await {
+            match with_start_timeout(state.fluxvm.resume(warm.sandbox_id)).await {
                 Ok(()) => (warm.sandbox_id, SessionStartMode::Warm, true),
                 Err(error) => {
                     tracing::warn!(
@@ -344,31 +375,27 @@ async fn create_session(
                         ));
                     }
                     let name = format!("agent-{}", &id.simple().to_string()[..12]);
-                    let sandbox = state
-                        .fluxvm
-                        .create_sandbox(
-                            name,
-                            &agent.manifest.template,
-                            None,
-                            agent.manifest.runtime_port,
-                        )
-                        .await
-                        .map_err(ApiError::bad_gateway)?;
+                    let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
+                        name,
+                        &agent.manifest.template,
+                        None,
+                        agent.manifest.runtime_port,
+                    ))
+                    .await
+                    .map_err(ApiError::bad_gateway)?;
                     (sandbox.id, SessionStartMode::Cold, false)
                 }
             }
         } else {
             let name = format!("agent-{}", &id.simple().to_string()[..12]);
-            let sandbox = state
-                .fluxvm
-                .create_sandbox(
-                    name,
-                    &agent.manifest.template,
-                    None,
-                    agent.manifest.runtime_port,
-                )
-                .await
-                .map_err(ApiError::bad_gateway)?;
+            let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
+                name,
+                &agent.manifest.template,
+                None,
+                agent.manifest.runtime_port,
+            ))
+            .await
+            .map_err(ApiError::bad_gateway)?;
             (sandbox.id, SessionStartMode::Cold, false)
         };
 
@@ -1300,5 +1327,32 @@ mod tests {
         assert!(validate_request_id("ticket:INC-1042").is_ok());
         assert!(validate_request_id("bad key").is_err());
         assert!(validate_request_id(&"x".repeat(129)).is_err());
+    }
+
+    // Regression test for the bug this session's investigation found: a
+    // hung FluxVM resume/create call held the per-agent creation lock
+    // forever, permanently blocking that agent's session creation until
+    // the whole process was restarted. `with_timeout` must convert a
+    // never-resolving future into a bounded error instead of hanging.
+    #[tokio::test(start_paused = true)]
+    async fn with_timeout_bounds_a_call_that_never_resolves() {
+        let never = std::future::pending::<anyhow::Result<()>>();
+        let result = with_timeout(Duration::from_secs(5), never);
+        tokio::time::advance(Duration::from_secs(6)).await;
+        assert!(result.await.is_err());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn with_timeout_passes_through_a_call_that_resolves_in_time() {
+        let fast = async { Ok::<_, anyhow::Error>(42) };
+        let result = with_timeout(Duration::from_secs(5), fast).await;
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn with_timeout_passes_through_the_inner_error_when_it_resolves_in_time() {
+        let failing = async { Err::<(), _>(anyhow::anyhow!("boom")) };
+        let result = with_timeout(Duration::from_secs(5), failing).await;
+        assert_eq!(result.unwrap_err().to_string(), "boom");
     }
 }

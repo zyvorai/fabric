@@ -30,3 +30,4 @@ uuid = { version = "1.26", features = ["v4", "serde"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+tokio = { version = "1.53", features = ["test-util"] }
