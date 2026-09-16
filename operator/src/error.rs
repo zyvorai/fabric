@@ -25,12 +25,13 @@ mod tests {
 
     #[test]
     fn kube_error_is_prefixed_and_wrapped_via_from() {
-        let kube_err = kube::Error::Api(kube::core::ErrorResponse {
-            status: "Failure".to_string(),
+        let kube_err = kube::Error::Api(Box::new(kube::core::Status {
+            status: Some(kube::core::response::StatusSummary::Failure),
             message: "virtualmachines.zyvor-fabricd.io \"web-01\" not found".to_string(),
             reason: "NotFound".to_string(),
             code: 404,
-        });
+            ..Default::default()
+        }));
         let err: OperatorError = kube_err.into();
         assert!(err.to_string().starts_with("kubernetes API: "));
         assert!(matches!(err, OperatorError::Kube(_)));

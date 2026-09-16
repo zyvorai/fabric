@@ -381,10 +381,10 @@ fn build_network_policy(req: &NetworkPolicyRequest) -> NetworkPolicy {
             ..Default::default()
         },
         spec: Some(K8sNetworkPolicySpec {
-            pod_selector: LabelSelector {
+            pod_selector: Some(LabelSelector {
                 match_labels: Some(req.pod_selector_labels.clone()),
                 match_expressions: None,
-            },
+            }),
             ingress,
             egress,
             policy_types: if policy_types.is_empty() {
