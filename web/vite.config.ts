@@ -11,7 +11,7 @@ export default defineConfig({
   // Default target predates top-level await, which @novnc/novnc's ESM
   // build uses -- es2022 is baseline-supported by every browser this
   // app already requires (native ES modules, CSS nesting, etc).
-  esbuild: {
+  oxc: {
     target: 'es2022',
   },
   optimizeDeps: {
