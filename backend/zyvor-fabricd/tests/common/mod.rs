@@ -11,6 +11,23 @@ use zyvor_fabricd::config::{
 };
 use zyvor_fabricd::server::{AppState, QuotaCache};
 
+/// A loopback URL nothing is listening on, for tests that need the FluxVM
+/// driver to fail fast with a real connection error rather than actually
+/// reach a server. NOT FluxVM's real default port (7788): a host that has
+/// ever run the actual `zyvor-fabricd` + FluxVM stack (any dev/lab/CI box
+/// reused across runs) can have a real, auth-enabled FluxVM daemon still
+/// listening there, so a test expecting an unauthenticated "connection
+/// refused" would instead get a genuine 401 from production FluxVM. Asking
+/// the OS for a fresh ephemeral port (then dropping the listener before
+/// anyone connects) avoids that, and also avoids colliding with any other
+/// hardcoded port a sibling test harness might spawn a real server on.
+fn unreachable_fluxvm_url() -> String {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind ephemeral port");
+    let port = listener.local_addr().expect("local_addr").port();
+    drop(listener);
+    format!("http://127.0.0.1:{port}")
+}
+
 /// Test middleware that injects admin Claims into every request.
 /// This is needed because unauthenticated_claims() now defaults to Viewer,
 /// but integration tests need full access.
@@ -76,7 +93,7 @@ pub async fn create_test_app() -> Router {
         .build()
         .unwrap();
 
-    let driver = zyvor_fabric_fluxvm_driver::FluxVmDriver::new("http://127.0.0.1:7788")
+    let driver = zyvor_fabric_fluxvm_driver::FluxVmDriver::new(&unreachable_fluxvm_url())
         .expect("failed to construct test FluxVM driver (no real connection made yet)");
 
     let lock_manager = Arc::new(zyvor_fabric_lock_manager::LockManager::new(
@@ -173,7 +190,7 @@ pub async fn create_test_app_with_role(role: security::Role) -> Router {
         .build()
         .unwrap();
 
-    let driver = zyvor_fabric_fluxvm_driver::FluxVmDriver::new("http://127.0.0.1:7788")
+    let driver = zyvor_fabric_fluxvm_driver::FluxVmDriver::new(&unreachable_fluxvm_url())
         .expect("failed to construct test FluxVM driver (no real connection made yet)");
 
     let lock_manager = Arc::new(zyvor_fabric_lock_manager::LockManager::new(
