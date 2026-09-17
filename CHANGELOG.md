@@ -16,6 +16,24 @@
   VMs/sandboxes ([.github/workflows/hermes-agent.yml](.github/workflows/hermes-agent.yml)).
 
 ### Fixed
+- **The Alerts page's CPU/memory/disk rules never actually fired** — `GET
+  /api/system/alerts` only ever returned live bandwidth alerts from
+  `net_monitor`; the `cpu-high`/`mem-high`/`disk-high` rules shown on the
+  same page under "Alert Rules" were seeded into the store once and then
+  just echoed back verbatim by `/api/system/alerts/rules` — nothing ever
+  read a real CPU/memory/disk value and compared it against them. A host
+  pinned at 100% CPU for a week would never produce a "High CPU usage"
+  alert. `get_system_alerts` now also evaluates each enabled rule against
+  the same `/proc`-derived metrics `/api/system/metrics` already exposes,
+  and both alert sources are normalized into the one shape the frontend
+  actually reads (`id`/`severity`/`title`/`message`/`value`/`timestamp`) —
+  bandwidth alerts previously serialized with none of those field names
+  (`triggered_at` instead of `timestamp`, no `message`/`title` at all), so
+  a bandwidth alert firing would have rendered as a badge with no text.
+  5 new tests. Verified live: real cpu/memory/disk metrics on a running
+  host correctly produce no alerts while under threshold, and the same
+  evaluation path (exercised with a trivially low threshold) correctly
+  fires against the real live metric.
 - **agent-runtime**: a "Run session" could get stuck showing `creating`
   forever, with no error, no matter how it was retried. `create_session`
   awaited the whole guest-provisioning flow (boot wait, health-check

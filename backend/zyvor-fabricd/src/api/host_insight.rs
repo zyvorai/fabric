@@ -530,11 +530,41 @@ pub async fn get_security_summary(
 }
 
 /// GET /api/system/alerts
+///
+/// Merges two independent alert sources into the one shape the "Alerts"
+/// page renders: live bandwidth alerts from `net_monitor` (already
+/// continuously evaluated by the background task below), and cpu/memory/disk
+/// threshold breaches evaluated here, on read, against the rules from
+/// `/system/alerts/rules`. Before this, the rules endpoint only ever
+/// returned static, never-evaluated defaults -- a host pinned at 100% CPU
+/// for a week would never produce a "High CPU usage" alert, because nothing
+/// ever checked the rule against a real metric.
 pub async fn get_system_alerts(
     RequireRead(_claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
-    let alerts = state.net_monitor.evaluator.get_active_alerts().await;
+    let bandwidth_alerts: Vec<serde_json::Value> = state
+        .net_monitor
+        .evaluator
+        .get_active_alerts()
+        .await
+        .into_iter()
+        .map(|a| {
+            serde_json::json!({
+                "id": a.id,
+                "severity": a.severity,
+                "title": format!("{:?} bandwidth on {}", a.direction, a.vm_name),
+                "message": format!(
+                    "{:?} bandwidth on {} is {:.0} bps (threshold {} bps)",
+                    a.direction, a.vm_name, a.actual_bps, a.threshold_bps
+                ),
+                "value": a.actual_bps,
+                "timestamp": a.triggered_at,
+            })
+        })
+        .collect();
+    let rule_alerts = evaluate_alert_rules(&load_alert_rules(&state));
+    let alerts: Vec<serde_json::Value> = bandwidth_alerts.into_iter().chain(rule_alerts).collect();
     Json(serde_json::json!({ "alerts": alerts }))
 }
 
@@ -581,11 +611,10 @@ fn default_alert_rules() -> Vec<AlertRule> {
     ]
 }
 
-/// GET /api/system/alerts/rules
-pub async fn get_alert_rules(
-    RequireRead(_claims): RequireRead,
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+/// Loads persisted alert rules, seeding the defaults on first read. Shared by
+/// `get_alert_rules` (which just displays them) and `get_system_alerts`
+/// (which actually evaluates them).
+fn load_alert_rules(state: &AppState) -> Vec<AlertRule> {
     let mut rules: Vec<AlertRule> = state.store.list_entities("alert_rules").unwrap_or_default();
     if rules.is_empty() {
         rules = default_alert_rules();
@@ -593,7 +622,66 @@ pub async fn get_alert_rules(
             let _ = state.store.save_entity("alert_rules", &rule.id, rule);
         }
     }
-    Json(serde_json::json!({ "rules": rules }))
+    rules
+}
+
+/// Reads the live value for a rule's `metric` and compares it against
+/// `threshold` per `condition`. Unknown metrics/conditions never match,
+/// rather than falling back to some default comparison that could fire
+/// spuriously.
+fn rule_metric_value(metric: &str) -> Option<f64> {
+    match metric {
+        "cpu" => Some(parse_cpu_usage().0),
+        "memory" => parse_meminfo().get("usage_percent").and_then(|v| v.as_f64()),
+        "disk" => parse_filesystems()
+            .into_iter()
+            .find(|fs| fs.get("mountpoint").and_then(|m| m.as_str()) == Some("/"))
+            .and_then(|fs| fs.get("usage_percent").and_then(|v| v.as_f64())),
+        _ => None,
+    }
+}
+
+fn condition_breached(condition: &str, value: f64, threshold: f64) -> bool {
+    match condition {
+        "gt" => value > threshold,
+        "gte" => value >= threshold,
+        "lt" => value < threshold,
+        "lte" => value <= threshold,
+        _ => false,
+    }
+}
+
+fn evaluate_alert_rules(rules: &[AlertRule]) -> Vec<serde_json::Value> {
+    let now = Utc::now();
+    rules
+        .iter()
+        .filter(|rule| rule.enabled)
+        .filter_map(|rule| {
+            let value = rule_metric_value(&rule.metric)?;
+            if !condition_breached(&rule.condition, value, rule.threshold) {
+                return None;
+            }
+            Some(serde_json::json!({
+                "id": rule.id,
+                "severity": rule.severity,
+                "title": rule.name,
+                "message": format!(
+                    "{} is {:.1} ({} {})",
+                    rule.name, value, rule.condition, rule.threshold
+                ),
+                "value": value,
+                "timestamp": now,
+            }))
+        })
+        .collect()
+}
+
+/// GET /api/system/alerts/rules
+pub async fn get_alert_rules(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "rules": load_alert_rules(&state) }))
 }
 
 /// GET /api/system/explain/:metric
@@ -860,4 +948,72 @@ pub async fn list_isos_legacy(claims: RequireRead) -> Json<serde_json::Value> {
         "isos": isos,
         "vms_with_isos": []
     }))
+}
+
+#[cfg(test)]
+mod alert_rule_tests {
+    use super::*;
+
+    #[test]
+    fn condition_breached_matches_each_comparison() {
+        assert!(condition_breached("gt", 95.0, 90.0));
+        assert!(!condition_breached("gt", 90.0, 90.0));
+        assert!(condition_breached("gte", 90.0, 90.0));
+        assert!(!condition_breached("gte", 89.9, 90.0));
+        assert!(condition_breached("lt", 5.0, 10.0));
+        assert!(!condition_breached("lt", 10.0, 10.0));
+        assert!(condition_breached("lte", 10.0, 10.0));
+        assert!(!condition_breached("lte", 10.1, 10.0));
+    }
+
+    #[test]
+    fn condition_breached_rejects_unknown_conditions_rather_than_defaulting() {
+        assert!(!condition_breached("between", 50.0, 10.0));
+        assert!(!condition_breached("", 999.0, 0.0));
+    }
+
+    #[test]
+    fn evaluate_alert_rules_skips_disabled_rules_even_if_breached() {
+        let rules = vec![AlertRule {
+            id: "cpu-high".into(),
+            name: "High CPU usage".into(),
+            metric: "cpu".into(),
+            condition: "gte".into(),
+            threshold: 0.0, // guaranteed to breach if it were evaluated
+            severity: "warning".into(),
+            enabled: false,
+        }];
+        assert!(evaluate_alert_rules(&rules).is_empty());
+    }
+
+    #[test]
+    fn evaluate_alert_rules_skips_unknown_metrics_rather_than_alerting_on_none() {
+        let rules = vec![AlertRule {
+            id: "made-up".into(),
+            name: "Not a real metric".into(),
+            metric: "made-up-metric".into(),
+            condition: "gt".into(),
+            threshold: -1.0,
+            severity: "critical".into(),
+            enabled: true,
+        }];
+        assert!(evaluate_alert_rules(&rules).is_empty());
+    }
+
+    #[test]
+    fn evaluate_alert_rules_fires_on_the_real_cpu_metric_with_a_trivially_low_threshold() {
+        let rules = vec![AlertRule {
+            id: "cpu-high".into(),
+            name: "High CPU usage".into(),
+            metric: "cpu".into(),
+            condition: "gte".into(),
+            threshold: 0.0,
+            severity: "warning".into(),
+            enabled: true,
+        }];
+        let alerts = evaluate_alert_rules(&rules);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0]["id"], "cpu-high");
+        assert_eq!(alerts[0]["severity"], "warning");
+    }
 }
