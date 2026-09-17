@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 ### Added
 - **Deploy Agent from the web console** — the Agents page can now deploy a
