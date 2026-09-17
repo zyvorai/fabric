@@ -42,6 +42,18 @@ export default function Sessions() {
     void load()
   }, [load])
 
+  // Session creation returns as soon as the sandbox is admitted; provisioning
+  // (guest boot, health checks, bundle push) continues in the background and
+  // only shows up here as a later status change, so poll while it's in
+  // flight instead of leaving the page showing a stale "creating" forever.
+  useEffect(() => {
+    if (!id || !detail) return
+    const terminal = ['completed', 'failed', 'cancelled', 'expired']
+    if (terminal.includes(detail.status)) return
+    const timer = setInterval(() => void load(), 2000)
+    return () => clearInterval(timer)
+  }, [id, detail, load])
+
   const act = async (sessionId: string, action: 'cancel' | 'hibernate' | 'resume') => {
     try {
       await sessionAction(sessionId, action)

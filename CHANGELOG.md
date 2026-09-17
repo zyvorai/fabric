@@ -16,6 +16,29 @@
   VMs/sandboxes ([.github/workflows/hermes-agent.yml](.github/workflows/hermes-agent.yml)).
 
 ### Fixed
+- **agent-runtime**: a "Run session" could get stuck showing `creating`
+  forever, with no error, no matter how it was retried. `create_session`
+  awaited the whole guest-provisioning flow (boot wait, health-check
+  retries, bundle push — which can legitimately take minutes) inline,
+  before responding to the HTTP request that started it. Any upstream
+  timeout shorter than that — the browser, or `zyvor-fabricd`'s own reverse
+  proxy — closed the connection first, and axum then dropped the
+  in-flight handler future outright, skipping every line of the
+  failure-handling code that would have marked the session `Failed` and
+  released its sandbox. The session was left in `creating` with its
+  `updated_at` identical to its `created_at`: nothing ever touched it
+  again. Provisioning now runs in a detached `tokio::spawn` task; the
+  initial response returns as soon as the sandbox is admitted, and the
+  eventual `session.running`/`session.failed` outcome is always recorded
+  regardless of what the original caller does. Every individual FluxVM
+  call inside that provisioning flow (`process`/`fs_write`/`guest_request`)
+  is now also independently bounded by a 15s timeout — the existing 120s
+  admission-time timeout only ever gets checked *between* retry-loop
+  iterations, so a single hung call could previously block the loop from
+  ever reaching its own deadline, no matter how short that deadline was.
+  The web console's session detail view now polls every 2s while a
+  session is non-terminal, since the backend fix means that transition is
+  genuinely asynchronous and the page previously only ever fetched once.
 - Backend integration tests hardcoded FluxVM's real default port (7788)
   for the test driver, so a host that also runs a real, auth-enabled
   FluxVM instance there got a genuine 401 instead of the expected

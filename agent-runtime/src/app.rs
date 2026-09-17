@@ -37,6 +37,14 @@ pub(crate) const WORKER: &[u8] = include_bytes!("worker.mjs");
 /// until the process is restarted.
 const SANDBOX_START_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// Upper bound on a single guest_request() call inside provision_guest's
+/// health-check retry loop (and the final /run call). Shorter than
+/// FluxVmClient's own 180s reqwest timeout, for the same reason
+/// SANDBOX_START_TIMEOUT is shorter than it: a single stuck call must not be
+/// able to block the retry loop past its own guest_start_timeout_secs
+/// deadline, which is only ever checked *between* attempts.
+const HEALTH_CHECK_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
+
 async fn with_start_timeout<T>(
     fut: impl std::future::Future<Output = anyhow::Result<T>>,
 ) -> anyhow::Result<T> {
@@ -499,52 +507,73 @@ async fn create_session(
         (record, req.input.clone(), prewarmed, operation_guard)
     };
 
-    if let Err(error) = provision_guest(&state, &record, &agent, input, prewarmed).await {
-        let message = format!("{error:#}");
-        // Journal the terminal event before setting terminal=true so an SSE
-        // consumer cannot observe the state transition and miss the reason.
-        let _ = state
+    // Provisioning (guest boot, health-check retries, bundle push) can take up
+    // to guest_start_timeout_secs, far longer than any upstream proxy or
+    // browser is willing to hold a single request open. Awaiting it inline
+    // here would mean: once the caller's connection is closed by an impatient
+    // timeout, axum drops this handler's future mid-flight, and none of the
+    // failure-handling below (marking the session Failed, releasing the
+    // sandbox) ever runs -- the session is then stuck in Creating forever,
+    // with no further writes to it, ever. So provisioning is detached into
+    // its own task; the client observes the outcome via session.running /
+    // session.failed events (or by polling), never by blocking this request.
+    let response_record = record.clone();
+    tokio::spawn(async move {
+        let _session_guard = _session_guard;
+        if let Err(error) = provision_guest(&state, &record, &agent, input, prewarmed).await {
+            let message = format!("{error:#}");
+            // Journal the terminal event before setting terminal=true so an SSE
+            // consumer cannot observe the state transition and miss the reason.
+            let _ = state
+                .store
+                .append_event(
+                    record.id,
+                    "session.failed",
+                    json!({"error": message.clone()}),
+                )
+                .await;
+            let _ = state
+                .store
+                .update_session(record.id, |s| {
+                    s.status = SessionStatus::Failed;
+                    s.error = Some(message.clone());
+                })
+                .await;
+            if let Some(failed) = state.store.get_session(record.id).await {
+                let _ = try_release_sandbox(&state, &failed).await;
+            }
+            return;
+        }
+
+        let startup_ms = u64::try_from(admission_started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let updated = match state
+            .store
+            .update_session(record.id, |s| {
+                s.status = SessionStatus::Running;
+                s.startup_ms = Some(startup_ms);
+            })
+            .await
+        {
+            Ok(updated) => updated,
+            Err(error) => {
+                tracing::error!(session = %record.id, %error, "failed to mark session running after successful provisioning");
+                return;
+            }
+        };
+        if let Err(error) = state
             .store
             .append_event(
                 record.id,
-                "session.failed",
-                json!({"error": message.clone()}),
+                "session.running",
+                json!({"start_mode": updated.start_mode, "startup_ms": startup_ms}),
             )
-            .await;
-        let _ = state
-            .store
-            .update_session(record.id, |s| {
-                s.status = SessionStatus::Failed;
-                s.error = Some(message.clone());
-            })
-            .await;
-        if let Some(failed) = state.store.get_session(record.id).await {
-            let _ = try_release_sandbox(&state, &failed).await;
+            .await
+        {
+            tracing::warn!(session = %record.id, %error, "failed to journal session.running event");
         }
-        return Err(ApiError::bad_gateway(
-            "sandbox was created but agent runtime provisioning failed; inspect the session for details",
-        ));
-    }
+    });
 
-    let startup_ms = u64::try_from(admission_started.elapsed().as_millis()).unwrap_or(u64::MAX);
-    let updated = state
-        .store
-        .update_session(record.id, |s| {
-            s.status = SessionStatus::Running;
-            s.startup_ms = Some(startup_ms);
-        })
-        .await
-        .map_err(ApiError::internal)?;
-    state
-        .store
-        .append_event(
-            record.id,
-            "session.running",
-            json!({"start_mode": updated.start_mode, "startup_ms": startup_ms}),
-        )
-        .await
-        .map_err(ApiError::internal)?;
-    Ok((StatusCode::CREATED, Json(updated.into())))
+    Ok((StatusCode::CREATED, Json(response_record.into())))
 }
 
 /// Blocks until the guest's vsock-based FluxVM guest agent accepts a
@@ -555,11 +584,16 @@ async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Resul
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
     loop {
-        match state
-            .fluxvm
-            .process(sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10))
-            .await
-        {
+        // See HEALTH_CHECK_ATTEMPT_TIMEOUT's doc comment: a single call here
+        // has to be bounded independently of the retry loop's own deadline,
+        // or a stuck call blocks the loop from ever reaching that deadline
+        // check at all.
+        let attempt = with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.process(sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10)),
+        )
+        .await;
+        match attempt {
             Ok(_) => return Ok(()),
             Err(error) if tokio::time::Instant::now() < deadline => {
                 tracing::debug!(sandbox = %sandbox_id, %error, "guest agent not ready yet, retrying");
@@ -593,24 +627,34 @@ async fn provision_guest(
         // Retry until the channel comes up rather than failing the session for
         // a timing issue that resolves itself within a few seconds.
         wait_for_guest_agent_ready(state, session.sandbox_id).await?;
-        state
-            .fluxvm
-            .fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755)
-            .await?;
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state
+                .fluxvm
+                .fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755),
+        )
+        .await?;
     }
-    state
-        .fluxvm
-        .fs_write(
+    with_timeout(
+        HEALTH_CHECK_ATTEMPT_TIMEOUT,
+        state.fluxvm.fs_write(
             session.sandbox_id,
             "/opt/zyvor/agent/bundle.mjs",
             &bundle,
             0o644,
-        )
-        .await?;
+        ),
+    )
+    .await?;
 
     let host = match state.config.egress_advertise_host.as_deref() {
         Some(v) => v.to_string(),
-        None => state.fluxvm.default_gateway(session.sandbox_id).await?,
+        None => {
+            with_timeout(
+                HEALTH_CHECK_ATTEMPT_TIMEOUT,
+                state.fluxvm.default_gateway(session.sandbox_id),
+            )
+            .await?
+        }
     };
     let broker = format!(
         "http://{}:{}",
@@ -621,25 +665,34 @@ async fn provision_guest(
         "mkdir -p /opt/zyvor/agent; ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()), shell_quote(&session.capability_token), shell_quote(&broker), agent.manifest.runtime_port
     );
-    state
-        .fluxvm
-        .process(session.sandbox_id, &command, Some(10))
-        .await?;
+    with_timeout(
+        HEALTH_CHECK_ATTEMPT_TIMEOUT,
+        state.fluxvm.process(session.sandbox_id, &command, Some(10)),
+    )
+    .await?;
 
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
     loop {
-        match state
-            .fluxvm
-            .guest_request(
+        // A single guest_request() has been observed to hang well past even
+        // FluxVmClient's own 180s reqwest timeout (root cause not fully
+        // understood -- reqwest connection-pool/keep-alive interaction is
+        // the leading suspect, see fluxvm-api's sandbox_proxy_inner). Bound
+        // every individual attempt here too, defensively: without this, one
+        // stuck call blocks the loop from ever reaching the deadline check
+        // below, no matter how short guest_start_timeout_secs is.
+        let attempt = with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.guest_request(
                 session.sandbox_id,
                 agent.manifest.runtime_port,
                 Method::GET,
                 "health",
                 None,
-            )
-            .await
-        {
+            ),
+        )
+        .await;
+        match attempt {
             Ok(v) if v.get("ok").and_then(Value::as_bool) == Some(true) => break,
             _ if tokio::time::Instant::now() < deadline => {
                 tokio::time::sleep(Duration::from_millis(200)).await
@@ -647,16 +700,17 @@ async fn provision_guest(
             _ => anyhow::bail!("guest agent worker did not become ready before timeout"),
         }
     }
-    state
-        .fluxvm
-        .guest_request(
+    with_timeout(
+        HEALTH_CHECK_ATTEMPT_TIMEOUT,
+        state.fluxvm.guest_request(
             session.sandbox_id,
             agent.manifest.runtime_port,
             Method::POST,
             "run",
             Some(&json!({"input": input})),
-        )
-        .await?;
+        ),
+    )
+    .await?;
     Ok(())
 }
 
