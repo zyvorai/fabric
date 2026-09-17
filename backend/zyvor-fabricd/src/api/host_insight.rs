@@ -632,7 +632,9 @@ fn load_alert_rules(state: &AppState) -> Vec<AlertRule> {
 fn rule_metric_value(metric: &str) -> Option<f64> {
     match metric {
         "cpu" => Some(parse_cpu_usage().0),
-        "memory" => parse_meminfo().get("usage_percent").and_then(|v| v.as_f64()),
+        "memory" => parse_meminfo()
+            .get("usage_percent")
+            .and_then(|v| v.as_f64()),
         "disk" => parse_filesystems()
             .into_iter()
             .find(|fs| fs.get("mountpoint").and_then(|m| m.as_str()) == Some("/"))

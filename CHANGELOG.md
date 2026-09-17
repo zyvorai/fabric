@@ -72,6 +72,15 @@
   responsive throughout.
 
 ### Security
+- Bumped `rustls` 0.23.44 → 0.23.45, fixing RUSTSEC-2026-0285 (rustls
+  accepted TLS 1.3 handshake messages sent at the wrong encryption level
+  when packed into the same record as a key-changing message — the
+  handshake transcript stays authenticated, so this couldn't be used to
+  alter or complete a handshake, but a peer's plaintext messages weren't
+  being rejected the way RFC 8446 §5.1 requires). Found blocking `main`'s
+  `cargo-deny` gate while checking release readiness — newly published,
+  unrelated to any other change in this release. `cargo deny check
+  advisories` clean afterward.
 - Removed `web-legacy/`, the pre-consolidation dashboard superseded in
   May 2026 and unreferenced by any build/CI since — resolved ~20 open
   Dependabot alerts in dead code rather than patching it.
