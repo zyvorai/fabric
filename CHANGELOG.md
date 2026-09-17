@@ -61,8 +61,23 @@
   `pam`) to `uzers`, its actively maintained fork, via a small local
   shim crate (`backend/vendor/users-shim`).
 - Upgraded `website/`'s vulnerable transitive deps (`qs`, `uuid`,
-  `serialize-javascript`) via npm `overrides`, and `integrations/machina`'s
-  `serde_with`.
+  `serialize-javascript`, `image-size`) via npm `overrides`, and
+  `integrations/machina`'s `serde_with`. `image-size` (pulled in
+  transitively via `@docusaurus/mdx-loader`, used only at site build time
+  against our own docs content) had two high-severity infinite-loop DoS
+  advisories (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq) against `<= 2.0.2`;
+  fixed upstream in `2.0.4`, published after the advisories despite
+  Dependabot not yet showing a `first_patched_version` for either.
+- `integrations/machina/desktop/src-tauri`'s `glib` (0.18.5, pulled in
+  transitively via `gtk`/`webkit2gtk`/`wry` for the Linux Tauri build) has
+  an open medium-severity soundness advisory (GHSA-wrw7-89jp-8q8g,
+  `VariantStrIter`'s `Iterator`/`DoubleEndedIterator` impls) fixed in
+  `glib 0.20.0` — left unpatched for now: Tauri 2.11.5 (already the latest
+  published 2.x release) and the whole gtk-rs stack it pulls in are still
+  on the 0.18.x generation, and the `gtk` crate itself hasn't published a
+  release past 0.19.0 yet, so there is no compatible upgrade path without
+  either a breaking gtk-rs major-version jump across a dozen crates or
+  waiting on upstream Tauri/wry/tao/muda to move first.
 - **Agent Runtime** — standalone component (`agent-runtime/`, `sdk/agent-runtime/`)
   for deploying durable TypeScript agent sessions, each in its own FluxVM
   sandbox: immutable content-addressed agent deployments, durable event
