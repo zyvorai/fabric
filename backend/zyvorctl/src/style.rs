@@ -28,14 +28,19 @@ pub enum ColorMode {
 
 impl ColorMode {
     /// Resolve whether ANSI color should be emitted for stdout.
+    ///
+    /// `always` wins over `NO_COLOR` so scripts and CI can force color.
+    /// `auto` honors `NO_COLOR` and only paints a TTY.
     pub fn enabled(self) -> bool {
-        if std::env::var_os("NO_COLOR").is_some() {
-            return false;
-        }
         match self {
             ColorMode::Always => true,
             ColorMode::Never => false,
-            ColorMode::Auto => std::io::stdout().is_terminal(),
+            ColorMode::Auto => {
+                if std::env::var_os("NO_COLOR").is_some() {
+                    return false;
+                }
+                std::io::stdout().is_terminal()
+            }
         }
     }
 }

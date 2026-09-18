@@ -96,8 +96,15 @@ pub struct Cli {
 impl Cli {
     /// Build clap Command with Cilium-style grouped root `--help`.
     pub fn command_with_grouped_help() -> clap::Command {
-        let color = peek_color_mode();
-        Self::command().override_help(crate::help::render_root_help(color.enabled()))
+        let mode = peek_color_mode();
+        let choice = match mode {
+            ColorMode::Always => clap::ColorChoice::Always,
+            ColorMode::Never => clap::ColorChoice::Never,
+            ColorMode::Auto => clap::ColorChoice::Auto,
+        };
+        Self::command()
+            .color(choice)
+            .override_help(crate::help::render_root_help(mode.enabled()))
     }
 }
 
@@ -2625,9 +2632,7 @@ mod container_group_cli_tests {
         let cli = Cli::try_parse_from(["zyvorctl", "completion", "zsh"]).unwrap();
         assert!(matches!(
             cli.command,
-            Some(Commands::Completion {
-                shell: Shell::Zsh
-            })
+            Some(Commands::Completion { shell: Shell::Zsh })
         ));
     }
 

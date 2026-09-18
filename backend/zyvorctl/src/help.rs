@@ -232,10 +232,7 @@ pub fn render_root_help(color: bool) -> String {
         out.push('\n');
     }
 
-    out.push_str(&format!(
-        "🚩 {}\n",
-        paint(color, style::BOLD, "Flags:")
-    ));
+    out.push_str(&format!("🚩 {}\n", paint(color, style::BOLD, "Flags:")));
     out.push_str(&flag_line(
         color,
         "-o, --output",

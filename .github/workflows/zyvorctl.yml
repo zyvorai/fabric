@@ -1,0 +1,78 @@
+name: zyvorctl
+
+# Fast gate for the Fabric CLI: fmt, clippy, unit tests, and a smoke of the
+# Cilium-style grouped help / color / completion surface. The full workspace
+# suite still runs in ci.yml; this job fails earlier and names the CLI failure.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/zyvorctl/**"
+      - "backend/vm-model/**"
+      - "backend/Cargo.toml"
+      - "backend/Cargo.lock"
+      - ".github/workflows/zyvorctl.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/zyvorctl/**"
+      - "backend/vm-model/**"
+      - "backend/Cargo.toml"
+      - "backend/Cargo.lock"
+      - ".github/workflows/zyvorctl.yml"
+
+jobs:
+  zyvorctl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Check formatting
+        run: cd backend && cargo fmt -p zyvorctl -- --check
+
+      - name: Lint
+        run: cd backend && cargo clippy -p zyvorctl --all-targets -- -D warnings
+
+      - name: Test
+        run: cd backend && cargo test -p zyvorctl
+
+      - name: Build
+        run: cd backend && cargo build -p zyvorctl
+
+      - name: CLI smoke (grouped help, color, completion)
+        run: |
+          set -euo pipefail
+          BIN=backend/target/debug/zyvorctl
+          "$BIN" --version
+          help="$("$BIN" --color never --help)"
+          printf '%s\n' "$help" | grep -q "Basic Commands:"
+          printf '%s\n' "$help" | grep -q "Dataplane (FluxVM edge):"
+          printf '%s\n' "$help" | grep -q "Networking & Security:"
+          printf '%s\n' "$help" | grep -q "Meta:"
+          # --color never must not emit ANSI
+          printf '%s\n' "$help" | grep -q $'\x1b' && {
+            echo "::error::--color never help contains ANSI"
+            exit 1
+          } || true
+          # Explicit --color always must paint even if the runner exports NO_COLOR.
+          color="$(env -u NO_COLOR "$BIN" --color always --help)"
+          printf '%s\n' "$color" | grep -q $'\x1b' || {
+            echo "::error::--color always help has no ANSI"
+            exit 1
+          }
+          cfg="$("$BIN" config --color never)"
+          printf '%s\n' "$cfg" | grep -q "server:"
+          bash_comp="$("$BIN" completion bash)"
+          printf '%s\n' "$bash_comp" | grep -q "_zyvorctl"
+          zsh_comp="$("$BIN" completion zsh)"
+          printf '%s\n' "$zsh_comp" | grep -q "compdef"
+          fish_comp="$("$BIN" completion fish)"
+          printf '%s\n' "$fish_comp" | grep -q "complete"
