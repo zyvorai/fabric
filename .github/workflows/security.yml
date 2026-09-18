@@ -68,7 +68,6 @@ jobs:
 
   trivy-dockerfile:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
       - name: Run Trivy on Dockerfiles
@@ -78,6 +77,7 @@ jobs:
           scan-ref: .
           severity: HIGH,CRITICAL
           exit-code: "1"
+          trivyignores: .trivyignore
 
   codeql:
     runs-on: ubuntu-latest
