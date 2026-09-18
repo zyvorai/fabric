@@ -3,20 +3,7 @@
 
 //! Color / plain Hubble-style text for `zyvorctl dataplane hubble`.
 
-const RESET: &str = "\x1b[0m";
-const GREEN: &str = "\x1b[32m";
-const RED: &str = "\x1b[31m";
-const YELLOW: &str = "\x1b[33m";
-const BLUE: &str = "\x1b[34m";
-const CYAN: &str = "\x1b[36m";
-
-fn paint(color: bool, code: &str, text: &str) -> String {
-    if color {
-        format!("{code}{text}{RESET}")
-    } else {
-        text.to_string()
-    }
-}
+use crate::style::{self, paint};
 
 pub fn render_hubble_json(val: &serde_json::Value, output: &str) -> String {
     let color = matches!(output.to_ascii_lowercase().as_str(), "color" | "colour");
@@ -35,9 +22,9 @@ pub fn render_hubble_json(val: &serde_json::Value, output: &str) -> String {
             .and_then(|v| v.as_str())
             .unwrap_or("FORWARDED");
         let vtxt = match verdict {
-            "DROPPED" => paint(color, RED, verdict),
-            "AUDIT" => paint(color, YELLOW, verdict),
-            _ => paint(color, GREEN, verdict),
+            "DROPPED" => paint(color, style::RED, verdict),
+            "AUDIT" => paint(color, style::YELLOW, verdict),
+            _ => paint(color, style::GREEN, verdict),
         };
         let dir = item
             .get("traffic_direction")
@@ -62,8 +49,8 @@ pub fn render_hubble_json(val: &serde_json::Value, output: &str) -> String {
         let proto = l4.get("protocol").and_then(|v| v.as_str()).unwrap_or("?");
         out.push_str(&format!(
             "{vtxt} {dir} {proto} {src} {arrow} {dst}\n",
-            proto = paint(color, CYAN, proto),
-            arrow = paint(color, BLUE, "→"),
+            proto = paint(color, style::CYAN, proto),
+            arrow = paint(color, style::BLUE, "→"),
         ));
         if let Some(hops) = item.get("hops").and_then(|v| v.as_array()) {
             for (i, hop) in hops.iter().enumerate() {
@@ -81,6 +68,15 @@ pub fn render_hubble_json(val: &serde_json::Value, output: &str) -> String {
         out.push('\n');
     }
     out
+}
+
+/// Default hubble `--style` when the user did not force one: color on TTY, else plain.
+pub fn default_hubble_style(color_mode_enabled: bool) -> &'static str {
+    if color_mode_enabled {
+        "color"
+    } else {
+        "plain"
+    }
 }
 
 #[cfg(test)]

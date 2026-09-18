@@ -3,6 +3,11 @@
 ## 0.3.0
 
 ### Added
+- **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
+  Networking / Meta, with emoji section markers), `--color auto|always|never`,
+  `--server` / `--token`, meta commands `status` / `config` / `completion`
+  (bash/zsh/fish), and table-mode output that no longer dumps JSON for object
+  responses. Hubble `--style` defaults to color on TTY.
 - **Deploy Agent from the web console** — the Agents page can now deploy a
   new agent directly (upload a bundle built with the new `fabric-agent
   build` CLI subcommand, set template/credentials/egress hosts/warm pool

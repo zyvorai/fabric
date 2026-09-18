@@ -205,7 +205,9 @@ Hands-on: [Tutorial 09](../../tutorials/09-edge-dataplane.md) ·
 ## CLI (`zyvorctl`)
 
 `zyvorctl list` decodes the paginated `GET /api/vms` envelope (`{items, total, …}`),
-not a bare JSON array.
+not a bare JSON array. Root help is Cilium-style grouped with emoji markers
+(`zyvorctl --help`); `--color auto|always|never` colorizes tables/status
+(honors `NO_COLOR`).
 
 ```bash
 # HTTPS labs (self-signed cert accepted when URL is https://)
@@ -215,6 +217,8 @@ export ZYVOR_FABRIC_TOKEN="$(curl -sk -X POST "$ZYVOR_FABRIC_URL/api/auth/login"
   -d '{"username":"admin","password":"YOUR_PASSWORD"}' \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')"
 
+zyvorctl status                # Fabric API + dataplane checklist
+zyvorctl config                # effective --server / token / color
 zyvorctl list -o json          # items[] from paginated /api/vms
 zyvorctl dataplane status <name> -o json
 zyvorctl dataplane policy get <name> -o json
@@ -227,10 +231,12 @@ zyvorctl dataplane group list -o json
 zyvorctl dataplane cnp list -o json
 zyvorctl dataplane observe -o json
 zyvorctl dataplane refresh-dns -o json
+zyvorctl dataplane hubble --style color   # default: color on TTY, plain when piped
+zyvorctl completion zsh > ~/.zfunc/_zyvorctl
 ```
 
 Aliases: `FABRIC_URL`, `FABRIC_TOKEN` (same as `ZYVOR_FABRIC_*`). Default URL remains `http://localhost:9095`
-for local Docker eval.
+for local Docker eval. Overrides: `--server`, `--token`.
 
 ---
 

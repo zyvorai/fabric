@@ -37,13 +37,14 @@
 
 ### CLI (zyvorctl)
 
-- 15+ subcommand groups (vm, policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net, dataplane)
-- `zyvorctl dataplane status|policy|stats|flows|effective|health|group|cnp|observe|…` — FluxVM Network Fabric edge (not SDN network-policies)
-- Output formats: table, JSON, YAML (`-o json|yaml|table`)
+- Cilium-style grouped help with emoji section markers (`zyvorctl --help`) plus 15+ subcommand groups (policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net, dataplane, …)
+- `zyvorctl dataplane status|policy|stats|flows|effective|health|group|cnp|observe|hubble|…` — FluxVM Network Fabric edge (not SDN network-policies)
+- Meta: `status` (API/dataplane checklist), `config`, `completion` (bash/zsh/fish)
+- Output formats: table, JSON, YAML (`-o json|yaml|table`); `--color auto|always|never` (TTY-aware, honors `NO_COLOR`)
 - Declarative config import: `zyvorctl apply -f config.yaml`
 - Config export: `zyvorctl export <resource> -o yaml`
 - Ceph management: pool create, health, stats, RBD image CRUD
-- Color output and progress indicators
+- Colorized tables/status and Hubble flow output
 
 ### Web UI (React)
 

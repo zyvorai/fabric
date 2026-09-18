@@ -2,24 +2,54 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::{generate, Shell};
 use reqwest::Client;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::io;
+use std::sync::Mutex;
 use tabled::{Table, Tabled};
 use vm_model::{CreateVMRequest, VM};
 
-/// Fabric API root including `/api` (override with `ZYVOR_FABRIC_URL` or `FABRIC_URL`).
-fn api_base() -> String {
-    let root = std::env::var("ZYVOR_FABRIC_URL")
-        .or_else(|_| std::env::var("FABRIC_URL"))
-        .unwrap_or_else(|_| "http://localhost:9095".to_string());
+use crate::style::{self, ColorMode};
+
+static API_BASE: Mutex<String> = Mutex::new(String::new());
+
+/// Fabric API root including `/api` (override with `--server` / `ZYVOR_FABRIC_URL` / `FABRIC_URL`).
+fn resolve_api_base(server: Option<&str>) -> String {
+    let root = server
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("ZYVOR_FABRIC_URL").ok())
+        .or_else(|| std::env::var("FABRIC_URL").ok())
+        .unwrap_or_else(|| "http://localhost:9095".to_string());
     let root = root.trim_end_matches('/').to_string();
     if root.ends_with("/api") {
         root
     } else {
         format!("{root}/api")
     }
+}
+
+fn set_api_base(base: String) {
+    *API_BASE.lock().expect("api base lock") = base;
+}
+
+fn api_base() -> String {
+    let guard = API_BASE.lock().expect("api base lock");
+    if guard.is_empty() {
+        resolve_api_base(None)
+    } else {
+        guard.clone()
+    }
+}
+
+fn auth_token(token_flag: Option<&str>) -> Option<String> {
+    token_flag.map(|s| s.to_string()).or_else(|| {
+        std::env::var("ZYVOR_FABRIC_TOKEN")
+            .or_else(|_| std::env::var("FABRIC_TOKEN"))
+            .ok()
+    })
 }
 
 // ─── Output format ───────────────────────────────────────────────────────────
@@ -35,7 +65,7 @@ pub enum OutputFormat {
 
 #[derive(Parser)]
 #[command(name = "zyvorctl")]
-#[command(about = "zyvor-fabricd command-line interface", long_about = None)]
+#[command(about = "Zyvor Fabric CLI", long_about = None)]
 // clap's --version auto-wiring needs the "cargo" feature (this workspace
 // doesn't enable it, backend/Cargo.toml:75) -- pass the version explicitly
 // via the plain `env!` std macro instead, which needs no clap feature.
@@ -44,11 +74,46 @@ pub enum OutputFormat {
 #[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 
     /// Output format
     #[arg(long, short = 'o', default_value = "table", global = true)]
     output: OutputFormat,
+
+    /// Colorize output (auto detects TTY; honors NO_COLOR)
+    #[arg(long, default_value = "auto", global = true, value_enum)]
+    color: ColorMode,
+
+    /// Fabric API URL (overrides ZYVOR_FABRIC_URL / FABRIC_URL)
+    #[arg(long, global = true)]
+    server: Option<String>,
+
+    /// Bearer token (overrides ZYVOR_FABRIC_TOKEN / FABRIC_TOKEN)
+    #[arg(long, global = true)]
+    token: Option<String>,
+}
+
+impl Cli {
+    /// Build clap Command with Cilium-style grouped root `--help`.
+    pub fn command_with_grouped_help() -> clap::Command {
+        let color = peek_color_mode();
+        Self::command().override_help(crate::help::render_root_help(color.enabled()))
+    }
+}
+
+/// Peek `--color` from argv before full parse (for help rendering).
+fn peek_color_mode() -> ColorMode {
+    let mut args = std::env::args().skip(1);
+    while let Some(a) = args.next() {
+        if a == "--color" {
+            if let Some(v) = args.next() {
+                return ColorMode::from_str(&v, true).unwrap_or(ColorMode::Auto);
+            }
+        } else if let Some(v) = a.strip_prefix("--color=") {
+            return ColorMode::from_str(v, true).unwrap_or(ColorMode::Auto);
+        }
+    }
+    ColorMode::Auto
 }
 
 #[derive(Subcommand)]
@@ -170,6 +235,17 @@ enum Commands {
     /// Manage ContainerGroup workloads (FluxVM Secure Containers)
     #[command(subcommand)]
     ContainerGroup(ContainerGroupCmd),
+
+    // ─── Meta (Cilium-parity) ────────────────────────────────────────────
+    /// Display Fabric / dataplane status
+    Status,
+    /// Show effective CLI configuration
+    Config,
+    /// Generate shell completion scripts
+    Completion {
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }
 
 // ─── Sub-command enums ───────────────────────────────────────────────────────
@@ -217,9 +293,9 @@ enum DataplaneCmd {
     /// Hubble-style packet flows (JSON from Fabric; color/plain via --style)
     ///
     /// Uses `--style` (not global `-o/--output`) because `zyvorctl` already
-    /// reserves `-o` for table|json|yaml.
+    /// reserves `-o` for table|json|yaml. Default: color on TTY, else plain.
     Hubble {
-        #[arg(long = "style", default_value = "json")]
+        #[arg(long = "style", default_value = "auto")]
         style: String,
         #[arg(long, default_value_t = 64)]
         limit: usize,
@@ -826,12 +902,41 @@ fn format_output<T: Serialize>(val: &T, fmt: OutputFormat) -> Result<String> {
     }
 }
 
+fn print_kv_table(val: &serde_json::Value) {
+    if let Some(obj) = val.as_object() {
+        let width = obj.keys().map(|k| k.len()).max().unwrap_or(4).max(4);
+        for (k, v) in obj {
+            let rendered = match v {
+                serde_json::Value::String(s) => style::status_cell(s),
+                serde_json::Value::Bool(b) => style::status_cell(if *b { "true" } else { "false" }),
+                serde_json::Value::Null => style::paint_global(style::DIM, "-"),
+                serde_json::Value::Number(n) => n.to_string(),
+                other if other.is_array() || other.is_object() => {
+                    serde_json::to_string(other).unwrap_or_default()
+                }
+                other => other.to_string(),
+            };
+            println!("  {:width$}: {}", k, rendered, width = width);
+        }
+    } else {
+        println!("{}", serde_json::to_string_pretty(val).unwrap_or_default());
+    }
+}
+
 fn print_value(val: &serde_json::Value, fmt: OutputFormat) {
     match fmt {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(val).unwrap_or_default()),
         OutputFormat::Yaml => println!("{}", serde_yaml::to_string(val).unwrap_or_default()),
         OutputFormat::Table => {
-            println!("{}", serde_json::to_string_pretty(val).unwrap_or_default())
+            if let Some(items) = val.as_array() {
+                print_resources(items, fmt);
+            } else if let Some(items) = val.get("items").and_then(|v| v.as_array()) {
+                print_resources(items, fmt);
+            } else if val.is_object() {
+                print_kv_table(val);
+            } else {
+                println!("{}", serde_json::to_string_pretty(val).unwrap_or_default());
+            }
         }
     }
 }
@@ -845,18 +950,8 @@ fn print_resources(items: &[serde_json::Value], fmt: OutputFormat) {
             }
             let rows: Vec<ResourceRow> = items
                 .iter()
-                .map(|v| ResourceRow {
-                    id: v
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("-")
-                        .to_string(),
-                    name: v
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("-")
-                        .to_string(),
-                    status: v
+                .map(|v| {
+                    let status_raw = v
                         .get("enabled")
                         .map(|e| {
                             if e.as_bool().unwrap_or(false) {
@@ -865,9 +960,23 @@ fn print_resources(items: &[serde_json::Value], fmt: OutputFormat) {
                                 "disabled"
                             }
                         })
-                        .unwrap_or("active")
-                        .to_string(),
-                    info: extract_info(v),
+                        .or_else(|| v.get("status").and_then(|s| s.as_str()))
+                        .or_else(|| v.get("state").and_then(|s| s.as_str()))
+                        .unwrap_or("active");
+                    ResourceRow {
+                        id: v
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("-")
+                            .to_string(),
+                        name: v
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("-")
+                            .to_string(),
+                        status: style::status_cell(status_raw),
+                        info: extract_info(v),
+                    }
                 })
                 .collect();
             println!("{}", Table::new(rows));
@@ -1054,21 +1163,189 @@ async fn api_post_void(client: &Client, path: &str) -> Result<()> {
     Ok(())
 }
 
+fn print_config(
+    server: Option<&str>,
+    token: Option<&str>,
+    color: ColorMode,
+    fmt: OutputFormat,
+) -> Result<()> {
+    let base = resolve_api_base(server);
+    let token_set = auth_token(token).is_some();
+    let cfg = serde_json::json!({
+        "server": base,
+        "token_set": token_set,
+        "color": format!("{:?}", color).to_ascii_lowercase(),
+        "version": env!("CARGO_PKG_VERSION"),
+    });
+    match fmt {
+        OutputFormat::Table => {
+            println!("{}", style::heading("⚙️  zyvorctl config"));
+            println!("  server:    {}", base);
+            println!(
+                "  token:     {}",
+                if token_set {
+                    style::paint_global(style::GREEN, "set")
+                } else {
+                    style::paint_global(style::YELLOW, "unset")
+                }
+            );
+            println!("  color:     {:?}", color);
+            println!("  version:   {}", env!("CARGO_PKG_VERSION"));
+        }
+        _ => println!("{}", format_output(&cfg, fmt)?),
+    }
+    Ok(())
+}
+
+async fn run_status(client: &Client, fmt: OutputFormat, token_set: bool) -> Result<()> {
+    let mut ok = true;
+    let mut lines: Vec<(String, String)> = Vec::new();
+
+    // API reachability via VM list (lightweight)
+    let api_result = client
+        .get(format!("{}/vms?limit=1", api_base()))
+        .send()
+        .await;
+    match api_result {
+        Ok(res) if res.status().is_success() => {
+            lines.push(("Fabric API".into(), "ok".into()));
+        }
+        Ok(res) if res.status().as_u16() == 401 || res.status().as_u16() == 403 => {
+            lines.push(("Fabric API".into(), "reachable (auth required)".into()));
+            lines.push(("Auth".into(), "missing or invalid token".into()));
+            ok = false;
+        }
+        Ok(res) => {
+            lines.push(("Fabric API".into(), format!("error ({})", res.status())));
+            ok = false;
+        }
+        Err(e) => {
+            lines.push(("Fabric API".into(), format!("unreachable ({e})")));
+            ok = false;
+        }
+    }
+
+    if token_set {
+        lines.push(("Auth token".into(), "set".into()));
+    } else {
+        lines.push(("Auth token".into(), "unset".into()));
+    }
+
+    match api_get(client, "/dataplane/health").await {
+        Ok(val) => {
+            let summary = val
+                .get("status")
+                .or_else(|| val.get("state"))
+                .or_else(|| val.get("ok"))
+                .map(|v| match v {
+                    serde_json::Value::Bool(true) => "ok".to_string(),
+                    serde_json::Value::Bool(false) => "degraded".to_string(),
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                })
+                .unwrap_or_else(|| "ok".to_string());
+            let healthy = summary.to_ascii_lowercase().contains("ok")
+                || summary.to_ascii_lowercase().contains("healthy")
+                || summary == "true";
+            if !healthy {
+                ok = false;
+            }
+            lines.push(("Dataplane".into(), summary));
+            if matches!(fmt, OutputFormat::Json | OutputFormat::Yaml) {
+                // fall through to structured dump below
+                let report = serde_json::json!({
+                    "fabric_api": lines.iter().find(|(k, _)| k == "Fabric API").map(|(_, v)| v),
+                    "auth_token": if token_set { "set" } else { "unset" },
+                    "dataplane": val,
+                    "ok": ok,
+                });
+                print_value(&report, fmt);
+                if !ok {
+                    anyhow::bail!("zyvorctl status: unhealthy");
+                }
+                return Ok(());
+            }
+        }
+        Err(e) => {
+            lines.push(("Dataplane".into(), format!("unavailable ({e})")));
+            ok = false;
+        }
+    }
+
+    match fmt {
+        OutputFormat::Table => {
+            println!("{}", style::heading("❤️  zyvorctl status"));
+            for (name, detail) in &lines {
+                let lower = detail.to_ascii_lowercase();
+                let line = if lower.contains("ok")
+                    || lower == "set"
+                    || lower.contains("healthy")
+                    || lower.contains("reachable (auth")
+                {
+                    if lower.contains("auth required") || lower.contains("missing") {
+                        style::check_warn(&format!("{name}: {detail}"))
+                    } else {
+                        style::check_ok(&format!("{name}: {detail}"))
+                    }
+                } else if lower.contains("unset") {
+                    style::check_warn(&format!("{name}: {detail}"))
+                } else {
+                    style::check_fail(&format!("{name}: {detail}"))
+                };
+                println!("{line}");
+            }
+        }
+        _ => {
+            let report = serde_json::json!({
+                "checks": lines.iter().map(|(k, v)| serde_json::json!({k: v})).collect::<Vec<_>>(),
+                "ok": ok,
+            });
+            print_value(&report, fmt);
+        }
+    }
+
+    if !ok {
+        anyhow::bail!("zyvorctl status: unhealthy");
+    }
+    Ok(())
+}
+
 // ─── Execution ───────────────────────────────────────────────────────────────
 
 impl Cli {
     pub async fn run(self) -> Result<()> {
+        style::set_color_enabled(self.color.enabled());
+        set_api_base(resolve_api_base(self.server.as_deref()));
+
+        let Some(command) = self.command else {
+            crate::help::print_root_help(self.color.enabled());
+            return Ok(());
+        };
+
+        // Meta commands that do not need an HTTP client
+        if let Commands::Completion { shell } = &command {
+            let mut cmd = Self::command_with_grouped_help();
+            generate(*shell, &mut cmd, "zyvorctl", &mut io::stdout());
+            return Ok(());
+        }
+        if matches!(command, Commands::Config) {
+            return print_config(
+                self.server.as_deref(),
+                self.token.as_deref(),
+                self.color,
+                self.output,
+            );
+        }
+
         let base = api_base();
         let mut headers = reqwest::header::HeaderMap::new();
-        if let Ok(token) =
-            std::env::var("ZYVOR_FABRIC_TOKEN").or_else(|_| std::env::var("FABRIC_TOKEN"))
-        {
+        if let Some(token) = auth_token(self.token.as_deref()) {
             let value = format!("Bearer {token}");
             headers.insert(
                 reqwest::header::AUTHORIZATION,
                 value
                     .parse()
-                    .context("invalid ZYVOR_FABRIC_TOKEN / FABRIC_TOKEN")?,
+                    .context("invalid ZYVOR_FABRIC_TOKEN / FABRIC_TOKEN / --token")?,
             );
         }
         let client = Client::builder()
@@ -1077,8 +1354,14 @@ impl Cli {
             .build()
             .context("build HTTP client")?;
         let fmt = self.output;
+        let color_on = self.color.enabled();
 
-        match self.command {
+        match command {
+            Commands::Status => {
+                let token_set = auth_token(self.token.as_deref()).is_some();
+                return run_status(&client, fmt, token_set).await;
+            }
+            Commands::Config | Commands::Completion { .. } => unreachable!(),
             // ── VM Management ────────────────────────────────────────────
             Commands::List => {
                 #[derive(serde::Deserialize)]
@@ -1104,13 +1387,16 @@ impl Cli {
                         }
                         let rows: Vec<VMRow> = vms
                             .into_iter()
-                            .map(|vm| VMRow {
-                                name: vm.name,
-                                state: format!("{:?}", vm.state),
-                                cpus: vm.cpus,
-                                memory: format!("{}MB", vm.memory),
-                                disk: format!("{}GB", vm.disk),
-                                image: vm.image,
+                            .map(|vm| {
+                                let state_raw = format!("{:?}", vm.state);
+                                VMRow {
+                                    name: vm.name,
+                                    state: style::status_cell(&state_raw),
+                                    cpus: vm.cpus,
+                                    memory: format!("{}MB", vm.memory),
+                                    disk: format!("{}GB", vm.disk),
+                                    image: vm.image,
+                                }
                             })
                             .collect();
                         println!("{}", Table::new(rows));
@@ -1130,8 +1416,9 @@ impl Cli {
 
                 match fmt {
                     OutputFormat::Table => {
+                        let state_raw = format!("{:?}", vm.state);
                         println!("Name:     {}", vm.name);
-                        println!("State:    {:?}", vm.state);
+                        println!("State:    {}", style::status_cell(&state_raw));
                         println!("CPUs:     {}", vm.cpus);
                         println!("Memory:   {}MB", vm.memory);
                         println!("Disk:     {}GB", vm.disk);
@@ -1350,6 +1637,11 @@ impl Cli {
                 DataplaneCmd::Hubble { style, limit } => {
                     let val = api_get(&client, &format!("/dataplane/hubble/flows?limit={}", limit))
                         .await?;
+                    let style = if style.eq_ignore_ascii_case("auto") {
+                        crate::packetflow::default_hubble_style(color_on).to_string()
+                    } else {
+                        style
+                    };
                     // Global `-o json` also forces JSON (same as --style json).
                     if matches!(fmt, OutputFormat::Json) || style.eq_ignore_ascii_case("json") {
                         print_value(&val, OutputFormat::Json);
@@ -2252,7 +2544,7 @@ mod container_group_cli_tests {
         let cli = Cli::try_parse_from(["zyvorctl", "container-group", "list"]).unwrap();
         assert!(matches!(
             cli.command,
-            Commands::ContainerGroup(ContainerGroupCmd::List)
+            Some(Commands::ContainerGroup(ContainerGroupCmd::List))
         ));
     }
 
@@ -2262,7 +2554,7 @@ mod container_group_cli_tests {
         let cli =
             Cli::try_parse_from(["zyvorctl", "container-group", "apply", "-f", "cg.yaml"]).unwrap();
         match cli.command {
-            Commands::ContainerGroup(ContainerGroupCmd::Apply { file }) => {
+            Some(Commands::ContainerGroup(ContainerGroupCmd::Apply { file })) => {
                 assert_eq!(file, "cg.yaml");
             }
             _ => panic!("expected ContainerGroup::Apply"),
@@ -2274,7 +2566,7 @@ mod container_group_cli_tests {
         assert!(Cli::try_parse_from(["zyvorctl", "container-group", "delete"]).is_err());
         let cli = Cli::try_parse_from(["zyvorctl", "container-group", "delete", "web"]).unwrap();
         match cli.command {
-            Commands::ContainerGroup(ContainerGroupCmd::Delete { name }) => {
+            Some(Commands::ContainerGroup(ContainerGroupCmd::Delete { name })) => {
                 assert_eq!(name, "web");
             }
             _ => panic!("expected ContainerGroup::Delete"),
@@ -2286,12 +2578,12 @@ mod container_group_cli_tests {
         let cli = Cli::try_parse_from(["zyvorctl", "container-group", "backup", "create", "web"])
             .unwrap();
         match cli.command {
-            Commands::ContainerGroup(ContainerGroupCmd::Backup(
+            Some(Commands::ContainerGroup(ContainerGroupCmd::Backup(
                 ContainerGroupBackupCmd::Create {
                     container_group_name,
                     retention_days,
                 },
-            )) => {
+            ))) => {
                 assert_eq!(container_group_name, "web");
                 assert_eq!(retention_days, 30);
             }
@@ -2311,12 +2603,37 @@ mod container_group_cli_tests {
         ])
         .unwrap();
         match cli.command {
-            Commands::ContainerGroup(ContainerGroupCmd::Backup(
+            Some(Commands::ContainerGroup(ContainerGroupCmd::Backup(
                 ContainerGroupBackupCmd::Restore { id },
-            )) => {
+            ))) => {
                 assert_eq!(id, "backup-1");
             }
             _ => panic!("expected ContainerGroup::Backup::Restore"),
         }
+    }
+
+    #[test]
+    fn meta_commands_parse() {
+        assert!(matches!(
+            Cli::try_parse_from(["zyvorctl", "status"]).unwrap().command,
+            Some(Commands::Status)
+        ));
+        assert!(matches!(
+            Cli::try_parse_from(["zyvorctl", "config"]).unwrap().command,
+            Some(Commands::Config)
+        ));
+        let cli = Cli::try_parse_from(["zyvorctl", "completion", "zsh"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Completion {
+                shell: Shell::Zsh
+            })
+        ));
+    }
+
+    #[test]
+    fn bare_zyvorctl_has_no_command() {
+        let cli = Cli::try_parse_from(["zyvorctl"]).unwrap();
+        assert!(cli.command.is_none());
     }
 }

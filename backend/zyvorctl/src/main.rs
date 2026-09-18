@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod cli;
+mod help;
 mod packetflow;
+mod style;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::FromArgMatches;
 use cli::Cli;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -26,6 +28,8 @@ async fn main() -> Result<()> {
 
     tracing::debug!("zyvorctl starting");
 
-    let cli = Cli::parse();
+    let mut cmd = Cli::command_with_grouped_help();
+    let matches = cmd.get_matches_mut();
+    let cli = Cli::from_arg_matches(&matches)?;
     cli.run().await
 }

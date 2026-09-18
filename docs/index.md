@@ -260,6 +260,7 @@ Detailed documentation for each major feature area.
 
 | Command | Description |
 |---------|-------------|
+| `zyvorctl` / `zyvorctl --help` | Cilium-style grouped help with emoji section markers (Basic, Dataplane, Networking, Meta, …) |
 | `zyvorctl list` | List VMs (paginated `{items, total, …}` from `GET /api/vms`); set `FABRIC_URL` + `FABRIC_TOKEN` or `ZYVOR_FABRIC_*` for HTTPS labs |
 | `zyvorctl create` | Create a new VM |
 | `zyvorctl start` | Start a stopped VM |
@@ -268,8 +269,14 @@ Detailed documentation for each major feature area.
 | `zyvorctl delete` | Delete a VM |
 | `zyvorctl apply` | Apply declarative YAML specification |
 | `zyvorctl policy` | Manage network policies |
+| `zyvorctl dataplane` | VM edge dataplane (policy, flows, hubble, CNP, …) |
+| `zyvorctl status` | Fabric API + dataplane health checklist |
+| `zyvorctl config` | Show effective server/token/color settings |
+| `zyvorctl completion` | Generate bash/zsh/fish completion scripts |
 | `zyvorctl ceph` | Ceph storage management |
 | `zyvorctl metrics` | Get VM metrics |
+
+Global flags: `-o table|json|yaml`, `--color auto|always|never`, `--server`, `--token`.
 
 VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`) — there is no `zyvorctl console` command.
 
