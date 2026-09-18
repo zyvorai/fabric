@@ -53,26 +53,26 @@ jobs:
           BIN=backend/target/debug/zyvorctl
           "$BIN" --version
           help="$("$BIN" --color never --help)"
-          printf '%s\n' "$help" | grep -q "Basic Commands:"
-          printf '%s\n' "$help" | grep -q "Dataplane (FluxVM edge):"
-          printf '%s\n' "$help" | grep -q "Networking & Security:"
-          printf '%s\n' "$help" | grep -q "Meta:"
+          [[ "$help" == *"Basic Commands:"* ]]
+          [[ "$help" == *"Dataplane (FluxVM edge):"* ]]
+          [[ "$help" == *"Networking & Security:"* ]]
+          [[ "$help" == *"Meta:"* ]]
           # --color never must not emit ANSI
-          printf '%s\n' "$help" | grep -q $'\x1b' && {
+          if [[ "$help" == *$'\x1b'* ]]; then
             echo "::error::--color never help contains ANSI"
             exit 1
-          } || true
+          fi
           # Explicit --color always must paint even if the runner exports NO_COLOR.
           color="$(env -u NO_COLOR "$BIN" --color always --help)"
-          printf '%s\n' "$color" | grep -q $'\x1b' || {
+          if [[ "$color" != *$'\x1b'* ]]; then
             echo "::error::--color always help has no ANSI"
             exit 1
-          }
+          fi
           cfg="$("$BIN" config --color never)"
-          printf '%s\n' "$cfg" | grep -q "server:"
+          [[ "$cfg" == *"server:"* ]]
           bash_comp="$("$BIN" completion bash)"
-          printf '%s\n' "$bash_comp" | grep -q "_zyvorctl"
+          [[ "$bash_comp" == *"_zyvorctl"* ]]
           zsh_comp="$("$BIN" completion zsh)"
-          printf '%s\n' "$zsh_comp" | grep -q "compdef"
+          [[ "$zsh_comp" == *"compdef"* ]]
           fish_comp="$("$BIN" completion fish)"
-          printf '%s\n' "$fish_comp" | grep -q "complete"
+          [[ "$fish_comp" == *"complete"* ]]
