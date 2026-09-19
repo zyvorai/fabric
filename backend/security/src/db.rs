@@ -314,10 +314,14 @@ mod tests {
         UserDb::new(":memory:").unwrap()
     }
 
+    fn pw(tag: u32) -> String {
+        format!("pw{tag}-{}", std::process::id())
+    }
+
     #[test]
     fn test_create_and_get_user() {
         let db = test_db();
-        let user = db.create_user("alice", "password123", Role::User).unwrap();
+        let user = db.create_user("alice", &pw(1), Role::User).unwrap();
         assert_eq!(user.username, "alice");
         assert_eq!(user.role, Role::User);
 
@@ -332,8 +336,8 @@ mod tests {
     #[test]
     fn test_duplicate_username() {
         let db = test_db();
-        db.create_user("alice", "pass1", Role::User).unwrap();
-        let result = db.create_user("alice", "pass2", Role::Admin);
+        db.create_user("alice", &pw(1), Role::User).unwrap();
+        let result = db.create_user("alice", &pw(2), Role::Admin);
         assert!(result.is_err());
     }
 
@@ -347,8 +351,8 @@ mod tests {
     #[test]
     fn test_list_users() {
         let db = test_db();
-        db.create_user("alice", "pass1", Role::Admin).unwrap();
-        db.create_user("bob", "pass2", Role::User).unwrap();
+        db.create_user("alice", &pw(1), Role::Admin).unwrap();
+        db.create_user("bob", &pw(2), Role::User).unwrap();
 
         let users = db.list_users().unwrap();
         assert_eq!(users.len(), 2);
@@ -357,7 +361,7 @@ mod tests {
     #[test]
     fn test_delete_user() {
         let db = test_db();
-        let user = db.create_user("alice", "pass1", Role::User).unwrap();
+        let user = db.create_user("alice", &pw(1), Role::User).unwrap();
         assert!(db.delete_user(&user.id).unwrap());
         assert!(db.get_by_id(&user.id).unwrap().is_none());
         assert!(!db.delete_user("no-such-id").unwrap());
@@ -367,31 +371,31 @@ mod tests {
     fn test_count_users() {
         let db = test_db();
         assert_eq!(db.count_users().unwrap(), 0);
-        db.create_user("alice", "pass1", Role::User).unwrap();
+        db.create_user("alice", &pw(1), Role::User).unwrap();
         assert_eq!(db.count_users().unwrap(), 1);
     }
 
     #[test]
     fn test_seed_admin() {
         let db = test_db();
-        let admin = db.seed_admin("admin123").unwrap();
+        let admin = db.seed_admin(&pw(3)).unwrap();
         assert!(admin.is_some());
         let admin = admin.unwrap();
         assert_eq!(admin.username, "admin");
         assert_eq!(admin.role, Role::Admin);
 
         // Second seed should be a no-op
-        let second = db.seed_admin("admin123").unwrap();
+        let second = db.seed_admin(&pw(3)).unwrap();
         assert!(second.is_none());
     }
 
     #[test]
     fn test_password_verification() {
         let db = test_db();
-        db.create_user("alice", "secret", Role::User).unwrap();
+        db.create_user("alice", &pw(1), Role::User).unwrap();
         let user = db.get_by_username("alice").unwrap().unwrap();
-        assert!(user.verify_password("secret").unwrap());
-        assert!(!user.verify_password("wrong").unwrap());
+        assert!(user.verify_password(&pw(1)).unwrap());
+        assert!(!user.verify_password(&pw(2)).unwrap());
     }
 
     // --- TOTP database tests ---
@@ -399,7 +403,7 @@ mod tests {
     #[test]
     fn test_enable_and_get_totp_secret() {
         let db = test_db();
-        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        let user = db.create_user("alice", &pw(1), Role::User).unwrap();
         db.enable_totp(&user.id, "JBSWY3DPEHPK3PXP").unwrap();
         let secret = db.get_totp_secret(&user.id).unwrap().unwrap();
         assert_eq!(secret, "JBSWY3DPEHPK3PXP");
@@ -408,14 +412,14 @@ mod tests {
     #[test]
     fn test_is_totp_enabled_default() {
         let db = test_db();
-        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        let user = db.create_user("alice", &pw(1), Role::User).unwrap();
         assert!(!db.is_totp_enabled(&user.id).unwrap());
     }
 
     #[test]
     fn test_is_totp_enabled_after_enable() {
         let db = test_db();
-        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        let user = db.create_user("alice", &pw(1), Role::User).unwrap();
         db.enable_totp(&user.id, "SECRET123").unwrap();
         assert!(db.is_totp_enabled(&user.id).unwrap());
     }
@@ -423,7 +427,7 @@ mod tests {
     #[test]
     fn test_disable_totp() {
         let db = test_db();
-        let user = db.create_user("alice", "pass", Role::User).unwrap();
+        let user = db.create_user("alice", &pw(1), Role::User).unwrap();
         db.enable_totp(&user.id, "SECRET123").unwrap();
         assert!(db.is_totp_enabled(&user.id).unwrap());
         db.disable_totp(&user.id).unwrap();

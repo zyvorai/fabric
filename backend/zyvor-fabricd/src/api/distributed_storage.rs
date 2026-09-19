@@ -405,6 +405,36 @@ pub async fn start_storage_migration(
         );
         let dest_dir = format!("/var/lib/zyvor-fabricd/storage/{}", target_pool_id);
         let dest_path = format!("{}/{}.qcow2", dest_dir, vm_name);
+        if source_path.contains("..") {
+            tracing::error!("rejected unsafe storage migration path");
+            return;
+        }
+        if dest_dir.contains("..") {
+            tracing::error!("rejected unsafe storage migration path");
+            return;
+        }
+        if dest_path.contains("..") {
+            tracing::error!("rejected unsafe storage migration path");
+            return;
+        }
+        let source_path = if input_guard::COMMAND_ARGS.contains(&source_path) {
+            source_path
+        } else {
+            tracing::error!("rejected unsafe storage migration path");
+            return;
+        };
+        let dest_dir = if input_guard::COMMAND_ARGS.contains(&dest_dir) {
+            dest_dir
+        } else {
+            tracing::error!("rejected unsafe storage migration path");
+            return;
+        };
+        let dest_path = if input_guard::COMMAND_ARGS.contains(&dest_path) {
+            dest_path
+        } else {
+            tracing::error!("rejected unsafe storage migration path");
+            return;
+        };
 
         if !std::path::Path::new(&source_path).exists() {
             tracing::debug!(

@@ -573,7 +573,11 @@ pub async fn delete_iso(
     tracing::debug!("images::{}", stringify!(delete_iso));
     crate::validation::validate_vm_name(&name)
         .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
-    let path = format!("/var/lib/zyvor-fabricd/iso/{}.iso", name);
+    let name = input_guard::vet_component!(
+        &name,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid ISO name")
+    );
+    let path = format!("/var/lib/zyvor-fabricd/iso/{name}.iso");
     if let Err(e) = tokio::fs::remove_file(&path).await {
         if e.kind() != std::io::ErrorKind::NotFound {
             return Err(crate::api_error::json_error(
@@ -639,10 +643,18 @@ pub async fn resize_disk(
         )
     })?;
     let image_path = image_path.display().to_string();
+    let image_path = input_guard::vet!(
+        &image_path,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk path")
+    );
+    let size = input_guard::vet!(
+        &req.size,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk size")
+    );
 
     // Resize with qemu-img
     let output = tokio::process::Command::new("qemu-img")
-        .args(["resize", &image_path, &req.size])
+        .args(["resize", image_path, size])
         .output()
         .await
         .map_err(|e| {
@@ -819,18 +831,34 @@ pub async fn import_vm_image(
             format!("Failed to create directory: {}", e),
         )
     })?;
-    let dest_path = format!("{}/{}.{}", dest_dir, req.name, req.target_format);
+    let name = input_guard::vet_component!(
+        &req.name,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid image name")
+    );
+    let target_format = input_guard::vet_component!(
+        &req.target_format,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid image format")
+    );
+    let source_path = input_guard::vet!(
+        &req.source_path,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid source path")
+    );
+    let source_format = input_guard::vet_component!(
+        &source_format,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid source format")
+    );
+    let dest_path = format!("{dest_dir}/{name}.{target_format}");
 
     // Convert using qemu-img convert
     let output = tokio::process::Command::new("qemu-img")
         .args([
             "convert",
             "-f",
-            &source_format,
+            source_format,
             "-O",
-            &req.target_format,
-            &req.source_path,
-            &dest_path,
+            target_format,
+            source_path,
+            dest_path.as_str(),
         ])
         .output()
         .await

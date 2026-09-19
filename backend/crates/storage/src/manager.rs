@@ -482,8 +482,21 @@ impl StorageManager {
     }
 
     fn update_pool_stats(&self, pool: &mut StoragePool) -> Result<(), StorageError> {
+        let path = pool.path.to_str().ok_or_else(|| {
+            StorageError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "storage path is not valid UTF-8",
+            ))
+        })?;
+        let path = input_guard::vet!(
+            path,
+            StorageError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "rejected unsafe storage path",
+            ))
+        );
         let output = std::process::Command::new("df")
-            .args(["-k", pool.path.to_str().unwrap()])
+            .args(["-k", path])
             .output()?;
 
         let df_output = String::from_utf8_lossy(&output.stdout);

@@ -386,8 +386,32 @@ pub async fn create_snapshot(
             }
         }
     } else {
+        if image_path.contains("..") {
+            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk path")
+                .into_response();
+        }
+        let image_path = if input_guard::COMMAND_ARGS.contains(&image_path) {
+            image_path
+        } else {
+            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk path")
+                .into_response();
+        };
+        if req.name.contains("..") {
+            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid snapshot name")
+                .into_response();
+        }
+        if !input_guard::is_safe_component(&req.name) {
+            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid snapshot name")
+                .into_response();
+        }
+        let snap = if input_guard::COMMAND_ARGS.contains(&req.name) {
+            req.name.as_str()
+        } else {
+            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid snapshot name")
+                .into_response();
+        };
         let output = Command::new("qemu-img")
-            .args(["snapshot", "-c", &req.name, &image_path])
+            .args(["snapshot", "-c", snap, image_path.as_str()])
             .output()
             .await;
 

@@ -1346,8 +1346,11 @@ fn resolve_image_source(state: &AppState, image: &str) -> std::path::PathBuf {
 }
 
 async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
-    let target = crate::validation::find_vm_image_or_default(&vm.name);
-    if std::path::Path::new(&target).exists() {
+    let vm_name = input_guard::vet_component!(&vm.name, "invalid VM name".to_string());
+    let image = input_guard::vet!(&vm.image, "invalid image path".to_string());
+    let target = crate::validation::find_vm_image_or_default(vm_name);
+    let target = input_guard::vet!(&target, "rejected target path".to_string());
+    if std::path::Path::new(target).exists() {
         return Ok(());
     }
     if let Some(parent) = std::path::Path::new(&target).parent() {
@@ -1356,16 +1359,14 @@ async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
 
-    let source = resolve_image_source(state, &vm.image);
+    let source = resolve_image_source(state, image);
     if source.exists() {
+        let source_s = source
+            .to_str()
+            .ok_or_else(|| "invalid source path".to_string())?;
+        let source_s = input_guard::vet!(source_s, "rejected source path".to_string());
         let output = tokio::process::Command::new("cp")
-            .args([
-                "--reflink=auto",
-                source
-                    .to_str()
-                    .ok_or_else(|| "invalid source path".to_string())?,
-                &target,
-            ])
+            .args(["--reflink=auto", source_s, target])
             .output()
             .await
             .map_err(|e| e.to_string())?;
@@ -1376,8 +1377,9 @@ async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
     }
 
     let size_gib = if vm.disk > 0 { vm.disk } else { 20 };
+    let size_arg = format!("{size_gib}G");
     let output = tokio::process::Command::new("qemu-img")
-        .args(["create", "-f", "qcow2", &target, &format!("{size_gib}G")])
+        .args(["create", "-f", "qcow2", target, size_arg.as_str()])
         .output()
         .await
         .map_err(|e| e.to_string())?;

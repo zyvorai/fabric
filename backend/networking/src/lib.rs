@@ -57,6 +57,7 @@ fn parse_addr(cidr: &str) -> Option<IpAddr> {
 /// uses for the per-bridge DHCP *server* -- this is the DHCP *client*
 /// side, for the bridge device's own address, a separate concern.
 fn run_dhcp_client(iface: &str) -> Result<()> {
+    let iface = input_guard::vet_component!(iface, anyhow::anyhow!("rejected interface name"));
     let output = Command::new("dhcpcd")
         .arg(iface)
         .output()
@@ -341,8 +342,9 @@ impl NetworkdManager {
 
     /// Configure SR-IOV VFs on a physical function interface
     pub fn apply_sriov(&self, cfg: &SriovConfig) -> Result<()> {
+        let pf_name = input_guard::vet_component!(&cfg.pf_name, anyhow::anyhow!("invalid PF name"));
         // Set number of VFs via sysfs
-        let sriov_path = format!("/sys/class/net/{}/device/sriov_numvfs", cfg.pf_name);
+        let sriov_path = format!("/sys/class/net/{pf_name}/device/sriov_numvfs");
 
         // Most NIC drivers reject writing a new nonzero VF count while VFs
         // already exist (EBUSY) -- a well-known SR-IOV sysfs quirk:
@@ -369,14 +371,15 @@ impl NetworkdManager {
             let mut args = vec![
                 "link".to_string(),
                 "set".to_string(),
-                cfg.pf_name.clone(),
+                pf_name.to_string(),
                 "vf".to_string(),
                 vf.vf_index.to_string(),
             ];
 
             if let Some(ref mac) = vf.mac_address {
+                let mac = input_guard::vet!(mac, anyhow::anyhow!("invalid VF MAC address"));
                 args.push("mac".to_string());
-                args.push(mac.clone());
+                args.push(mac.to_string());
             }
             if let Some(vlan) = vf.vlan {
                 args.push("vlan".to_string());
@@ -475,12 +478,16 @@ impl NetworkdManager {
 
     /// List all config files we manage (with our prefix)
     pub fn list_managed_files(&self) -> Result<Vec<String>> {
+        let config_dir = input_guard::vet_path!(
+            &self.config_dir,
+            anyhow::anyhow!("rejected network config directory")
+        );
         let mut files = Vec::new();
-        if !self.config_dir.exists() {
+        if !config_dir.exists() {
             return Ok(files);
         }
 
-        for entry in fs::read_dir(&self.config_dir)? {
+        for entry in fs::read_dir(&config_dir)? {
             let entry = entry?;
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with(&self.file_prefix) {
@@ -494,6 +501,7 @@ impl NetworkdManager {
 
     /// Query `networkctl status <name>` for a specific device
     pub fn device_status(&self, name: &str) -> Result<String> {
+        let name = input_guard::vet_component!(name, anyhow::anyhow!("invalid device name"));
         let output = Command::new("networkctl")
             .args(["status", name, "--no-pager"])
             .output()

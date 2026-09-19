@@ -335,6 +335,7 @@ pub async fn create_macvtap(parent: &str, name: &str, mode: &str) -> Result<()> 
 /// pragmatic exception, not a step back toward systemd-networkd (which this
 /// replaces `networkctl reload`, not `iproute2`, for).
 pub async fn create_tap(name: &str) -> Result<()> {
+    let name = input_guard::vet_component!(name, anyhow::anyhow!("invalid tap device name"));
     let output = tokio::process::Command::new("ip")
         .args(["tuntap", "add", "dev", name, "mode", "tap"])
         .output()

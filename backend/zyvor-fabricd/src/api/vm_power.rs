@@ -251,12 +251,24 @@ pub async fn migrate_storage(
     })?;
     let source_path = source_path.display().to_string();
 
-    let source_format = std::path::Path::new(&source_path)
+    let source_path = input_guard::vet!(
+        &source_path,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid source path")
+    );
+    let source_format = std::path::Path::new(source_path)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("qcow2");
+    let source_format = input_guard::vet_component!(
+        source_format,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid source format")
+    );
 
     let target_format = req.target_format.as_deref().unwrap_or(source_format);
+    let target_format = input_guard::vet_component!(
+        target_format,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid target format")
+    );
 
     // Validate target format against allowlist
     validate_image_format(target_format)?;
@@ -264,9 +276,17 @@ pub async fn migrate_storage(
     // Validate pool name using standard validator
     crate::validation::validate_vm_name(&req.target_pool)
         .map_err(|(s, m)| crate::api_error::json_error(s, format!("Invalid pool name: {}", m)))?;
+    let pool = input_guard::vet_component!(
+        &req.target_pool,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid pool name")
+    );
+    let vm_name = input_guard::vet_component!(
+        &vm_name,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid VM name")
+    );
 
     // Determine target path based on pool
-    let target_dir = format!("/var/lib/zyvor-fabricd/pools/{}", req.target_pool);
+    let target_dir = format!("/var/lib/zyvor-fabricd/pools/{pool}");
     tokio::fs::create_dir_all(&target_dir).await.map_err(|e| {
         crate::api_error::json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -274,7 +294,7 @@ pub async fn migrate_storage(
         )
     })?;
 
-    let target_path = format!("{}/{}.{}", target_dir, vm_name, target_format);
+    let target_path = format!("{target_dir}/{vm_name}.{target_format}");
 
     tracing::info!(
         "Migrating storage for VM '{}': {} -> {}",
@@ -292,8 +312,8 @@ pub async fn migrate_storage(
             source_format,
             "-O",
             target_format,
-            &source_path,
-            &target_path,
+            source_path,
+            target_path.as_str(),
         ])
         .output()
         .await

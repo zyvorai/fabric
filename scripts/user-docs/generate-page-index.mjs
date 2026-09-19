@@ -78,7 +78,7 @@ const lines = [
 for (const [cat, list] of byCat) {
   lines.push(`## ${cat}`, '', '| Page | Route | Purpose | Guide |', '|------|-------|---------|-------|')
   for (const it of list) {
-    const purpose = (purposes[it.path] || '').replace(/\|/g, '\\|')
+    const purpose = (purposes[it.path] || '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|')
     const g = guides.get(slug(it.path))
     lines.push(`| ${it.label} | \`${consoleUrl(it.path)}\` | ${purpose} | ${g ? `[Open](${g})` : '—'} |`)
   }

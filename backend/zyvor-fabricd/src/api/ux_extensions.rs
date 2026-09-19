@@ -823,10 +823,20 @@ pub async fn create_image_from_vm(
         .image_path
         .trim_end_matches('/')
         .to_string();
+    if dest_dir.contains("..") {
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "invalid image directory",
+        ));
+    }
+    let name = input_guard::vet_component!(
+        &req.name,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid image name")
+    );
     tokio::fs::create_dir_all(&dest_dir)
         .await
         .map_err(|e| internal_err(format!("Failed to create directory: {}", e)))?;
-    let output_path = format!("{}/{}.qcow2", dest_dir, req.name);
+    let output_path = format!("{dest_dir}/{name}.qcow2");
 
     if tokio::fs::metadata(&output_path).await.is_ok() {
         return Err(crate::api_error::json_error(

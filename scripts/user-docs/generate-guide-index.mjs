@@ -24,6 +24,7 @@ function summaryOf(file, dir) {
     if (t && !t.startsWith('#')) {
       return t
         .replace(/\s+/g, ' ')
+        .replace(/\\/g, '\\\\')
         .replace(/\|/g, '\\|')
         .replace(/\*\*/g, '')
         // A Purpose paragraph often cross-links sibling guides by bare filename

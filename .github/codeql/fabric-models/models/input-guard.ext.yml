@@ -1,0 +1,13 @@
+extensions:
+  - addsTo:
+      pack: codeql/rust-all
+      extensible: barrierGuardModel
+    data:
+      - ["input_guard::CommandArgAllowlist::contains", "Argument[0]", "true", "command-injection", "manual"]
+      - ["input_guard::CommandArgAllowlist::contains", "Argument[0]", "true", "path-injection", "manual"]
+      - ["input_guard::is_safe_argv", "Argument[0]", "true", "command-injection", "manual"]
+      - ["input_guard::is_safe_argv", "Argument[0]", "true", "path-injection", "manual"]
+      - ["input_guard::is_safe_component", "Argument[0]", "true", "path-injection", "manual"]
+      - ["input_guard::is_safe_component", "Argument[0]", "true", "command-injection", "manual"]
+      - ["input_guard::is_safe_outbound_url", "Argument[0]", "true", "request-url", "manual"]
+      - ["input_guard::is_safe_probe_host", "Argument[0]", "true", "request-url", "manual"]

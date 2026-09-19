@@ -690,6 +690,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "input-guard",
  "reqwest",
  "serde",
  "serde_json",
@@ -1721,6 +1722,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "input-guard"
+version = "0.3.0"
+
+[[package]]
 name = "ipnet"
 version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2284,6 +2289,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "futures",
+ "input-guard",
  "netlink-packet-route",
  "rand 0.10.2",
  "rtnetlink",
@@ -2478,6 +2484,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "input-guard",
  "quick-xml",
  "uuid",
 ]
@@ -3641,6 +3648,7 @@ name = "state-store"
 version = "0.3.0"
 dependencies = [
  "anyhow",
+ "input-guard",
  "serde",
  "serde_json",
  "tempfile",
@@ -4946,6 +4954,7 @@ name = "zyvor-fabric-dnsmasq-manager"
 version = "0.3.0"
 dependencies = [
  "anyhow",
+ "input-guard",
  "tempfile",
  "tokio",
  "tracing",
@@ -5036,6 +5045,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "input-guard",
  "serde",
  "serde_json",
  "tempfile",
@@ -5095,6 +5105,7 @@ dependencies = [
  "fault-tolerance",
  "flate2",
  "futures",
+ "input-guard",
  "jsonwebtoken",
  "k8s-pod-client",
  "lettre",

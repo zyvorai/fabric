@@ -64,6 +64,14 @@ fn file_type_from_name(filename: &str) -> &str {
 /// Scan a directory for systemd-networkd config files (.netdev, .network, .link)
 /// and parse each one
 pub fn scan_networkd_dir(dir: &Path) -> Result<Vec<ParsedConfigFile>> {
+    let dir_s = dir.to_string_lossy().into_owned();
+    if dir_s.contains("..") {
+        anyhow::bail!("rejected networkd directory");
+    }
+    if !input_guard::COMMAND_ARGS.contains(&dir_s) {
+        anyhow::bail!("rejected networkd directory");
+    }
+    let dir = Path::new(&dir_s);
     let mut results = Vec::new();
 
     if !dir.exists() {

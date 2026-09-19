@@ -103,6 +103,10 @@ pub struct ZfsPool {
 impl ZfsPool {
     /// Create a new ZFS pool handle, validating the pool exists
     pub fn new(zpool: &str, dataset: Option<String>) -> Result<Self, ZfsError> {
+        let zpool = input_guard::vet!(zpool, ZfsError::CommandFailed("invalid zpool name".into()));
+        if let Some(ds) = &dataset {
+            let _ = input_guard::vet!(ds, ZfsError::CommandFailed("invalid dataset name".into()));
+        }
         let output = Command::new("zpool").args(["status", zpool]).output()?;
 
         if !output.status.success() {
@@ -235,8 +239,12 @@ impl ZfsPool {
 
     /// Get pool statistics
     pub fn get_stats(&self) -> Result<ZfsStats, ZfsError> {
+        let zpool = input_guard::vet!(
+            &self.zpool,
+            ZfsError::CommandFailed("invalid zpool name".into())
+        );
         let output = Command::new("zpool")
-            .args(["list", "-H", "-o", "size,alloc,free", &self.zpool])
+            .args(["list", "-H", "-o", "size,alloc,free", zpool])
             .output()?;
 
         if !output.status.success() {

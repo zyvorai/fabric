@@ -3,7 +3,7 @@
 
 pub mod ovf;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::path::Path;
 
 /// Export a VM to OVA format (tar containing OVF descriptor + disk images).
@@ -14,6 +14,9 @@ pub fn export_ova(
     memory_mb: u64,
     output_path: &str,
 ) -> Result<String> {
+    let vm_name = input_guard::vet_component!(vm_name, anyhow!("Invalid VM name"));
+    let disk_path = input_guard::vet!(disk_path, anyhow!("rejected disk path"));
+    let output_path = input_guard::vet!(output_path, anyhow!("rejected output path"));
     // Validate inputs
     if vm_name.is_empty() || vm_name.len() > 128 {
         anyhow::bail!("Invalid VM name");
@@ -26,7 +29,13 @@ pub fn export_ova(
     let vmdk_path = format!("{}.vmdk", output_path.trim_end_matches(".ova"));
     let output = std::process::Command::new("qemu-img")
         .args([
-            "convert", "-f", "qcow2", "-O", "vmdk", disk_path, &vmdk_path,
+            "convert",
+            "-f",
+            "qcow2",
+            "-O",
+            "vmdk",
+            disk_path,
+            vmdk_path.as_str(),
         ])
         .output()?;
     if !output.status.success() {
@@ -63,10 +72,10 @@ pub fn export_ova(
     let tar_output = std::process::Command::new("tar")
         .args([
             "cf",
-            &ova_path,
+            ova_path.as_str(),
             "-C",
             parent_dir,
-            &ovf_filename,
+            ovf_filename.as_str(),
             vmdk_filename,
         ])
         .output()?;

@@ -82,6 +82,18 @@ pub async fn export_vm(
     crate::validation::validate_host_path(&output_dir)
         .map_err(|(s, m)| (s, Json(serde_json::json!({"error": m}))))?;
 
+    if output_dir.contains("..") {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "invalid export directory"})),
+        ));
+    }
+    if !input_guard::COMMAND_ARGS.contains(&output_dir) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "invalid export directory"})),
+        ));
+    }
     // Ensure output directory exists
     tokio::fs::create_dir_all(&output_dir).await.map_err(|e| {
         (

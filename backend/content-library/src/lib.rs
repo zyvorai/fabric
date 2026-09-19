@@ -721,7 +721,21 @@ impl ContentLibraryManager {
         std::fs::create_dir_all(&storage_path)?;
 
         // Download the file
-        let client = reqwest::Client::new();
+        let url = if input_guard::is_safe_outbound_url(url) {
+            url
+        } else {
+            anyhow::bail!("refusing to download from an unsafe URL");
+        };
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                if input_guard::is_safe_outbound_url(attempt.url().as_str()) {
+                    attempt.follow()
+                } else {
+                    attempt.stop()
+                }
+            }))
+            .build()
+            .map_err(|e| anyhow!("HTTP client setup failed: {e}"))?;
         let response = client
             .get(url)
             .send()

@@ -320,13 +320,33 @@ pub async fn deploy_template(
     }
 
     // Copy template image as new VM disk if image file exists
-    let source_image = &template.image;
+    let source_image = input_guard::vet!(
+        &template.image,
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid template image" })),
+        )
+    );
     if std::path::Path::new(source_image).exists() {
         let ext = std::path::Path::new(source_image)
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("qcow2");
-        let target_image = format!("/var/lib/zyvor-fabricd/images/{}.{}", req.vm_name, ext);
+        let vm_name = input_guard::vet_component!(
+            &req.vm_name,
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid VM name" })),
+            )
+        );
+        let ext = input_guard::vet_component!(
+            ext,
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid image extension" })),
+            )
+        );
+        let target_image = format!("/var/lib/zyvor-fabricd/images/{vm_name}.{ext}");
 
         if let Some(parent) = std::path::Path::new(&target_image).parent() {
             if let Err(e) = tokio::fs::create_dir_all(parent).await {
@@ -335,7 +355,7 @@ pub async fn deploy_template(
         }
 
         let output = Command::new("cp")
-            .args(["--reflink=auto", source_image, &target_image])
+            .args(["--reflink=auto", source_image, target_image.as_str()])
             .output()
             .await
             .map_err(|e| {

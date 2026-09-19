@@ -657,10 +657,36 @@ fn find_rule_handles(json: &serde_json::Value, chain: &str, comment_needle: &str
 }
 
 fn run_nft(args: &[&str]) -> Result<()> {
+    const CHAIN_SPECS: &[&str] = &[
+        "{ type nat hook prerouting priority dstnat; }",
+        "{ type nat hook postrouting priority srcnat; }",
+    ];
+    let mut safe = Vec::with_capacity(args.len());
+    for arg in args {
+        if arg.contains("..") {
+            anyhow::bail!("rejected nft argument");
+        }
+        if CHAIN_SPECS.contains(arg) {
+            safe.push((*arg).to_string());
+            continue;
+        }
+        if let Some(inner) = arg.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+            if input_guard::COMMAND_ARGS.contains(inner) {
+                safe.push(format!("\"{inner}\""));
+                continue;
+            }
+            anyhow::bail!("rejected nft argument");
+        }
+        if input_guard::COMMAND_ARGS.contains(*arg) {
+            safe.push((*arg).to_string());
+            continue;
+        }
+        anyhow::bail!("rejected nft argument");
+    }
     let output = Command::new("nft")
-        .args(args)
+        .args(&safe)
         .output()
-        .with_context(|| format!("Failed to execute nft {}", args.join(" ")))?;
+        .with_context(|| format!("Failed to execute nft {}", safe.join(" ")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

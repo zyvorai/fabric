@@ -90,6 +90,9 @@ impl Store {
 
     pub async fn deploy_agent(&self, req: DeployAgentRequest) -> Result<AgentRecord> {
         validate_name(&req.name)?;
+        if req.name.contains("..") {
+            bail!("path traversal");
+        }
         let bundle = base64::engine::general_purpose::STANDARD
             .decode(req.bundle_base64.as_bytes())
             .context("bundle_base64 is not valid base64")?;
@@ -109,6 +112,9 @@ impl Store {
         hasher.update(serde_json::to_vec(&req.manifest)?);
         let digest = hex::encode(hasher.finalize());
         let version = digest[..12].to_string();
+        if version.contains("..") {
+            bail!("path traversal");
+        }
         let record = AgentRecord {
             name: req.name.clone(),
             version: version.clone(),
@@ -155,6 +161,12 @@ impl Store {
     /// Load one immutable historical deployment version. Sessions pin this
     /// record so a later deploy cannot change their egress or runtime policy.
     pub async fn get_agent_version(&self, name: &str, version: &str) -> Result<AgentRecord> {
+        if name.contains("..") {
+            bail!("path traversal");
+        }
+        if version.contains("..") {
+            bail!("path traversal");
+        }
         let path = self
             .root
             .join("agents")
@@ -168,6 +180,12 @@ impl Store {
     }
 
     pub async fn agent_bundle(&self, name: &str, version: &str) -> Result<Vec<u8>> {
+        if name.contains("..") {
+            bail!("path traversal");
+        }
+        if version.contains("..") {
+            bail!("path traversal");
+        }
         let path = self
             .root
             .join("agents")
@@ -180,7 +198,11 @@ impl Store {
     }
 
     pub async fn save_session(&self, record: SessionRecord) -> Result<()> {
-        let dir = self.root.join("sessions").join(record.id.to_string());
+        let id = record.id.to_string();
+        if id.contains("..") {
+            bail!("path traversal");
+        }
+        let dir = self.root.join("sessions").join(&id);
         fs::create_dir_all(&dir).await?;
         atomic_write(
             &dir.join("session.json"),
@@ -295,7 +317,11 @@ impl Store {
             }
         };
 
-        let dir = self.root.join("sessions").join(id.to_string());
+        let id_s = id.to_string();
+        if id_s.contains("..") {
+            bail!("path traversal");
+        }
+        let dir = self.root.join("sessions").join(&id_s);
         fs::create_dir_all(&dir).await?;
         let mut file = OpenOptions::new()
             .create(true)
@@ -472,6 +498,11 @@ impl Store {
 }
 
 async fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+    let path_s = path.to_string_lossy().into_owned();
+    if path_s.contains("..") {
+        bail!("refusing path traversal");
+    }
+    let path = PathBuf::from(&path_s);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).await?;
     }

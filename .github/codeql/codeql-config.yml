@@ -1,0 +1,5 @@
+name: Fabric CodeQL
+disable-default-queries: false
+packs:
+  rust:
+    - zyvor/fabric-models:.github/codeql/fabric-models

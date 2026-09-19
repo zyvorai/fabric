@@ -199,7 +199,11 @@ fn read_process_detail(pid: u32) -> Result<ProcessDetail, (StatusCode, String)> 
 
 #[cfg(target_os = "linux")]
 fn read_process_detail_linux(pid: u32) -> Result<ProcessDetail, (StatusCode, String)> {
-    let proc_dir = format!("/proc/{pid}");
+    let pid_s = pid.to_string();
+    if pid_s.contains("..") {
+        return Err((StatusCode::BAD_REQUEST, "invalid pid".into()));
+    }
+    let proc_dir = format!("/proc/{pid_s}");
     if !std::path::Path::new(&proc_dir).exists() {
         return Err((StatusCode::NOT_FOUND, format!("process {pid} not found")));
     }
@@ -222,7 +226,11 @@ fn read_process_detail_linux(pid: u32) -> Result<ProcessDetail, (StatusCode, Str
 
 #[cfg(target_os = "linux")]
 fn read_proc_cmdline(pid: u32) -> String {
-    let path = format!("/proc/{pid}/cmdline");
+    let pid_s = pid.to_string();
+    if pid_s.contains("..") {
+        return String::new();
+    }
+    let path = format!("/proc/{pid_s}/cmdline");
     std::fs::read(&path)
         .map(|b| {
             let s = String::from_utf8_lossy(&b)
@@ -240,7 +248,11 @@ fn read_proc_cmdline(pid: u32) -> String {
 
 #[cfg(target_os = "linux")]
 fn read_proc_io(pid: u32) -> (Option<u64>, Option<u64>) {
-    let path = format!("/proc/{pid}/io");
+    let pid_s = pid.to_string();
+    if pid_s.contains("..") {
+        return (None, None);
+    }
+    let path = format!("/proc/{pid_s}/io");
     let Ok(content) = std::fs::read_to_string(&path) else {
         return (None, None);
     };
@@ -258,7 +270,11 @@ fn read_proc_io(pid: u32) -> (Option<u64>, Option<u64>) {
 
 #[cfg(target_os = "linux")]
 fn count_proc_fds(pid: u32) -> Option<u32> {
-    let path = format!("/proc/{pid}/fd");
+    let pid_s = pid.to_string();
+    if pid_s.contains("..") {
+        return None;
+    }
+    let path = format!("/proc/{pid_s}/fd");
     std::fs::read_dir(&path)
         .ok()
         .map(|entries| entries.filter_map(Result::ok).count() as u32)
@@ -266,7 +282,11 @@ fn count_proc_fds(pid: u32) -> Option<u32> {
 
 #[cfg(target_os = "linux")]
 fn read_proc_status(pid: u32) -> (Option<u64>, Option<u64>) {
-    let path = format!("/proc/{pid}/status");
+    let pid_s = pid.to_string();
+    if pid_s.contains("..") {
+        return (None, None);
+    }
+    let path = format!("/proc/{pid_s}/status");
     let Ok(content) = std::fs::read_to_string(&path) else {
         return (None, None);
     };

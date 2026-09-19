@@ -61,9 +61,11 @@ impl DnsmasqManager {
     /// its pidfile, so there's nothing to hold a live handle to; `stop`
     /// finds it again via that pidfile.
     pub async fn start(&self, cfg: &DhcpConfig) -> Result<()> {
-        tokio::fs::create_dir_all(&self.run_dir)
+        let run_dir =
+            input_guard::vet_path!(&self.run_dir, anyhow::anyhow!("invalid DHCP run directory"));
+        tokio::fs::create_dir_all(&run_dir)
             .await
-            .with_context(|| format!("failed to create {}", self.run_dir.display()))?;
+            .with_context(|| format!("failed to create {}", run_dir.display()))?;
         // dnsmasq requires --hostsdir's target to already exist at startup
         // (unlike the files inside it, which it's fine to watch appear
         // later) -- ensure it's there even if no zone has been created yet.
@@ -76,9 +78,9 @@ impl DnsmasqManager {
         // Idempotent: tear down any prior instance for this bridge first.
         let _ = self.stop(&cfg.bridge).await;
 
-        let conf_path = self.conf_path(&cfg.bridge);
-        let pid_path = self.pid_path(&cfg.bridge);
-        let lease_path = self.lease_path(&cfg.bridge);
+        let conf_path = self.conf_path(&cfg.bridge)?;
+        let pid_path = self.pid_path(&cfg.bridge)?;
+        let lease_path = self.lease_path(&cfg.bridge)?;
         let conf = render_config(cfg, &pid_path, &lease_path)?;
         tokio::fs::write(&conf_path, conf)
             .await
@@ -116,7 +118,7 @@ impl DnsmasqManager {
 
     /// Stop the DHCP server for `bridge`, if one is running.
     pub async fn stop(&self, bridge: &str) -> Result<()> {
-        let pid_path = self.pid_path(bridge);
+        let pid_path = self.pid_path(bridge)?;
         if let Ok(pid_str) = tokio::fs::read_to_string(&pid_path).await {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
                 let _ = tokio::process::Command::new("kill")
@@ -126,22 +128,32 @@ impl DnsmasqManager {
             }
             let _ = tokio::fs::remove_file(&pid_path).await;
         }
-        let _ = tokio::fs::remove_file(self.conf_path(bridge)).await;
-        let _ = tokio::fs::remove_file(self.lease_path(bridge)).await;
+        let _ = tokio::fs::remove_file(self.conf_path(bridge)?).await;
+        let _ = tokio::fs::remove_file(self.lease_path(bridge)?).await;
         tracing::info!(bridge = %bridge, "Stopped DHCP server");
         Ok(())
     }
 
-    fn conf_path(&self, bridge: &str) -> PathBuf {
-        self.run_dir.join(format!("{bridge}.conf"))
+    fn conf_path(&self, bridge: &str) -> Result<PathBuf> {
+        let bridge = input_guard::vet_component!(bridge, anyhow::anyhow!("invalid bridge name"));
+        Ok(self.runtime_dir()?.join(format!("{bridge}.conf")))
     }
 
-    fn pid_path(&self, bridge: &str) -> PathBuf {
-        self.run_dir.join(format!("{bridge}.pid"))
+    fn pid_path(&self, bridge: &str) -> Result<PathBuf> {
+        let bridge = input_guard::vet_component!(bridge, anyhow::anyhow!("invalid bridge name"));
+        Ok(self.runtime_dir()?.join(format!("{bridge}.pid")))
     }
 
-    fn lease_path(&self, bridge: &str) -> PathBuf {
-        self.run_dir.join(format!("{bridge}.leases"))
+    fn lease_path(&self, bridge: &str) -> Result<PathBuf> {
+        let bridge = input_guard::vet_component!(bridge, anyhow::anyhow!("invalid bridge name"));
+        Ok(self.runtime_dir()?.join(format!("{bridge}.leases")))
+    }
+
+    fn runtime_dir(&self) -> Result<PathBuf> {
+        Ok(input_guard::vet_path!(
+            &self.run_dir,
+            anyhow::anyhow!("invalid DHCP run directory")
+        ))
     }
 
     /// Look up the current DHCP-leased IP for a MAC address, across every

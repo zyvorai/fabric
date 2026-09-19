@@ -94,6 +94,7 @@ impl LvmPool {
     /// Create a new LVM pool, validating the VG exists
     pub fn new(vg_name: &str) -> Result<Self, LvmError> {
         validate_lvm_name(vg_name, "VG name")?;
+        let vg_name = input_guard::vet!(vg_name, LvmError::CommandFailed("invalid VG name".into()));
         let output = Command::new("vgs")
             .args([
                 "--noheadings",
@@ -255,6 +256,10 @@ impl LvmPool {
 
     /// Get VG statistics
     pub fn get_stats(&self) -> Result<LvmStats, LvmError> {
+        let vg_name = input_guard::vet!(
+            &self.vg_name,
+            LvmError::CommandFailed("invalid VG name".into())
+        );
         let output = Command::new("vgs")
             .args([
                 "--noheadings",
@@ -263,7 +268,7 @@ impl LvmPool {
                 "b",
                 "-o",
                 "vg_size,vg_free",
-                &self.vg_name,
+                vg_name,
             ])
             .output()?;
 

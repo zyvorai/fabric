@@ -192,6 +192,12 @@ fn parse_vlan_info(name: &str, sysfs: &str, kind: HostDeviceType) -> (Option<u16
 /// List `.link`, `.netdev`, `.network` files in a config directory.
 pub fn list_systemd_network_files(config_dir: &str) -> Vec<String> {
     let mut files = Vec::new();
+    if config_dir.contains("..") {
+        return files;
+    }
+    if !input_guard::COMMAND_ARGS.contains(config_dir) {
+        return files;
+    }
     let Ok(entries) = std::fs::read_dir(config_dir) else {
         return files;
     };

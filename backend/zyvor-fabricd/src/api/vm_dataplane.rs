@@ -866,7 +866,12 @@ fn to_service_lb_spec(
         unhealthy_threshold: h.unhealthy_threshold,
         healthy_threshold: h.healthy_threshold,
     });
-    let mut backends = Vec::with_capacity(service.backends.len());
+    const MAX_SERVICE_BACKENDS: usize = 1024;
+    let backend_count = service.backends.len();
+    if backend_count > MAX_SERVICE_BACKENDS {
+        return Err(bad("service has too many backends".to_string()));
+    }
+    let mut backends = Vec::with_capacity(backend_count);
     for b in &service.backends {
         let address: IpAddr = b
             .address

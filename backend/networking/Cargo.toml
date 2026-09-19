@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+input-guard = { path = "../crates/input-guard" }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true

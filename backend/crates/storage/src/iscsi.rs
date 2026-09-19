@@ -18,6 +18,7 @@ pub struct IscsiTarget {
 
 /// Discover iSCSI targets on a portal.
 pub fn discover_targets(portal: &str) -> Result<Vec<String>> {
+    let portal = input_guard::vet!(portal, anyhow!("rejected iSCSI portal"));
     let output = std::process::Command::new("iscsiadm")
         .args(["-m", "discovery", "-t", "sendtargets", "-p", portal])
         .output()
@@ -38,6 +39,8 @@ pub fn discover_targets(portal: &str) -> Result<Vec<String>> {
 
 /// Login to an iSCSI target.
 pub fn login_target(portal: &str, target_iqn: &str) -> Result<()> {
+    let portal = input_guard::vet!(portal, anyhow!("rejected iSCSI portal"));
+    let target_iqn = input_guard::vet!(target_iqn, anyhow!("rejected iSCSI target"));
     let output = std::process::Command::new("iscsiadm")
         .args(["-m", "node", "-T", target_iqn, "-p", portal, "--login"])
         .output()
@@ -52,6 +55,8 @@ pub fn login_target(portal: &str, target_iqn: &str) -> Result<()> {
 
 /// Logout from an iSCSI target.
 pub fn logout_target(portal: &str, target_iqn: &str) -> Result<()> {
+    let portal = input_guard::vet!(portal, anyhow!("rejected iSCSI portal"));
+    let target_iqn = input_guard::vet!(target_iqn, anyhow!("rejected iSCSI target"));
     let output = std::process::Command::new("iscsiadm")
         .args(["-m", "node", "-T", target_iqn, "-p", portal, "--logout"])
         .output()

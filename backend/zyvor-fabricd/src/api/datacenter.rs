@@ -690,17 +690,25 @@ pub async fn discover_host(
     Json(req): Json<DiscoverHostRequest>,
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(discover_host));
-    // Validate address against SSRF
-    let check_url = format!("http://{}:{}", req.address, req.port.unwrap_or(9095));
-    if let Err(e) = crate::api::notifications::validate_external_url_public(&check_url) {
+    let address = req.address.trim();
+    if !input_guard::is_safe_probe_host(address) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": format!("Invalid address: {}", e)})),
+            Json(serde_json::json!({"error": "Invalid address"})),
         )
             .into_response();
     }
+    let address = if input_guard::is_safe_probe_host(address) {
+        address
+    } else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Invalid address"})),
+        )
+            .into_response();
+    };
     let port = req.port.unwrap_or(9095);
-    let url = format!("http://{}:{}/health", req.address, port);
+    let url = format!("http://{address}:{port}/health");
 
     // Check if already registered
     let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| {
@@ -723,7 +731,7 @@ pub async fn discover_host(
 
     let (hostname, cpus, memory_mb) = if reachable {
         // Try to get system info from the remote host
-        let info_url = format!("http://{}:{}/api/system/cpu/topology", req.address, port);
+        let info_url = format!("http://{address}:{port}/api/system/cpu/topology");
         let cpu_info = state
             .http_client
             .get(&info_url)
@@ -741,7 +749,7 @@ pub async fn discover_host(
             None
         };
 
-        let mem_url = format!("http://{}:{}/api/system/memory", req.address, port);
+        let mem_url = format!("http://{address}:{port}/api/system/memory");
         let mem_info = state
             .http_client
             .get(&mem_url)

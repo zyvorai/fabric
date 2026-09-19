@@ -379,7 +379,26 @@ pub async fn set_memory_ballooning(
 
     // If enabled and target is specified, set balloon target via QEMU monitor
     if let Some(target_mb) = req.target_mb {
-        let monitor_socket = format!("/run/systemd/vmspawn/{}/qemu.sock", vm_name);
+        let vm_name = input_guard::vet_component!(
+            &vm_name,
+            (StatusCode::BAD_REQUEST, "invalid VM name".to_string())
+        );
+        let monitor_socket = format!("/run/systemd/vmspawn/{vm_name}/qemu.sock");
+        if monitor_socket.contains("..") {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "invalid monitor socket".to_string(),
+            ));
+        }
+        let socat_target = format!("UNIX-CONNECT:{monitor_socket}");
+        let socat_target = if input_guard::COMMAND_ARGS.contains(&socat_target) {
+            socat_target
+        } else {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "invalid monitor socket".to_string(),
+            ));
+        };
 
         // Check if monitor socket exists
         if !std::path::Path::new(&monitor_socket).exists() {
@@ -400,7 +419,7 @@ pub async fn set_memory_ballooning(
         // Write QMP command to socat via stdin (no shell interpolation)
         let mut child = Command::new("socat")
             .arg("-")
-            .arg(format!("UNIX-CONNECT:{}", monitor_socket))
+            .arg(socat_target)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())

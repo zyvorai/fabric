@@ -356,6 +356,14 @@ pub async fn login(
 
 /// Check if a user belongs to an admin group (wheel, sudo, or adm).
 async fn is_admin_user(username: &str) -> bool {
+    if username.contains("..") {
+        return false;
+    }
+    let username = if input_guard::COMMAND_ARGS.contains(username) {
+        username
+    } else {
+        return false;
+    };
     if let Ok(output) = tokio::process::Command::new("id")
         .arg("-Gn")
         .arg(username)

@@ -78,7 +78,7 @@ impl CephPool {
     pub fn check_cluster(&self) -> Result<bool, CephError> {
         let mut cmd = Command::new("ceph");
         cmd.args(["--connect-timeout", "5", "health"]);
-        self.add_auth_args(&mut cmd);
+        self.add_auth_args(&mut cmd)?;
 
         match cmd.output() {
             Ok(output) => Ok(output.status.success()),
@@ -88,9 +88,13 @@ impl CephPool {
 
     /// Get pool statistics
     pub fn get_stats(&self) -> Result<CephStats, CephError> {
+        let pool_name = input_guard::vet!(
+            &self.pool_name,
+            CephError::CommandFailed("invalid Ceph pool".into())
+        );
         let mut cmd = Command::new("ceph");
-        cmd.args(["osd", "pool", "stats", &self.pool_name, "-f", "json"]);
-        self.add_auth_args(&mut cmd);
+        cmd.args(["osd", "pool", "stats", pool_name, "-f", "json"]);
+        self.add_auth_args(&mut cmd)?;
 
         let output = cmd.output()?;
         if !output.status.success() {
@@ -102,7 +106,7 @@ impl CephPool {
         // Get cluster-level df for capacity info
         let mut df_cmd = Command::new("ceph");
         df_cmd.args(["df", "-f", "json"]);
-        self.add_auth_args(&mut df_cmd);
+        self.add_auth_args(&mut df_cmd)?;
 
         let df_output = df_cmd.output()?;
         if !df_output.status.success() {
@@ -156,7 +160,7 @@ impl CephPool {
     pub fn health_check(&self) -> Result<CephHealth, CephError> {
         let mut cmd = Command::new("ceph");
         cmd.args(["health", "-f", "json"]);
-        self.add_auth_args(&mut cmd);
+        self.add_auth_args(&mut cmd)?;
 
         let output = cmd.output()?;
         if !output.status.success() {
@@ -193,7 +197,7 @@ impl CephPool {
             "--image-format",
             "2",
         ]);
-        self.add_auth_args(&mut cmd);
+        self.add_auth_args(&mut cmd)?;
 
         let output = cmd.output()?;
         if !output.status.success() {
@@ -208,7 +212,7 @@ impl CephPool {
     pub fn delete_rbd_image(&self, name: &str) -> Result<(), CephError> {
         let mut cmd = Command::new("rbd");
         cmd.args(["rm", &format!("{}/{}", self.pool_name, name)]);
-        self.add_auth_args(&mut cmd);
+        self.add_auth_args(&mut cmd)?;
 
         let output = cmd.output()?;
         if !output.status.success() {
@@ -223,7 +227,7 @@ impl CephPool {
     pub fn list_rbd_images(&self) -> Result<Vec<String>, CephError> {
         let mut cmd = Command::new("rbd");
         cmd.args(["ls", &self.pool_name, "-f", "json"]);
-        self.add_auth_args(&mut cmd);
+        self.add_auth_args(&mut cmd)?;
 
         let output = cmd.output()?;
         if !output.status.success() {
@@ -236,13 +240,27 @@ impl CephPool {
         Ok(images)
     }
 
-    fn add_auth_args(&self, cmd: &mut Command) {
+    fn add_auth_args(&self, cmd: &mut Command) -> Result<(), CephError> {
         if !self.monitors.is_empty() {
-            cmd.arg("-m").arg(self.monitors.join(","));
+            let monitors = self.monitors.join(",");
+            let monitors = input_guard::vet!(
+                &monitors,
+                CephError::CommandFailed("invalid Ceph monitors".into())
+            );
+            cmd.arg("-m").arg(monitors);
         }
-        cmd.arg("--id").arg(&self.user);
+        let user = input_guard::vet!(
+            &self.user,
+            CephError::CommandFailed("invalid Ceph user".into())
+        );
+        cmd.arg("--id").arg(user);
         if let Some(ref keyring) = self.keyring {
+            let keyring = input_guard::vet!(
+                keyring,
+                CephError::CommandFailed("invalid Ceph keyring path".into())
+            );
             cmd.arg("--keyring").arg(keyring);
         }
+        Ok(())
     }
 }

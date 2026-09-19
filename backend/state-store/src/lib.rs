@@ -33,6 +33,9 @@ impl StateStore {
     }
 
     pub fn save_entity<T: Serialize>(&self, subdir: &str, id: &str, entity: &T) -> Result<()> {
+        let subdir =
+            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
+        let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
         Self::validate_entity_id(id)?;
         let dir = self.path.join(subdir);
         fs::create_dir_all(&dir)?;
@@ -52,6 +55,9 @@ impl StateStore {
         subdir: &str,
         id: &str,
     ) -> Result<Option<T>> {
+        let subdir =
+            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
+        let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
         Self::validate_entity_id(id)?;
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
 
@@ -68,6 +74,8 @@ impl StateStore {
 
     /// List all entities in a subdirectory
     pub fn list_entities<T: for<'de> Deserialize<'de>>(&self, subdir: &str) -> Result<Vec<T>> {
+        let subdir =
+            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
         let dir = self.path.join(subdir);
 
         if !dir.exists() {
@@ -112,6 +120,8 @@ impl StateStore {
         T: for<'de> Deserialize<'de>,
         F: Fn(&T) -> bool,
     {
+        let subdir =
+            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
         let dir = self.path.join(subdir);
         if !dir.exists() {
             return Ok(Vec::new());
@@ -152,6 +162,9 @@ impl StateStore {
 
     /// Delete an entity by ID
     pub fn delete_entity(&self, subdir: &str, id: &str) -> Result<()> {
+        let subdir =
+            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
+        let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
         Self::validate_entity_id(id)?;
         let file_path = self.path.join(subdir).join(format!("{}.json", id));
 
@@ -188,11 +201,12 @@ impl StateStore {
     }
 
     pub fn save_vm(&self, vm: &VM) -> Result<()> {
-        Self::validate_entity_id(&vm.name)?;
+        let name = input_guard::vet_component!(&vm.name, anyhow::anyhow!("Invalid VM name"));
+        Self::validate_entity_id(name)?;
         // Serialize and write file FIRST — if this fails, in-memory state stays consistent
         let content = serde_json::to_string_pretty(vm)?;
-        let vm_file = self.path.join(format!("{}.json", vm.name));
-        let tmp_file = self.path.join(format!("{}.json.tmp", vm.name));
+        let vm_file = self.path.join(format!("{name}.json"));
+        let tmp_file = self.path.join(format!("{name}.json.tmp"));
         fs::write(&tmp_file, &content)?;
         fs::rename(&tmp_file, &vm_file)?;
 
@@ -250,9 +264,10 @@ impl StateStore {
     }
 
     pub fn delete_vm(&self, name: &str) -> Result<()> {
+        let name = input_guard::vet_component!(name, anyhow::anyhow!("Invalid VM name"));
         Self::validate_entity_id(name)?;
         // Delete file FIRST — if this fails, in-memory state stays consistent
-        let vm_file = self.path.join(format!("{}.json", name));
+        let vm_file = self.path.join(format!("{name}.json"));
         match fs::remove_file(&vm_file) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}

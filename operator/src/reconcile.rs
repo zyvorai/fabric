@@ -294,7 +294,7 @@ mod tests {
             zyvor_fabricd_url: "http://unused".to_string(),
             zyvor_fabricd_token: None,
         };
-        let req = with_auth(&ctx_no_token, http.get("http://example.invalid/api/vms"))
+        let req = with_auth(&ctx_no_token, http.get("https://example.invalid/api/vms"))
             .build()
             .unwrap();
         assert!(req.headers().get("authorization").is_none());
@@ -305,7 +305,7 @@ mod tests {
             zyvor_fabricd_url: "http://unused".to_string(),
             zyvor_fabricd_token: Some("s3cr3t".to_string()),
         };
-        let req = with_auth(&ctx_with_token, http.get("http://example.invalid/api/vms"))
+        let req = with_auth(&ctx_with_token, http.get("https://example.invalid/api/vms"))
             .build()
             .unwrap();
         assert_eq!(req.headers().get("authorization").unwrap(), "Bearer s3cr3t");

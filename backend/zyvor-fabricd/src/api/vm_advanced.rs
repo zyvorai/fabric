@@ -237,10 +237,24 @@ pub async fn create_checkpoint(
         )
     })?;
     let image_path = image_path.display().to_string();
+    let image_path = input_guard::vet!(
+        &image_path,
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid disk path" })),
+        )
+    );
+    let snap = input_guard::vet_component!(
+        &req.name,
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid checkpoint name" })),
+        )
+    );
 
     // Create internal snapshot via qemu-img
     let output = Command::new("qemu-img")
-        .args(["snapshot", "-c", &req.name, &image_path])
+        .args(["snapshot", "-c", snap, image_path])
         .output()
         .await
         .map_err(|e| {
@@ -474,7 +488,21 @@ pub async fn fork_vm(
         )
     })?;
     let source_image = source_image.display().to_string();
-    let fork_image = format!("/var/lib/zyvor-fabricd/images/{}.qcow2", req.new_name);
+    let source_image = input_guard::vet!(
+        &source_image,
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid source image" })),
+        )
+    );
+    let new_name = input_guard::vet_component!(
+        &req.new_name,
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid VM name" })),
+        )
+    );
+    let fork_image = format!("/var/lib/zyvor-fabricd/images/{new_name}.qcow2");
 
     if let Some(parent) = std::path::Path::new(&fork_image).parent() {
         if let Err(e) = tokio::fs::create_dir_all(parent).await {
@@ -488,10 +516,10 @@ pub async fn fork_vm(
             "-f",
             "qcow2",
             "-b",
-            &source_image,
+            source_image,
             "-F",
             "qcow2",
-            &fork_image,
+            fork_image.as_str(),
         ])
         .output()
         .await
