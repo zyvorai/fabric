@@ -758,7 +758,7 @@ Secure Containers placement (Kubernetes Pod + `RuntimeClass fluxvm`). See [conta
 
 ## Agents & Sessions
 
-Proxied to **agent-runtime** when `[agent_runtime]` is set; otherwise **503**. See [tutorials/11-agent-runtime-quickstart.md](tutorials/11-agent-runtime-quickstart.md).
+Proxied to **agent-runtime** when `[agent_runtime]` is set; otherwise **503**. See [tutorials/11-agent-runtime-quickstart.md](tutorials/11-agent-runtime-quickstart.md). Harness runs, MCP, agent cron, signed webhooks, loops, approvals, and delegation are served by the agent-runtime process itself (`:9096`), not by these proxy routes. VM backup schedules under `/schedules` are unrelated.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|

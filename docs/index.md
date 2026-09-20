@@ -479,11 +479,15 @@ The REST API is organized into the following endpoint groups:
 
 ## Agent Runtime
 
-Standalone component: durable, FluxVM-sandboxed TypeScript agent sessions with a host-side credential-injecting egress broker. Lives in `agent-runtime/` (Rust daemon), `sdk/agent-runtime/` (SDK + `fabric-agent` CLI), and `examples/agent-runtime/` — outside the `backend/` Cargo workspace, with no dependency on the `networking` crate chain.
+Standalone component: durable agent sessions in a FluxVM sandbox, or on a GitHub runner through a FluxVM stand-in. A session runs a JavaScript worker or a `claude`, `codex`, or `gemini` CLI. Provider keys stay on the host egress broker. The crate also accepts cron schedules, signed webhooks, bounded loops, operator approvals, agent-to-agent delegation, and a small MCP server. Lives in `agent-runtime/` (Rust daemon), `sdk/agent-runtime/` (SDK + `fabric-agent` CLI), and `examples/agent-runtime/` — outside the `backend/` Cargo workspace.
 
 | Document | Description |
 |----------|-------------|
-| [agent-runtime/README.md](../agent-runtime/README.md) | Deploy/run, credentials, HTTP API, warm pools, safe auto-hibernation, security notes |
+| [agent-runtime/README.md](../agent-runtime/README.md) | Deploy/run, harness, schedules, MCP, HTTP API, warm pools, session CI |
+| [Tutorial 11](tutorials/11-agent-runtime-quickstart.md) | Build a Node.js FluxVM template and drive a session |
+| [Tutorial 13](tutorials/13-deploy-agent-from-console.md) | Build a bundle and deploy it from the web console |
+| [Tutorial 14](tutorials/14-interacting-with-agents.md) | Use cases: ops, coding, research, cron, webhook, loop, approval, handoff, IDE chat, fan-out |
+| [examples/agent-runtime/README.md](../examples/agent-runtime/README.md) | Ops health check, hello-go, warm pool, and fan-out |
 
 ---
 

@@ -121,6 +121,12 @@ migration receivers / dataplane pod fields / QGA / agent-runtime, and Vitest API
 path filters. Fabric E2E sources `scripts/ci-feat-catchup-stub.sh` against the
 same stub. Lab-only verify: `scripts/feat-catchup-verify.sh`.
 
+Agent sessions have their own workflow, `.github/workflows/agent-runtime.yml`.
+The `sessions` job runs `agent-runtime/tests/session-ci.sh` with Node, Rust,
+and Go. It does not need FluxVM. A push to `main` also runs
+`.github/workflows/lab-deploy.yml`, which SSHes to the lab host with
+`LAB_DEPLOY_KEY` and runs `scripts/deploy-remote.sh --quick --e2e --verify-apis`.
+
 ### Test Requirements
 
 - All tests must pass before submitting a PR

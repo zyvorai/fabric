@@ -4,7 +4,7 @@ Issue #17 — Fabric × FluxVM × GuestKit × Kubernetes versions.
 
 Status values:
 
-- **CI** — exercised on GitHub Actions (`ci.yml`, `fabric-e2e.yml`, `operator.yml`)
+- **CI** — exercised on GitHub Actions (`ci.yml`, `fabric-e2e.yml`, `operator.yml`, `agent-runtime.yml`). `lab-deploy.yml` rebuilds the lab host on push to `main`.
 - **Lab** — documented lab path (`docs/DOCKER.md`, `docs/KUBERNETES.md`)
 - **Unverified** — combination exists in the wild but is not gated here
 

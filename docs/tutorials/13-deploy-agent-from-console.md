@@ -134,6 +134,7 @@ For `ops-agent`, it's the structured disk/memory/uptime report emitted by
 
 ## Next Steps
 
-1. Reference: [agent-runtime/README.md](../../agent-runtime/README.md) — full HTTP API, warm pools, hibernation, security model
-2. Fan-out and idempotency: [Tutorial 11](11-agent-runtime-quickstart.md) and `examples/agent-runtime/fanout.ts`
-3. Both example agents: [examples/agent-runtime/README.md](../../examples/agent-runtime/README.md)
+1. [Tutorial 14](14-interacting-with-agents.md) — console, API, and MCP: read a result, schedule a run, approve, and delegate
+2. Reference: [agent-runtime/README.md](../../agent-runtime/README.md) — full HTTP API, warm pools, hibernation, security model
+3. Fan-out and idempotency: [Tutorial 11](11-agent-runtime-quickstart.md) and `examples/agent-runtime/fanout.ts`
+4. Both example agents: [examples/agent-runtime/README.md](../../examples/agent-runtime/README.md)

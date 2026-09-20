@@ -24,7 +24,7 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | **OpenStack compatibility** (Keystone/Nova/…) | [openstack-compat.md](openstack-compat.md) · [Tutorial 08](tutorials/08-openstack-clients.md) |
 | **Host maintenance evacuation** | [host-lifecycle.md](host-lifecycle.md) |
 | **Container Groups** (FluxVM Secure Containers workloads) | [container-groups.md](container-groups.md) |
-| **Agent Runtime** (durable FluxVM-sandboxed agent sessions) | [agent-runtime/README.md](../agent-runtime/README.md) |
+| **Agent Runtime** (sandboxed sessions, harness, schedules, session CI) | [agent-runtime/README.md](../agent-runtime/README.md) |
 | User page index | [user/PAGE_INDEX.md](user/PAGE_INDEX.md) |
 | Full documentation catalog | [index.md](index.md) |
 
@@ -36,6 +36,7 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | Bare metal remote | `./scripts/deploy remote USER@HOST` | [README](../README.md#deploy) |
 | **Prod readiness** | `FABRIC_TOKEN=… ./scripts/test-production-readiness.sh` | [production.md](deployment/production.md) · [DEVOPS.md](DEVOPS.md) |
 | Lab verify | `./scripts/test-lab-verify.sh` | [DEVOPS.md](DEVOPS.md) |
+| Lab deploy from GitHub | push to `main`, or run the Lab deploy workflow | [DEVOPS.md](DEVOPS.md) · [`.github/workflows/lab-deploy.yml`](../.github/workflows/lab-deploy.yml) |
 | Kubernetes lab | `./scripts/deploy k8s USER@HOST` | [KUBERNETES.md](KUBERNETES.md) |
 | Kubernetes local | `make k8s-deploy` | [KUBERNETES.md](KUBERNETES.md) |
 | Helm | `helm upgrade --install … ./charts/zyvor-fabric` | [KUBERNETES.md](KUBERNETES.md#c-helm) |

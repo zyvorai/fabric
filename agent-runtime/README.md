@@ -2,7 +2,7 @@
 
 Deploy JavaScript/TypeScript agents like serverless functions while giving every session its own durable FluxVM Linux sandbox.
 
-## What this PR adds
+## Capabilities
 
 - immutable, content-addressed agent deployments
 - one FluxVM sandbox per session
@@ -26,6 +26,11 @@ Deploy JavaScript/TypeScript agents like serverless functions while giving every
 - runtime-owned TTL expiry so warm sessions receive their full requested lifetime
 - `start_mode` + `startup_ms` observability for warm/cold launch measurement
 - per-session operation serialization for steer/hibernate/resume/cancel/delete/expiry
+- a coding-agent harness for `claude`, `codex`, or `gemini`, with operator approvals
+- agent-to-agent delegation that keeps the child's own allowlist and grants
+- cron schedules, HMAC webhooks, and bounded loops
+- an MCP endpoint for listing agents, listing executions, and chatting
+- GitHub session CI that runs those paths with no FluxVM and no model key
 
 The runtime is intentionally a standalone component in the Fabric repository. It consumes FluxVM's existing `/v1/sandboxes` API directly and does not alter the existing `zyvor-fabricd` VM API or backend workspace.
 
@@ -340,6 +345,19 @@ POST   /v1/sessions/{id}/cancel
 POST   /v1/sessions/{id}/hibernate
 POST   /v1/sessions/{id}/resume
 GET    /v1/sessions/{id}/events?after=<seq>
+POST   /v1/sessions/{id}/delegate
+
+POST   /v1/schedules
+DELETE /v1/schedules/{id}
+POST   /v1/webhooks
+DELETE /v1/webhooks/{id}
+POST   /v1/hooks/{id}                 # HMAC signature, not the API bearer token
+POST   /v1/loops
+DELETE /v1/loops/{id}
+GET    /v1/approvals
+POST   /v1/approvals/{id}
+
+POST   /mcp
 ```
 
 The events endpoint is SSE. Reconnecting with the last seen sequence number replays all durable host events after that point.
@@ -348,7 +366,30 @@ The events endpoint is SSE. Reconnecting with the last seen sequence number repl
 
 `hibernate` asks the guest worker to checkpoint its event boundary, creates a FluxVM memory+disk sandbox snapshot, and pauses the sandbox. `resume` resumes that same paused sandbox, preserving the JavaScript process stack and in-memory agent state.
 
-Session metadata, TTL deadlines, warm-pool claims and the host event journal survive Agent Runtime restarts. Exact mid-stack recovery after a **host/FluxVM process restart** additionally requires FluxVM to expose its existing sandbox `SnapshotLoad` primitive through REST; the current FluxVM API exposes snapshot save but not that load operation. This PR does not pretend cold restore is implemented when the upstream REST contract is not present.
+Session metadata, TTL deadlines, warm-pool claims and the host event journal survive Agent Runtime restarts. Exact mid-stack recovery after a **host/FluxVM process restart** additionally requires FluxVM to expose its existing sandbox `SnapshotLoad` primitive through REST. The current FluxVM API can save a snapshot but cannot load one, so cold restore is not implemented.
+
+## Continuous integration
+
+`.github/workflows/agent-runtime.yml` typechecks the crate, builds the example bundles, and runs a real session on the GitHub runner. Runners have no FluxVM, so [`agent-runtime/tests/sandbox_stub.py`](tests/sandbox_stub.py) stores the guest files and starts `worker.mjs` or `harness.mjs` with Node on the runner. Provider APIs are not called.
+
+[`agent-runtime/tests/session-ci.sh`](tests/session-ci.sh) deploys four agents and checks each path:
+
+| Agent | What the job asserts |
+|---|---|
+| `examples/agent-runtime/ops-agent.ts` | Session reaches `completed` and the journal contains `healthcheck.completed` |
+| `agent-runtime/tests/waiter.mjs` | Stays in `nextSteer()` so another agent can be delegated before the session ends |
+| `agent-runtime/tests/harness-prompt.md` | A fake `claude` on `PATH` prints `ZYVOR_APPROVAL`; approving it finishes the session |
+| `examples/agent-runtime/hello-go-agent.ts` | Returns the Go source it wrote, and `go run` prints `hello` |
+
+The same script also checks MCP `tools/list` and `chat_with_agent`, a five-field cron schedule, a signed webhook (and a rejected bad signature), and a loop with `max_runs: 1`.
+
+```bash
+bash agent-runtime/tests/session-ci.sh
+```
+
+The harness writes its workspace to `/opt/zyvor/agent/workspace`. GitHub-hosted runners create that directory. If the path cannot be created, the script sets `ZYVOR_HARNESS_WORKSPACE` and the harness uses that directory instead.
+
+A push to `main` also runs [`.github/workflows/lab-deploy.yml`](../.github/workflows/lab-deploy.yml), which rebuilds `zyvor-fabricd` on the lab host and runs the end-to-end checks and the API audit. That job is separate from the agent session job above.
 
 ## Security notes
 

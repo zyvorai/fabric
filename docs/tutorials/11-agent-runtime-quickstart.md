@@ -24,6 +24,13 @@ running and reachable, Rust toolchain, Node.js 20+ locally (for the SDK/CLI),
 > [agent-runtime/README.md](../../agent-runtime/README.md#host-requirements)
 > for the latest status before assuming it will complete.
 
+GitHub Actions does not have KVM or FluxVM. The agent-runtime workflow
+still runs a full session there: [`agent-runtime/tests/session-ci.sh`](../../agent-runtime/tests/session-ci.sh)
+stores guest files and starts the Node worker on the runner. That covers
+the ops agent, MCP, schedules, webhooks, loops, delegation, a harness
+approval, and the hello-go agent. It is not a substitute for Step 4 on a
+real FluxVM template.
+
 ---
 
 ## What You Will Learn

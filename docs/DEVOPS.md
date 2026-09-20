@@ -24,6 +24,14 @@ Canonical JSON: [contracts/fabric-fluxvm-readyz.json](contracts/fabric-fluxvm-re
 2. **Lab** — `./scripts/ship sus@HOST` (FluxVM + Fabric + readiness). Full lab pack: `scripts/test-lab-verify.sh`. Optional catch-up verify: `scripts/feat-catchup-verify.sh`.
 3. **Prod** — snapshot (`scripts/upgrade-rollback.sh snapshot`) → `FABRIC_ADMIN_PASSWORD=… ./scripts/ship sus@HOST --prod` → keep snapshot.
 
+A push to `main` also deploys the lab host from GitHub Actions
+([`.github/workflows/lab-deploy.yml`](../.github/workflows/lab-deploy.yml)).
+The job runs `./scripts/deploy-remote.sh 80.79.5.173 sus --quick --e2e --verify-apis`
+and authenticates with the `LAB_DEPLOY_KEY` repository secret (an ed25519 key
+for `sus`, not a personal key). You can start the same job with
+`workflow_dispatch`. It stops `zyvor-fabricd` for the remote rebuild, so it
+does not run on pull requests.
+
 Pair FluxVM upgrades with [fluxvm `scripts/upgrade-snapshot.sh`](https://github.com/zyvorai/fluxvm) on the same change window.
 
 ## Lab HTTPS

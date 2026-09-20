@@ -19,6 +19,21 @@
 - Weekly + on-demand CI smoke test for NousResearch/hermes-agent's
   installer, as a candidate real-world agent workload for Fabric-hosted
   VMs/sandboxes ([.github/workflows/hermes-agent.yml](.github/workflows/hermes-agent.yml)).
+- **Agent sessions in CI** — `.github/workflows/agent-runtime.yml` starts
+  the runtime against a FluxVM stand-in and runs a real session: ops
+  health check, MCP, cron, signed webhooks, a one-run loop, delegation,
+  a fake Claude approval, and a Go agent that returns its source and
+  prints `hello`. No model provider is called.
+- **Lab deploy workflow** — a push to `main` runs
+  [`.github/workflows/lab-deploy.yml`](.github/workflows/lab-deploy.yml),
+  which rebuilds `zyvor-fabricd` on the lab host and runs
+  `--e2e --verify-apis`. Login uses the `LAB_DEPLOY_KEY` secret.
+- **Coding-agent harness, schedules, and MCP** — an agent version can
+  run the `claude`, `codex`, or `gemini` CLI inside the sandbox with
+  keys still injected by the host broker. Operators approve a
+  `ZYVOR_APPROVAL` line, sessions can delegate to another agent, and
+  the runtime accepts cron, HMAC webhooks, bounded loops, and MCP
+  `list_agents` / `list_executions` / `chat_with_agent`.
 
 ### Fixed
 - **The Alerts page's CPU/memory/disk rules never actually fired** — `GET

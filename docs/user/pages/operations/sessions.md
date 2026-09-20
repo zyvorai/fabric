@@ -26,5 +26,6 @@ Inspect and control agent-runtime sessions (`/api/sessions`); hibernate, resume,
 ## Related
 
 - [Agents](agents.md)
+- [How users interact](../../../tutorials/14-interacting-with-agents.md)
 - [Agent Runtime Quickstart](../../../tutorials/11-agent-runtime-quickstart.md)
 - [Page index](../../PAGE_INDEX.md)
