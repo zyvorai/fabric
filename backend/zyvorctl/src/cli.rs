@@ -150,6 +150,15 @@ enum Commands {
         /// Optional tenant id (stored as labels.tenant and passed to FluxVM)
         #[arg(long)]
         tenant: Option<String>,
+        /// Host NIC for a bridge-less FluxVM tap (`l2-uplink`). Mutually exclusive with bridged networking.
+        #[arg(long)]
+        direct_uplink: Option<String>,
+        /// `l2-uplink` (default) or `peer-veth`.
+        #[arg(long)]
+        direct_mode: Option<String>,
+        /// Guest IPv4 for `l2-uplink` ARP steering. Repeat up to 8 times.
+        #[arg(long = "direct-guest-ip")]
+        direct_guest_ip: Vec<String>,
     },
     /// Start a VM
     Start { name: String },
@@ -1459,6 +1468,9 @@ impl Cli {
                 tags,
                 label,
                 tenant,
+                direct_uplink,
+                direct_mode,
+                direct_guest_ip,
             } => {
                 let labels =
                     label.map(|pairs| pairs.into_iter().collect::<HashMap<String, String>>());
@@ -1475,6 +1487,9 @@ impl Cli {
                     port_forwards: Vec::new(),
                     network_tap: false,
                     network_static_ip: false,
+                    direct_uplink,
+                    direct_mode,
+                    direct_guest_ips: direct_guest_ip,
                     storage: None,
                     enable_qga: false,
                     hyperv: false,

@@ -6,7 +6,7 @@
 use chrono::{Duration, Utc};
 use serde_json::json;
 use uuid::Uuid;
-use wiremock::matchers::{header, method, path};
+use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 use zyvor_fabric_fluxvm_client::{
     CreateVmRequest, FluxVmClient, MigrationReceiverRequest, VmStatus,
@@ -218,4 +218,68 @@ async fn pause_resume_and_qga_ping_paths() {
     let resumed = client.resume_vm(id).await.unwrap();
     assert_eq!(resumed.status, VmStatus::Running);
     client.qga_ping(id).await.unwrap();
+}
+
+fn vm_record(id: Uuid, name: &str, request: &CreateVmRequest) -> serde_json::Value {
+    json!({
+        "id": id,
+        "name": name,
+        "backend": "qemu",
+        "status": "stopped",
+        "pid": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "expires_at": null,
+        "workspace": "/tmp",
+        "disk": "/tmp/disk.qcow2",
+        "seed_disk": null,
+        "tap_name": null,
+        "control_socket": null,
+        "log_path": "/tmp/log",
+        "error": null,
+        "request": request,
+        "virtiofsd_pids": [],
+        "dhcp_leasefile": null
+    })
+}
+
+#[tokio::test]
+async fn create_vm_posts_direct_l2_uplink() {
+    let server = MockServer::start().await;
+    let id = Uuid::parse_str("00000000-0000-0000-0000-0000000000aa").unwrap();
+    let req: CreateVmRequest = serde_json::from_value(json!({
+        "name": "uplink",
+        "backend": "qemu",
+        "image": "/tmp/base.qcow2",
+        "network": {
+            "mode": "tap",
+            "mac": "02:00:00:00:0a:0a",
+            "direct": {
+                "outer": "enp1s0",
+                "mode": "l2-uplink",
+                "guest_ips": ["192.168.1.50"]
+            }
+        }
+    }))
+    .expect("CreateVmRequest");
+
+    Mock::given(method("POST"))
+        .and(path("/v1/vms"))
+        .and(body_partial_json(json!({
+            "network": {
+                "mode": "tap",
+                "direct": {
+                    "outer": "enp1s0",
+                    "mode": "l2-uplink",
+                    "guest_ips": ["192.168.1.50"]
+                }
+            }
+        })))
+        .respond_with(ResponseTemplate::new(201).set_body_json(vm_record(id, "uplink", &req)))
+        .mount(&server)
+        .await;
+
+    let client = FluxVmClient::new(server.uri()).unwrap();
+    let created = client.create_vm(&req).await.expect("create");
+    assert_eq!(created.id, id);
+    assert_eq!(created.name, "uplink");
 }

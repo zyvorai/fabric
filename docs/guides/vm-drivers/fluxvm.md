@@ -18,9 +18,12 @@ fluxvm_url = "http://127.0.0.1:7788"   # FluxVM's REST API base URL
 
 See [FluxVM's own README](https://github.com/zyvorai/fluxvm#readme) for running `fluxvm serve` itself.
 
-For Network Fabric **schema v4** (TC/eBPF VM-edge dataplane — groups, CNP,
+For Network Fabric (TC/eBPF VM-edge dataplane — groups, CNP,
 health/ipcache), Fabric ships [`configs/fluxvm-dataplane.toml`](../../configs/fluxvm-dataplane.toml)
-and mounts it as `/etc/fluxvm.toml` in compose/k8s:
+and mounts it as `/etc/fluxvm.toml` in compose/k8s. A current attach reports
+**schema 11**. `mode = "ebpf"` is required for the bridge-less direct datapath,
+which also needs `fluxvm_direct.bpf.o` next to `fluxvm_tc.bpf.o`. Service Fabric
+is not attached to direct taps.
 
 ```toml
 [sandbox.dataplane]
@@ -42,7 +45,8 @@ When FluxVM enables `[[auth.tokens]]`, set `driver.fluxvm_token`. Optional
 [PRODUCTION.md](https://github.com/zyvorai/fluxvm/blob/main/docs/PRODUCTION.md)
 and [production tutorials](https://github.com/zyvorai/fluxvm/blob/main/docs/tutorials/production/README.md).
 
-The FluxVM image must include the BPF `.o` files; the DaemonSet/compose also mounts host `/sys/fs/bpf` and raises memlock (`SYS_RESOURCE` / `ulimit memlock=-1`).
+The FluxVM image must include both BPF objects (`fluxvm_tc.bpf.o` and
+`fluxvm_direct.bpf.o`); the DaemonSet/compose also mounts host `/sys/fs/bpf` and raises memlock (`SYS_RESOURCE` / `ulimit memlock=-1`).
 
 ## Wired vs missing (FluxVM 0.4.x catch-up)
 
@@ -51,7 +55,8 @@ The FluxVM image must include the BPF `.o` files; the DaemonSet/compose also mou
 | VM lifecycle, agent shell/console/files, resources, freeze/thaw | Wired |
 | Guest **pause/resume** (`/api/vms/{name}/pause\|resume`) | Wired → FluxVM pause/resume |
 | Image catalog + warm pools | Wired |
-| Network Fabric schema v4 (policy/status/stats/flows/effective/groups/CNP/…) | Wired |
+| Network Fabric (policy/status/stats/flows/effective/groups/CNP/…; schema is the number FluxVM returns, 11 on a current attach) | Wired |
+| Bridge-less direct tap (`network.direct`, `l2-uplink`) | Wired on create and NIC hotplug |
 | Drop-reasons + pod-policy proxies | Wired |
 | Service Fabric Maglev + remote ipcache fan-out | Wired |
 | CEP endpoints + MicroVM metrics + Hubble flows proxy | Wired |
@@ -69,14 +74,22 @@ The FluxVM image must include the BPF `.o` files; the DaemonSet/compose also mou
 
 The `fluxvm-driver`/`fluxvm-client` crates (`backend/crates/`) implement `driver-core`'s trait family against FluxVM's REST API. Every VM this driver creates requests FluxVM's vsock guest agent (`CreateVmRequest.agent.enabled: true`) by default, so shell exec, console, and file copy below work without any extra opt-in — FluxVM bakes in the agent and its auth token at create time, transparent to the caller.
 
-Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network namespace + dnsmasq), not a shared host-bridge tap.
+Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network namespace + dnsmasq), not a shared host-bridge tap. A direct uplink is `NetworkSpec::Tap { netns: false, direct: { mode: "l2-uplink", … } }` and is mutually exclusive with that path and with user-mode NAT.
+
+```json
+{"network":{"mode":"tap","mac":"02:00:00:00:0a:0a","direct":{"outer":"enp1s0","mode":"l2-uplink","guest_ips":["192.168.1.50"]}}}
+```
+
+On Fabric that is `direct_uplink` plus optional `direct_guest_ips` on create (`zyvorctl create --direct-uplink enp1s0 --direct-guest-ip 192.168.1.50`). The spec is stored on the VM and sent on first start. NIC hotplug of a direct uplink is `POST /v1/vms/{id}/hotplug/nic`; a bridged hotplug stays on QMP.
 
 | Capability | `driver-core` trait | FluxVM endpoint(s) |
 | --- | --- | --- |
 | Create, list, get, resolve by name | `VMDriver` | `POST`/`GET /v1/vms`, `GET /v1/vms?name=`, `GET /v1/vms?tenant=` |
 | Readiness | — | Fabric `GET /readyz` proxies FluxVM `GET /readyz` + local store |
 | Start, stop, pause, resume, delete | `VMDriver` | `/v1/vms/{id}/{start,stop,pause,resume}`, `DELETE /v1/vms/{id}` |
-| Hotplug (CPU/memory/disk/nic) | — | Generic — resolves `VMDriver::get_control_socket` and speaks QMP directly, no FluxVM-specific wiring needed |
+| Hotplug (CPU/memory/disk) | — | Generic — resolves `VMDriver::get_control_socket` and speaks QMP directly |
+| Hotplug NIC (bridge) | — | QMP `netdev_add` + `device_add` |
+| Hotplug NIC (direct uplink) | — | `POST /v1/vms/{id}/hotplug/nic` with `direct` (FluxVM opens the tap and attaches `fluxvm_direct`) |
 | CPU pinning (cgroup cpuset) | `ResourceControlDriver::{set,get}_cpuset` | `POST /v1/vms/{id}/resources`, `GET /v1/vms/{id}/cpuset` |
 | CPU/memory/IO/pids limits | `ResourceControlDriver` | `POST /v1/vms/{id}/resources` |
 | Point-in-time usage + PSI pressure | `ResourceStatsDriver` | `GET /v1/vms/{id}/{stats,pressure}` |
@@ -92,7 +105,7 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 | Native migration receivers | — | `/v1/migration/receivers` (+ activate); Fabric `…/migration/native/prepare-receiver` |
 | Network migration state | — | `/v1/vms/{id}/network/migration/{state,quiesce,export,restore,resume}` |
 | QGA | — | `/v1/vms/{id}/qga/{ping,exec,firewall/*}` via Fabric `/api/vms/{name}/qga/*` |
-| **Network Fabric schema v4 (VM edge dataplane)** | `VmDataplaneDriver` | `/v1/vms/{id}/network/{policy,status,stats,flows,effective,drop-reasons,pod-policy}` + `/v1/network/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` — proxied as Fabric `/api/vms/{name}/dataplane/*` and `/api/dataplane/*` |
+| **Network Fabric (VM edge dataplane, schema 11 on a current attach)** | `VmDataplaneDriver` | `/v1/vms/{id}/network/{policy,status,stats,flows,effective,drop-reasons,pod-policy}` + `/v1/network/{groups,cnp,identities,observe,health,ipcache,refresh-dns}` — proxied as Fabric `/api/vms/{name}/dataplane/*` and `/api/dataplane/*`. Status shows the schema FluxVM returns; Service Fabric is not attached to direct taps |
 | **Service Fabric v6 (BPF schema 4 — Maglev VIP LB)** | `service-lb` + FluxVM services API | `/v1/network/services…` — proxied as `/api/dataplane/services…` (status/health/ads/GC/flows/delta/policy); see [ebpf-service-fabric.md](../../ebpf-service-fabric.md) |
 
 ### Fabric API and CLI for the dataplane

@@ -4,7 +4,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
@@ -38,9 +38,21 @@ fn default_bus() -> String {
 
 #[derive(Debug, Deserialize)]
 pub struct HotplugNicRequest {
+    /// Host bridge. Empty when `direct_uplink` is set.
+    #[serde(default)]
     pub bridge: String,
     #[serde(default)]
     pub model: Option<String>,
+    /// Host NIC for a bridge-less tap. Mutually exclusive with `bridge`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    /// `l2-uplink` (default) or `peer-veth`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mac: Option<String>,
 }
 
 pub(crate) fn not_available_response() -> impl IntoResponse {
@@ -553,6 +565,22 @@ pub async fn hotplug_nic(
     if let Err((s, m)) = crate::validation::validate_vm_name(&vm_name) {
         return crate::api_error::json_error(s, m).into_response();
     }
+    let uplink = req
+        .direct_uplink
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    if uplink.is_some() && !req.bridge.trim().is_empty() {
+        return crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "NIC hotplug takes a bridge or a direct uplink, not both",
+        )
+        .into_response();
+    }
+    if let Some(outer) = uplink {
+        return hotplug_direct_nic(&state, &vm_name, &outer, &req).await;
+    }
     let Some(qmp) = resolve_qmp(&state, &vm_name).await else {
         return not_available_response().into_response();
     };
@@ -656,6 +684,97 @@ pub async fn hotplug_nic(
             )
                 .into_response()
         }
+    }
+}
+
+/// Direct taps are created by FluxVM (it attaches `fluxvm_direct` and passes
+/// the fd). QMP `netdev_add` cannot open that tap.
+async fn hotplug_direct_nic(
+    state: &AppState,
+    vm_name: &str,
+    outer: &str,
+    req: &HotplugNicRequest,
+) -> Response {
+    use zyvor_fabric_fluxvm_client::{
+        DirectMode, DirectSpec, FluxVmClient, HotplugNicRequest as FluxHotplug,
+    };
+
+    let errors = vm_model::direct_uplink_errors(
+        Some(outer),
+        req.direct_mode.as_deref(),
+        &req.direct_guest_ips,
+        false,
+        false,
+    );
+    if !errors.is_empty() {
+        return crate::api_error::json_error(StatusCode::BAD_REQUEST, errors.join("; "))
+            .into_response();
+    }
+    let mode = match req
+        .direct_mode
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        None | Some("l2-uplink") => DirectMode::L2Uplink,
+        Some("peer-veth") => DirectMode::PeerVeth,
+        Some(other) => {
+            return crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                format!("direct_mode must be 'l2-uplink' or 'peer-veth', got '{other}'"),
+            )
+            .into_response();
+        }
+    };
+    let client = match FluxVmClient::new(&state.config.driver.fluxvm_url) {
+        Ok(client) => match state.config.driver.fluxvm_token.as_deref() {
+            Some(token) if !token.is_empty() => client.with_token(token.to_owned()),
+            _ => client,
+        },
+        Err(e) => {
+            return crate::api_error::json_error(
+                StatusCode::BAD_GATEWAY,
+                format!("FluxVM client: {e}"),
+            )
+            .into_response();
+        }
+    };
+    let record = match client.find_by_name(vm_name).await {
+        Ok(Some(record)) => record,
+        Ok(None) => {
+            return crate::api_error::json_error(
+                StatusCode::NOT_FOUND,
+                format!("VM '{vm_name}' is not known to FluxVM"),
+            )
+            .into_response();
+        }
+        Err(e) => {
+            return crate::api_error::json_error(StatusCode::BAD_GATEWAY, e.to_string())
+                .into_response();
+        }
+    };
+    let body = FluxHotplug {
+        bridge: String::new(),
+        mac: req.mac.clone(),
+        direct: Some(DirectSpec {
+            outer: outer.to_string(),
+            netns_path: None,
+            mode,
+            guest_ips: req.direct_guest_ips.clone(),
+        }),
+    };
+    match client.hotplug_nic(record.id, &body).await {
+        Ok(value) => Json(serde_json::json!({
+            "status": "ok",
+            "direct_uplink": outer,
+            "fluxvm": value,
+        }))
+        .into_response(),
+        Err(e) => crate::api_error::json_error(
+            StatusCode::BAD_GATEWAY,
+            format!("FluxVM hotplug/nic failed: {e}"),
+        )
+        .into_response(),
     }
 }
 

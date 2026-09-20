@@ -64,8 +64,10 @@ export default function CreateVM() {
   const [imagesReload, setImagesReload] = useState(0)
   const [showGoldenImage, setShowGoldenImage] = useState(false)
   const [showDownloadImage, setShowDownloadImage] = useState(false)
-  const [networkMode, setNetworkMode] = useState<'nat' | 'bridged'>('nat')
+  const [networkMode, setNetworkMode] = useState<'nat' | 'bridged' | 'direct'>('nat')
   const [staticIp, setStaticIp] = useState(false)
+  const [directUplink, setDirectUplink] = useState('')
+  const [directGuestIps, setDirectGuestIps] = useState('')
   const [tenant, setTenant] = useState('')
   const [portForwards, setPortForwards] = useState<{ hostPort: string; guestPort: string; protocol: 'tcp' | 'udp' }[]>([])
 
@@ -124,6 +126,18 @@ export default function CreateVM() {
     if (step === 1) {
       if (cpus < 1 || cpus > 32) return 'vCPUs must be between 1 and 32'
       if (memory < 256) return 'Memory must be at least 256 MB'
+      if (networkMode === 'direct') {
+        const nic = directUplink.trim()
+        if (!nic) return 'Direct uplink needs the host NIC name (for example enp1s0)'
+        if (nic.length > 15 || nic.includes('/') || nic.includes(' ')) {
+          return 'Uplink NIC must be an interface name (1–15 characters, no slash or space)'
+        }
+        const ips = directGuestIps.split(',').map((s) => s.trim()).filter(Boolean)
+        if (ips.length > 8) return 'At most 8 guest IPv4 addresses'
+        for (const ip of ips) {
+          if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return `Guest IP '${ip}' is not an IPv4 address`
+        }
+      }
       const hostPorts = new Set<string>()
       for (const row of networkMode === 'nat' ? portForwards : []) {
         const h = parseInt(row.hostPort)
@@ -178,10 +192,15 @@ export default function CreateVM() {
             protocol: row.protocol,
           }))
         : []
+      const guestIps = networkMode === 'direct'
+        ? directGuestIps.split(',').map((s) => s.trim()).filter(Boolean)
+        : []
       await createVM({
         name, image, cpus, memory, disk: diskGb,
         network_tap: networkMode === 'bridged',
         network_static_ip: networkMode === 'bridged' && staticIp,
+        ...(networkMode === 'direct' ? { direct_uplink: directUplink.trim() } : {}),
+        ...(guestIps.length ? { direct_guest_ips: guestIps } : {}),
         ...(tenant.trim() ? { tenant: tenant.trim() } : {}),
         ...(port_forwards.length ? { port_forwards } : {}),
       })
@@ -582,12 +601,43 @@ export default function CreateVM() {
                         >
                           Bridged (DHCP)
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setNetworkMode('direct')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            networkMode === 'direct'
+                              ? 'bg-[var(--zf-link)]/20 text-[var(--zf-link)] border border-[var(--zf-link)]/30'
+                              : 'bg-white border border-[var(--zf-hairline)] text-[var(--zf-muted)] hover:text-[var(--zf-ink)]'
+                          }`}
+                        >
+                          Direct uplink
+                        </button>
                       </div>
                       <p className="text-xs text-[var(--zf-muted)] mt-2">
                         {networkMode === 'nat'
                           ? 'No host-routable IP — reach anything inside this VM (like SSH) by forwarding a port below.'
-                          : 'This VM gets its own real IP (visible on its Network tab once booted) — no port forwards needed.'}
+                          : networkMode === 'direct'
+                            ? 'Bridge-less tap on a host NIC. Service Fabric is not attached to direct taps.'
+                            : 'This VM gets its own real IP (visible on its Network tab once booted) — no port forwards needed.'}
                       </p>
+                      {networkMode === 'direct' && (
+                        <div className="mt-3 space-y-2">
+                          <input
+                            type="text"
+                            value={directUplink}
+                            onChange={(e) => setDirectUplink(e.target.value)}
+                            placeholder="Uplink NIC (e.g. enp1s0)"
+                            className="w-full bg-white border border-[var(--zf-hairline)] rounded-lg px-3 py-2 text-sm text-[var(--zf-ink)]"
+                          />
+                          <input
+                            type="text"
+                            value={directGuestIps}
+                            onChange={(e) => setDirectGuestIps(e.target.value)}
+                            placeholder="Guest IPv4s, optional (comma-separated, up to 8)"
+                            className="w-full bg-white border border-[var(--zf-hairline)] rounded-lg px-3 py-2 text-sm text-[var(--zf-ink)]"
+                          />
+                        </div>
+                      )}
                       {networkMode === 'bridged' && (
                         <label className="flex items-center gap-2 mt-3 text-sm text-[var(--zf-ink)]">
                           <input
@@ -719,7 +769,7 @@ export default function CreateVM() {
                 <div className={`flex justify-between gap-4 ${networkMode === 'nat' && portForwards.length ? 'border-b border-[var(--zf-hairline)] pb-2' : ''}`}>
                   <dt className="text-[var(--zf-muted)]">Networking</dt>
                   <dd className="text-[var(--zf-ink)]">
-                    {networkMode === 'nat' ? 'NAT' : staticIp ? 'Bridged (static IP)' : 'Bridged (DHCP)'}
+                    {networkMode === 'nat' ? 'NAT' : networkMode === 'direct' ? `Direct (${directUplink.trim() || 'uplink'})` : staticIp ? 'Bridged (static IP)' : 'Bridged (DHCP)'}
                   </dd>
                 </div>
                 {networkMode === 'nat' && portForwards.length > 0 && (

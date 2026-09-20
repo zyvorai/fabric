@@ -22,7 +22,9 @@ export default function HotplugTab({ vm }: { vm: VM }) {
   const [cpuCount, setCpuCount] = useState(vm.cpus + 1)
   const [memMb, setMemMb] = useState(512)
   const [diskPath, setDiskPath] = useState('')
-  const [nicBridge, setNicBridge] = useState('br0')
+  const [nicBridge, setNicBridge] = useState('')
+  const [nicUplink, setNicUplink] = useState('')
+  const [nicGuestIps, setNicGuestIps] = useState('')
   const [diskDeviceId, setDiskDeviceId] = useState('')
   const [nicDeviceId, setNicDeviceId] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
@@ -152,10 +154,38 @@ export default function HotplugTab({ vm }: { vm: VM }) {
               disabled={!canWrite}
               className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] disabled:opacity-50"
             />
+            <input
+              type="text"
+              placeholder="Or direct uplink NIC (e.g. enp1s0)"
+              value={nicUplink}
+              onChange={(e) => setNicUplink(e.target.value)}
+              disabled={!canWrite}
+              className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] disabled:opacity-50"
+            />
+            {nicUplink.trim() && (
+              <input
+                type="text"
+                placeholder="Guest IPv4s, optional (comma-separated)"
+                value={nicGuestIps}
+                onChange={(e) => setNicGuestIps(e.target.value)}
+                disabled={!canWrite}
+                className="w-full bg-white border border-[#d2d2d7] rounded-lg px-3 py-2 text-sm text-[#1d1d1f] disabled:opacity-50"
+              />
+            )}
             <ActionButton
-              disabled={!canWrite || busy !== null || !nicBridge.trim()}
+              disabled={!canWrite || busy !== null || (!nicBridge.trim() && !nicUplink.trim()) || (!!nicBridge.trim() && !!nicUplink.trim())}
               loading={busy === 'nic'}
-              onClick={() => run('nic', () => hotplugNic(vm.name, { bridge: nicBridge.trim() }), 'NIC attached')}
+              onClick={() => {
+                const uplink = nicUplink.trim()
+                const ips = nicGuestIps.split(',').map((s) => s.trim()).filter(Boolean)
+                return run(
+                  'nic',
+                  () => hotplugNic(vm.name, uplink
+                    ? { bridge: '', direct_uplink: uplink, ...(ips.length ? { direct_guest_ips: ips } : {}) }
+                    : { bridge: nicBridge.trim() }),
+                  'NIC attached',
+                )
+              }}
               label="Attach NIC"
             />
             <div className="flex gap-2 items-end pt-1">

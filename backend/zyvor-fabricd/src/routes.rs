@@ -539,6 +539,9 @@ pub async fn add_port_forward(
             storage: vm.storage.clone(),
             enable_qga: vm.enable_qga,
             hyperv: vm.hyperv,
+            direct_uplink: vm.direct_uplink.clone(),
+            direct_mode: vm.direct_mode.clone(),
+            direct_guest_ips: vm.direct_guest_ips.clone(),
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -653,6 +656,9 @@ pub async fn remove_port_forward(
             storage: vm.storage.clone(),
             enable_qga: vm.enable_qga,
             hyperv: vm.hyperv,
+            direct_uplink: vm.direct_uplink.clone(),
+            direct_mode: vm.direct_mode.clone(),
+            direct_guest_ips: vm.direct_guest_ips.clone(),
             ..Default::default()
         };
         if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
@@ -812,6 +818,9 @@ pub async fn start_vm(
             storage: vm.storage.clone(),
             enable_qga: vm.enable_qga,
             hyperv: vm.hyperv,
+            direct_uplink: vm.direct_uplink.clone(),
+            direct_mode: vm.direct_mode.clone(),
+            direct_guest_ips: vm.direct_guest_ips.clone(),
             ..Default::default()
         });
         let result = state_clone.driver.start_with_options(&vm, &opts).await;
@@ -979,6 +988,9 @@ pub async fn restart_vm(
         storage: vm.storage.clone(),
         enable_qga: vm.enable_qga,
         hyperv: vm.hyperv,
+        direct_uplink: vm.direct_uplink.clone(),
+        direct_mode: vm.direct_mode.clone(),
+        direct_guest_ips: vm.direct_guest_ips.clone(),
         ..Default::default()
     };
 

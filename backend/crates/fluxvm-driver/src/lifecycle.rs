@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use vm_model::{VMStartOptions, VMState, VM};
 use zyvor_fabric_driver_core::{MachineInfo, VMDriver};
 use zyvor_fabric_fluxvm_client::{
-    BackendKind, CreateVmRequest, NetworkSpec, PortForward, QgaSpec, StorageBackend, VmRecord,
-    VmStatus,
+    BackendKind, CreateVmRequest, DirectMode, DirectSpec, NetworkSpec, PortForward, QgaSpec,
+    StorageBackend, VmRecord, VmStatus,
 };
 
 use crate::FluxVmDriver;
@@ -252,7 +252,9 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
         anyhow::anyhow!("vcpu count {} exceeds the fluxvm backend's limit", vm.cpus)
     })?;
 
-    let network = if opts.network_tap {
+    let network = if let Some(direct) = direct_tap(vm, opts)? {
+        direct
+    } else if opts.network_tap {
         // Always pin an explicit MAC rather than letting QEMU auto-assign
         // one: FluxVM never persists an auto-generated MAC anywhere on
         // VmRecord, so a later ssh_info lookup (get_mac_address, below)
@@ -269,6 +271,7 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
             bridge: None,
             mac: Some(mac),
             netns: true,
+            direct: None,
         }
     } else {
         NetworkSpec::User {
@@ -379,6 +382,63 @@ fn translate_start_options(vm: &VM, opts: &VMStartOptions) -> Result<CreateVmReq
     })
 }
 
+/// Bridge-less tap when a direct uplink is set on the start options, or
+/// (if those are empty) on the stored VM. `None` keeps the netns or NAT path.
+fn direct_tap(vm: &VM, opts: &VMStartOptions) -> Result<Option<NetworkSpec>> {
+    let from_opts = opts
+        .direct_uplink
+        .as_ref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
+    let (uplink, mode, guest_ips) = if from_opts {
+        (
+            opts.direct_uplink.clone(),
+            opts.direct_mode.clone(),
+            opts.direct_guest_ips.clone(),
+        )
+    } else {
+        (
+            vm.direct_uplink.clone(),
+            vm.direct_mode.clone(),
+            vm.direct_guest_ips.clone(),
+        )
+    };
+    let Some(outer) = uplink
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    else {
+        return Ok(None);
+    };
+    let errors = vm_model::direct_uplink_errors(
+        Some(&outer),
+        mode.as_deref(),
+        &guest_ips,
+        opts.network_tap,
+        opts.network_user_mode || !opts.port_forwards.is_empty(),
+    );
+    if !errors.is_empty() {
+        bail!("{}", errors.join("; "));
+    }
+    let parsed = match mode.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        None | Some("l2-uplink") => DirectMode::L2Uplink,
+        Some("peer-veth") => DirectMode::PeerVeth,
+        Some(other) => bail!("direct_mode must be 'l2-uplink' or 'peer-veth', got '{other}'"),
+    };
+    let mac = vm.mac_address.clone().unwrap_or_else(generate_mac_address);
+    Ok(Some(NetworkSpec::Tap {
+        tap_name: None,
+        bridge: None,
+        mac: Some(mac),
+        netns: false,
+        direct: Some(DirectSpec {
+            outer,
+            netns_path: None,
+            mode: parsed,
+            guest_ips,
+        }),
+    }))
+}
+
 fn parse_storage_backend(raw: Option<&str>) -> StorageBackend {
     match raw.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
         None | Some("") | Some("default") => StorageBackend::Default,
@@ -437,5 +497,59 @@ mod tests {
         );
         let req = translate_start_options(&vm, &VMStartOptions::default()).unwrap();
         assert!(req.shared_folders.is_empty());
+    }
+
+    #[test]
+    fn direct_uplink_emits_l2_uplink() {
+        let mut vm = VM::new(
+            "fixture".to_string(),
+            "/tmp/base.qcow2".to_string(),
+            2,
+            2048,
+        );
+        vm.direct_uplink = Some("enp1s0".to_string());
+        vm.direct_guest_ips = vec!["192.168.1.50".to_string()];
+        let opts = VMStartOptions {
+            direct_uplink: Some("enp1s0".to_string()),
+            direct_guest_ips: vec!["192.168.1.50".to_string()],
+            ..Default::default()
+        };
+        let req = translate_start_options(&vm, &opts).unwrap();
+        match req.network {
+            NetworkSpec::Tap {
+                netns,
+                bridge,
+                direct,
+                ..
+            } => {
+                assert!(!netns);
+                assert!(bridge.is_none());
+                let spec = direct.expect("direct");
+                assert_eq!(spec.outer, "enp1s0");
+                assert_eq!(spec.mode, DirectMode::L2Uplink);
+                assert_eq!(spec.guest_ips, vec!["192.168.1.50".to_string()]);
+            }
+            other => panic!("expected tap, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn direct_uplink_rejects_network_tap() {
+        let vm = VM::new(
+            "fixture".to_string(),
+            "/tmp/base.qcow2".to_string(),
+            2,
+            2048,
+        );
+        let opts = VMStartOptions {
+            direct_uplink: Some("enp1s0".to_string()),
+            network_tap: true,
+            ..Default::default()
+        };
+        let err = translate_start_options(&vm, &opts).unwrap_err();
+        assert!(
+            err.to_string().contains("network_tap"),
+            "unexpected error: {err}"
+        );
     }
 }

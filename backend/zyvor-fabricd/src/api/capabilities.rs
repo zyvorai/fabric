@@ -203,7 +203,7 @@ async fn probe_vm_dataplane(state: &AppState) -> SubsystemStatus {
                 SubsystemStatus {
                     phase: SubsystemPhase::Off,
                     detail: Some(
-                        "sandbox.dataplane.mode=legacy — set mode=ebpf (or cilium) for Network Fabric schema v4"
+                        "sandbox.dataplane.mode=legacy — set mode=ebpf (or cilium) for Network Fabric"
                             .to_string(),
                     ),
                 }

@@ -21,6 +21,9 @@ export interface VM {
   port_forwards?: PortForwardSpec[]
   network_tap?: boolean
   network_static_ip?: boolean
+  direct_uplink?: string
+  direct_mode?: string
+  direct_guest_ips?: string[]
   /** Why the VM ended up in the 'failed' state, if it did. Cleared on the next successful start. */
   last_error?: string
 }
@@ -52,6 +55,15 @@ export interface CreateVMRequest {
    * (not every image runs one automatically on boot).
    */
   network_static_ip?: boolean
+  /**
+   * Host NIC for a bridge-less FluxVM tap (`l2-uplink`). Mutually exclusive
+   * with `network_tap` and port forwards. Applied on first start.
+   */
+  direct_uplink?: string
+  /** `l2-uplink` (default) or `peer-veth`. */
+  direct_mode?: string
+  /** Guest IPv4s for `l2-uplink` ARP steering. At most 8. */
+  direct_guest_ips?: string[]
   /** Optional tenant id — stored as `labels.tenant` and passed to FluxVM. */
   tenant?: string
   labels?: Record<string, string>

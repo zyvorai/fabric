@@ -53,6 +53,17 @@ pub struct VM {
     /// DHCP client (which not every image runs automatically on boot).
     #[serde(default)]
     pub network_static_ip: bool,
+    /// Host NIC for a bridge-less FluxVM tap (`l2-uplink` by default).
+    /// Mutually exclusive with `network_tap` and user-mode NAT. Stored on
+    /// the VM and applied on first start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    /// `l2-uplink` (default) or `peer-veth`. Absent means `l2-uplink`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    /// Guest IPv4s for `l2-uplink` ARP steering. At most 8.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
     /// SSH public keys to inject via cloud-init on (re)creation -- also the
     /// reason *any* cloud-init seed gets attached at all for a plain NAT
     /// VM with no other cloud-init needs: without one, cloud-init finds no
@@ -127,6 +138,16 @@ pub struct CreateVMRequest {
     pub network_tap: bool,
     #[serde(default)]
     pub network_static_ip: bool,
+    /// Host NIC for a bridge-less FluxVM tap. Mutually exclusive with
+    /// `network_tap` and `port_forwards`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    /// `l2-uplink` (default) or `peer-veth`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    /// Guest IPv4s for `l2-uplink` ARP steering. At most 8.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
     /// FluxVM storage backend: `default` | `lvm-thin` | `nbd` | `ceph-rbd`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage: Option<String>,
@@ -168,6 +189,14 @@ impl CreateVMRequest {
                 self.disk
             ));
         }
+
+        errors.extend(direct_uplink_errors(
+            self.direct_uplink.as_deref(),
+            self.direct_mode.as_deref(),
+            &self.direct_guest_ips,
+            self.network_tap,
+            !self.port_forwards.is_empty(),
+        ));
 
         if errors.is_empty() {
             Ok(())
@@ -341,6 +370,16 @@ pub struct VMStartOptions {
     /// Use user mode networking
     #[serde(default)]
     pub network_user_mode: bool,
+    /// Host NIC for a bridge-less FluxVM tap. Mutually exclusive with
+    /// `network_tap` and user-mode NAT.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    /// `l2-uplink` (default) or `peer-veth`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    /// Guest IPv4s for `l2-uplink` ARP steering. At most 8.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
     /// Host-port -> guest-port forwards for user-mode networking. Ignored
     /// when `network_tap` is set.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -876,12 +915,79 @@ impl VMStartOptions {
             }
         }
 
+        errors.extend(direct_uplink_errors(
+            self.direct_uplink.as_deref(),
+            self.direct_mode.as_deref(),
+            &self.direct_guest_ips,
+            self.network_tap,
+            self.network_user_mode || !self.port_forwards.is_empty(),
+        ));
+
         if errors.is_empty() {
             Ok(())
         } else {
             Err(errors)
         }
     }
+}
+
+/// Shared checks for a bridge-less uplink. Empty when `uplink` is unset and
+/// no stray mode or guest IPs were sent.
+pub fn direct_uplink_errors(
+    uplink: Option<&str>,
+    mode: Option<&str>,
+    guest_ips: &[String],
+    network_tap: bool,
+    user_nat: bool,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let outer = uplink.map(str::trim).filter(|s| !s.is_empty());
+    if outer.is_none() {
+        if mode.map(|m| !m.trim().is_empty()).unwrap_or(false) || !guest_ips.is_empty() {
+            errors.push("direct_mode and direct_guest_ips require direct_uplink".to_string());
+        }
+        return errors;
+    }
+    let outer = outer.unwrap();
+    if network_tap {
+        errors.push("direct_uplink is mutually exclusive with network_tap".to_string());
+    }
+    if user_nat {
+        errors.push(
+            "direct_uplink is mutually exclusive with user-mode NAT (port forwards)".to_string(),
+        );
+    }
+    if !(1..=15).contains(&outer.len()) || outer.contains('/') || outer.contains(' ') {
+        errors.push(format!(
+            "direct_uplink '{outer}' must be an interface name (1-15 characters, no slash or space)"
+        ));
+    }
+    let mode = mode
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("l2-uplink");
+    if mode != "l2-uplink" && mode != "peer-veth" {
+        errors.push(format!(
+            "direct_mode must be 'l2-uplink' or 'peer-veth', got '{mode}'"
+        ));
+    }
+    if mode != "l2-uplink" && !guest_ips.is_empty() {
+        errors.push("direct_guest_ips are only valid for direct_mode l2-uplink".to_string());
+    }
+    if guest_ips.len() > 8 {
+        errors.push(format!(
+            "direct_guest_ips accepts at most 8 addresses, got {}",
+            guest_ips.len()
+        ));
+    }
+    for ip in guest_ips {
+        if ip.parse::<std::net::Ipv4Addr>().is_err() {
+            errors.push(format!(
+                "direct_guest_ips entry '{ip}' is not an IPv4 address"
+            ));
+        }
+    }
+    errors
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -948,6 +1054,9 @@ impl VM {
             port_forwards: Vec::new(),
             network_tap: false,
             network_static_ip: false,
+            direct_uplink: None,
+            direct_mode: None,
+            direct_guest_ips: Vec::new(),
             ssh_authorized_keys: Vec::new(),
             cloud_init_packages: Vec::new(),
             cloud_init_runcmd: Vec::new(),
@@ -985,6 +1094,9 @@ impl VM {
             port_forwards: req.port_forwards.clone(),
             network_tap: req.network_tap,
             network_static_ip: req.network_static_ip,
+            direct_uplink: req.direct_uplink.clone(),
+            direct_mode: req.direct_mode.clone(),
+            direct_guest_ips: req.direct_guest_ips.clone(),
             ssh_authorized_keys: Vec::new(),
             cloud_init_packages: Vec::new(),
             cloud_init_runcmd: Vec::new(),
@@ -1035,6 +1147,9 @@ mod tests {
             port_forwards: Vec::new(),
             network_tap: false,
             network_static_ip: false,
+            direct_uplink: None,
+            direct_mode: None,
+            direct_guest_ips: Vec::new(),
             storage: None,
             enable_qga: false,
             hyperv: false,
@@ -1234,6 +1349,9 @@ mod tests {
             cpuset: Some("0-1".into()),
             hugepages: Some(false),
             vfio_devices: vec![],
+            direct_uplink: None,
+            direct_mode: None,
+            direct_guest_ips: vec![],
         };
 
         let json = serde_json::to_string(&opts).unwrap();

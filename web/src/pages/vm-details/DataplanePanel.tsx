@@ -330,7 +330,8 @@ export default function DataplanePanel({ vmName }: { vmName: string }) {
           <div>
             <h3 className="text-sm font-semibold text-[#1d1d1f]">VM edge dataplane (FluxVM)</h3>
             <p className="text-xs text-[#6e6e73]">
-              Per-VM TC/eBPF policy (schema v4), groups, rate limits, stats, and flows — not Fabric SDN.
+              Per-VM TC/eBPF policy. Schema version is whatever FluxVM reports (11 on a current attach) — not Fabric SDN.
+              Service Fabric is not attached to bridge-less direct taps.
             </p>
           </div>
         </div>

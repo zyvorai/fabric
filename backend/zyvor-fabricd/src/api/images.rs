@@ -901,7 +901,7 @@ pub async fn import_vm_image(
         Json(ImportResult {
             vm_name: req.name,
             image_path: dest_path,
-            source_format,
+            source_format: source_format.to_string(),
             target_format: req.target_format,
             size_bytes: size,
         }),

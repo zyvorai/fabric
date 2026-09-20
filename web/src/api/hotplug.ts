@@ -20,6 +20,11 @@ export interface HotplugDiskRequest {
 export interface HotplugNicRequest {
   bridge: string
   model?: string
+  /** Host NIC for a bridge-less tap. Mutually exclusive with `bridge`. */
+  direct_uplink?: string
+  direct_mode?: string
+  direct_guest_ips?: string[]
+  mac?: string
 }
 
 export async function hotplugCpu(vmName: string, req: HotplugCpuRequest): Promise<unknown> {

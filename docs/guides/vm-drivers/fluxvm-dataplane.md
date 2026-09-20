@@ -1,13 +1,16 @@
 # FluxVM Network Fabric (VM edge dataplane)
 
-Fabric exposes FluxVM **Network Fabric schema v4** — a TC/eBPF classifier on each VM’s
-host-visible edge — as first-class **API · Web · CLI**. This is **not** Fabric’s
-host SDN (`/api/network-policies` → nftables). Both planes can run together.
+Fabric exposes FluxVM **Network Fabric** — a TC/eBPF classifier on each VM’s
+host-visible edge — as first-class **API · Web · CLI**. The status payload
+shows the schema number FluxVM returns (**11** on a current attach). Do not
+require `schema_version == 4`. This is **not** Fabric’s host SDN
+(`/api/network-policies` → nftables). Both planes can run together.
+Service Fabric is not attached to bridge-less direct taps.
 
 | Layer | Owns | Surface |
 | --- | --- | --- |
 | **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · **Net Security → Policies** |
-| **VM edge (Network Fabric schema v4)** | Per-VM L3/L4 allowlists, Mbps/PPS, stats, LRU flows on TAP/netns | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** · `zyvorctl dataplane` |
+| **VM edge (Network Fabric)** | Per-VM L3/L4 allowlists, Mbps/PPS, stats, LRU flows on TAP/netns. Current attach schema is 11 | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** · `zyvorctl dataplane` |
 
 Kernel program and safety properties live in FluxVM:
 [Network Fabric architecture](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works) ·
@@ -44,20 +47,20 @@ Ship [`configs/fluxvm-dataplane.toml`](../../configs/fluxvm-dataplane.toml)
 ```toml
 [sandbox.dataplane]
 mode = "ebpf"                                          # legacy | ebpf | cilium
-bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"
+bpf_object = "/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o"    # direct taps also need fluxvm_direct.bpf.o beside this
 pin_root = "/sys/fs/bpf/fluxvm"
 required = true                                        # GA: fail-closed when a VM edge exists
 ```
 
 Requirements:
 
-1. BPF object present in the FluxVM image (`/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o`).
+1. BPF objects present in the FluxVM image (`/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o` and, for a direct uplink, `fluxvm_direct.bpf.o` in the same directory).
 2. Host `/sys/fs/bpf` mounted into the FluxVM process (compose/k8s/systemd).
 3. Raised memlock (`LimitMEMLOCK=infinity` / `ulimit -l unlimited` / `SYS_RESOURCE`).
-4. Bridged Fabric VMs use `network_tap: true` → FluxVM `NetworkSpec::Tap { netns: true }` so the classifier attaches on the **host** veth (`vh…`).
+4. Bridged Fabric VMs use `network_tap: true` → FluxVM `NetworkSpec::Tap { netns: true }` so the classifier attaches on the **host** veth (`vh…`). A bridge-less uplink is `direct_uplink` (FluxVM `direct.mode = "l2-uplink"`, `netns: false`). Service Fabric is not applied to that tap.
 
 GA default in `configs/fluxvm-dataplane.toml` is already `required = true`.
-Confirm `schema_version=4` + `attached=true` on a bridged VM after deploy.
+Confirm the schema number FluxVM returns (11 on a current attach) and `attached=true` on a bridged VM after deploy. Do not require `schema_version == 4`.
 
 ---
 
@@ -264,7 +267,31 @@ curl -sk -X POST "$ZYVOR_FABRIC_URL/api/vms/lab-dp/start" \
 
 # Wait until state=running, then:
 zyvorctl dataplane status lab-dp -o json
-# expect: mode=ebpf, attached=true, schema_version=4
+# expect: mode=ebpf, attached=true, schema_version=11
+```
+
+A bridge-less uplink (mutually exclusive with `network_tap` and user-mode NAT).
+Service Fabric is not attached to this tap:
+
+```bash
+curl -sk -X POST "$ZYVOR_FABRIC_URL/api/vms" \
+  -H "Authorization: Bearer $ZYVOR_FABRIC_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "lab-direct",
+    "cpus": 1,
+    "memory": 1024,
+    "disk": 8,
+    "image": "/var/lib/fluxvm/images/noble-server-cloudimg-amd64.img",
+    "direct_uplink": "enp1s0",
+    "direct_guest_ips": ["192.168.1.50"]
+  }'
+```
+
+FluxVM sees that as:
+
+```json
+{"network":{"mode":"tap","direct":{"outer":"enp1s0","mode":"l2-uplink","guest_ips":["192.168.1.50"]}}}
 ```
 
 User-mode NAT / `network.mode=none` VMs do **not** attach eBPF (no host edge
@@ -276,7 +303,8 @@ iface). That is expected.
 
 | Symptom | Check |
 | --- | --- |
-| `attached=false`, mode=ebpf | Bridged/`network_tap`? BPF object path? memlock? `/sys/fs/bpf` writable? |
+| `attached=false`, mode=ebpf | Bridged/`network_tap` or direct uplink? Both BPF objects (`fluxvm_tc.bpf.o` and `fluxvm_direct.bpf.o`)? memlock? `/sys/fs/bpf` writable? |
+| Direct tap has no Service Fabric | Expected. FluxVM does not attach Service Fabric to bridge-less direct taps |
 | `mode=legacy` | `[sandbox.dataplane] mode` in `/etc/fluxvm.toml` |
 | Policy POST 4xx on ports | Use `tcp/443`, not `443` |
 | `zyvorctl` 401 | Set `ZYVOR_FABRIC_TOKEN` from `/api/auth/login` |

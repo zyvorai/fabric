@@ -23,11 +23,11 @@
 //!
 //! Wire types track FluxVM 0.4.x (`CreateVmRequest.storage`, jailer/vsock/
 //! QGA bookkeeping on `VmRecord`, migration receivers, network-migration
-//! state, pod-policy, drop-reasons, QGA). Network Fabric schema v4 REST
-//! types (`VmNetworkPolicy`, groups/CNP/health/ipcache, …) and
-//! `NetworkSpec::Tap.netns` are mirrored here. Per-direction schema-v9
-//! `ppstat` counters are BPF/observer-only until FluxVM exposes them on
-//! `/v1/vms/{id}/network/stats`.
+//! state, pod-policy, drop-reasons, QGA). Network Fabric REST types
+//! (`VmNetworkPolicy`, groups/CNP/health/ipcache, …), `NetworkSpec::Tap.netns`,
+//! and the bridge-less `direct` tap (`DirectSpec`, dataplane schema 11) are
+//! mirrored here. Per-direction `ppstat` counters are BPF/observer-only until
+//! FluxVM exposes them on `/v1/vms/{id}/network/stats`.
 
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -78,6 +78,11 @@ pub enum NetworkSpec {
         /// NetworkSpec::Tap.netns`.
         #[serde(default)]
         netns: bool,
+        /// Bridge-less attach. Mutually exclusive with `bridge` and `netns`.
+        /// Absent means a bridged or netns tap. Mirrors
+        /// `fluxvm_core::model::NetworkSpec::Tap.direct`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        direct: Option<DirectSpec>,
     },
     Macvtap {
         parent: String,
@@ -92,6 +97,47 @@ impl Default for NetworkSpec {
     fn default() -> Self {
         Self::User { forwards: vec![] }
     }
+}
+
+/// How a bridge-less tap is paired with its outer device.
+/// Mirrors `fluxvm_core::model::DirectMode`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum DirectMode {
+    /// Outer device is a veth (a CNI pod's `eth0`).
+    #[default]
+    PeerVeth,
+    /// Outer device is an unenslaved physical or bond NIC. Frames are steered
+    /// by destination MAC, and ARP requests by `guest_ips`.
+    L2Uplink,
+}
+
+/// Bridge-less attach of a VM tap to an outer device.
+/// Mirrors `fluxvm_core::model::DirectSpec`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DirectSpec {
+    /// Interface the redirect pairs with the tap.
+    pub outer: String,
+    /// Network namespace holding both devices. `None` is the host namespace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub netns_path: Option<String>,
+    #[serde(default)]
+    pub mode: DirectMode,
+    /// IPv4 addresses for `l2-uplink` ARP steering. At most 8.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guest_ips: Vec<String>,
+}
+
+/// `POST /v1/vms/{id}/hotplug/nic`. Exactly one of `bridge` or `direct`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HotplugNicRequest {
+    /// Host bridge for a bridged NIC. Empty when `direct` is set.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub bridge: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mac: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct: Option<DirectSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1326,6 +1372,25 @@ impl FluxVmClient {
                 self.http
                     .post(self.url(&format!("/v1/migration/receivers/{id}/activate"))?),
             )
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/vms/{id}/hotplug/nic` — QEMU only. A `direct` body is required
+    /// for a bridge-less tap: FluxVM creates the tap, attaches the dataplane,
+    /// and hands the fd to QEMU. Bridged hotplug may still use QMP.
+    pub async fn hotplug_nic(
+        &self,
+        id: Uuid,
+        req: &HotplugNicRequest,
+    ) -> Result<serde_json::Value> {
+        let resp = self
+            .authed(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/hotplug/nic"))?),
+            )
+            .json(req)
             .send()
             .await?;
         Self::parse(resp).await
