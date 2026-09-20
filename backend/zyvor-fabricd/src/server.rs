@@ -398,6 +398,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/vms/{name}/port-forwards/{host_port}",
             delete(routes::remove_port_forward),
         )
+        .route(
+            "/vms/{name}/direct-uplink",
+            put(routes::set_direct_uplink).delete(routes::clear_direct_uplink),
+        )
         .route("/vms/{name}/stop", post(routes::stop_vm))
         .route("/vms/{name}/restart", post(routes::restart_vm))
         .route("/vms/{name}/metrics", get(routes::get_metrics))

@@ -80,7 +80,7 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 {"network":{"mode":"tap","mac":"02:00:00:00:0a:0a","direct":{"outer":"enp1s0","mode":"l2-uplink","guest_ips":["192.168.1.50"]}}}
 ```
 
-On Fabric that is `direct_uplink` plus optional `direct_guest_ips` on create (`zyvorctl create --direct-uplink enp1s0 --direct-guest-ip 192.168.1.50`). The spec is stored on the VM and sent on first start. NIC hotplug of a direct uplink is `POST /v1/vms/{id}/hotplug/nic`; a bridged hotplug stays on QMP.
+On Fabric that is `direct_uplink` plus optional `direct_guest_ips` on create (`zyvorctl create --direct-uplink enp1s0 --direct-guest-ip 192.168.1.50`). The spec is stored on the VM and sent on first start. A later change is `PUT /api/vms/{name}/direct-uplink` (`zyvorctl direct-uplink`), which drops the FluxVM record so the next start creates the new tap. NIC hotplug of a direct uplink is `POST /v1/vms/{id}/hotplug/nic`; a bridged hotplug stays on QMP. A hotplug onto a VM that is not already bridged or NAT is stored on the VM so a restart keeps it.
 
 | Capability | `driver-core` trait | FluxVM endpoint(s) |
 | --- | --- | --- |

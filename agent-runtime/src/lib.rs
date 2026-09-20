@@ -6,8 +6,10 @@ pub mod config;
 pub mod credentials;
 pub mod egress;
 pub mod fluxvm;
+pub mod mcp;
 pub mod model;
 pub mod pool;
+pub mod schedules;
 pub mod store;
 
 use crate::{config::Config, credentials::CredentialVault, fluxvm::FluxVm, store::Store};

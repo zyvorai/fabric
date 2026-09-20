@@ -203,7 +203,7 @@ HTTPS labs: `export ZYVOR_FABRIC_URL=https://127.0.0.1:9095` and `export ZYVOR_F
 
 ## Enable packaging
 
-Ship [`configs/fluxvm-dataplane.toml`](../configs/fluxvm-dataplane.toml) (`mode = "ebpf"`). Compose/k8s mount it as `/etc/fluxvm.toml`, mount host `/sys/fs/bpf`, and raise memlock (`SYS_RESOURCE` / `ulimit memlock=-1`). Image must include `/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o`. After first green attach (`schema_version=4`, `attached=true`), set `required = true` for fail-closed production.
+Ship [`configs/fluxvm-dataplane.toml`](../configs/fluxvm-dataplane.toml) (`mode = "ebpf"`). Compose/k8s mount it as `/etc/fluxvm.toml`, mount host `/sys/fs/bpf`, and raise memlock (`SYS_RESOURCE` / `ulimit memlock=-1`). The image must include `/usr/lib/fluxvm/bpf/fluxvm_tc.bpf.o` and, for a direct uplink, `fluxvm_direct.bpf.o` beside it. After the first green attach (`attached=true`, schema version whatever FluxVM reports — 11 on a current attach), set `required = true` for fail-closed production. Service Fabric is not attached to direct taps.
 
 ## Why Fabric + Network Fabric is ahead of other VMMs
 

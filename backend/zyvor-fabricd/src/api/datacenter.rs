@@ -694,16 +694,15 @@ pub async fn discover_host(
     let port = req.port.unwrap_or(9095);
     // Check the whole URL. A host-only check leaves the port (and the
     // formatted string) tainted for CodeQL's request-forgery query.
-    let base = format!("http://{address}:{port}");
-    let base = if input_guard::is_safe_probe_url(&base) {
-        base
-    } else {
+    let base_owned = format!("http://{address}:{port}");
+    let base = input_guard::sanitize_probe_url(&base_owned);
+    if base.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Invalid address"})),
         )
             .into_response();
-    };
+    }
     let url = format!("{base}/health");
 
     // Check if already registered

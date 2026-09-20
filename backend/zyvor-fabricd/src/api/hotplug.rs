@@ -764,18 +764,60 @@ async fn hotplug_direct_nic(
         }),
     };
     match client.hotplug_nic(record.id, &body).await {
-        Ok(value) => Json(serde_json::json!({
-            "status": "ok",
-            "direct_uplink": outer,
-            "fluxvm": value,
-        }))
-        .into_response(),
+        Ok(value) => {
+            let persisted = persist_direct_hotplug(state, vm_name, outer, req);
+            Json(serde_json::json!({
+                "status": "ok",
+                "direct_uplink": outer,
+                "persisted": persisted,
+                "fluxvm": value,
+            }))
+            .into_response()
+        }
         Err(e) => crate::api_error::json_error(
             StatusCode::BAD_GATEWAY,
             format!("FluxVM hotplug/nic failed: {e}"),
         )
         .into_response(),
     }
+}
+
+/// Remember a hotplugged uplink on the Fabric VM so a later recreate sends
+/// it. Skipped when the VM is bridged or NAT, or already has a different uplink.
+fn persist_direct_hotplug(
+    state: &AppState,
+    vm_name: &str,
+    outer: &str,
+    req: &HotplugNicRequest,
+) -> bool {
+    let Ok(Some(mut vm)) = state.store.get_vm(vm_name) else {
+        return false;
+    };
+    if vm.network_tap || !vm.port_forwards.is_empty() {
+        return false;
+    }
+    match vm
+        .direct_uplink
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(existing) if existing != outer => return false,
+        Some(_) => {
+            for ip in &req.direct_guest_ips {
+                if !vm.direct_guest_ips.iter().any(|have| have == ip) {
+                    vm.direct_guest_ips.push(ip.clone());
+                }
+            }
+            vm.direct_guest_ips.truncate(8);
+        }
+        None => {
+            vm.direct_uplink = Some(outer.to_string());
+            vm.direct_mode = req.direct_mode.clone();
+            vm.direct_guest_ips = req.direct_guest_ips.clone();
+        }
+    }
+    state.store.save_vm(&vm).is_ok()
 }
 
 /// DELETE /api/vms/:name/hotplug/nic/:id - Hot-remove a NIC

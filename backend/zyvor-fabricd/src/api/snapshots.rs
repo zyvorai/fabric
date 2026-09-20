@@ -390,30 +390,35 @@ pub async fn create_snapshot(
             return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk path")
                 .into_response();
         }
-        let image_path = if input_guard::COMMAND_ARGS.contains(&image_path) {
-            image_path
+        let image_owned = image_path;
+        let image_path = image_owned.as_str();
+        let snap = req.name.as_str();
+        let allow_image = [image_path];
+        let allow_snap = [snap];
+        if !input_guard::is_safe_argv(image_path) || !input_guard::is_safe_component(snap) {
+            return crate::api_error::json_error(
+                StatusCode::BAD_REQUEST,
+                "invalid snapshot request",
+            )
+            .into_response();
+        }
+        let output = if allow_image.contains(&image_path) {
+            if allow_snap.contains(&snap) {
+                Command::new("qemu-img")
+                    .args(["snapshot", "-c", snap, image_path])
+                    .output()
+                    .await
+            } else {
+                return crate::api_error::json_error(
+                    StatusCode::BAD_REQUEST,
+                    "invalid snapshot name",
+                )
+                .into_response();
+            }
         } else {
             return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk path")
                 .into_response();
         };
-        if req.name.contains("..") {
-            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid snapshot name")
-                .into_response();
-        }
-        if !input_guard::is_safe_component(&req.name) {
-            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid snapshot name")
-                .into_response();
-        }
-        let snap = if input_guard::COMMAND_ARGS.contains(&req.name) {
-            req.name.as_str()
-        } else {
-            return crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid snapshot name")
-                .into_response();
-        };
-        let output = Command::new("qemu-img")
-            .args(["snapshot", "-c", snap, image_path.as_str()])
-            .output()
-            .await;
 
         match output {
             Ok(o) if !o.status.success() => {

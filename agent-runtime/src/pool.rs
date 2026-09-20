@@ -8,9 +8,10 @@
 //! code has executed. That preserves per-session filesystem/process isolation.
 
 use crate::{
-    app::WORKER,
+    app::{HARNESS, WORKER},
     model::{
-        AgentRecord, WarmPoolReconcileResult, WarmPoolView, WarmSandboxRecord, WarmSandboxState,
+        AgentRecord, AgentRuntimeKind, WarmPoolReconcileResult, WarmPoolView, WarmSandboxRecord,
+        WarmSandboxState,
     },
     AppState,
 };
@@ -20,9 +21,19 @@ use sha2::{Digest, Sha256};
 use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
 
-pub fn worker_digest_sha256() -> String {
+pub fn entrypoint_bytes(runtime: AgentRuntimeKind) -> &'static [u8] {
+    if runtime.is_harness() {
+        HARNESS
+    } else {
+        WORKER
+    }
+}
+
+pub fn worker_digest_sha256(runtime: AgentRuntimeKind) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(WORKER);
+    hasher.update(runtime.as_str().as_bytes());
+    hasher.update([0]);
+    hasher.update(entrypoint_bytes(runtime));
     hex::encode(hasher.finalize())
 }
 
@@ -79,7 +90,6 @@ pub async fn reconcile_all(state: &AppState) -> Result<WarmPoolReconcileResult> 
 
     // First remove old deployment pools and resolve durable in-flight claims.
     let records = state.store.list_warm_sandboxes().await;
-    let worker_digest = worker_digest_sha256();
     for record in records {
         if record.state == WarmSandboxState::Claiming {
             if let Some(session_id) = record.claimed_by {
@@ -113,7 +123,7 @@ pub async fn reconcile_all(state: &AppState) -> Result<WarmPoolReconcileResult> 
             agent.version == record.agent_version
                 && agent.manifest.warm_pool_size > 0
                 && record.runtime_port == agent.manifest.runtime_port
-                && record.worker_digest_sha256 == worker_digest
+                && record.worker_digest_sha256 == worker_digest_sha256(agent.manifest.runtime)
         });
         if !keep {
             let Some(reserved) = state.store.begin_warm_reconcile(record.sandbox_id).await? else {
@@ -140,7 +150,7 @@ async fn reconcile_agent_locked(
     agent: &AgentRecord,
 ) -> Result<WarmPoolReconcileResult> {
     let mut result = WarmPoolReconcileResult::default();
-    let worker_digest = worker_digest_sha256();
+    let worker_digest = worker_digest_sha256(agent.manifest.runtime);
 
     // Validate every claimable/reconciling record against FluxVM. Reserving
     // the record in `Reconciling` makes the health action mutually exclusive
@@ -336,7 +346,12 @@ async fn create_warm_sandbox(
             .await?;
         state
             .fluxvm
-            .fs_write(sandbox.id, "/opt/zyvor/worker.mjs", WORKER, 0o755)
+            .fs_write(
+                sandbox.id,
+                "/opt/zyvor/worker.mjs",
+                entrypoint_bytes(agent.manifest.runtime),
+                0o755,
+            )
             .await?;
         state.fluxvm.pause(sandbox.id).await?;
         Ok::<(), anyhow::Error>(())

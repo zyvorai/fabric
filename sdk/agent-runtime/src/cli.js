@@ -15,6 +15,7 @@ Options (deploy):
   --allow-host <host>       repeatable egress allow host
   --credential <name>       repeatable host-side credential grant
   --allow-private-network  permit brokered private/link-local destinations
+  --runtime <kind>          node (default), claude, codex, or gemini
   --runtime-port <port>     guest worker port (default 8080)
   --ttl <seconds>           default session TTL
   --max-concurrency <n>     cap non-terminal sessions for this agent
@@ -41,7 +42,12 @@ const flags = parseFlags(args.slice(2));
 
 if (command === "deploy") {
   if (!flags.name || !flags.template) usage(1);
-  const { bundle } = await buildBundle(entry);
+  const runtime = flags.runtime || "node";
+  if (!["node", "claude", "codex", "gemini"].includes(runtime)) {
+    console.error("runtime must be node, claude, codex, or gemini");
+    process.exit(1);
+  }
+  const bundle = runtime === "node" ? (await buildBundle(entry)).bundle : await readFile(entry);
   const baseUrl = (flags.url || process.env.FABRIC_AGENT_URL || "http://127.0.0.1:9096").replace(/\/$/, "");
   const token = flags.token || process.env.FABRIC_AGENT_TOKEN;
   const response = await fetch(`${baseUrl}/v1/agents`, {
@@ -55,6 +61,7 @@ if (command === "deploy") {
       bundle_base64: Buffer.from(bundle).toString("base64"),
       manifest: {
         template: flags.template,
+        runtime,
         credentials: flags.credential,
         egress_allow_hosts: flags.allowHost,
         allow_private_networks: flags.allowPrivateNetwork,
@@ -116,6 +123,7 @@ function parseFlags(argv) {
     switch (arg) {
       case "--name": out.name = value; break;
       case "--template": out.template = value; break;
+      case "--runtime": out.runtime = value; break;
       case "--credential": out.credential.push(value); break;
       case "--allow-host": out.allowHost.push(value); break;
       case "--runtime-port": out.runtimePort = value; break;

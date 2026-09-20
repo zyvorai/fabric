@@ -14,3 +14,12 @@ extensions:
       - ["input_guard::is_safe_outbound_url", "Argument[0]", "true", "request-url", "manual"]
       - ["input_guard::is_safe_probe_host", "Argument[0]", "true", "request-url", "manual"]
       - ["input_guard::is_safe_probe_url", "Argument[0]", "true", "request-url", "manual"]
+  - addsTo:
+      pack: codeql/rust-all
+      extensible: barrierModel
+    data:
+      # The return value is the checked string, or "" when rejected. Callers
+      # that use the return value (and refuse "") are not passing the original
+      # tainted reference into the sink.
+      - ["input_guard::sanitize_outbound_url", "ReturnValue", "request-url", "manual"]
+      - ["input_guard::sanitize_probe_url", "ReturnValue", "request-url", "manual"]

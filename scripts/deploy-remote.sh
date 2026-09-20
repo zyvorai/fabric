@@ -754,7 +754,7 @@ if $VERIFY_APIS; then
             ADMIN_PW='Admin@321'
         fi
     fi
-    if [[ -n "$ADMIN_PW" ]] && FABRIC_USER=admin FABRIC_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "http://${HOST}:${API_PORT}"; then
+    if [[ -n "$ADMIN_PW" ]] && FABRIC_USER=admin FABRIC_PASS="$ADMIN_PW" "$REPO/scripts/audit-ux-apis.sh" "https://${HOST}:${API_PORT}"; then
         deploy_ui_celebrate "API audit passed"
     else
         warn "API audit failed (deploy itself succeeded)"

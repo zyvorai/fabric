@@ -33,6 +33,13 @@ pub struct VMSpec {
     pub hostname: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Host NIC for a bridge-less FluxVM tap. Mutually exclusive with bridged networking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
     /// Auto-start VM after creation
     #[serde(default)]
     pub auto_start: bool,
@@ -123,6 +130,12 @@ pub struct StartOptionsSpec {
     /// Generate and pass SSH key to VM
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pass_ssh_key: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
 }
 
 impl From<StartOptionsSpec> for vm_model::VMStartOptions {
@@ -141,6 +154,9 @@ impl From<StartOptionsSpec> for vm_model::VMStartOptions {
             credentials: spec.set_credentials,
             forward_journal: spec.forward_journal,
             pass_ssh_key: spec.pass_ssh_key,
+            direct_uplink: spec.direct_uplink,
+            direct_mode: spec.direct_mode,
+            direct_guest_ips: spec.direct_guest_ips,
             ..Default::default()
         }
     }
@@ -347,15 +363,31 @@ pub async fn apply_vm_spec(
             labels: None,
             tenant: None,
             port_forwards: Vec::new(),
-            network_tap: false,
+            network_tap: spec.start_options.network_tap,
             network_static_ip: false,
-            direct_uplink: None,
-            direct_mode: None,
-            direct_guest_ips: Vec::new(),
+            direct_uplink: spec
+                .direct_uplink
+                .clone()
+                .or_else(|| spec.start_options.direct_uplink.clone()),
+            direct_mode: spec
+                .direct_mode
+                .clone()
+                .or_else(|| spec.start_options.direct_mode.clone()),
+            direct_guest_ips: if spec.direct_guest_ips.is_empty() {
+                spec.start_options.direct_guest_ips.clone()
+            } else {
+                spec.direct_guest_ips.clone()
+            },
             storage: None,
             enable_qga: false,
             hyperv: false,
         };
+        if let Err(errors) = req.validate() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": errors.join("; ")})),
+            ));
+        }
 
         let vm = vm_model::VM::from_request(&req);
 
@@ -363,6 +395,51 @@ pub async fn apply_vm_spec(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+    } else if spec.direct_uplink.is_some() || spec.start_options.direct_uplink.is_some() {
+        let mut existing = state.store.get_vm(&spec.name).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
+        let Some(vm) = existing.as_mut() else {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "VM not found"})),
+            ));
+        };
+        vm.direct_uplink = spec
+            .direct_uplink
+            .clone()
+            .or_else(|| spec.start_options.direct_uplink.clone());
+        vm.direct_mode = spec
+            .direct_mode
+            .clone()
+            .or_else(|| spec.start_options.direct_mode.clone());
+        vm.direct_guest_ips = if spec.direct_guest_ips.is_empty() {
+            spec.start_options.direct_guest_ips.clone()
+        } else {
+            spec.direct_guest_ips.clone()
+        };
+        let errors = vm_model::direct_uplink_errors(
+            vm.direct_uplink.as_deref(),
+            vm.direct_mode.as_deref(),
+            &vm.direct_guest_ips,
+            vm.network_tap || spec.start_options.network_tap,
+            !vm.port_forwards.is_empty() || spec.start_options.network_user_mode,
+        );
+        if !errors.is_empty() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": errors.join("; ")})),
+            ));
+        }
+        state.store.save_vm(vm).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
             )
         })?;
     }
@@ -409,7 +486,9 @@ pub async fn apply_vm_spec(
         || !spec.start_options.bind_mounts.is_empty()
         || !spec.start_options.set_credentials.is_empty()
         || spec.start_options.forward_journal.is_some()
-        || spec.start_options.pass_ssh_key.is_some();
+        || spec.start_options.pass_ssh_key.is_some()
+        || spec.start_options.direct_uplink.is_some()
+        || !spec.start_options.direct_guest_ips.is_empty();
     if has_non_default_opts {
         state
             .store
@@ -573,6 +652,9 @@ pub async fn export_vm_spec(
         autoscale,
         hostname: vm.hostname,
         tags: vm.tags.unwrap_or_default(),
+        direct_uplink: vm.direct_uplink,
+        direct_mode: vm.direct_mode,
+        direct_guest_ips: vm.direct_guest_ips,
         auto_start: false,
     };
 

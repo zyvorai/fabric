@@ -30,6 +30,12 @@ pub struct VMTemplate {
     pub image: String,
     pub cloud_init: Option<serde_json::Value>,
     pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -45,6 +51,12 @@ pub struct CreateTemplateRequest {
     pub cloud_init: Option<serde_json::Value>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_uplink: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direct_guest_ips: Vec<String>,
     /// If set, create template from existing VM config
     pub from_vm: Option<String>,
 }
@@ -81,38 +93,48 @@ pub async fn create_template(
         .map_err(|(s, m)| crate::api_error::json_error(s, m))?;
     let now = Utc::now();
 
-    let (cpus, memory, disk, image, tags) = if let Some(ref vm_name) = req.from_vm {
-        // Create template from existing VM
-        match state.store.get_vm(vm_name) {
-            Ok(Some(vm)) => (
-                vm.cpus,
-                vm.memory,
-                vm.disk,
-                vm.image.clone(),
-                vm.tags.unwrap_or_default(),
-            ),
-            Ok(None) => {
-                return Err((
-                    StatusCode::NOT_FOUND,
-                    Json(json!({ "error": format!("VM '{}' not found", vm_name) })),
-                ));
+    let (cpus, memory, disk, image, tags, direct_uplink, direct_mode, direct_guest_ips) =
+        if let Some(ref vm_name) = req.from_vm {
+            match state.store.get_vm(vm_name) {
+                Ok(Some(vm)) => (
+                    vm.cpus,
+                    vm.memory,
+                    vm.disk,
+                    vm.image.clone(),
+                    vm.tags.unwrap_or_default(),
+                    req.direct_uplink.clone().or(vm.direct_uplink),
+                    req.direct_mode.clone().or(vm.direct_mode),
+                    if req.direct_guest_ips.is_empty() {
+                        vm.direct_guest_ips
+                    } else {
+                        req.direct_guest_ips.clone()
+                    },
+                ),
+                Ok(None) => {
+                    return Err((
+                        StatusCode::NOT_FOUND,
+                        Json(json!({ "error": format!("VM '{}' not found", vm_name) })),
+                    ));
+                }
+                Err(e) => {
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": e.to_string() })),
+                    ));
+                }
             }
-            Err(e) => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": e.to_string() })),
-                ));
-            }
-        }
-    } else {
-        (
-            req.cpus,
-            req.memory,
-            req.disk,
-            req.image.clone(),
-            req.tags.clone(),
-        )
-    };
+        } else {
+            (
+                req.cpus,
+                req.memory,
+                req.disk,
+                req.image.clone(),
+                req.tags.clone(),
+                req.direct_uplink.clone(),
+                req.direct_mode.clone(),
+                req.direct_guest_ips.clone(),
+            )
+        };
 
     let template = VMTemplate {
         id: uuid::Uuid::new_v4().to_string(),
@@ -124,6 +146,9 @@ pub async fn create_template(
         image,
         cloud_init: req.cloud_init,
         tags,
+        direct_uplink,
+        direct_mode,
+        direct_guest_ips,
         created: now,
         updated: now,
     };
@@ -388,9 +413,9 @@ pub async fn deploy_template(
         port_forwards: Vec::new(),
         network_tap: false,
         network_static_ip: false,
-        direct_uplink: None,
-        direct_mode: None,
-        direct_guest_ips: Vec::new(),
+        direct_uplink: template.direct_uplink.clone(),
+        direct_mode: template.direct_mode.clone(),
+        direct_guest_ips: template.direct_guest_ips.clone(),
         storage: None,
         enable_qga: false,
         hyperv: false,

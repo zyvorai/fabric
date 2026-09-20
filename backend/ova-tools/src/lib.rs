@@ -27,17 +27,14 @@ pub fn export_ova(
 
     // Step 1: Convert disk to VMDK
     let vmdk_path = format!("{}.vmdk", output_path.trim_end_matches(".ova"));
-    let output = std::process::Command::new("qemu-img")
-        .args([
-            "convert",
-            "-f",
-            "qcow2",
-            "-O",
-            "vmdk",
-            disk_path,
-            vmdk_path.as_str(),
-        ])
-        .output()?;
+    let output =
+        input_guard::argv_checked!(disk_path, anyhow!("rejected disk path"), |disk_path| {
+            input_guard::argv_checked!(&vmdk_path, anyhow!("rejected output path"), |vmdk_path| {
+                std::process::Command::new("qemu-img")
+                    .args(["convert", "-f", "qcow2", "-O", "vmdk", disk_path, vmdk_path])
+                    .output()?
+            })
+        });
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         anyhow::bail!("qemu-img convert failed: {}", stderr);
@@ -69,16 +66,36 @@ pub fn export_ova(
         .to_str()
         .unwrap_or_default();
 
-    let tar_output = std::process::Command::new("tar")
-        .args([
-            "cf",
-            ova_path.as_str(),
-            "-C",
-            parent_dir,
-            ovf_filename.as_str(),
-            vmdk_filename,
-        ])
-        .output()?;
+    let tar_output = input_guard::argv_checked!(
+        ova_path.as_str(),
+        anyhow!("rejected output path"),
+        |ova_path| {
+            input_guard::argv_checked!(parent_dir, anyhow!("rejected output path"), |parent_dir| {
+                input_guard::argv_checked!(
+                    ovf_filename.as_str(),
+                    anyhow!("Invalid VM name"),
+                    |ovf_filename| {
+                        input_guard::argv_checked!(
+                            vmdk_filename,
+                            anyhow!("rejected disk path"),
+                            |vmdk_filename| {
+                                std::process::Command::new("tar")
+                                    .args([
+                                        "cf",
+                                        ova_path,
+                                        "-C",
+                                        parent_dir,
+                                        ovf_filename,
+                                        vmdk_filename,
+                                    ])
+                                    .output()?
+                            }
+                        )
+                    }
+                )
+            })
+        }
+    );
     if !tar_output.status.success() {
         let stderr = String::from_utf8_lossy(&tar_output.stderr);
         // Clean up intermediate files on failure

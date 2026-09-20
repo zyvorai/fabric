@@ -336,11 +336,14 @@ pub async fn create_macvtap(parent: &str, name: &str, mode: &str) -> Result<()> 
 /// replaces `networkctl reload`, not `iproute2`, for).
 pub async fn create_tap(name: &str) -> Result<()> {
     let name = input_guard::vet_component!(name, anyhow::anyhow!("invalid tap device name"));
-    let output = tokio::process::Command::new("ip")
-        .args(["tuntap", "add", "dev", name, "mode", "tap"])
-        .output()
-        .await
-        .context("failed to run `ip tuntap add`")?;
+    let output =
+        input_guard::argv_checked!(name, anyhow::anyhow!("invalid tap device name"), |name| {
+            tokio::process::Command::new("ip")
+                .args(["tuntap", "add", "dev", name, "mode", "tap"])
+                .output()
+                .await
+                .context("failed to run `ip tuntap add`")?
+        });
     if !output.status.success() {
         bail!(
             "ip tuntap add dev {name} failed: {}",

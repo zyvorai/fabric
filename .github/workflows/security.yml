@@ -90,5 +90,20 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
+      - name: Install local CodeQL model pack
+        run: |
+          set -euo pipefail
+          root="$(find /opt/hostedtoolcache/CodeQL -type d -name qlpacks | head -1)"
+          test -n "$root"
+          dest="$root/zyvor/fabric-models/0.0.1"
+          mkdir -p "$dest"
+          cp -a .github/codeql/fabric-models/. "$dest/"
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
+        env:
+          # Library model packs are not loaded via the config `packs:` key.
+          # --model-packs consumes rows once the pack is on the CodeQL search
+          # path (the qlpacks directory filled in above). Do not also pass
+          # --additional-packs here: the action already sets that for pull
+          # request diff ranges, and a second flag would replace it.
+          CODEQL_ACTION_EXTRA_OPTIONS: '{"database":{"run-queries":["--model-packs=zyvor/fabric-models"]}}'

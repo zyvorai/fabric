@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::model::{
-    AgentRecord, DeployAgentRequest, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
-    WarmSandboxState,
+    AgentRecord, ApprovalRecord, DeployAgentRequest, LoopRecord, ScheduleRecord, SessionEvent,
+    SessionRecord, SessionStatus, WarmSandboxRecord, WarmSandboxState, WebhookRecord,
 };
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use chrono::Utc;
+use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
@@ -25,6 +26,10 @@ pub struct Store {
     agents: RwLock<HashMap<String, AgentRecord>>,
     sessions: RwLock<HashMap<Uuid, SessionRecord>>,
     warm_sandboxes: RwLock<HashMap<Uuid, WarmSandboxRecord>>,
+    schedules: RwLock<HashMap<Uuid, ScheduleRecord>>,
+    webhooks: RwLock<HashMap<Uuid, WebhookRecord>>,
+    loops: RwLock<HashMap<Uuid, LoopRecord>>,
+    approvals: RwLock<HashMap<Uuid, ApprovalRecord>>,
 }
 
 impl Store {
@@ -38,6 +43,10 @@ impl Store {
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
             warm_sandboxes: RwLock::new(HashMap::new()),
+            schedules: RwLock::new(HashMap::new()),
+            webhooks: RwLock::new(HashMap::new()),
+            loops: RwLock::new(HashMap::new()),
+            approvals: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -85,6 +94,10 @@ impl Store {
             .into_iter()
             .map(|record| (record.sandbox_id, record))
             .collect();
+        *self.schedules.write().await = read_id_map(&self.root.join("schedules.json")).await?;
+        *self.webhooks.write().await = read_id_map(&self.root.join("webhooks.json")).await?;
+        *self.loops.write().await = read_id_map(&self.root.join("loops.json")).await?;
+        *self.approvals.write().await = read_id_map(&self.root.join("approvals.json")).await?;
         Ok(())
     }
 
@@ -123,23 +136,34 @@ impl Store {
             created_at: Utc::now(),
         };
 
-        let dir = self.root.join("agents").join(&req.name).join(&version);
-        fs::create_dir_all(&dir).await?;
-        atomic_write(&dir.join("bundle.mjs"), &bundle).await?;
-        atomic_write(
-            &dir.join("record.json"),
-            &serde_json::to_vec_pretty(&record)?,
-        )
-        .await?;
-        atomic_write(
-            &self
-                .root
-                .join("agents")
-                .join(&req.name)
-                .join("current.json"),
-            &serde_json::to_vec_pretty(&record)?,
-        )
-        .await?;
+        let dir = self
+            .root
+            .join("agents")
+            .join(&req.name)
+            .join(&version)
+            .to_string_lossy()
+            .into_owned();
+        let current = self
+            .root
+            .join("agents")
+            .join(&req.name)
+            .join("current.json")
+            .to_string_lossy()
+            .into_owned();
+        if dir.contains("..") {
+            bail!("path traversal in agent directory");
+        } else if current.contains("..") {
+            bail!("path traversal in current pointer");
+        } else {
+            fs::create_dir_all(&dir).await?;
+            atomic_write(Path::new(&dir).join("bundle.mjs"), &bundle).await?;
+            atomic_write(
+                Path::new(&dir).join("record.json"),
+                &serde_json::to_vec_pretty(&record)?,
+            )
+            .await?;
+            atomic_write(&current, &serde_json::to_vec_pretty(&record)?).await?;
+        }
 
         self.agents
             .write()
@@ -172,10 +196,16 @@ impl Store {
             .join("agents")
             .join(name)
             .join(version)
-            .join("record.json");
-        let raw = fs::read(&path)
-            .await
-            .with_context(|| format!("reading agent record {}", path.display()))?;
+            .join("record.json")
+            .to_string_lossy()
+            .into_owned();
+        let raw = if path.contains("..") {
+            bail!("path traversal");
+        } else {
+            fs::read(&path)
+                .await
+                .with_context(|| format!("reading agent record {path}"))?
+        };
         serde_json::from_slice(&raw).context("decoding immutable agent record")
     }
 
@@ -202,13 +232,22 @@ impl Store {
         if id.contains("..") {
             bail!("path traversal");
         }
-        let dir = self.root.join("sessions").join(&id);
-        fs::create_dir_all(&dir).await?;
-        atomic_write(
-            &dir.join("session.json"),
-            &serde_json::to_vec_pretty(&record)?,
-        )
-        .await?;
+        let dir = self
+            .root
+            .join("sessions")
+            .join(&id)
+            .to_string_lossy()
+            .into_owned();
+        if dir.contains("..") {
+            bail!("path traversal");
+        } else {
+            fs::create_dir_all(&dir).await?;
+            atomic_write(
+                Path::new(&dir).join("session.json"),
+                &serde_json::to_vec_pretty(&record)?,
+            )
+            .await?;
+        }
         self.sessions.write().await.insert(record.id, record);
         Ok(())
     }
@@ -321,16 +360,25 @@ impl Store {
         if id_s.contains("..") {
             bail!("path traversal");
         }
-        let dir = self.root.join("sessions").join(&id_s);
-        fs::create_dir_all(&dir).await?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(dir.join("events.jsonl"))
-            .await?;
-        file.write_all(&serde_json::to_vec(&event)?).await?;
-        file.write_all(b"\n").await?;
-        file.flush().await?;
+        let dir = self
+            .root
+            .join("sessions")
+            .join(&id_s)
+            .to_string_lossy()
+            .into_owned();
+        if dir.contains("..") {
+            bail!("path traversal");
+        } else {
+            fs::create_dir_all(&dir).await?;
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(Path::new(&dir).join("events.jsonl"))
+                .await?;
+            file.write_all(&serde_json::to_vec(&event)?).await?;
+            file.write_all(b"\n").await?;
+            file.flush().await?;
+        }
 
         if let Some(record) = self.get_session(id).await {
             self.persist_session(&record).await?;
@@ -486,6 +534,113 @@ impl Store {
         .await
     }
 
+    pub async fn list_schedules(&self) -> Vec<ScheduleRecord> {
+        let mut out: Vec<_> = self.schedules.read().await.values().cloned().collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
+    pub async fn save_schedule(&self, record: ScheduleRecord) -> Result<()> {
+        let mut map = self.schedules.write().await;
+        map.insert(record.id, record);
+        self.persist_vec("schedules.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    pub async fn delete_schedule(&self, id: Uuid) -> Result<bool> {
+        let mut map = self.schedules.write().await;
+        if map.remove(&id).is_none() {
+            return Ok(false);
+        }
+        self.persist_vec("schedules.json", &map.values().cloned().collect::<Vec<_>>())
+            .await?;
+        Ok(true)
+    }
+
+    pub async fn list_webhooks(&self) -> Vec<WebhookRecord> {
+        let mut out: Vec<_> = self.webhooks.read().await.values().cloned().collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
+    pub async fn get_webhook(&self, id: Uuid) -> Option<WebhookRecord> {
+        self.webhooks.read().await.get(&id).cloned()
+    }
+
+    pub async fn save_webhook(&self, record: WebhookRecord) -> Result<()> {
+        let mut map = self.webhooks.write().await;
+        map.insert(record.id, record);
+        self.persist_vec("webhooks.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    pub async fn delete_webhook(&self, id: Uuid) -> Result<bool> {
+        let mut map = self.webhooks.write().await;
+        if map.remove(&id).is_none() {
+            return Ok(false);
+        }
+        self.persist_vec("webhooks.json", &map.values().cloned().collect::<Vec<_>>())
+            .await?;
+        Ok(true)
+    }
+
+    pub async fn list_loops(&self) -> Vec<LoopRecord> {
+        let mut out: Vec<_> = self.loops.read().await.values().cloned().collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
+    pub async fn save_loop(&self, record: LoopRecord) -> Result<()> {
+        let mut map = self.loops.write().await;
+        map.insert(record.id, record);
+        self.persist_vec("loops.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    pub async fn delete_loop(&self, id: Uuid) -> Result<bool> {
+        let mut map = self.loops.write().await;
+        if map.remove(&id).is_none() {
+            return Ok(false);
+        }
+        self.persist_vec("loops.json", &map.values().cloned().collect::<Vec<_>>())
+            .await?;
+        Ok(true)
+    }
+
+    pub async fn list_approvals(&self) -> Vec<ApprovalRecord> {
+        let mut out: Vec<_> = self.approvals.read().await.values().cloned().collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
+    pub async fn get_approval(&self, id: Uuid) -> Option<ApprovalRecord> {
+        self.approvals.read().await.get(&id).cloned()
+    }
+
+    pub async fn save_approval(&self, record: ApprovalRecord) -> Result<()> {
+        let mut map = self.approvals.write().await;
+        map.insert(record.id, record);
+        self.persist_vec("approvals.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    pub async fn approval_for_event(
+        &self,
+        session_id: Uuid,
+        source_seq: u64,
+    ) -> Option<ApprovalRecord> {
+        self.approvals
+            .read()
+            .await
+            .values()
+            .find(|record| record.session_id == session_id && record.source_seq == Some(source_seq))
+            .cloned()
+    }
+
+    async fn persist_vec<T: serde::Serialize>(&self, file: &str, records: &[T]) -> Result<()> {
+        atomic_write(&self.root.join(file), &serde_json::to_vec_pretty(records)?).await
+    }
+
     pub async fn active_sessions(&self) -> Vec<SessionRecord> {
         self.sessions
             .read()
@@ -497,19 +652,61 @@ impl Store {
     }
 }
 
-async fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
-    let path_s = path.to_string_lossy().into_owned();
+async fn read_id_map<T>(path: &Path) -> Result<HashMap<Uuid, T>>
+where
+    T: DeserializeOwned + Identified,
+{
+    let items = match fs::read(path).await {
+        Ok(raw) => serde_json::from_slice::<Vec<T>>(&raw)
+            .with_context(|| format!("decoding {}", path.display()))?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error.into()),
+    };
+    Ok(items
+        .into_iter()
+        .map(|item| (item.identified_id(), item))
+        .collect())
+}
+
+trait Identified {
+    fn identified_id(&self) -> Uuid;
+}
+
+impl Identified for ScheduleRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
+impl Identified for WebhookRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
+impl Identified for LoopRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
+impl Identified for ApprovalRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
+
+async fn atomic_write(path: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
+    let path_s = path.as_ref().to_string_lossy().into_owned();
     if path_s.contains("..") {
         bail!("refusing path traversal");
+    } else {
+        let path = PathBuf::from(&path_s);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+        let tmp = path.with_extension(format!("tmp-{}", Uuid::new_v4()));
+        fs::write(&tmp, bytes).await?;
+        fs::rename(&tmp, &path).await?;
+        Ok(())
     }
-    let path = PathBuf::from(&path_s);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).await?;
-    }
-    let tmp = path.with_extension(format!("tmp-{}", Uuid::new_v4()));
-    fs::write(&tmp, bytes).await?;
-    fs::rename(&tmp, path).await?;
-    Ok(())
 }
 
 pub fn validate_name(name: &str) -> Result<()> {
@@ -556,6 +753,7 @@ mod tests {
                 max_concurrent_sessions: None,
                 idle_hibernate_seconds: None,
                 warm_pool_size: 0,
+                runtime: Default::default(),
             },
         };
         let record = store.deploy_agent(request).await.unwrap();
@@ -589,6 +787,7 @@ mod tests {
                     max_concurrent_sessions: None,
                     idle_hibernate_seconds: None,
                     warm_pool_size: 0,
+                    runtime: Default::default(),
                 },
             })
             .await
@@ -607,6 +806,7 @@ mod tests {
                     max_concurrent_sessions: None,
                     idle_hibernate_seconds: None,
                     warm_pool_size: 0,
+                    runtime: Default::default(),
                 },
             })
             .await
@@ -650,6 +850,7 @@ mod tests {
                 sandbox_released: false,
                 capability_token: "cap".into(),
                 error: None,
+                parent_session_id: None,
             })
             .await
             .unwrap();

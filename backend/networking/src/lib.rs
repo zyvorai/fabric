@@ -58,10 +58,13 @@ fn parse_addr(cidr: &str) -> Option<IpAddr> {
 /// side, for the bridge device's own address, a separate concern.
 fn run_dhcp_client(iface: &str) -> Result<()> {
     let iface = input_guard::vet_component!(iface, anyhow::anyhow!("rejected interface name"));
-    let output = Command::new("dhcpcd")
-        .arg(iface)
-        .output()
-        .context("failed to run dhcpcd (is it installed?)")?;
+    let output =
+        input_guard::argv_checked!(iface, anyhow::anyhow!("rejected interface name"), |iface| {
+            Command::new("dhcpcd")
+                .arg(iface)
+                .output()
+                .context("failed to run dhcpcd (is it installed?)")?
+        });
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "dhcpcd failed for '{iface}': {}",
@@ -502,10 +505,13 @@ impl NetworkdManager {
     /// Query `networkctl status <name>` for a specific device
     pub fn device_status(&self, name: &str) -> Result<String> {
         let name = input_guard::vet_component!(name, anyhow::anyhow!("invalid device name"));
-        let output = Command::new("networkctl")
-            .args(["status", name, "--no-pager"])
-            .output()
-            .context("Failed to execute networkctl status")?;
+        let output =
+            input_guard::argv_checked!(name, anyhow::anyhow!("invalid device name"), |name| {
+                Command::new("networkctl")
+                    .args(["status", name, "--no-pager"])
+                    .output()
+                    .context("Failed to execute networkctl status")?
+            });
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

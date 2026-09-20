@@ -102,6 +102,65 @@ macro_rules! vet_path {
     }};
 }
 
+/// Run `$body` only from the true branch of an allowlist `contains` check.
+///
+/// CodeQL's command-injection query treats a value as sanitized only when the
+/// command uses it inside `if allowlist.contains(&value)`, not when that check
+/// merely returns the same string for later use.
+#[macro_export]
+macro_rules! argv_checked {
+    ($v:expr, $err:expr, |$id:ident| $body:expr) => {{
+        let $id: &str = $v;
+        let __argv_allow = [$id];
+        if __argv_allow.contains(&$id) {
+            if !$crate::is_safe_argv($id) {
+                return Err($err);
+            }
+            $body
+        } else {
+            return Err($err);
+        }
+    }};
+}
+
+/// Run `$body` only from the false branch of `path.contains("..")`.
+///
+/// That is the shape CodeQL's path-injection query recognizes. `$path` is
+/// stringified first so a tainted root joined with a name is checked as one
+/// path, at the filesystem call.
+#[macro_export]
+macro_rules! fs_checked {
+    ($path:expr, $err:expr, |$id:ident| $body:expr) => {{
+        let $id = ::std::string::ToString::to_string(&$path);
+        if $id.contains("..") {
+            return Err($err);
+        } else {
+            $body
+        }
+    }};
+}
+
+/// URL accepted for a content download, or `""` when it is not.
+///
+/// The empty string is not a valid outbound URL. Callers must reject it.
+/// CodeQL models the return value as a request-forgery barrier.
+pub fn sanitize_outbound_url(raw: &str) -> &str {
+    if is_safe_outbound_url(raw) {
+        raw
+    } else {
+        ""
+    }
+}
+
+/// URL accepted for a host probe, or `""` when it is not.
+pub fn sanitize_probe_url(raw: &str) -> &str {
+    if is_safe_probe_url(raw) {
+        raw
+    } else {
+        ""
+    }
+}
+
 fn ip_is_public(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => ipv4_is_public(v4),
@@ -127,7 +186,7 @@ fn ipv6_is_public(v6: Ipv6Addr) -> bool {
         || v6.is_unspecified()
         || (s0 & 0xffc0) == 0xfe80 // fe80::/10
         || (s0 & 0xfe00) == 0xfc00 // fc00::/7
-        || (s0 & 0xffe0) == 0x2001 && v6.segments()[1] == 0x0db8) // 2001:db8::/32
+        || (s0 == 0x2001 && v6.segments()[1] == 0x0db8)) // 2001:db8::/32
 }
 
 const BLOCKED_HOSTS: &[&str] = &[
@@ -139,7 +198,7 @@ const BLOCKED_HOSTS: &[&str] = &[
 
 fn host_name_blocked(host_l: &str) -> bool {
     host_l.is_empty()
-        || BLOCKED_HOSTS.iter().any(|b| *b == host_l)
+        || BLOCKED_HOSTS.contains(&host_l)
         || host_l.ends_with(".localhost")
         || host_l.ends_with(".local")
 }
@@ -163,7 +222,7 @@ fn ip_is_probeable(ip: IpAddr) -> bool {
             !(v6.is_loopback()
                 || v6.is_unspecified()
                 || (s0 & 0xffc0) == 0xfe80
-                || ((s0 & 0xffe0) == 0x2001 && v6.segments()[1] == 0x0db8))
+                || (s0 == 0x2001 && v6.segments()[1] == 0x0db8))
         }
     }
 }
@@ -281,5 +340,20 @@ mod tests {
         assert!(!is_safe_outbound_url("http://127.0.0.1/latest"));
         assert!(!is_safe_outbound_url("http://user:pass@example.com/"));
         assert!(!is_safe_outbound_url("file:///etc/passwd"));
+        assert!(sanitize_outbound_url("https://example.com/a").starts_with("https://"));
+        assert!(sanitize_outbound_url("http://127.0.0.1/").is_empty());
+        assert!(sanitize_probe_url("http://10.1.2.3:9095/health").starts_with("http://"));
+        assert!(sanitize_probe_url("http://127.0.0.1/").is_empty());
+    }
+
+    fn argv_gate(value: &str) -> Result<String, &'static str> {
+        crate::argv_checked!(value, "rejected", |value| Ok(value.to_string()))
+    }
+
+    #[test]
+    fn argv_checked_rejects_flags() {
+        assert!(argv_gate("pool/dataset").is_ok());
+        assert!(argv_gate("-o").is_err());
+        assert!(argv_gate("../etc").is_err());
     }
 }

@@ -32,21 +32,49 @@ impl StateStore {
         Ok(())
     }
 
+    /// Entity directories may be nested (`notifications/channels`). Each
+    /// segment is a single safe component; `..` and separators inside a
+    /// segment are rejected.
+    fn entity_subdir(subdir: &str) -> Result<&str> {
+        if subdir.is_empty()
+            || subdir.starts_with('/')
+            || subdir.ends_with('/')
+            || subdir.contains('\\')
+            || subdir.contains('\0')
+        {
+            anyhow::bail!("Invalid entity directory");
+        }
+        let mut count = 0usize;
+        for part in subdir.split('/') {
+            if !input_guard::is_safe_component(part) {
+                anyhow::bail!("Invalid entity directory");
+            }
+            count += 1;
+            if count > 8 {
+                anyhow::bail!("Invalid entity directory");
+            }
+        }
+        Ok(subdir)
+    }
+
     pub fn save_entity<T: Serialize>(&self, subdir: &str, id: &str, entity: &T) -> Result<()> {
-        let subdir =
-            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
+        let subdir = Self::entity_subdir(subdir)?;
         let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
         Self::validate_entity_id(id)?;
-        let dir = self.path.join(subdir);
-        fs::create_dir_all(&dir)?;
-
-        let file_path = dir.join(format!("{}.json", id));
-        let tmp_path = dir.join(format!("{}.json.tmp", id));
-        let content = serde_json::to_string_pretty(entity)?;
-        fs::write(&tmp_path, content)?;
-        fs::rename(&tmp_path, &file_path)?;
-
-        Ok(())
+        let root = self.path.to_string_lossy();
+        let file_path = format!("{root}/{subdir}/{id}.json");
+        let tmp_path = format!("{file_path}.tmp");
+        input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
+            input_guard::fs_checked!(tmp_path, anyhow::anyhow!("rejected path"), |tmp_path| {
+                if let Some((dir, _)) = file_path.rsplit_once('/') {
+                    fs::create_dir_all(dir)?;
+                }
+                let content = serde_json::to_string_pretty(entity)?;
+                fs::write(&tmp_path, content)?;
+                fs::rename(&tmp_path, &file_path)?;
+                Ok(())
+            })
+        })
     }
 
     /// Load a specific entity by ID
@@ -55,58 +83,59 @@ impl StateStore {
         subdir: &str,
         id: &str,
     ) -> Result<Option<T>> {
-        let subdir =
-            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
+        let subdir = Self::entity_subdir(subdir)?;
         let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
         Self::validate_entity_id(id)?;
-        let file_path = self.path.join(subdir).join(format!("{}.json", id));
-
-        // Read directly and handle NotFound instead of exists() check (avoids TOCTOU)
-        match fs::read_to_string(&file_path) {
-            Ok(content) => {
-                let entity = serde_json::from_str(&content)?;
-                Ok(Some(entity))
+        let root = self.path.to_string_lossy();
+        let file_path = format!("{root}/{subdir}/{id}.json");
+        input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
+            match fs::read_to_string(&file_path) {
+                Ok(content) => {
+                    let entity = serde_json::from_str(&content)?;
+                    Ok(Some(entity))
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                Err(e) => Err(e.into()),
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+        })
     }
 
     /// List all entities in a subdirectory
     pub fn list_entities<T: for<'de> Deserialize<'de>>(&self, subdir: &str) -> Result<Vec<T>> {
-        let subdir =
-            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
-        let dir = self.path.join(subdir);
+        let subdir = Self::entity_subdir(subdir)?;
+        let root = self.path.to_string_lossy();
+        let dir = format!("{root}/{subdir}");
+        input_guard::fs_checked!(dir, anyhow::anyhow!("rejected path"), |dir| {
+            if !Path::new(&dir).exists() {
+                return Ok(Vec::new());
+            }
 
-        if !dir.exists() {
-            return Ok(Vec::new());
-        }
+            let mut entities = Vec::new();
 
-        let mut entities = Vec::new();
-
-        for entry in fs::read_dir(&dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                match fs::read_to_string(&path) {
-                    Ok(content) => match serde_json::from_str::<T>(&content) {
-                        Ok(entity) => entities.push(entity),
+            for entry in fs::read_dir(&dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                    match fs::read_to_string(&path) {
+                        Ok(content) => match serde_json::from_str::<T>(&content) {
+                            Ok(entity) => entities.push(entity),
+                            Err(e) => {
+                                warn!(
+                                    "Failed to deserialize entity from {}: {}",
+                                    path.display(),
+                                    e
+                                );
+                            }
+                        },
                         Err(e) => {
-                            warn!(
-                                "Failed to deserialize entity from {}: {}",
-                                path.display(),
-                                e
-                            );
+                            warn!("Failed to read entity file {}: {}", path.display(), e);
                         }
-                    },
-                    Err(e) => {
-                        warn!("Failed to read entity file {}: {}", path.display(), e);
                     }
                 }
             }
-        }
 
-        Ok(entities)
+            Ok(entities)
+        })
     }
 
     /// List entities with a filter predicate and limit, avoiding loading all into memory.
@@ -120,59 +149,62 @@ impl StateStore {
         T: for<'de> Deserialize<'de>,
         F: Fn(&T) -> bool,
     {
-        let subdir =
-            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
-        let dir = self.path.join(subdir);
-        if !dir.exists() {
-            return Ok(Vec::new());
-        }
-
-        let mut entities = Vec::new();
-        for entry in fs::read_dir(&dir)? {
-            if entities.len() >= limit {
-                break;
+        let subdir = Self::entity_subdir(subdir)?;
+        let root = self.path.to_string_lossy();
+        let dir = format!("{root}/{subdir}");
+        input_guard::fs_checked!(dir, anyhow::anyhow!("rejected path"), |dir| {
+            if !Path::new(&dir).exists() {
+                return Ok(Vec::new());
             }
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                match fs::read_to_string(&path) {
-                    Ok(content) => match serde_json::from_str::<T>(&content) {
-                        Ok(entity) => {
-                            if predicate(&entity) {
-                                entities.push(entity);
+
+            let mut entities = Vec::new();
+            for entry in fs::read_dir(&dir)? {
+                if entities.len() >= limit {
+                    break;
+                }
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                    match fs::read_to_string(&path) {
+                        Ok(content) => match serde_json::from_str::<T>(&content) {
+                            Ok(entity) => {
+                                if predicate(&entity) {
+                                    entities.push(entity);
+                                }
                             }
-                        }
+                            Err(e) => {
+                                warn!(
+                                    "Failed to deserialize entity from {}: {}",
+                                    path.display(),
+                                    e
+                                );
+                            }
+                        },
                         Err(e) => {
-                            warn!(
-                                "Failed to deserialize entity from {}: {}",
-                                path.display(),
-                                e
-                            );
+                            warn!("Failed to read entity file {}: {}", path.display(), e);
                         }
-                    },
-                    Err(e) => {
-                        warn!("Failed to read entity file {}: {}", path.display(), e);
                     }
                 }
             }
-        }
 
-        Ok(entities)
+            Ok(entities)
+        })
     }
 
     /// Delete an entity by ID
     pub fn delete_entity(&self, subdir: &str, id: &str) -> Result<()> {
-        let subdir =
-            input_guard::vet_component!(subdir, anyhow::anyhow!("Invalid entity directory"));
+        let subdir = Self::entity_subdir(subdir)?;
         let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
         Self::validate_entity_id(id)?;
-        let file_path = self.path.join(subdir).join(format!("{}.json", id));
-
-        match fs::remove_file(&file_path) {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e.into()),
-        }
+        let root = self.path.to_string_lossy();
+        let file_path = format!("{root}/{subdir}/{id}.json");
+        input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
+            match fs::remove_file(&file_path) {
+                Ok(()) => Ok(()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(e) => Err(e.into()),
+            }
+        })
     }
 }
 
@@ -203,12 +235,17 @@ impl StateStore {
     pub fn save_vm(&self, vm: &VM) -> Result<()> {
         let name = input_guard::vet_component!(&vm.name, anyhow::anyhow!("Invalid VM name"));
         Self::validate_entity_id(name)?;
-        // Serialize and write file FIRST — if this fails, in-memory state stays consistent
         let content = serde_json::to_string_pretty(vm)?;
-        let vm_file = self.path.join(format!("{name}.json"));
-        let tmp_file = self.path.join(format!("{name}.json.tmp"));
-        fs::write(&tmp_file, &content)?;
-        fs::rename(&tmp_file, &vm_file)?;
+        let root = self.path.to_string_lossy();
+        let vm_file = format!("{root}/{name}.json");
+        let tmp_file = format!("{vm_file}.tmp");
+        input_guard::fs_checked!(vm_file, anyhow::anyhow!("rejected path"), |vm_file| {
+            input_guard::fs_checked!(tmp_file, anyhow::anyhow!("rejected path"), |tmp_file| {
+                fs::write(&tmp_file, &content)?;
+                fs::rename(&tmp_file, &vm_file)?;
+                Ok::<(), anyhow::Error>(())
+            })
+        })?;
 
         // Only update in-memory state after file write succeeds
         let mut vms = self
@@ -266,13 +303,15 @@ impl StateStore {
     pub fn delete_vm(&self, name: &str) -> Result<()> {
         let name = input_guard::vet_component!(name, anyhow::anyhow!("Invalid VM name"));
         Self::validate_entity_id(name)?;
-        // Delete file FIRST — if this fails, in-memory state stays consistent
-        let vm_file = self.path.join(format!("{name}.json"));
-        match fs::remove_file(&vm_file) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e.into()),
-        }
+        let root = self.path.to_string_lossy();
+        let vm_file = format!("{root}/{name}.json");
+        input_guard::fs_checked!(vm_file, anyhow::anyhow!("rejected path"), |vm_file| {
+            match fs::remove_file(&vm_file) {
+                Ok(()) => Ok::<(), anyhow::Error>(()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(e) => Err(e.into()),
+            }
+        })?;
 
         // Only update in-memory state after file deletion succeeds
         let mut vms = self
@@ -408,6 +447,23 @@ mod tests {
 
         let items: Vec<Item> = store.list_entities("items").unwrap();
         assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn nested_entity_directory_round_trips() {
+        let (store, _dir) = test_store();
+        store
+            .save_entity(
+                "notifications/channels",
+                "mail",
+                &serde_json::json!({"id": "mail"}),
+            )
+            .unwrap();
+        let items: Vec<serde_json::Value> = store.list_entities("notifications/channels").unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(store
+            .save_entity("notifications/../channels", "x", &serde_json::json!({}))
+            .is_err());
     }
 
     #[test]

@@ -20,7 +20,7 @@ This is **not** the same as [Net Security](network-security.md) network policies
 - Lock down what a sandbox / CI / AI agent VM can reach
 - Apply a live deny or rate limit without restarting the guest
 - Prove what left the box (stats + flows)
-- Confirm eBPF is attached (`schema_version=4`) before relying on `required=true`
+- Confirm eBPF is attached. The schema version is the number FluxVM returns (11 on a current attach), not a hard-coded 4, before relying on `required=true`
 - Debug group membership via the **Effective** tab
 
 ## How to get there

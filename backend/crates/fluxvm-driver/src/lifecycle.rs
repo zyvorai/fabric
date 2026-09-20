@@ -38,6 +38,18 @@ impl VMDriver for FluxVmDriver {
         // baked in at creation time — replay the stored request rather
         // than trying to apply a second, possibly-different option set.
         if let Some(record) = self.client.find_by_name(&vm.name).await? {
+            // Direct uplink, netns tap, and user NAT are fixed at FluxVM
+            // create time. A later start must not replay a stale record
+            // after Fabric's stored network changed (same reason port
+            // forwards delete the record). MAC is ignored: it is pinned
+            // fresh on each create and must not force a recreate.
+            let desired = network_key(vm, opts)?;
+            if network_key_of(&record.request.network) != desired {
+                self.client.delete_vm(record.id).await?;
+                let req = translate_start_options(vm, opts)?;
+                self.client.create_vm(&req).await?;
+                return Ok(());
+            }
             return self.client.start_vm(record.id).await.map(|_| ());
         }
         // First launch: translate into an FluxVM CreateVmRequest.
@@ -439,6 +451,49 @@ fn direct_tap(vm: &VM, opts: &VMStartOptions) -> Result<Option<NetworkSpec>> {
     }))
 }
 
+/// Identity of the create-time network, ignoring MAC and tap name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum NetworkKey {
+    User,
+    Netns,
+    Direct {
+        outer: String,
+        mode: String,
+        guest_ips: Vec<String>,
+    },
+}
+
+fn network_key_of(spec: &NetworkSpec) -> NetworkKey {
+    match spec {
+        NetworkSpec::Tap {
+            direct: Some(direct),
+            ..
+        } => {
+            let mut guest_ips = direct.guest_ips.clone();
+            guest_ips.sort();
+            let mode = match direct.mode {
+                DirectMode::L2Uplink => "l2-uplink",
+                DirectMode::PeerVeth => "peer-veth",
+            };
+            NetworkKey::Direct {
+                outer: direct.outer.clone(),
+                mode: mode.to_string(),
+                guest_ips,
+            }
+        }
+        NetworkSpec::Tap { netns: true, .. } => NetworkKey::Netns,
+        _ => NetworkKey::User,
+    }
+}
+
+fn network_key(vm: &VM, opts: &VMStartOptions) -> Result<NetworkKey> {
+    Ok(match direct_tap(vm, opts)? {
+        Some(spec) => network_key_of(&spec),
+        None if opts.network_tap => NetworkKey::Netns,
+        None => NetworkKey::User,
+    })
+}
+
 fn parse_storage_backend(raw: Option<&str>) -> StorageBackend {
     match raw.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
         None | Some("") | Some("default") => StorageBackend::Default,
@@ -550,6 +605,37 @@ mod tests {
         assert!(
             err.to_string().contains("network_tap"),
             "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn network_key_ignores_mac_and_sees_an_uplink_change() {
+        let vm = VM::new(
+            "fixture".to_string(),
+            "/tmp/base.qcow2".to_string(),
+            2,
+            2048,
+        );
+        let direct = VMStartOptions {
+            direct_uplink: Some("enp1s0".to_string()),
+            direct_guest_ips: vec!["192.168.1.50".to_string()],
+            ..Default::default()
+        };
+        let again = VMStartOptions {
+            direct_uplink: Some("enp1s0".to_string()),
+            direct_guest_ips: vec!["192.168.1.50".to_string()],
+            ..Default::default()
+        };
+        let nat = VMStartOptions::default();
+        let key = network_key(&vm, &direct).unwrap();
+        assert_eq!(key, network_key(&vm, &again).unwrap());
+        assert_ne!(key, network_key(&vm, &nat).unwrap());
+
+        let stored = translate_start_options(&vm, &direct).unwrap();
+        let replay = translate_start_options(&vm, &again).unwrap();
+        assert_eq!(
+            network_key_of(&stored.network),
+            network_key_of(&replay.network)
         );
     }
 }

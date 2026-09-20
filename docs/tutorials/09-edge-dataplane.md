@@ -61,7 +61,7 @@ curl -sk "$FABRIC_HOST/api/vms/$VM/dataplane/status" "${AUTH[@]}" | jq '{
 }'
 ```
 
-Pass bar: `/readyz` `"ok": true`, then `attached=true`, `schema_version=4`.
+Pass bar: `/readyz` `"ok": true`, then `attached=true` and the schema version FluxVM returns (11 on a current attach). Do not require `schema_version=4`.
 
 ---
 

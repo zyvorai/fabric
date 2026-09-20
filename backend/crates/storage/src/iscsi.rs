@@ -19,10 +19,12 @@ pub struct IscsiTarget {
 /// Discover iSCSI targets on a portal.
 pub fn discover_targets(portal: &str) -> Result<Vec<String>> {
     let portal = input_guard::vet!(portal, anyhow!("rejected iSCSI portal"));
-    let output = std::process::Command::new("iscsiadm")
-        .args(["-m", "discovery", "-t", "sendtargets", "-p", portal])
-        .output()
-        .map_err(|e| anyhow!("Failed to run iscsiadm: {}. Is open-iscsi installed?", e))?;
+    let output = input_guard::argv_checked!(portal, anyhow!("rejected iSCSI portal"), |portal| {
+        std::process::Command::new("iscsiadm")
+            .args(["-m", "discovery", "-t", "sendtargets", "-p", portal])
+            .output()
+            .map_err(|e| anyhow!("Failed to run iscsiadm: {}. Is open-iscsi installed?", e))?
+    });
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -41,10 +43,14 @@ pub fn discover_targets(portal: &str) -> Result<Vec<String>> {
 pub fn login_target(portal: &str, target_iqn: &str) -> Result<()> {
     let portal = input_guard::vet!(portal, anyhow!("rejected iSCSI portal"));
     let target_iqn = input_guard::vet!(target_iqn, anyhow!("rejected iSCSI target"));
-    let output = std::process::Command::new("iscsiadm")
-        .args(["-m", "node", "-T", target_iqn, "-p", portal, "--login"])
-        .output()
-        .map_err(|e| anyhow!("Failed to run iscsiadm login: {}", e))?;
+    let output = input_guard::argv_checked!(portal, anyhow!("rejected iSCSI portal"), |portal| {
+        input_guard::argv_checked!(target_iqn, anyhow!("rejected iSCSI target"), |target_iqn| {
+            std::process::Command::new("iscsiadm")
+                .args(["-m", "node", "-T", target_iqn, "-p", portal, "--login"])
+                .output()
+                .map_err(|e| anyhow!("Failed to run iscsiadm login: {}", e))?
+        })
+    });
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -57,10 +63,14 @@ pub fn login_target(portal: &str, target_iqn: &str) -> Result<()> {
 pub fn logout_target(portal: &str, target_iqn: &str) -> Result<()> {
     let portal = input_guard::vet!(portal, anyhow!("rejected iSCSI portal"));
     let target_iqn = input_guard::vet!(target_iqn, anyhow!("rejected iSCSI target"));
-    let output = std::process::Command::new("iscsiadm")
-        .args(["-m", "node", "-T", target_iqn, "-p", portal, "--logout"])
-        .output()
-        .map_err(|e| anyhow!("Failed to run iscsiadm logout: {}", e))?;
+    let output = input_guard::argv_checked!(portal, anyhow!("rejected iSCSI portal"), |portal| {
+        input_guard::argv_checked!(target_iqn, anyhow!("rejected iSCSI target"), |target_iqn| {
+            std::process::Command::new("iscsiadm")
+                .args(["-m", "node", "-T", target_iqn, "-p", portal, "--logout"])
+                .output()
+                .map_err(|e| anyhow!("Failed to run iscsiadm logout: {}", e))?
+        })
+    });
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

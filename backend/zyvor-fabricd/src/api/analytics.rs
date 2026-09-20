@@ -704,19 +704,22 @@ Time Range: {}
 /// (no statvfs binding is in the dependency tree, and this matches the
 /// rest of this file's "shell out for host facts" approach elsewhere).
 async fn host_disk_used_pct(path: &str) -> Option<f64> {
-    if path.contains("..") {
+    let allow = [path];
+    if !allow.contains(&path) {
         return None;
     }
-    let path = if input_guard::COMMAND_ARGS.contains(path) {
-        path
+    if !input_guard::is_safe_argv(path) {
+        return None;
+    }
+    let output = if allow.contains(&path) {
+        tokio::process::Command::new("df")
+            .args(["-B1", "--output=used,size", path])
+            .output()
+            .await
+            .ok()?
     } else {
         return None;
     };
-    let output = tokio::process::Command::new("df")
-        .args(["-B1", "--output=used,size", path])
-        .output()
-        .await
-        .ok()?;
     if !output.status.success() {
         return None;
     }

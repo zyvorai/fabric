@@ -653,13 +653,28 @@ pub async fn resize_disk(
     );
 
     // Resize with qemu-img
-    let output = tokio::process::Command::new("qemu-img")
-        .args(["resize", image_path, size])
-        .output()
-        .await
-        .map_err(|e| {
-            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+    let output = input_guard::argv_checked!(
+        &image_path,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk path"),
+        |image_path| {
+            input_guard::argv_checked!(
+                &size,
+                crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid disk size"),
+                |size| {
+                    tokio::process::Command::new("qemu-img")
+                        .args(["resize", image_path, size])
+                        .output()
+                        .await
+                        .map_err(|e| {
+                            crate::api_error::json_error(
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                e.to_string(),
+                            )
+                        })?
+                }
+            )
+        }
+    );
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -850,24 +865,54 @@ pub async fn import_vm_image(
     let dest_path = format!("{dest_dir}/{name}.{target_format}");
 
     // Convert using qemu-img convert
-    let output = tokio::process::Command::new("qemu-img")
-        .args([
-            "convert",
-            "-f",
-            source_format,
-            "-O",
-            target_format,
-            source_path,
-            dest_path.as_str(),
-        ])
-        .output()
-        .await
-        .map_err(|e| {
-            crate::api_error::json_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("qemu-img convert failed: {}", e),
+    let output = input_guard::argv_checked!(
+        source_format,
+        crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid source format"),
+        |source_format| {
+            input_guard::argv_checked!(
+                target_format,
+                crate::api_error::json_error(StatusCode::BAD_REQUEST, "invalid image format"),
+                |target_format| {
+                    input_guard::argv_checked!(
+                        source_path,
+                        crate::api_error::json_error(
+                            StatusCode::BAD_REQUEST,
+                            "invalid source path"
+                        ),
+                        |source_path| {
+                            input_guard::argv_checked!(
+                                dest_path.as_str(),
+                                crate::api_error::json_error(
+                                    StatusCode::BAD_REQUEST,
+                                    "invalid destination path"
+                                ),
+                                |dest_path| {
+                                    tokio::process::Command::new("qemu-img")
+                                        .args([
+                                            "convert",
+                                            "-f",
+                                            source_format,
+                                            "-O",
+                                            target_format,
+                                            source_path,
+                                            dest_path,
+                                        ])
+                                        .output()
+                                        .await
+                                        .map_err(|e| {
+                                            crate::api_error::json_error(
+                                                StatusCode::INTERNAL_SERVER_ERROR,
+                                                format!("qemu-img convert failed: {}", e),
+                                            )
+                                        })?
+                                }
+                            )
+                        }
+                    )
+                }
             )
-        })?;
+        }
+    );
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

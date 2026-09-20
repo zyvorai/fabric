@@ -468,6 +468,17 @@ pub async fn add_port_forward(
         )
         .into_response();
     }
+    if vm
+        .direct_uplink
+        .as_ref()
+        .is_some_and(|s| !s.trim().is_empty())
+    {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "this VM uses a direct uplink -- port forwards only apply to NAT-networked VMs",
+        )
+        .into_response();
+    }
 
     if vm
         .port_forwards
@@ -696,6 +707,175 @@ pub async fn remove_port_forward(
         "SUCCESS",
     );
     (StatusCode::OK, Json(vm)).into_response()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetDirectUplinkRequest {
+    pub uplink: String,
+    #[serde(default)]
+    pub mode: Option<String>,
+    #[serde(default)]
+    pub guest_ips: Vec<String>,
+}
+
+fn stored_start_options(vm: &vm_model::VM) -> VMStartOptions {
+    VMStartOptions {
+        port_forwards: vm.port_forwards.clone(),
+        network_tap: vm.network_tap,
+        network_static_ip: vm.network_static_ip,
+        ssh_authorized_keys: vm.ssh_authorized_keys.clone(),
+        cloud_init_packages: vm.cloud_init_packages.clone(),
+        cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
+        cloud_init_write_files: vm.cloud_init_write_files.clone(),
+        storage: vm.storage.clone(),
+        enable_qga: vm.enable_qga,
+        hyperv: vm.hyperv,
+        direct_uplink: vm.direct_uplink.clone(),
+        direct_mode: vm.direct_mode.clone(),
+        direct_guest_ips: vm.direct_guest_ips.clone(),
+        ..Default::default()
+    }
+}
+
+/// PUT /api/vms/:name/direct-uplink — store a bridge-less uplink and drop
+/// any FluxVM record so the next start creates it. A running VM is recreated.
+pub async fn set_direct_uplink(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(req): Json<SetDirectUplinkRequest>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    let errors = vm_model::direct_uplink_errors(
+        Some(&req.uplink),
+        req.mode.as_deref(),
+        &req.guest_ips,
+        false,
+        false,
+    );
+    if !errors.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, errors.join("; ")).into_response();
+    }
+
+    let _lock = state.vm_lock(&name).lock_owned().await;
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => {
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
+        }
+    };
+    if vm.network_tap || !vm.port_forwards.is_empty() {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "direct uplink replaces bridged networking and NAT port forwards; remove those first",
+        )
+        .into_response();
+    }
+    let was_running = matches!(
+        vm.state,
+        vm_model::VMState::Running | vm_model::VMState::Starting | vm_model::VMState::Paused
+    );
+    vm.direct_uplink = Some(req.uplink.trim().to_string());
+    vm.direct_mode = req.mode;
+    vm.direct_guest_ips = req.guest_ips;
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+            .into_response();
+    }
+    if let Err(resp) = clear_fluxvm_record(&state, &claims, &name, "SET_DIRECT_UPLINK").await {
+        return resp;
+    }
+    if was_running {
+        let opts = stored_start_options(&vm);
+        if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to recreate VM '{name}' with the direct uplink: {e}"),
+            )
+            .into_response();
+        }
+        vm.state = vm_model::VMState::Running;
+        vm.last_error = None;
+        if let Err(e) = state.store.save_vm(&vm) {
+            tracing::error!("Failed to save VM state after direct-uplink recreate: {e}");
+        }
+    }
+    (StatusCode::OK, Json(vm)).into_response()
+}
+
+/// DELETE /api/vms/:name/direct-uplink — clear a stored uplink and drop the
+/// FluxVM record so the next start goes back to user-mode NAT.
+pub async fn clear_direct_uplink(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_vm_name(&name) {
+        return json_error(status, msg).into_response();
+    }
+    let _lock = state.vm_lock(&name).lock_owned().await;
+    let mut vm = match state.store.get_vm(&name) {
+        Ok(Some(vm)) => vm,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "VM not found").into_response(),
+        Err(e) => {
+            return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+                .into_response()
+        }
+    };
+    let was_running = matches!(
+        vm.state,
+        vm_model::VMState::Running | vm_model::VMState::Starting | vm_model::VMState::Paused
+    );
+    vm.direct_uplink = None;
+    vm.direct_mode = None;
+    vm.direct_guest_ips.clear();
+    if let Err(e) = state.store.save_vm(&vm) {
+        return json_error_safe(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), &claims)
+            .into_response();
+    }
+    if let Err(resp) = clear_fluxvm_record(&state, &claims, &name, "CLEAR_DIRECT_UPLINK").await {
+        return resp;
+    }
+    if was_running {
+        let opts = stored_start_options(&vm);
+        if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to recreate VM '{name}' without the direct uplink: {e}"),
+            )
+            .into_response();
+        }
+        vm.state = vm_model::VMState::Running;
+        vm.last_error = None;
+        if let Err(e) = state.store.save_vm(&vm) {
+            tracing::error!("Failed to save VM state after clearing direct uplink: {e}");
+        }
+    }
+    (StatusCode::OK, Json(vm)).into_response()
+}
+
+async fn clear_fluxvm_record(
+    state: &AppState,
+    claims: &security::Claims,
+    name: &str,
+    action: &str,
+) -> Result<(), axum::response::Response> {
+    if let Err(e) = state.driver.delete(name).await {
+        let msg = e.to_string();
+        if !msg.contains("known to FluxVM") {
+            audit(state, &claims.sub, action, &format!("vm/{name}"), "FAILED");
+            return Err(json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to clear VM '{name}' for recreation: {msg}"),
+            )
+            .into_response());
+        }
+    }
+    Ok(())
 }
 
 pub async fn start_vm(
@@ -1377,11 +1557,16 @@ async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
             .to_str()
             .ok_or_else(|| "invalid source path".to_string())?;
         let source_s = input_guard::vet!(source_s, "rejected source path".to_string());
-        let output = tokio::process::Command::new("cp")
-            .args(["--reflink=auto", source_s, target])
-            .output()
-            .await
-            .map_err(|e| e.to_string())?;
+        let output =
+            input_guard::argv_checked!(source_s, "rejected source path".to_string(), |source_s| {
+                input_guard::argv_checked!(target, "rejected target path".to_string(), |target| {
+                    tokio::process::Command::new("cp")
+                        .args(["--reflink=auto", source_s, target])
+                        .output()
+                        .await
+                        .map_err(|e| e.to_string())?
+                })
+            });
         if !output.status.success() {
             return Err(String::from_utf8_lossy(&output.stderr).to_string());
         }
@@ -1391,11 +1576,16 @@ async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
     let size_gib = if vm.disk > 0 { vm.disk } else { 20 };
     let size_arg = format!("{size_gib}G");
     let size_arg = input_guard::vet!(&size_arg, "invalid disk size".to_string());
-    let output = tokio::process::Command::new("qemu-img")
-        .args(["create", "-f", "qcow2", target, size_arg])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
+    let output =
+        input_guard::argv_checked!(&size_arg, "invalid disk size".to_string(), |size_arg| {
+            input_guard::argv_checked!(target, "rejected target path".to_string(), |target| {
+                tokio::process::Command::new("qemu-img")
+                    .args(["create", "-f", "qcow2", target, size_arg])
+                    .output()
+                    .await
+                    .map_err(|e| e.to_string())?
+            })
+        });
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
     }

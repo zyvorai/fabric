@@ -56,7 +56,7 @@ Provider secret values are never serialized into agent deployments, session reco
 ## Host requirements
 
 1. A working FluxVM server reachable from the Agent Runtime.
-2. A FluxVM sandbox template containing Node.js 20+.
+2. A FluxVM sandbox template containing Node.js 20+. A `claude`, `codex`, or `gemini` agent also needs that CLI on `PATH` in the same template. The harness adapter is still Node; it does not put provider keys in the guest.
 3. The template should use `tap` + `netns` networking. The worker derives the host-side gateway from its default route so it can reach the egress broker. If that is not appropriate, set `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` explicitly.
 4. The FluxVM guest agent must be present. FluxVM sandbox creation enables it by default.
 
@@ -73,6 +73,35 @@ and separately hangs during guest kernel boot at virtio-mmio device
 probe on at least one general-purpose Ubuntu+Node.js image. Until
 that's resolved, build and test your template image with `--cpus 1`
 first before assuming a real session will complete end to end.
+
+## Coding-agent harness
+
+Set `manifest.runtime` to `claude`, `codex`, or `gemini` to run that CLI inside the session instead of a JavaScript bundle. The choice is part of the immutable version. Deploy an existing `CLAUDE.md` or `AGENTS.md` without rewriting it:
+
+```bash
+fabric-agent deploy ./CLAUDE.md --name reviewer --template node22-agent \
+  --runtime claude --credential anthropic --allow-host api.anthropic.com
+```
+
+The template must contain Node.js and the selected CLI. The adapter writes the instruction file into the sandbox and points `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, and `GEMINI_API_BASE_URL` at a loopback shim. The shim calls the host egress broker, which injects the granted credential. Placeholder client keys in the guest are not provider secrets.
+
+A JSON bundle is also accepted: `{"instructions":"...","files":{"CLAUDE.md":"...","src/main.py":"..."}}`.
+
+When the CLI prints `ZYVOR_APPROVAL <question>`, the runtime opens an operator approval and waits. `POST /v1/approvals/{id}` with `{"decision":"approved"}` or `"denied"` steers the session. `POST /v1/sessions/{id}/delegate` starts another agent; the child keeps its own allowlist and credential grants, and delegation stops at three levels.
+
+## Schedules, webhooks, and loops
+
+- `POST /v1/schedules` with a five-field UTC cron expression admits a session each time it is due.
+- `POST /v1/webhooks` returns an HMAC secret once. Callers `POST /v1/hooks/{id}` with `X-Zyvor-Signature: sha256=<hex>` over the raw body. That route does not use the API bearer token.
+- `POST /v1/loops` repeats a session until `max_runs`, `max_duration_secs`, `max_cost`, or `max_no_progress`. A loop must set one of those.
+
+## MCP
+
+`POST /mcp` speaks MCP over JSON-RPC (`initialize`, `tools/list`, `tools/call`) on the same bearer token as the rest of the API.
+
+- `list_agents`
+- `list_executions`
+- `chat_with_agent` creates a session, or steers one when `session_id` is set
 
 ## Credentials
 

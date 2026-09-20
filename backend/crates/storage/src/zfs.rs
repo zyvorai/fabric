@@ -107,7 +107,11 @@ impl ZfsPool {
         if let Some(ds) = &dataset {
             let _ = input_guard::vet!(ds, ZfsError::CommandFailed("invalid dataset name".into()));
         }
-        let output = Command::new("zpool").args(["status", zpool]).output()?;
+        let output = input_guard::argv_checked!(
+            zpool,
+            ZfsError::CommandFailed("invalid zpool name".into()),
+            |zpool| Command::new("zpool").args(["status", zpool]).output()?
+        );
 
         if !output.status.success() {
             return Err(ZfsError::PoolNotFound(zpool.to_string()));
@@ -243,9 +247,15 @@ impl ZfsPool {
             &self.zpool,
             ZfsError::CommandFailed("invalid zpool name".into())
         );
-        let output = Command::new("zpool")
-            .args(["list", "-H", "-o", "size,alloc,free", zpool])
-            .output()?;
+        let output = input_guard::argv_checked!(
+            zpool,
+            ZfsError::CommandFailed("invalid zpool name".into()),
+            |zpool| {
+                Command::new("zpool")
+                    .args(["list", "-H", "-o", "size,alloc,free", zpool])
+                    .output()?
+            }
+        );
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

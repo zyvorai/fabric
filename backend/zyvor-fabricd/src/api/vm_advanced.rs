@@ -253,16 +253,34 @@ pub async fn create_checkpoint(
     );
 
     // Create internal snapshot via qemu-img
-    let output = Command::new("qemu-img")
-        .args(["snapshot", "-c", snap, image_path])
-        .output()
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": format!("qemu-img failed: {}", e) })),
+    let output = input_guard::argv_checked!(
+        &image_path,
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid disk path" })),
+        ),
+        |image_path| {
+            input_guard::argv_checked!(
+                &snap,
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid checkpoint name" })),
+                ),
+                |snap| {
+                    Command::new("qemu-img")
+                        .args(["snapshot", "-c", snap, image_path])
+                        .output()
+                        .await
+                        .map_err(|e| {
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(json!({ "error": format!("qemu-img failed: {}", e) })),
+                            )
+                        })?
+                }
             )
-        })?;
+        }
+    );
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

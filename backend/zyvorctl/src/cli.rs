@@ -160,6 +160,16 @@ enum Commands {
         #[arg(long = "direct-guest-ip")]
         direct_guest_ip: Vec<String>,
     },
+    /// Set a bridge-less direct uplink on an existing VM (recreates it in FluxVM)
+    DirectUplink {
+        name: String,
+        #[arg(long)]
+        uplink: String,
+        #[arg(long)]
+        direct_mode: Option<String>,
+        #[arg(long = "direct-guest-ip")]
+        direct_guest_ip: Vec<String>,
+    },
     /// Start a VM
     Start { name: String },
     /// Stop a VM
@@ -1503,6 +1513,38 @@ impl Cli {
                     .await?;
                 match fmt {
                     OutputFormat::Table => println!("VM '{}' created successfully", name),
+                    _ => println!("{}", format_output(&vm, fmt)?),
+                }
+            }
+
+            Commands::DirectUplink {
+                name,
+                uplink,
+                direct_mode,
+                direct_guest_ip,
+            } => {
+                let mut body = serde_json::json!({ "uplink": uplink });
+                if let Some(mode) = direct_mode {
+                    body["mode"] = serde_json::json!(mode);
+                }
+                if !direct_guest_ip.is_empty() {
+                    body["guest_ips"] = serde_json::json!(direct_guest_ip);
+                }
+                let vm: VM = client
+                    .put(format!("{}/vms/{}/direct-uplink", api_base(), name))
+                    .json(&body)
+                    .send()
+                    .await?
+                    .json()
+                    .await?;
+                match fmt {
+                    OutputFormat::Table => {
+                        println!(
+                            "VM '{}' direct uplink set to {}",
+                            name,
+                            vm.direct_uplink.as_deref().unwrap_or(&uplink)
+                        );
+                    }
                     _ => println!("{}", format_output(&vm, fmt)?),
                 }
             }

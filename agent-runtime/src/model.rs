@@ -37,6 +37,39 @@ pub struct AgentManifest {
     /// immutable agent version. Sandboxes are single-use and never recycled.
     #[serde(default)]
     pub warm_pool_size: usize,
+    /// Guest program for this immutable version. `node` runs the JavaScript
+    /// worker. `claude`, `codex`, and `gemini` run that CLI from the FluxVM
+    /// template via the harness adapter. The choice cannot change without a
+    /// new version.
+    #[serde(default)]
+    pub runtime: AgentRuntimeKind,
+}
+
+/// What the sandbox executes. Harness runtimes share one adapter and differ
+/// only by which template CLI it spawns.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentRuntimeKind {
+    #[default]
+    Node,
+    Claude,
+    Codex,
+    Gemini,
+}
+
+impl AgentRuntimeKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Node => "node",
+            Self::Claude => "claude",
+            Self::Codex => "codex",
+            Self::Gemini => "gemini",
+        }
+    }
+
+    pub fn is_harness(self) -> bool {
+        !matches!(self, Self::Node)
+    }
 }
 
 fn default_runtime_port() -> u16 {
@@ -84,6 +117,10 @@ pub struct CreateSessionRequest {
     pub request_id: Option<String>,
     #[serde(default)]
     pub start_policy: SessionStartPolicy,
+    /// When set, this session was started on behalf of another session. The
+    /// child still uses its own egress allowlist and credential grants.
+    #[serde(default)]
+    pub parent_session_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -150,6 +187,8 @@ pub struct SessionRecord {
     pub capability_token: String,
     #[serde(default)]
     pub error: Option<String>,
+    #[serde(default)]
+    pub parent_session_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -170,6 +209,7 @@ pub struct SessionView {
     pub expires_at: Option<DateTime<Utc>>,
     pub sandbox_released: bool,
     pub error: Option<String>,
+    pub parent_session_id: Option<Uuid>,
 }
 
 impl From<SessionRecord> for SessionView {
@@ -191,6 +231,7 @@ impl From<SessionRecord> for SessionView {
             expires_at: v.expires_at,
             sandbox_released: v.sandbox_released,
             error: v.error,
+            parent_session_id: v.parent_session_id,
         }
     }
 }
@@ -293,4 +334,231 @@ pub struct EgressRequest {
 
 fn default_method() -> String {
     "GET".to_string()
+}
+
+/// Stop conditions for a cron schedule, a signed webhook, or a loop.
+/// A loop must set at least one. Schedules and webhooks may leave them unset.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LoopBounds {
+    #[serde(default)]
+    pub max_runs: Option<u32>,
+    #[serde(default)]
+    pub max_duration_secs: Option<u64>,
+    #[serde(default)]
+    pub max_cost: Option<f64>,
+    /// Stop after this many consecutive runs that make no progress.
+    #[serde(default)]
+    pub max_no_progress: Option<u32>,
+}
+
+impl LoopBounds {
+    pub fn is_bounded(&self) -> bool {
+        self.max_runs.is_some()
+            || self.max_duration_secs.is_some()
+            || self.max_cost.is_some()
+            || self.max_no_progress.is_some()
+    }
+
+    pub fn stop_reason(
+        &self,
+        runs: u32,
+        elapsed_secs: u64,
+        cost: f64,
+        no_progress: u32,
+    ) -> Option<&'static str> {
+        if self.max_runs.is_some_and(|max| runs >= max) {
+            return Some("max_runs");
+        }
+        if self
+            .max_duration_secs
+            .is_some_and(|max| elapsed_secs >= max)
+        {
+            return Some("max_duration");
+        }
+        if self.max_cost.is_some_and(|max| cost >= max) {
+            return Some("max_cost");
+        }
+        if self.max_no_progress.is_some_and(|max| no_progress >= max) {
+            return Some("no_progress");
+        }
+        None
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScheduleRecord {
+    pub id: Uuid,
+    pub agent: String,
+    /// Five-field UTC cron: minute hour day month weekday.
+    pub cron: String,
+    pub input: Value,
+    #[serde(default)]
+    pub bounds: LoopBounds,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub started_at: DateTime<Utc>,
+    pub next_run_at: DateTime<Utc>,
+    #[serde(default)]
+    pub runs: u32,
+    #[serde(default)]
+    pub consecutive_no_progress: u32,
+    #[serde(default)]
+    pub accumulated_cost: f64,
+    #[serde(default)]
+    pub active_session_id: Option<Uuid>,
+    #[serde(default)]
+    pub accounted_session_id: Option<Uuid>,
+    #[serde(default)]
+    pub last_result: Option<Value>,
+    #[serde(default)]
+    pub stopped_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateScheduleRequest {
+    pub agent: String,
+    pub cron: String,
+    #[serde(default)]
+    pub input: Value,
+    #[serde(default)]
+    pub bounds: LoopBounds,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookRecord {
+    pub id: Uuid,
+    pub agent: String,
+    /// HMAC-SHA256 secret. Serialized so it survives restart, but list
+    /// responses use [`WebhookView`], which omits it.
+    pub secret: String,
+    #[serde(default)]
+    pub input: Value,
+    #[serde(default)]
+    pub bounds: LoopBounds,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub runs: u32,
+    #[serde(default)]
+    pub stopped_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WebhookView {
+    pub id: Uuid,
+    pub agent: String,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub runs: u32,
+    pub bounds: LoopBounds,
+    pub stopped_reason: Option<String>,
+}
+
+impl From<&WebhookRecord> for WebhookView {
+    fn from(v: &WebhookRecord) -> Self {
+        Self {
+            id: v.id,
+            agent: v.agent.clone(),
+            enabled: v.enabled,
+            created_at: v.created_at,
+            runs: v.runs,
+            bounds: v.bounds.clone(),
+            stopped_reason: v.stopped_reason.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateWebhookRequest {
+    pub agent: String,
+    #[serde(default)]
+    pub input: Value,
+    #[serde(default)]
+    pub bounds: LoopBounds,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CreateWebhookResponse {
+    #[serde(flatten)]
+    pub webhook: WebhookView,
+    pub secret: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoopRecord {
+    pub id: Uuid,
+    pub agent: String,
+    pub input: Value,
+    pub bounds: LoopBounds,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub started_at: DateTime<Utc>,
+    #[serde(default)]
+    pub runs: u32,
+    #[serde(default)]
+    pub consecutive_no_progress: u32,
+    #[serde(default)]
+    pub accumulated_cost: f64,
+    #[serde(default)]
+    pub active_session_id: Option<Uuid>,
+    #[serde(default)]
+    pub accounted_session_id: Option<Uuid>,
+    #[serde(default)]
+    pub last_result: Option<Value>,
+    #[serde(default)]
+    pub stopped_reason: Option<String>,
+    #[serde(default)]
+    pub next_attempt_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateLoopRequest {
+    pub agent: String,
+    #[serde(default)]
+    pub input: Value,
+    pub bounds: LoopBounds,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ApprovalStatus {
+    Pending,
+    Approved,
+    Denied,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApprovalRecord {
+    pub id: Uuid,
+    pub session_id: Uuid,
+    pub prompt: String,
+    pub status: ApprovalStatus,
+    #[serde(default)]
+    pub comment: Option<String>,
+    pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub decided_at: Option<DateTime<Utc>>,
+    /// Guest event sequence that opened this request, when it came from the sandbox.
+    #[serde(default)]
+    pub source_seq: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateApprovalRequest {
+    pub session_id: Uuid,
+    pub prompt: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DecideApprovalRequest {
+    pub decision: ApprovalStatus,
+    #[serde(default)]
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DelegateRequest {
+    pub agent: String,
+    #[serde(default)]
+    pub input: Value,
 }

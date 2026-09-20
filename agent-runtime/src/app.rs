@@ -3,9 +3,11 @@
 
 use crate::{
     model::{
-        CreateSessionRequest, DeployAgentRequest, EventsQuery, GuestEventsResponse,
-        GuestStatusResponse, SessionRecord, SessionStartMode, SessionStartPolicy, SessionStatus,
-        SessionView, SteerRequest, WarmPoolReconcileResult, WarmPoolView,
+        ApprovalRecord, ApprovalStatus, CreateApprovalRequest, CreateSessionRequest,
+        DecideApprovalRequest, DelegateRequest, DeployAgentRequest, EventsQuery,
+        GuestEventsResponse, GuestStatusResponse, SessionRecord, SessionStartMode,
+        SessionStartPolicy, SessionStatus, SessionView, SteerRequest, WarmPoolReconcileResult,
+        WarmPoolView,
     },
     pool, AppState,
 };
@@ -28,6 +30,7 @@ use std::{convert::Infallible, sync::Arc, time::Duration};
 use uuid::Uuid;
 
 pub(crate) const WORKER: &[u8] = include_bytes!("worker.mjs");
+pub(crate) const HARNESS: &[u8] = include_bytes!("harness.mjs");
 
 /// Upper bound on how long a single FluxVM resume/create call may run while
 /// holding a session's per-agent creation lock. Strictly less than the
@@ -65,31 +68,34 @@ async fn with_timeout<T>(
 }
 
 #[derive(Debug)]
-struct ApiError {
+pub(crate) struct ApiError {
     status: StatusCode,
     message: String,
 }
 
 impl ApiError {
-    fn bad_request(e: impl std::fmt::Display) -> Self {
+    pub(crate) fn message(&self) -> &str {
+        &self.message
+    }
+    pub(crate) fn bad_request(e: impl std::fmt::Display) -> Self {
         Self {
             status: StatusCode::BAD_REQUEST,
             message: e.to_string(),
         }
     }
-    fn not_found(message: impl Into<String>) -> Self {
+    pub(crate) fn not_found(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::NOT_FOUND,
             message: message.into(),
         }
     }
-    fn conflict(message: impl Into<String>) -> Self {
+    pub(crate) fn conflict(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::CONFLICT,
             message: message.into(),
         }
     }
-    fn bad_gateway(e: impl std::fmt::Display) -> Self {
+    pub(crate) fn bad_gateway(e: impl std::fmt::Display) -> Self {
         Self {
             status: StatusCode::BAD_GATEWAY,
             message: e.to_string(),
@@ -101,13 +107,19 @@ impl ApiError {
             message: message.into(),
         }
     }
-    fn too_many(message: impl Into<String>) -> Self {
+    pub(crate) fn too_many(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::TOO_MANY_REQUESTS,
             message: message.into(),
         }
     }
-    fn internal(e: impl std::fmt::Display) -> Self {
+    pub(crate) fn unauthorized(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::UNAUTHORIZED,
+            message: message.into(),
+        }
+    }
+    pub(crate) fn internal(e: impl std::fmt::Display) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: e.to_string(),
@@ -138,10 +150,39 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}/hibernate", post(hibernate_session))
         .route("/v1/sessions/{id}/resume", post(resume_session))
         .route("/v1/sessions/{id}/events", get(stream_events))
+        .route("/v1/sessions/{id}/delegate", post(delegate_session))
+        .route(
+            "/v1/schedules",
+            get(crate::schedules::list_schedules).post(crate::schedules::create_schedule),
+        )
+        .route(
+            "/v1/schedules/{id}",
+            axum::routing::delete(crate::schedules::delete_schedule),
+        )
+        .route(
+            "/v1/webhooks",
+            get(crate::schedules::list_webhooks).post(crate::schedules::create_webhook),
+        )
+        .route(
+            "/v1/webhooks/{id}",
+            axum::routing::delete(crate::schedules::delete_webhook),
+        )
+        .route(
+            "/v1/loops",
+            get(crate::schedules::list_loops).post(crate::schedules::create_loop),
+        )
+        .route(
+            "/v1/loops/{id}",
+            axum::routing::delete(crate::schedules::delete_loop),
+        )
+        .route("/v1/approvals", get(list_approvals).post(create_approval))
+        .route("/v1/approvals/{id}", post(decide_approval))
+        .route("/mcp", post(crate::mcp::handle))
         .route_layer(middleware::from_fn_with_state(state.clone(), api_auth));
 
     Router::new()
         .route("/healthz", get(|| async { Json(json!({"ok": true})) }))
+        .route("/v1/hooks/{id}", post(crate::schedules::webhook_ingress))
         .merge(protected)
         .with_state(state)
 }
@@ -259,7 +300,7 @@ async fn reconcile_warm_pool(
         .map_err(ApiError::bad_gateway)
 }
 
-async fn create_session(
+pub(crate) async fn create_session(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateSessionRequest>,
 ) -> ApiResult<(StatusCode, Json<SessionView>)> {
@@ -294,6 +335,17 @@ async fn create_session(
         }
         None => None,
     };
+    if let Some(parent_id) = req.parent_session_id {
+        let parent = state
+            .store
+            .get_session(parent_id)
+            .await
+            .ok_or_else(|| ApiError::bad_request("parent session not found"))?;
+        if parent.status.is_terminal() {
+            return Err(ApiError::conflict("parent session is not active"));
+        }
+        crate::schedules::delegation_allowed(&state, parent_id).await?;
+    }
 
     // The lock protects idempotency, quota admission and single-use warm-pool
     // claims. Warm starts only perform a cheap resume while locked; cold starts
@@ -335,7 +387,7 @@ async fn create_session(
         // visible. Sync/expiry/control requests can discover Creating state,
         // but cannot race provisioning or overwrite its terminal transition.
         let operation_guard = state.session_lock(id).lock_owned().await;
-        let worker_digest = pool::worker_digest_sha256();
+        let worker_digest = pool::worker_digest_sha256(agent.manifest.runtime);
         let warm =
             if agent.manifest.warm_pool_size > 0 && start_policy != SessionStartPolicy::ColdOnly {
                 state
@@ -426,6 +478,7 @@ async fn create_session(
             sandbox_released: false,
             capability_token: random_capability(),
             error: None,
+            parent_session_id: req.parent_session_id,
         };
         if let Err(error) = state.store.save_session(record.clone()).await {
             if prewarmed {
@@ -461,6 +514,7 @@ async fn create_session(
                     "start_policy": start_policy,
                     "start_mode": start_mode,
                     "expires_at": record.expires_at.as_ref(),
+                    "parent_session_id": record.parent_session_id,
                 }),
             )
             .await
@@ -590,7 +644,9 @@ async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Resul
         // check at all.
         let attempt = with_timeout(
             HEALTH_CHECK_ATTEMPT_TIMEOUT,
-            state.fluxvm.process(sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10)),
+            state
+                .fluxvm
+                .process(sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10)),
         )
         .await;
         match attempt {
@@ -629,9 +685,12 @@ async fn provision_guest(
         wait_for_guest_agent_ready(state, session.sandbox_id).await?;
         with_timeout(
             HEALTH_CHECK_ATTEMPT_TIMEOUT,
-            state
-                .fluxvm
-                .fs_write(session.sandbox_id, "/opt/zyvor/worker.mjs", WORKER, 0o755),
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                "/opt/zyvor/worker.mjs",
+                pool::entrypoint_bytes(agent.manifest.runtime),
+                0o755,
+            ),
         )
         .await?;
     }
@@ -661,9 +720,16 @@ async fn provision_guest(
         format_host(&host),
         state.config.egress_listen.port()
     );
+    let credentials =
+        serde_json::to_string(&agent.manifest.credentials).unwrap_or_else(|_| "[]".into());
     let command = format!(
-        "mkdir -p /opt/zyvor/agent; ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
-        shell_quote(&session.id.to_string()), shell_quote(&session.capability_token), shell_quote(&broker), agent.manifest.runtime_port
+        "mkdir -p /opt/zyvor/agent; ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
+        shell_quote(&session.id.to_string()),
+        shell_quote(&session.capability_token),
+        shell_quote(&broker),
+        agent.manifest.runtime_port,
+        shell_quote(agent.manifest.runtime.as_str()),
+        shell_quote(&credentials),
     );
     with_timeout(
         HEALTH_CHECK_ATTEMPT_TIMEOUT,
@@ -737,7 +803,7 @@ async fn get_session(
         .ok_or_else(|| ApiError::not_found("session not found"))
 }
 
-async fn steer_session(
+pub(crate) async fn steer_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
     Json(req): Json<SteerRequest>,
@@ -1043,7 +1109,7 @@ pub async fn sync_loop(state: Arc<AppState>) {
     }
 }
 
-async fn sync_session(state: &AppState, session: SessionRecord) -> Result<()> {
+async fn sync_session(state: &Arc<AppState>, session: SessionRecord) -> Result<()> {
     let agent = state
         .store
         .get_agent_version(&session.agent, &session.agent_version)
@@ -1096,6 +1162,12 @@ async fn sync_session(state: &AppState, session: SessionRecord) -> Result<()> {
                     .store
                     .update_session(session.id, |s| s.status = SessionStatus::Cancelled)
                     .await?;
+            }
+            "delegate.request" => {
+                spawn_delegation(state, session.id, &event.data);
+            }
+            "approval.requested" => {
+                record_approval_request(state, session.id, event.seq, &event.data).await?;
             }
             _ => {}
         }
@@ -1315,6 +1387,195 @@ pub async fn terminal_cleanup_loop(state: Arc<AppState>) {
             }
         }
     }
+}
+
+fn spawn_delegation(state: &Arc<AppState>, parent: Uuid, data: &Value) {
+    let target = data
+        .get("agent")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if target.is_empty() {
+        return;
+    }
+    let input = data.get("input").cloned().unwrap_or(Value::Null);
+    let state = Arc::clone(state);
+    tokio::spawn(async move {
+        let request = CreateSessionRequest {
+            agent: target.clone(),
+            input,
+            ttl_seconds: None,
+            request_id: Some(format!("delegate:{parent}:{}", Uuid::new_v4().simple())),
+            start_policy: SessionStartPolicy::PreferWarm,
+            parent_session_id: Some(parent),
+        };
+        match create_session(State(state.clone()), Json(request)).await {
+            Ok((_, Json(view))) => {
+                let _ = state
+                    .store
+                    .append_event(
+                        parent,
+                        "session.delegated",
+                        json!({"session_id": view.id, "agent": view.agent}),
+                    )
+                    .await;
+            }
+            Err(error) => {
+                let _ = state
+                    .store
+                    .append_event(
+                        parent,
+                        "session.delegate.failed",
+                        json!({"agent": target, "error": error.message()}),
+                    )
+                    .await;
+            }
+        }
+    });
+}
+
+async fn record_approval_request(
+    state: &AppState,
+    session_id: Uuid,
+    seq: u64,
+    data: &Value,
+) -> Result<()> {
+    if state
+        .store
+        .approval_for_event(session_id, seq)
+        .await
+        .is_some()
+    {
+        return Ok(());
+    }
+    let prompt = data
+        .get("prompt")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if prompt.is_empty() {
+        return Ok(());
+    }
+    state
+        .store
+        .save_approval(ApprovalRecord {
+            id: Uuid::new_v4(),
+            session_id,
+            prompt,
+            status: ApprovalStatus::Pending,
+            comment: None,
+            created_at: Utc::now(),
+            decided_at: None,
+            source_seq: Some(seq),
+        })
+        .await
+}
+
+async fn delegate_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<DelegateRequest>,
+) -> ApiResult<(StatusCode, Json<SessionView>)> {
+    let parent = require_session(&state, id).await?;
+    if parent.status != SessionStatus::Running {
+        return Err(ApiError::conflict("session is not running"));
+    }
+    let (status, Json(view)) = create_session(
+        State(state.clone()),
+        Json(CreateSessionRequest {
+            agent: req.agent,
+            input: req.input,
+            ttl_seconds: None,
+            request_id: Some(format!("delegate:{id}:{}", Uuid::new_v4().simple())),
+            start_policy: SessionStartPolicy::PreferWarm,
+            parent_session_id: Some(id),
+        }),
+    )
+    .await?;
+    let _ = state
+        .store
+        .append_event(
+            id,
+            "session.delegated",
+            json!({"session_id": view.id, "agent": view.agent}),
+        )
+        .await;
+    Ok((status, Json(view)))
+}
+
+async fn list_approvals(State(state): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({"items": state.store.list_approvals().await}))
+}
+
+async fn create_approval(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateApprovalRequest>,
+) -> ApiResult<(StatusCode, Json<ApprovalRecord>)> {
+    let session = require_session(&state, req.session_id).await?;
+    if session.status.is_terminal() {
+        return Err(ApiError::conflict("session is not active"));
+    }
+    if req.prompt.trim().is_empty() {
+        return Err(ApiError::bad_request("prompt is required"));
+    }
+    let record = ApprovalRecord {
+        id: Uuid::new_v4(),
+        session_id: req.session_id,
+        prompt: req.prompt,
+        status: ApprovalStatus::Pending,
+        comment: None,
+        created_at: Utc::now(),
+        decided_at: None,
+        source_seq: None,
+    };
+    state
+        .store
+        .save_approval(record.clone())
+        .await
+        .map_err(ApiError::internal)?;
+    Ok((StatusCode::CREATED, Json(record)))
+}
+
+async fn decide_approval(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<DecideApprovalRequest>,
+) -> ApiResult<Json<ApprovalRecord>> {
+    if req.decision == ApprovalStatus::Pending {
+        return Err(ApiError::bad_request("decision must be approved or denied"));
+    }
+    let Some(mut record) = state.store.get_approval(id).await else {
+        return Err(ApiError::not_found("approval not found"));
+    };
+    if record.status != ApprovalStatus::Pending {
+        return Err(ApiError::conflict("approval is already decided"));
+    }
+    let session = require_session(&state, record.session_id).await?;
+    if session.status != SessionStatus::Running {
+        return Err(ApiError::conflict("session is not running"));
+    }
+    record.status = req.decision;
+    record.comment = req.comment.clone();
+    record.decided_at = Some(Utc::now());
+    state
+        .store
+        .save_approval(record.clone())
+        .await
+        .map_err(ApiError::internal)?;
+    let message = json!({
+        "approval_id": record.id,
+        "decision": record.status,
+        "comment": record.comment,
+    });
+    let _ = steer_session(
+        State(state),
+        Path(record.session_id),
+        Json(SteerRequest { message }),
+    )
+    .await?;
+    Ok(Json(record))
 }
 
 fn validate_request_id(value: &str) -> ApiResult<()> {

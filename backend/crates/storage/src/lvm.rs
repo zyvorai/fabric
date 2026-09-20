@@ -95,17 +95,23 @@ impl LvmPool {
     pub fn new(vg_name: &str) -> Result<Self, LvmError> {
         validate_lvm_name(vg_name, "VG name")?;
         let vg_name = input_guard::vet!(vg_name, LvmError::CommandFailed("invalid VG name".into()));
-        let output = Command::new("vgs")
-            .args([
-                "--noheadings",
-                "--nosuffix",
-                "--units",
-                "b",
-                "-o",
-                "vg_name",
-                vg_name,
-            ])
-            .output()?;
+        let output = input_guard::argv_checked!(
+            vg_name,
+            LvmError::CommandFailed("invalid VG name".into()),
+            |vg_name| {
+                Command::new("vgs")
+                    .args([
+                        "--noheadings",
+                        "--nosuffix",
+                        "--units",
+                        "b",
+                        "-o",
+                        "vg_name",
+                        vg_name,
+                    ])
+                    .output()?
+            }
+        );
 
         if !output.status.success() {
             return Err(LvmError::VgNotFound(vg_name.to_string()));
@@ -260,17 +266,23 @@ impl LvmPool {
             &self.vg_name,
             LvmError::CommandFailed("invalid VG name".into())
         );
-        let output = Command::new("vgs")
-            .args([
-                "--noheadings",
-                "--nosuffix",
-                "--units",
-                "b",
-                "-o",
-                "vg_size,vg_free",
-                vg_name,
-            ])
-            .output()?;
+        let output = input_guard::argv_checked!(
+            vg_name,
+            LvmError::CommandFailed("invalid VG name".into()),
+            |vg_name| {
+                Command::new("vgs")
+                    .args([
+                        "--noheadings",
+                        "--nosuffix",
+                        "--units",
+                        "b",
+                        "-o",
+                        "vg_size,vg_free",
+                        vg_name,
+                    ])
+                    .output()?
+            }
+        );
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

@@ -721,11 +721,10 @@ impl ContentLibraryManager {
         std::fs::create_dir_all(&storage_path)?;
 
         // Download the file
-        let url = if input_guard::is_safe_outbound_url(url) {
-            url
-        } else {
+        let url = input_guard::sanitize_outbound_url(url);
+        if url.is_empty() {
             anyhow::bail!("refusing to download from an unsafe URL");
-        };
+        }
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::custom(|attempt| {
                 if input_guard::is_safe_outbound_url(attempt.url().as_str()) {

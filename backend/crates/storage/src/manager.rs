@@ -495,9 +495,18 @@ impl StorageManager {
                 "rejected unsafe storage path",
             ))
         );
-        let output = std::process::Command::new("df")
-            .args(["-k", path])
-            .output()?;
+        let output = input_guard::argv_checked!(
+            path,
+            StorageError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "rejected unsafe storage path",
+            )),
+            |path| {
+                std::process::Command::new("df")
+                    .args(["-k", path])
+                    .output()?
+            }
+        );
 
         let df_output = String::from_utf8_lossy(&output.stdout);
         let lines: Vec<&str> = df_output.lines().collect();

@@ -3,7 +3,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Workspace crates | 53 |
+| Workspace crates | 54 |
 | Workspace version | 0.3.0 |
 | Web package version | 0.3.0 |
 | React version | 19.3.0 |
@@ -12,5 +12,5 @@
 
 Canonical facts for README/architecture prose:
 
-- Backend workspace: **53 crates**
+- Backend workspace: **54 crates**
 - Web UI: **React 19.3.0**

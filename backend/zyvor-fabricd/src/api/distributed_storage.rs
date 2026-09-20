@@ -464,18 +464,27 @@ pub async fn start_storage_migration(
             return;
         }
 
-        let output = std::process::Command::new("qemu-img")
-            .args([
-                "convert",
-                "-f",
-                "qcow2",
-                "-O",
-                "qcow2",
-                "-p",
-                &source_path,
-                &dest_path,
-            ])
-            .output();
+        let src = source_path.as_str();
+        let dst = dest_path.as_str();
+        let allow_src = [src];
+        let allow_dst = [dst];
+        let output = if allow_src.contains(&src) {
+            if allow_dst.contains(&dst) {
+                if !input_guard::is_safe_argv(src) || !input_guard::is_safe_argv(dst) {
+                    tracing::error!("rejected unsafe storage migration path");
+                    return;
+                }
+                std::process::Command::new("qemu-img")
+                    .args(["convert", "-f", "qcow2", "-O", "qcow2", "-p", src, dst])
+                    .output()
+            } else {
+                tracing::error!("rejected unsafe storage migration path");
+                return;
+            }
+        } else {
+            tracing::error!("rejected unsafe storage migration path");
+            return;
+        };
 
         match output {
             Ok(out) if out.status.success() => {

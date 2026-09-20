@@ -13,6 +13,8 @@ export interface AgentManifest {
   max_concurrent_sessions?: number
   idle_hibernate_seconds?: number
   warm_pool_size?: number
+  /** node runs worker.mjs. claude, codex, and gemini run that CLI inside the template. */
+  runtime?: 'node' | 'claude' | 'codex' | 'gemini'
 }
 
 export interface AgentRecord {
@@ -35,6 +37,7 @@ export interface SessionView {
   last_event_seq: number
   request_id?: string | null
   error?: string | null
+  parent_session_id?: string | null
 }
 
 export async function listAgents(): Promise<{ items: AgentRecord[] }> {

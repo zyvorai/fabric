@@ -92,8 +92,15 @@ impl CephPool {
             &self.pool_name,
             CephError::CommandFailed("invalid Ceph pool".into())
         );
-        let mut cmd = Command::new("ceph");
-        cmd.args(["osd", "pool", "stats", pool_name, "-f", "json"]);
+        let mut cmd = input_guard::argv_checked!(
+            pool_name,
+            CephError::CommandFailed("invalid Ceph pool".into()),
+            |pool_name| {
+                let mut cmd = Command::new("ceph");
+                cmd.args(["osd", "pool", "stats", pool_name, "-f", "json"]);
+                cmd
+            }
+        );
         self.add_auth_args(&mut cmd)?;
 
         let output = cmd.output()?;
@@ -247,19 +254,37 @@ impl CephPool {
                 &monitors,
                 CephError::CommandFailed("invalid Ceph monitors".into())
             );
-            cmd.arg("-m").arg(monitors);
+            input_guard::argv_checked!(
+                monitors,
+                CephError::CommandFailed("invalid Ceph monitors".into()),
+                |monitors| {
+                    cmd.arg("-m").arg(monitors);
+                }
+            );
         }
         let user = input_guard::vet!(
             &self.user,
             CephError::CommandFailed("invalid Ceph user".into())
         );
-        cmd.arg("--id").arg(user);
+        input_guard::argv_checked!(
+            user,
+            CephError::CommandFailed("invalid Ceph user".into()),
+            |user| {
+                cmd.arg("--id").arg(user);
+            }
+        );
         if let Some(ref keyring) = self.keyring {
             let keyring = input_guard::vet!(
                 keyring,
                 CephError::CommandFailed("invalid Ceph keyring path".into())
             );
-            cmd.arg("--keyring").arg(keyring);
+            input_guard::argv_checked!(
+                keyring,
+                CephError::CommandFailed("invalid Ceph keyring path".into()),
+                |keyring| {
+                    cmd.arg("--keyring").arg(keyring);
+                }
+            );
         }
         Ok(())
     }
