@@ -283,3 +283,84 @@ async fn create_vm_posts_direct_l2_uplink() {
     assert_eq!(created.id, id);
     assert_eq!(created.name, "uplink");
 }
+
+#[tokio::test]
+async fn host_gpu_list_bind_release_paths() {
+    use zyvor_fabric_fluxvm_client::{GpuBindRequest, GpuReleaseRequest};
+
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/v1/host/gpus"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "items": [{
+                "bdf": "0000:01:00.0",
+                "vendor_id": 4318,
+                "device_id": 9860,
+                "vendor": "NVIDIA",
+                "class_id": 770,
+                "driver": "nvidia",
+                "iommu_group": 12,
+                "iommu_members": ["0000:01:00.0"],
+                "group_bound_to_vfio": false,
+                "group_held": false,
+                "numa_node": 0,
+                "vram_gib": 48
+            }]
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/v1/host/gpus/bind"))
+        .and(body_partial_json(json!({ "bdf": "0000:01:00.0" })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "bdf": "0000:01:00.0",
+            "iommu_group": 12,
+            "members": ["0000:01:00.0"],
+            "previous_drivers": { "0000:01:00.0": "nvidia" }
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/v1/host/gpus/release"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "bdf": "0000:01:00.0",
+            "vendor_id": 4318,
+            "device_id": 9860,
+            "vendor": "NVIDIA",
+            "class_id": 770,
+            "driver": "vfio-pci",
+            "iommu_group": 12,
+            "iommu_members": ["0000:01:00.0"],
+            "group_bound_to_vfio": true,
+            "group_held": false,
+            "numa_node": 0
+        })))
+        .mount(&server)
+        .await;
+
+    let client = FluxVmClient::new(server.uri()).unwrap();
+    let gpus = client.list_host_gpus().await.unwrap();
+    assert_eq!(gpus.len(), 1);
+    assert_eq!(gpus[0].bdf, "0000:01:00.0");
+
+    let bound = client
+        .bind_host_gpu(&GpuBindRequest {
+            bdf: "0000:01:00.0".into(),
+            vram_gib: Some(48),
+        })
+        .await
+        .unwrap();
+    assert_eq!(bound.iommu_group, 12);
+
+    let released = client
+        .release_host_gpu(&GpuReleaseRequest {
+            bdf: "0000:01:00.0".into(),
+            restore_driver: false,
+        })
+        .await
+        .unwrap();
+    assert_eq!(released.bdf, "0000:01:00.0");
+}

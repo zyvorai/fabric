@@ -262,6 +262,10 @@ enum Commands {
     #[command(subcommand)]
     ContainerGroup(ContainerGroupCmd),
 
+    /// Fabric AI Workloads (preview): models, deployments, endpoints, GPUs
+    #[command(subcommand)]
+    Ai(AiCmd),
+
     // ─── Meta (Cilium-parity) ────────────────────────────────────────────
     /// Display Fabric / dataplane status
     Status,
@@ -871,6 +875,187 @@ enum ContainerGroupBackupCmd {
     Delete { id: String },
     /// Restore a backup back onto its original host paths
     Restore { id: String },
+}
+
+/// Fabric AI Workloads CLI (preview). OpenAI-compatible inference on GPU VMs.
+#[derive(Subcommand)]
+enum AiCmd {
+    /// Register or list model artifacts
+    #[command(subcommand)]
+    Model(AiModelCmd),
+    /// Inference profiles (runtime + GPU/CPU shape)
+    #[command(subcommand)]
+    Profile(AiProfileCmd),
+    /// Deploy a model with a profile
+    Deploy {
+        /// Model artifact name (or use --model)
+        model: Option<String>,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        model_name: Option<String>,
+        #[arg(long, default_value = "vllm")]
+        runtime: String,
+        #[arg(long, default_value = "default")]
+        profile: String,
+        #[arg(long, default_value_t = 1)]
+        gpu: u32,
+        #[arg(long, default_value_t = 24)]
+        vram: u32,
+        #[arg(long, default_value_t = 8)]
+        cpu: u32,
+        #[arg(long, default_value_t = 32)]
+        memory: u32,
+        #[arg(long, default_value_t = 1)]
+        replicas: u32,
+    },
+    /// Deployment scale / info / list / delete
+    #[command(subcommand)]
+    Deployment(AiDeploymentCmd),
+    /// Expose or list OpenAI-compatible endpoints
+    #[command(subcommand)]
+    Endpoint(AiEndpointCmd),
+    /// Endpoint API keys (Phase 4)
+    #[command(subcommand)]
+    Key(AiKeyCmd),
+    /// List host GPUs (FluxVM inventory + Fabric allocation)
+    Gpus,
+}
+
+#[derive(Subcommand)]
+enum AiModelCmd {
+    /// List model artifacts
+    List,
+    /// Register a model (`hf://org/name` or local path)
+    Add {
+        name: String,
+        #[arg(long)]
+        source: String,
+        #[arg(long)]
+        revision: Option<String>,
+        #[arg(long, default_value = "safetensors")]
+        format: String,
+    },
+    /// Show one model
+    Info { name: String },
+    /// Delete a model artifact
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum AiProfileCmd {
+    List,
+    Add {
+        name: String,
+        #[arg(long, default_value = "vllm")]
+        runtime: String,
+        #[arg(long, default_value = "nvidia")]
+        vendor: String,
+        #[arg(long, default_value_t = 1)]
+        gpu: u32,
+        #[arg(long, default_value_t = 24)]
+        vram: u32,
+        #[arg(long, default_value_t = 8)]
+        cpu: u32,
+        #[arg(long, default_value_t = 32)]
+        memory: u32,
+    },
+    Info { name: String },
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum AiDeploymentCmd {
+    List,
+    Info { name: String },
+    Scale {
+        name: String,
+        #[arg(long)]
+        replicas: u32,
+    },
+    /// Configure queue/TTFT autoscaling
+    Autoscale {
+        name: String,
+        #[arg(long)]
+        enable: bool,
+        #[arg(long, default_value_t = 1)]
+        min: u32,
+        #[arg(long, default_value_t = 4)]
+        max: u32,
+        #[arg(long, default_value_t = false)]
+        scale_to_zero: bool,
+        #[arg(long, default_value_t = 20)]
+        scale_out_queue: u32,
+        #[arg(long, default_value_t = 30)]
+        scale_out_seconds: u64,
+        #[arg(long, default_value_t = 2)]
+        scale_in_queue: u32,
+        #[arg(long, default_value_t = 600)]
+        scale_in_seconds: u64,
+    },
+    /// Gracefully drain Maglev backends
+    Drain {
+        name: String,
+        #[arg(long)]
+        replica: Option<String>,
+        #[arg(long, default_value_t = 30)]
+        grace_seconds: u64,
+    },
+    /// Start a rolling / canary / blue-green rollout
+    Rollout {
+        name: String,
+        #[arg(long, default_value = "rolling")]
+        strategy: String,
+        #[arg(long)]
+        target_model: Option<String>,
+        #[arg(long, default_value_t = 10)]
+        canary_percent: u8,
+    },
+    /// Show last scraped AI metrics + Maglev weights
+    Metrics { name: String },
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum AiEndpointCmd {
+    List,
+    /// Expose a deployment as an OpenAI-compatible Maglev VIP
+    Expose {
+        /// Deployment name
+        deployment: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long, default_value_t = 8000)]
+        port: u16,
+        #[arg(long)]
+        vip: Option<String>,
+        #[arg(long, default_value_t = true)]
+        openai_compatible: bool,
+        /// Maglev weight strategy
+        #[arg(long, default_value = "least_queue")]
+        routing: String,
+        #[arg(long)]
+        preferred_site: Option<String>,
+        #[arg(long)]
+        residency: Option<String>,
+    },
+    Info { name: String },
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum AiKeyCmd {
+    List,
+    Create {
+        name: String,
+        #[arg(long)]
+        endpoint: String,
+        #[arg(long)]
+        model: Option<String>,
+        #[arg(long)]
+        request_quota: Option<u64>,
+    },
+    Delete { id: String },
 }
 
 // ─── Table row types ─────────────────────────────────────────────────────────
@@ -1884,6 +2069,10 @@ impl Cli {
                     "vlan" => ("POST", "/networkd/vlans"),
                     "bond" => ("POST", "/networkd/bonds"),
                     "port-forward" => ("POST", "/networkd/port-forwards"),
+                    "model-artifact" | "ModelArtifact" => ("POST", "/ai/models"),
+                    "inference-profile" | "InferenceProfile" => ("POST", "/ai/profiles"),
+                    "inference-deployment" | "InferenceDeployment" => ("POST", "/ai/deployments"),
+                    "inference-endpoint" | "InferenceEndpoint" => ("POST", "/ai/endpoints"),
                     _ => anyhow::bail!("Unknown resource kind: {}", kind),
                 };
 
@@ -2592,6 +2781,292 @@ impl Cli {
                         print_value(&val, fmt);
                     }
                 },
+            },
+
+            Commands::Ai(cmd) => match cmd {
+                AiCmd::Model(sub) => match sub {
+                    AiModelCmd::List => {
+                        let val = api_get(&client, "/ai/models").await?;
+                        print_value(&val, fmt);
+                    }
+                    AiModelCmd::Info { name } => {
+                        let val = api_get(&client, &format!("/ai/models/{name}")).await?;
+                        print_value(&val, fmt);
+                    }
+                    AiModelCmd::Add {
+                        name,
+                        source,
+                        revision,
+                        format: model_format,
+                    } => {
+                        let body = serde_json::json!({
+                            "name": name,
+                            "source": source,
+                            "revision": revision,
+                            "format": model_format,
+                        });
+                        let val = api_post(&client, "/ai/models", &body).await?;
+                        println!("Registered model artifact '{name}'");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    AiModelCmd::Delete { name } => {
+                        api_delete(&client, &format!("/ai/models/{name}")).await?;
+                        println!("Deleted model artifact '{name}'");
+                    }
+                },
+                AiCmd::Profile(sub) => match sub {
+                    AiProfileCmd::List => {
+                        let val = api_get(&client, "/ai/profiles").await?;
+                        print_value(&val, fmt);
+                    }
+                    AiProfileCmd::Info { name } => {
+                        let val = api_get(&client, &format!("/ai/profiles/{name}")).await?;
+                        print_value(&val, fmt);
+                    }
+                    AiProfileCmd::Add {
+                        name,
+                        runtime,
+                        vendor,
+                        gpu,
+                        vram,
+                        cpu,
+                        memory,
+                    } => {
+                        let body = serde_json::json!({
+                            "name": name,
+                            "runtime": runtime,
+                            "gpu": {
+                                "vendor": vendor,
+                                "count": gpu,
+                                "minimum_vram_gib": vram,
+                            },
+                            "cpu": cpu,
+                            "memory_gib": memory,
+                        });
+                        let val = api_post(&client, "/ai/profiles", &body).await?;
+                        println!("Created inference profile '{name}'");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    AiProfileCmd::Delete { name } => {
+                        api_delete(&client, &format!("/ai/profiles/{name}")).await?;
+                        println!("Deleted profile '{name}'");
+                    }
+                },
+                AiCmd::Deploy {
+                    model,
+                    name,
+                    model_name,
+                    runtime,
+                    profile,
+                    gpu,
+                    vram,
+                    cpu,
+                    memory,
+                    replicas,
+                } => {
+                    let model = model
+                        .or(model_name)
+                        .context("provide a model name (positional or --model-name)")?;
+                    let dep_name = name.unwrap_or_else(|| model.clone());
+                    // Ensure a profile exists (create/upsert-style for the MVP CLI).
+                    let profile_body = serde_json::json!({
+                        "name": profile,
+                        "runtime": runtime,
+                        "gpu": {
+                            "vendor": "nvidia",
+                            "count": gpu,
+                            "minimum_vram_gib": vram,
+                        },
+                        "cpu": cpu,
+                        "memory_gib": memory,
+                    });
+                    let _ = api_post(&client, "/ai/profiles", &profile_body).await;
+                    let body = serde_json::json!({
+                        "name": dep_name,
+                        "model": model,
+                        "profile": profile,
+                        "replicas": replicas,
+                    });
+                    let val = api_post(&client, "/ai/deployments", &body).await?;
+                    println!("Deployed '{dep_name}' (model={model}, profile={profile}, replicas={replicas})");
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
+                }
+                AiCmd::Deployment(sub) => match sub {
+                    AiDeploymentCmd::List => {
+                        let val = api_get(&client, "/ai/deployments").await?;
+                        print_value(&val, fmt);
+                    }
+                    AiDeploymentCmd::Info { name } => {
+                        let val = api_get(&client, &format!("/ai/deployments/{name}")).await?;
+                        print_value(&val, fmt);
+                    }
+                    AiDeploymentCmd::Scale { name, replicas } => {
+                        let body = serde_json::json!({ "replicas": replicas });
+                        let val =
+                            api_post(&client, &format!("/ai/deployments/{name}/scale"), &body)
+                                .await?;
+                        println!("Scaled deployment '{name}' to {replicas} replicas");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    AiDeploymentCmd::Autoscale {
+                        name,
+                        enable,
+                        min,
+                        max,
+                        scale_to_zero,
+                        scale_out_queue,
+                        scale_out_seconds,
+                        scale_in_queue,
+                        scale_in_seconds,
+                    } => {
+                        let body = serde_json::json!({
+                            "autoscaling": {
+                                "enabled": enable,
+                                "min_replicas": min,
+                                "max_replicas": max,
+                                "scale_to_zero": scale_to_zero,
+                                "scale_out_queue": scale_out_queue,
+                                "scale_out_seconds": scale_out_seconds,
+                                "scale_in_queue": scale_in_queue,
+                                "scale_in_seconds": scale_in_seconds,
+                            }
+                        });
+                        let val = api_put(
+                            &client,
+                            &format!("/ai/deployments/{name}/autoscaling"),
+                            &body,
+                        )
+                        .await?;
+                        println!("Updated autoscaling on '{name}' (enabled={enable})");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    AiDeploymentCmd::Drain {
+                        name,
+                        replica,
+                        grace_seconds,
+                    } => {
+                        let body = serde_json::json!({
+                            "replica": replica,
+                            "grace_seconds": grace_seconds,
+                        });
+                        let val =
+                            api_post(&client, &format!("/ai/deployments/{name}/drain"), &body)
+                                .await?;
+                        println!("Draining deployment '{name}'");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    AiDeploymentCmd::Rollout {
+                        name,
+                        strategy,
+                        target_model,
+                        canary_percent,
+                    } => {
+                        let body = serde_json::json!({
+                            "strategy": strategy,
+                            "target_model": target_model,
+                            "canary_percent": canary_percent,
+                        });
+                        let val =
+                            api_post(&client, &format!("/ai/deployments/{name}/rollout"), &body)
+                                .await?;
+                        println!("Rollout started for '{name}' ({strategy})");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    AiDeploymentCmd::Metrics { name } => {
+                        let val =
+                            api_get(&client, &format!("/ai/deployments/{name}/metrics")).await?;
+                        print_value(&val, fmt);
+                    }
+                    AiDeploymentCmd::Delete { name } => {
+                        api_delete(&client, &format!("/ai/deployments/{name}")).await?;
+                        println!("Deleted deployment '{name}'");
+                    }
+                },
+                AiCmd::Endpoint(sub) => match sub {
+                    AiEndpointCmd::List => {
+                        let val = api_get(&client, "/ai/endpoints").await?;
+                        print_value(&val, fmt);
+                    }
+                    AiEndpointCmd::Info { name } => {
+                        let val = api_get(&client, &format!("/ai/endpoints/{name}")).await?;
+                        print_value(&val, fmt);
+                    }
+                    AiEndpointCmd::Expose {
+                        deployment,
+                        name,
+                        port,
+                        vip,
+                        openai_compatible: _,
+                        routing,
+                        preferred_site,
+                        residency,
+                    } => {
+                        let ep_name = name.unwrap_or_else(|| format!("{deployment}-openai"));
+                        let body = serde_json::json!({
+                            "name": ep_name,
+                            "deployment": deployment,
+                            "protocol": "openai",
+                            "port": port,
+                            "vip": vip,
+                            "routing_strategy": routing,
+                            "preferred_site": preferred_site,
+                            "residency": residency,
+                        });
+                        let val = api_post(&client, "/ai/endpoints", &body).await?;
+                        println!("Exposed endpoint '{ep_name}' for deployment '{deployment}' (routing={routing})");
+                        if !matches!(fmt, OutputFormat::Table) {
+                            print_value(&val, fmt);
+                        }
+                    }
+                    AiEndpointCmd::Delete { name } => {
+                        api_delete(&client, &format!("/ai/endpoints/{name}")).await?;
+                        println!("Deleted endpoint '{name}'");
+                    }
+                },
+                AiCmd::Key(sub) => match sub {
+                    AiKeyCmd::List => {
+                        let val = api_get(&client, "/ai/keys").await?;
+                        print_value(&val, fmt);
+                    }
+                    AiKeyCmd::Create {
+                        name,
+                        endpoint,
+                        model,
+                        request_quota,
+                    } => {
+                        let body = serde_json::json!({
+                            "name": name,
+                            "endpoint": endpoint,
+                            "model": model,
+                            "request_quota": request_quota,
+                        });
+                        let val = api_post(&client, "/ai/keys", &body).await?;
+                        println!("Created API key (secret shown once)");
+                        print_value(&val, fmt);
+                    }
+                    AiKeyCmd::Delete { id } => {
+                        api_delete(&client, &format!("/ai/keys/{id}")).await?;
+                        println!("Deleted API key '{id}'");
+                    }
+                },
+                AiCmd::Gpus => {
+                    let val = api_get(&client, "/ai/gpus").await?;
+                    print_value(&val, fmt);
+                }
             },
         }
 

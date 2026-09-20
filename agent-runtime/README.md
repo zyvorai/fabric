@@ -108,6 +108,15 @@ When the CLI prints `ZYVOR_APPROVAL <question>`, the runtime opens an operator a
 - `list_executions`
 - `chat_with_agent` creates a session, or steers one when `session_id` is set
 
+## Fabric-managed inference (Phase 6)
+
+Agents can call a Fabric `InferenceEndpoint` Maglev VIP without an external
+provider API key. Add a credential with `"kind": "fabric"` (see
+`credentials.example.json`), grant it on the agent, set
+`ZYVOR_FABRIC_INFERENCE_BASE` to the VIP base URL, and optionally
+`FABRIC_AI_API_KEY` when endpoint keys are enabled. HTTP to private Maglev
+ports is allowed for `kind: fabric` only.
+
 ## Credentials
 
 Create a **descriptor file**, not a secret file:

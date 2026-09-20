@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod agent_runtime;
+pub mod ai;
 pub mod auth;
 pub mod capabilities;
 pub mod instance;

@@ -1,0 +1,217 @@
+// Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+// SPDX-License-Identifier: Apache-2.0
+//!
+//! Queue / TTFT-driven inference autoscaler (Phase 3, preview).
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use chrono::Utc;
+
+use crate::server::AppState;
+
+use super::reconcile;
+use super::types::{AutoscalingPolicy, InferenceDeployment};
+use super::STORE_DEPLOYMENTS;
+
+/// Background loop evaluating autoscaling policies.
+pub async fn run_ai_autoscaler(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(Duration::from_secs(15));
+    let mut out_since: HashMap<String, Instant> = HashMap::new();
+    let mut in_since: HashMap<String, Instant> = HashMap::new();
+    loop {
+        interval.tick().await;
+        if let Err(e) = autoscaler_tick(&state, &mut out_since, &mut in_since).await {
+            tracing::debug!("AI autoscaler tick: {e}");
+        }
+    }
+}
+
+async fn autoscaler_tick(
+    state: &Arc<AppState>,
+    out_since: &mut HashMap<String, Instant>,
+    in_since: &mut HashMap<String, Instant>,
+) -> Result<(), String> {
+    let deps: Vec<InferenceDeployment> = state
+        .store
+        .list_entities(STORE_DEPLOYMENTS)
+        .map_err(|e| e.to_string())?;
+
+    for dep in deps {
+        if !dep.autoscaling.enabled {
+            out_since.remove(&dep.name);
+            in_since.remove(&dep.name);
+            continue;
+        }
+        if let Err(e) = evaluate_one(state, &dep, out_since, in_since).await {
+            tracing::debug!(deployment = %dep.name, "AI autoscaler: {e}");
+        }
+    }
+    Ok(())
+}
+
+async fn evaluate_one(
+    state: &Arc<AppState>,
+    dep: &InferenceDeployment,
+    out_since: &mut HashMap<String, Instant>,
+    in_since: &mut HashMap<String, Instant>,
+) -> Result<(), String> {
+    let policy = &dep.autoscaling;
+    let (avg_queue, avg_ttft, ready) = aggregate_metrics(dep);
+
+    let want_out = ready > 0
+        && (avg_queue > f64::from(policy.scale_out_queue)
+            || (policy.scale_out_ttft_ms > 0.0 && avg_ttft > policy.scale_out_ttft_ms));
+    let want_in = avg_queue < f64::from(policy.scale_in_queue)
+        && (policy.scale_out_ttft_ms <= 0.0 || avg_ttft < policy.scale_out_ttft_ms * 0.5);
+
+    let now = Instant::now();
+    if want_out {
+        in_since.remove(&dep.name);
+        let since = out_since.entry(dep.name.clone()).or_insert(now);
+        if now.duration_since(*since) >= Duration::from_secs(policy.scale_out_seconds) {
+            let next = next_replicas(dep.replicas, policy, 1);
+            if next > dep.replicas {
+                apply_scale(state, &dep.name, next, "scale_out").await?;
+            }
+            out_since.remove(&dep.name);
+        }
+    } else if want_in {
+        out_since.remove(&dep.name);
+        let since = in_since.entry(dep.name.clone()).or_insert(now);
+        if now.duration_since(*since) >= Duration::from_secs(policy.scale_in_seconds) {
+            let next = next_replicas(dep.replicas, policy, -1);
+            if next < dep.replicas {
+                apply_scale(state, &dep.name, next, "scale_in").await?;
+            }
+            in_since.remove(&dep.name);
+        }
+    } else {
+        out_since.remove(&dep.name);
+        in_since.remove(&dep.name);
+    }
+    Ok(())
+}
+
+fn aggregate_metrics(dep: &InferenceDeployment) -> (f64, f64, usize) {
+    let ready: Vec<_> = dep.status.replicas.iter().filter(|r| r.ready).collect();
+    if ready.is_empty() {
+        return (0.0, 0.0, 0);
+    }
+    let n = ready.len() as f64;
+    let avg_queue = ready
+        .iter()
+        .map(|r| f64::from(r.metrics.as_ref().map(|m| m.queue_depth).unwrap_or(0)))
+        .sum::<f64>()
+        / n;
+    let avg_ttft = ready
+        .iter()
+        .map(|r| r.metrics.as_ref().map(|m| m.ttft_ms).unwrap_or(0.0))
+        .sum::<f64>()
+        / n;
+    (avg_queue, avg_ttft, ready.len())
+}
+
+/// Compute next desired replica count after a ±1 step, honouring min/max / scale-to-zero.
+pub fn next_replicas(current: u32, policy: &AutoscalingPolicy, delta: i32) -> u32 {
+    let mut min = policy.min_replicas;
+    if policy.scale_to_zero {
+        min = 0;
+    }
+    let max = policy.max_replicas.max(min);
+    let standby = if policy.warm_standby { 1u32 } else { 0 };
+    let effective_max = max.saturating_add(standby);
+    let next = (current as i64 + i64::from(delta)).clamp(i64::from(min), i64::from(effective_max));
+    next as u32
+}
+
+async fn apply_scale(
+    state: &Arc<AppState>,
+    name: &str,
+    replicas: u32,
+    reason: &str,
+) -> Result<(), String> {
+    let mut dep: InferenceDeployment = state
+        .store
+        .get_entity(STORE_DEPLOYMENTS, name)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("deployment '{name}' not found"))?;
+    if dep.replicas == replicas {
+        return Ok(());
+    }
+    tracing::info!(
+        deployment = %name,
+        from = dep.replicas,
+        to = replicas,
+        reason,
+        "AI autoscaler adjusting replicas"
+    );
+    dep.replicas = replicas;
+    dep.revision = dep.revision.saturating_add(1);
+    dep.status.phase = "Scaling".into();
+    dep.status.message = Some(format!("autoscaler {reason} → {replicas}"));
+    dep.updated = Utc::now();
+    state
+        .store
+        .save_entity(STORE_DEPLOYMENTS, &dep.name, &dep)
+        .map_err(|e| e.to_string())?;
+    reconcile::enqueue_deployment_reconcile(state.clone(), dep.name.clone());
+    Ok(())
+}
+
+/// Pure decision helper for unit tests.
+pub fn suggest_delta(
+    avg_queue: f64,
+    avg_ttft: f64,
+    policy: &AutoscalingPolicy,
+    sustained_out: bool,
+    sustained_in: bool,
+) -> i32 {
+    let want_out = avg_queue > f64::from(policy.scale_out_queue)
+        || (policy.scale_out_ttft_ms > 0.0 && avg_ttft > policy.scale_out_ttft_ms);
+    let want_in = avg_queue < f64::from(policy.scale_in_queue)
+        && (policy.scale_out_ttft_ms <= 0.0 || avg_ttft < policy.scale_out_ttft_ms * 0.5);
+    if want_out && sustained_out {
+        1
+    } else if want_in && sustained_in {
+        -1
+    } else {
+        0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn next_respects_bounds() {
+        let mut p = AutoscalingPolicy::default();
+        p.min_replicas = 1;
+        p.max_replicas = 3;
+        assert_eq!(next_replicas(1, &p, -1), 1);
+        assert_eq!(next_replicas(3, &p, 1), 3);
+        assert_eq!(next_replicas(2, &p, 1), 3);
+    }
+
+    #[test]
+    fn scale_to_zero() {
+        let mut p = AutoscalingPolicy::default();
+        p.min_replicas = 1;
+        p.scale_to_zero = true;
+        p.max_replicas = 2;
+        assert_eq!(next_replicas(1, &p, -1), 0);
+    }
+
+    #[test]
+    fn suggest_scale_out_on_queue() {
+        let p = AutoscalingPolicy {
+            scale_out_queue: 20,
+            ..AutoscalingPolicy::default()
+        };
+        assert_eq!(suggest_delta(25.0, 100.0, &p, true, false), 1);
+        assert_eq!(suggest_delta(25.0, 100.0, &p, false, false), 0);
+        assert_eq!(suggest_delta(1.0, 50.0, &p, false, true), -1);
+    }
+}

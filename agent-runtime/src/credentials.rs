@@ -12,6 +12,8 @@ pub struct CredentialDescriptor {
     /// Header injected by the host broker, e.g. `authorization` or `x-api-key`.
     pub header: String,
     /// Host environment variable containing the secret. Its value is never persisted.
+    /// For `kind=fabric`, leave empty — no external provider key is required.
+    #[serde(default)]
     pub env: String,
     #[serde(default)]
     pub prefix: String,
@@ -22,8 +24,18 @@ pub struct CredentialDescriptor {
     #[serde(default)]
     pub path_prefixes: Vec<String>,
     /// Additional HTTPS ports that may receive this credential. Port 443 is always allowed.
+    /// For `kind=fabric`, non-TLS Maglev ports (e.g. 8000) may be listed.
     #[serde(default)]
     pub allowed_ports: Vec<u16>,
+    /// `provider` (default) injects a host env secret over HTTPS.
+    /// `fabric` routes to a Fabric InferenceEndpoint VIP with no external API key
+    /// (optional `FABRIC_AI_API_KEY` when endpoint keys are enabled).
+    #[serde(default = "default_kind")]
+    pub kind: String,
+}
+
+fn default_kind() -> String {
+    "provider".into()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -61,6 +73,14 @@ impl CredentialVault {
         let descriptor = self.descriptor(name).with_context(|| {
             format!("credential '{name}' is not configured on this Fabric host")
         })?;
+        if descriptor.kind.eq_ignore_ascii_case("fabric") {
+            // Optional endpoint API key; empty means no Authorization header.
+            let value = std::env::var("FABRIC_AI_API_KEY").unwrap_or_default();
+            if value.is_empty() {
+                return Ok((descriptor, String::new()));
+            }
+            return Ok((descriptor, format!("{}{}", descriptor.prefix, value)));
+        }
         let value = std::env::var(&descriptor.env)
             .with_context(|| format!("host environment variable {} is not set", descriptor.env))?;
         if value.is_empty() {
@@ -71,12 +91,11 @@ impl CredentialVault {
 }
 
 fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
-    if name.is_empty()
-        || d.host.trim().is_empty()
-        || d.header.trim().is_empty()
-        || d.env.trim().is_empty()
-    {
-        bail!("credential descriptors require non-empty name, host, header and env");
+    if name.is_empty() || d.host.trim().is_empty() || d.header.trim().is_empty() {
+        bail!("credential descriptors require non-empty name, host and header");
+    }
+    if !d.kind.eq_ignore_ascii_case("fabric") && d.env.trim().is_empty() {
+        bail!("credential '{name}' requires env unless kind is fabric");
     }
     if d.header.eq_ignore_ascii_case("host") || d.header.eq_ignore_ascii_case("content-length") {
         bail!("credential '{name}' may not inject the {} header", d.header);
@@ -113,7 +132,12 @@ pub fn credential_allows_request(
             .path_prefixes
             .iter()
             .any(|prefix| path.starts_with(prefix));
-    let port_ok = port == 443 || descriptor.allowed_ports.contains(&port);
+    let port_ok = port == 443
+        || port == 80
+        || descriptor.allowed_ports.contains(&port)
+        || (descriptor.kind.eq_ignore_ascii_case("fabric")
+            && descriptor.allowed_ports.is_empty()
+            && (port == 8000 || port == 8080));
     method_ok && path_ok && port_ok
 }
 
@@ -148,6 +172,7 @@ mod tests {
             allowed_methods: vec!["POST".into()],
             path_prefixes: vec!["/v1/".into()],
             allowed_ports: vec![8443],
+            kind: "provider".into(),
         };
         assert!(credential_allows_request(
             &d,

@@ -1078,6 +1078,65 @@ struct DeletedResponse {
     deleted: String,
 }
 
+// ============================================================================
+// Host GPU inventory (mirror fluxvm_core::gpu)
+// ============================================================================
+
+/// One PCI function that looks like a GPU (VGA or 3D controller).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HostGpu {
+    pub bdf: String,
+    pub vendor_id: u16,
+    pub device_id: u16,
+    pub vendor: String,
+    pub class_id: u32,
+    pub driver: Option<String>,
+    pub iommu_group: Option<u32>,
+    pub iommu_members: Vec<String>,
+    pub group_bound_to_vfio: bool,
+    pub group_held: bool,
+    pub numa_node: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vram_gib: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_driver: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuBindRequest {
+    pub bdf: String,
+    #[serde(default)]
+    pub vram_gib: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuReleaseRequest {
+    pub bdf: String,
+    #[serde(default)]
+    pub restore_driver: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuBindResult {
+    pub bdf: String,
+    pub iommu_group: u32,
+    pub members: Vec<String>,
+    pub previous_drivers: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuPreflight {
+    pub iommu_enabled: bool,
+    pub vfio_pci_loaded: bool,
+    pub gpu_count: usize,
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HostGpuListResponse {
+    items: Vec<HostGpu>,
+}
+
 /// Applied to the VM handed back by a pool claim, replacing whatever the
 /// template said for these two fields. Mirrors
 /// `fluxvm_core::model::ClaimOverrides`.
@@ -2445,6 +2504,45 @@ impl FluxVmClient {
             .await?;
         let body: RefreshDnsResponse = Self::parse(resp).await?;
         Ok(body.refreshed)
+    }
+
+    /// `GET /v1/host/gpus` — host GPU inventory for Fabric AI placement.
+    pub async fn list_host_gpus(&self) -> Result<Vec<HostGpu>> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/host/gpus")?))
+            .send()
+            .await?;
+        let body: HostGpuListResponse = Self::parse(resp).await?;
+        Ok(body.items)
+    }
+
+    /// `GET /v1/host/gpus/preflight`
+    pub async fn host_gpu_preflight(&self) -> Result<GpuPreflight> {
+        let resp = self
+            .authed(self.http.get(self.url("/v1/host/gpus/preflight")?))
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/host/gpus/bind` — explicit VFIO bind (never a side effect of VM create).
+    pub async fn bind_host_gpu(&self, req: &GpuBindRequest) -> Result<GpuBindResult> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/host/gpus/bind")?))
+            .json(req)
+            .send()
+            .await?;
+        Self::parse(resp).await
+    }
+
+    /// `POST /v1/host/gpus/release`
+    pub async fn release_host_gpu(&self, req: &GpuReleaseRequest) -> Result<HostGpu> {
+        let resp = self
+            .authed(self.http.post(self.url("/v1/host/gpus/release")?))
+            .json(req)
+            .send()
+            .await?;
+        Self::parse(resp).await
     }
 
     async fn expect_no_content(resp: reqwest::Response) -> Result<()> {

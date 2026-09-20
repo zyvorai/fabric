@@ -136,10 +136,21 @@ async fn proxy_inner(
                 format!("credential '{name}' is not granted to this agent"),
             ));
         }
-        if url.scheme() != "https" {
+        let is_fabric = state
+            .credentials
+            .descriptor(name)
+            .map(|d| d.kind.eq_ignore_ascii_case("fabric"))
+            .unwrap_or(false);
+        if url.scheme() != "https" && !is_fabric {
             return Err((
                 StatusCode::FORBIDDEN,
                 "credentials are injected only into HTTPS requests".into(),
+            ));
+        }
+        if is_fabric && !matches!(url.scheme(), "http" | "https") {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "fabric credentials require http or https".into(),
             ));
         }
         let (descriptor, secret) = state
@@ -152,7 +163,7 @@ async fn proxy_inner(
                 format!("credential '{name}' cannot be used for host {host}"),
             ));
         }
-        let port = url.port_or_known_default().unwrap_or(443);
+        let port = url.port_or_known_default().unwrap_or(if is_fabric { 80 } else { 443 });
         if !credential_allows_request(descriptor, &method, url.path(), port) {
             return Err((
                 StatusCode::FORBIDDEN,
@@ -163,20 +174,22 @@ async fn proxy_inner(
                 ),
             ));
         }
-        let header_name = reqwest::header::HeaderName::from_bytes(descriptor.header.as_bytes())
-            .map_err(|_| {
+        if !secret.is_empty() {
+            let header_name = reqwest::header::HeaderName::from_bytes(descriptor.header.as_bytes())
+                .map_err(|_| {
+                    (
+                        StatusCode::BAD_GATEWAY,
+                        "configured credential header is invalid".into(),
+                    )
+                })?;
+            let header_value = reqwest::header::HeaderValue::from_str(&secret).map_err(|_| {
                 (
                     StatusCode::BAD_GATEWAY,
-                    "configured credential header is invalid".into(),
+                    "configured credential value cannot be represented as an HTTP header".into(),
                 )
             })?;
-        let header_value = reqwest::header::HeaderValue::from_str(&secret).map_err(|_| {
-            (
-                StatusCode::BAD_GATEWAY,
-                "configured credential value cannot be represented as an HTTP header".into(),
-            )
-        })?;
-        upstream = upstream.header(header_name, header_value);
+            upstream = upstream.header(header_name, header_value);
+        }
     }
 
     if let Some(encoded) = request.body_base64 {

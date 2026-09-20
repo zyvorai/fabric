@@ -1,0 +1,43 @@
+name: AI Workloads
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/zyvor-fabricd/src/api/ai/**"
+      - "backend/zyvorctl/src/cli.rs"
+      - "docs/ai-workloads.md"
+      - "scripts/test-ai-workloads-unit.sh"
+      - "agent-runtime/src/credentials.rs"
+      - "agent-runtime/src/egress.rs"
+      - ".github/workflows/ai-workloads.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/zyvor-fabricd/src/api/ai/**"
+      - "backend/zyvorctl/src/cli.rs"
+      - "docs/ai-workloads.md"
+      - "scripts/test-ai-workloads-unit.sh"
+      - "agent-runtime/src/credentials.rs"
+      - "agent-runtime/src/egress.rs"
+      - ".github/workflows/ai-workloads.yml"
+
+jobs:
+  fabricd-ai:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev clang pkg-config libssl-dev
+      - name: AI unit tests
+        run: ./scripts/test-ai-workloads-unit.sh
+
+  agent-fabric-cred:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Agent Runtime credential tests
+        run: cargo test --manifest-path agent-runtime/Cargo.toml credentials -- --nocapture

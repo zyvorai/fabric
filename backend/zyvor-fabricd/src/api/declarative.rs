@@ -343,6 +343,8 @@ pub async fn apply_vm_spec(
             1,
             0,
             None,
+            0,
+            None,
         )
         .await
         .map_err(|e| (StatusCode::FORBIDDEN, Json(json!({"error": e}))))?;

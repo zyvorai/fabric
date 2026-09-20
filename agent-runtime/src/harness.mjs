@@ -28,6 +28,8 @@ const UPSTREAM = {
   anthropic: "https://api.anthropic.com",
   openai: "https://api.openai.com",
   gemini: "https://generativelanguage.googleapis.com",
+  // Phase 6: Fabric-managed OpenAI-compatible Maglev VIP (no external API key).
+  fabric: process.env.ZYVOR_FABRIC_INFERENCE_BASE || "",
 };
 
 if (!sessionId || !capability || !broker) {
@@ -183,6 +185,10 @@ function childEnv() {
     env.OPENAI_BASE_URL = `${shimOrigin}/openai`;
     env.GEMINI_API_BASE_URL = `${shimOrigin}/gemini`;
     env.GOOGLE_GEMINI_BASE_URL = `${shimOrigin}/gemini`;
+    // OpenAI-compatible CLIs can target Fabric inference via the fabric shim prefix.
+    if (process.env.ZYVOR_FABRIC_INFERENCE_BASE) {
+      env.OPENAI_BASE_URL = `${shimOrigin}/fabric`;
+    }
   }
   // Placeholder only. The egress broker strips Authorization and injects the
   // granted credential on the host. This value is not a provider secret.
@@ -201,7 +207,11 @@ function startShim() {
       const upstream = UPSTREAM[provider];
       if (!upstream) {
         res.writeHead(404, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: "unknown provider prefix" }));
+        res.end(JSON.stringify({
+          error: provider === "fabric"
+            ? "set ZYVOR_FABRIC_INFERENCE_BASE to the Fabric InferenceEndpoint VIP"
+            : "unknown provider prefix",
+        }));
         return;
       }
       const chunks = [];
@@ -211,7 +221,7 @@ function startShim() {
         if (total > 16 * 1024 * 1024) throw new Error("request too large");
         chunks.push(chunk);
       }
-      const path = url.pathname.replace(/^\/(anthropic|openai|gemini)/, "") || "/";
+      const path = url.pathname.replace(/^\/(anthropic|openai|gemini|fabric)/, "") || "/";
       const forwarded = {};
       for (const [name, value] of Object.entries(req.headers)) {
         if (typeof value !== "string") continue;

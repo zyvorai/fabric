@@ -41,6 +41,13 @@ pub struct ResourceQuota {
     pub max_containers: Option<u32>,
     #[serde(default)]
     pub used_containers: u32,
+    /// Optional GPU count limit for Fabric AI inference deployments
+    /// (preview). `None` means no GPU quota is enforced — existing quotas
+    /// predate AI and must not suddenly block inference workloads.
+    #[serde(default)]
+    pub max_gpus: Option<u32>,
+    #[serde(default)]
+    pub used_gpus: u32,
     pub tags: Option<Vec<String>>,
     /// Scopes this quota to a single tenant (matched against `VM.labels["tenant"]`
     /// or `ContainerGroupSpec.tenant`) rather than by tag overlap. Takes
@@ -63,6 +70,8 @@ pub struct CreateQuotaRequest {
     pub max_vms: u32,
     #[serde(default)]
     pub max_containers: Option<u32>,
+    #[serde(default)]
+    pub max_gpus: Option<u32>,
     pub tags: Option<Vec<String>>,
     #[serde(default)]
     pub tenant: Option<String>,
@@ -78,6 +87,7 @@ pub struct UpdateQuotaRequest {
     pub max_disk: Option<u64>,
     pub max_vms: Option<u32>,
     pub max_containers: Option<u32>,
+    pub max_gpus: Option<u32>,
     pub tags: Option<Vec<String>>,
     pub tenant: Option<String>,
     pub enabled: Option<bool>,
@@ -93,6 +103,8 @@ pub struct QuotaUsage {
     pub vms_percent: f64,
     /// `None` when the quota has no `max_containers` configured.
     pub containers_percent: Option<f64>,
+    /// `None` when the quota has no `max_gpus` configured.
+    pub gpus_percent: Option<f64>,
     pub is_exceeded: bool,
     pub exceeded_resources: Vec<String>,
 }
@@ -171,6 +183,14 @@ impl QuotaUsage {
             }
         });
 
+        let gpus_percent = quota.max_gpus.map(|max| {
+            if max > 0 {
+                (quota.used_gpus as f64 / max as f64) * 100.0
+            } else {
+                0.0
+            }
+        });
+
         let mut exceeded_resources = Vec::new();
         let mut is_exceeded = false;
 
@@ -196,6 +216,12 @@ impl QuotaUsage {
                 is_exceeded = true;
             }
         }
+        if let Some(max_gpus) = quota.max_gpus {
+            if quota.used_gpus > max_gpus {
+                exceeded_resources.push("gpus".to_string());
+                is_exceeded = true;
+            }
+        }
 
         Self {
             quota_id: quota.id.clone(),
@@ -205,6 +231,7 @@ impl QuotaUsage {
             disk_percent,
             vms_percent,
             containers_percent,
+            gpus_percent,
             is_exceeded,
             exceeded_resources,
         }
@@ -276,11 +303,13 @@ pub async fn create_quota(
         max_disk: req.max_disk,
         max_vms: req.max_vms,
         max_containers: req.max_containers,
+        max_gpus: req.max_gpus,
         used_cpus: 0,
         used_memory: 0,
         used_disk: 0,
         used_vms: 0,
         used_containers: 0,
+        used_gpus: 0,
         tags: req.tags,
         tenant: req.tenant,
         enabled: req.enabled,
@@ -369,6 +398,9 @@ pub async fn update_quota(
     }
     if let Some(max_containers) = req.max_containers {
         quota.max_containers = Some(max_containers);
+    }
+    if let Some(max_gpus) = req.max_gpus {
+        quota.max_gpus = Some(max_gpus);
     }
     if let Some(tags) = req.tags {
         quota.tags = Some(tags);
@@ -540,7 +572,8 @@ pub async fn get_quota_usage(
         .store
         .list_entities::<ContainerGroupSpec>("container_groups")
         .unwrap_or_default();
-    calculate_quota_usage(&vms, &container_groups, &mut quota);
+    let gpu_workloads = list_gpu_workloads(&state);
+    calculate_quota_usage(&vms, &container_groups, &gpu_workloads, &mut quota);
 
     let usage = QuotaUsage::from_quota(&quota);
     Ok(Json(usage))
@@ -571,8 +604,9 @@ pub async fn get_all_quota_usage(
         .store
         .list_entities::<ContainerGroupSpec>("container_groups")
         .unwrap_or_default();
+    let gpu_workloads = list_gpu_workloads(&state);
     for quota in &mut quotas {
-        calculate_quota_usage(&vms, &container_groups, quota);
+        calculate_quota_usage(&vms, &container_groups, &gpu_workloads, quota);
     }
 
     let usage: Vec<QuotaUsage> = quotas.iter().map(QuotaUsage::from_quota).collect();
@@ -610,15 +644,39 @@ fn quota_applies(quota: &ResourceQuota, tenant: Option<&str>, tags: &[String]) -
     }
 }
 
-/// Calculate real quota usage from pre-loaded VMs and ContainerGroups. CPU
-/// and memory form one shared compute budget across both workload types
-/// (they compete for the same host capacity); VM count and container pod
-/// count are tracked as separate sub-limits since they're different units.
-/// ContainerGroup has no disk concept today (ephemeral/hostPath volumes
-/// only, see `container_declarative`), so `used_disk` stays VM-only.
+/// Slim view of an AI inference deployment used only for GPU quota math.
+/// Kept here (not imported from `api::ai`) to avoid a module cycle; serde
+/// ignores unknown fields when the stored entity grows.
+#[derive(Debug, Clone, Deserialize)]
+struct AiDeploymentGpuUsage {
+    name: String,
+    #[serde(default)]
+    tenant: Option<String>,
+    #[serde(default)]
+    replicas: u32,
+    #[serde(default = "default_gpus_per_replica")]
+    gpus_per_replica: u32,
+}
+
+fn default_gpus_per_replica() -> u32 {
+    1
+}
+
+fn list_gpu_workloads(state: &AppState) -> Vec<AiDeploymentGpuUsage> {
+    state
+        .store
+        .list_entities::<AiDeploymentGpuUsage>("ai_inference_deployments")
+        .unwrap_or_default()
+}
+
+/// Calculate real quota usage from pre-loaded VMs, ContainerGroups, and AI
+/// inference deployments. CPU and memory form one shared compute budget
+/// across VM and container workloads; GPU count is tracked separately from
+/// AI deployment desired replicas × `gpus_per_replica`.
 fn calculate_quota_usage(
     vms: &[vm_model::VM],
     container_groups: &[ContainerGroupSpec],
+    gpu_workloads: &[AiDeploymentGpuUsage],
     quota: &mut ResourceQuota,
 ) {
     // Reset usage counters
@@ -627,6 +685,7 @@ fn calculate_quota_usage(
     quota.used_disk = 0;
     quota.used_vms = 0;
     quota.used_containers = 0;
+    quota.used_gpus = 0;
 
     for vm in vms {
         let vm_tenant = vm.labels.as_ref().and_then(|l| l.get("tenant"));
@@ -648,14 +707,21 @@ fn calculate_quota_usage(
         }
     }
 
+    for dep in gpu_workloads {
+        if quota_applies(quota, dep.tenant.as_deref(), &[]) {
+            quota.used_gpus += dep.replicas.saturating_mul(dep.gpus_per_replica.max(1));
+        }
+    }
+
     tracing::debug!(
-        "Calculated quota '{}' usage: {} CPUs, {} MB memory, {} GB disk, {} VMs, {} container replicas",
+        "Calculated quota '{}' usage: {} CPUs, {} MB memory, {} GB disk, {} VMs, {} container replicas, {} GPUs",
         quota.name,
         quota.used_cpus,
         quota.used_memory,
         quota.used_disk,
         quota.used_vms,
-        quota.used_containers
+        quota.used_containers,
+        quota.used_gpus
     );
 }
 
@@ -664,17 +730,19 @@ fn calculate_quota_usage(
 // ============================================================================
 
 /// Check if creating/applying a workload would exceed any applicable quota.
-/// Usage is recalculated live from the current VM/ContainerGroup lists
-/// rather than trusting each quota's stored `used_*` counters, which are
-/// only refreshed when someone calls the usage-report endpoints — trusting
-/// them here would let usage drift stale between reports and silently admit
-/// requests a fresh count would have blocked.
+/// Usage is recalculated live from the current VM/ContainerGroup/AI
+/// deployment lists rather than trusting each quota's stored `used_*`
+/// counters, which are only refreshed when someone calls the usage-report
+/// endpoints — trusting them here would let usage drift stale between
+/// reports and silently admit requests a fresh count would have blocked.
 ///
 /// `exclude_container_group`, when set, drops that group from the usage
 /// count before checking — required when re-applying an existing
 /// ContainerGroup, since the store still holds its *previous* spec at check
 /// time and `cpus`/`memory`/`containers_delta` already represent that
 /// group's full new footprint, not an incremental add.
+///
+/// `exclude_inference_deployment` does the same for AI GPU accounting.
 #[allow(clippy::too_many_arguments)]
 pub async fn check_quota_enforcement(
     state: &AppState,
@@ -686,6 +754,8 @@ pub async fn check_quota_enforcement(
     vms_delta: u32,
     containers_delta: u32,
     exclude_container_group: Option<&str>,
+    gpus_delta: u32,
+    exclude_inference_deployment: Option<&str>,
 ) -> Result<(), String> {
     let mut quotas: Vec<ResourceQuota> = state
         .store
@@ -704,9 +774,13 @@ pub async fn check_quota_enforcement(
     if let Some(exclude) = exclude_container_group {
         container_groups.retain(|cg| cg.name != exclude);
     }
+    let mut gpu_workloads = list_gpu_workloads(state);
+    if let Some(exclude) = exclude_inference_deployment {
+        gpu_workloads.retain(|d| d.name != exclude);
+    }
 
     for mut quota in quotas {
-        calculate_quota_usage(&vms, &container_groups, &mut quota);
+        calculate_quota_usage(&vms, &container_groups, &gpu_workloads, &mut quota);
         let mut violations = Vec::new();
 
         if quota.used_cpus + cpus > quota.max_cpus {
@@ -758,6 +832,19 @@ pub async fn check_quota_enforcement(
             }
         }
 
+        if gpus_delta > 0 {
+            if let Some(max_gpus) = quota.max_gpus {
+                if quota.used_gpus + gpus_delta > max_gpus {
+                    violations.push(format!(
+                        "GPU quota exceeded: would use {} GPUs but limit is {} (current: {})",
+                        quota.used_gpus + gpus_delta,
+                        max_gpus,
+                        quota.used_gpus
+                    ));
+                }
+            }
+        }
+
         if !violations.is_empty() {
             let error_msg = format!(
                 "Quota '{}' would be exceeded:\n  - {}",
@@ -791,6 +878,8 @@ mod tests {
             used_vms: 0,
             max_containers: None,
             used_containers: 0,
+            max_gpus: None,
+            used_gpus: 0,
             tags: None,
             tenant: None,
             enabled: true,
@@ -855,7 +944,7 @@ mod tests {
             sample_container_group("web", Some("acme"), 3),
             sample_container_group("other", Some("other-tenant"), 5),
         ];
-        calculate_quota_usage(&[], &groups, &mut quota);
+        calculate_quota_usage(&[], &groups, &[], &mut quota);
         // "web": 2 cpus * 3 replicas = 6 cpus, 512 MB * 3 = 1536 MB
         assert_eq!(quota.used_cpus, 6);
         assert_eq!(quota.used_memory, 1536);
@@ -873,7 +962,7 @@ mod tests {
         )]));
         quota.tenant = Some("acme".to_string());
         let groups = vec![sample_container_group("web", Some("acme"), 1)];
-        calculate_quota_usage(&[vm], &groups, &mut quota);
+        calculate_quota_usage(&[vm], &groups, &[], &mut quota);
         assert_eq!(quota.used_cpus, 4 + 2);
         assert_eq!(quota.used_memory, 4096 + 512);
         assert_eq!(quota.used_vms, 1);
@@ -919,12 +1008,53 @@ mod tests {
             .cloned()
             .collect();
 
-        calculate_quota_usage(&[], &all_groups, &mut quota);
+        calculate_quota_usage(&[], &all_groups, &[], &mut quota);
         assert_eq!(quota.used_cpus, 2);
         assert_eq!(quota.used_containers, 1);
 
-        calculate_quota_usage(&[], &excluding_web, &mut quota);
+        calculate_quota_usage(&[], &excluding_web, &[], &mut quota);
         assert_eq!(quota.used_cpus, 0);
         assert_eq!(quota.used_containers, 0);
+    }
+
+    #[test]
+    fn calculate_quota_usage_counts_ai_deployment_gpus() {
+        let mut quota = sample_quota();
+        quota.max_gpus = Some(4);
+        quota.tenant = Some("acme".to_string());
+        let workloads = vec![
+            AiDeploymentGpuUsage {
+                name: "llm".into(),
+                tenant: Some("acme".into()),
+                replicas: 2,
+                gpus_per_replica: 1,
+            },
+            AiDeploymentGpuUsage {
+                name: "other".into(),
+                tenant: Some("other".into()),
+                replicas: 8,
+                gpus_per_replica: 1,
+            },
+        ];
+        calculate_quota_usage(&[], &[], &workloads, &mut quota);
+        assert_eq!(quota.used_gpus, 2);
+    }
+
+    #[test]
+    fn quota_usage_flags_exceeded_gpus() {
+        let mut quota = sample_quota();
+        quota.max_gpus = Some(2);
+        quota.used_gpus = 3;
+        let usage = QuotaUsage::from_quota(&quota);
+        assert_eq!(usage.gpus_percent, Some(150.0));
+        assert!(usage.is_exceeded);
+        assert!(usage.exceeded_resources.contains(&"gpus".to_string()));
+    }
+
+    #[test]
+    fn max_gpus_none_means_no_gpu_percent() {
+        let quota = sample_quota();
+        let usage = QuotaUsage::from_quota(&quota);
+        assert!(usage.gpus_percent.is_none());
     }
 }

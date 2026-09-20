@@ -172,6 +172,11 @@ const GROUPS: &[CmdGroup] = &[
                 name: "container-group",
                 about: "Manage ContainerGroup workloads",
             },
+            CmdEntry {
+                emoji: "🤖",
+                name: "ai",
+                about: "AI Workloads — models, deployments, endpoints (preview)",
+            },
         ],
     },
     CmdGroup {

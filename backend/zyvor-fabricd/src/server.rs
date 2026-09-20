@@ -307,6 +307,16 @@ impl Server {
             "cleanup_scheduler",
             crate::schedulers::run_cleanup_scheduler
         );
+        spawn_bg!(
+            self.state,
+            "ai_routing_controller",
+            crate::api::ai::routing::run_ai_routing_controller
+        );
+        spawn_bg!(
+            self.state,
+            "ai_autoscaler",
+            crate::api::ai::autoscaling::run_ai_autoscaler
+        );
 
         let handle = axum_server::Handle::new();
         let shutdown_handle = handle.clone();
@@ -1182,6 +1192,68 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/sessions/{id}/{action}",
             post(api::agent_runtime::session_action),
+        )
+        // Fabric AI Workloads — Inference MVP (preview)
+        .route(
+            "/ai/models",
+            get(api::ai::models::list_models).post(api::ai::models::create_model),
+        )
+        .route(
+            "/ai/models/{name}",
+            get(api::ai::models::get_model).delete(api::ai::models::delete_model),
+        )
+        .route(
+            "/ai/profiles",
+            get(api::ai::profiles::list_profiles).post(api::ai::profiles::create_profile),
+        )
+        .route(
+            "/ai/profiles/{name}",
+            get(api::ai::profiles::get_profile).delete(api::ai::profiles::delete_profile),
+        )
+        .route(
+            "/ai/deployments",
+            get(api::ai::deployments::list_deployments).post(api::ai::deployments::create_deployment),
+        )
+        .route(
+            "/ai/deployments/{name}",
+            get(api::ai::deployments::get_deployment).delete(api::ai::deployments::delete_deployment),
+        )
+        .route(
+            "/ai/deployments/{name}/scale",
+            post(api::ai::deployments::scale_deployment),
+        )
+        .route(
+            "/ai/deployments/{name}/autoscaling",
+            axum::routing::put(api::ai::deployments::patch_autoscaling),
+        )
+        .route(
+            "/ai/deployments/{name}/drain",
+            post(api::ai::rollouts::drain_deployment),
+        )
+        .route(
+            "/ai/deployments/{name}/rollout",
+            post(api::ai::rollouts::rollout_deployment),
+        )
+        .route(
+            "/ai/deployments/{name}/metrics",
+            get(api::ai::deployments::deployment_metrics),
+        )
+        .route(
+            "/ai/endpoints",
+            get(api::ai::endpoints::list_endpoints).post(api::ai::endpoints::create_endpoint),
+        )
+        .route(
+            "/ai/endpoints/{name}",
+            get(api::ai::endpoints::get_endpoint).delete(api::ai::endpoints::delete_endpoint),
+        )
+        .route("/ai/gpus", get(api::ai::gpus::list_gpus))
+        .route(
+            "/ai/keys",
+            get(api::ai::keys::list_keys).post(api::ai::keys::create_key),
+        )
+        .route(
+            "/ai/keys/{id}",
+            axum::routing::delete(api::ai::keys::delete_key),
         )
         // ContainerGroup volume backup/restore
         .route(

@@ -677,6 +677,8 @@ pub async fn apply_container_group_spec(
         0,
         spec.replicas,
         Some(spec.name.as_str()),
+        0,
+        None,
     )
     .await
     {
