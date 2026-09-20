@@ -88,7 +88,7 @@ fabric-agent deploy ./CLAUDE.md --name reviewer --template node22-agent \
   --runtime claude --credential anthropic --allow-host api.anthropic.com
 ```
 
-The template must contain Node.js and the selected CLI. The adapter writes the instruction file into the sandbox and points `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, and `GEMINI_API_BASE_URL` at a loopback shim. The shim calls the host egress broker, which injects the granted credential. Placeholder client keys in the guest are not provider secrets.
+The template must contain Node.js and the selected CLI. The adapter writes the instruction file into the sandbox and points `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, and `GEMINI_API_BASE_URL` at a loopback shim. The shim calls the host egress broker, which injects the granted credential. Placeholder client keys in the guest are not provider secrets. If the broker call fails, the shim responds `502` with `upstream request failed` and writes the exception to the guest process log. It does not put the exception message or stack in the HTTP body.
 
 A JSON bundle is also accepted: `{"instructions":"...","files":{"CLAUDE.md":"...","src/main.py":"..."}}`.
 
@@ -403,5 +403,6 @@ A push to `main` also runs [`.github/workflows/lab-deploy.yml`](../.github/workf
 - guest-supplied `Authorization`, proxy auth, hop-by-hop headers, and any configured credential-injection header are stripped before forwarding
 - upstream redirects are disabled, preventing credential forwarding to a redirected host
 - agent versions include the security manifest in their digest
+- guest HTTP error bodies are fixed strings (`upstream request failed`, `request failed`). The exception is written to the guest process log, not the response. A failed session records `error.message` in `session.failed`, not the stack.
 
 This broker protects managed provider credentials. For a full no-bypass sandbox, pair it with FluxVM Network Fabric default-deny rules so the guest can reach only the broker/DNS and required internal services.

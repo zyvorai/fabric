@@ -128,7 +128,7 @@ async function run(input) {
         emit("session.result", result === undefined ? null : result);
       }
     } catch (error) {
-      lastError = error?.stack || String(error);
+      lastError = error instanceof Error && error.message ? error.message : "agent failed";
       state = "failed";
       emit("session.failed", { error: lastError });
     }
@@ -184,7 +184,8 @@ const server = http.createServer(async (req, res) => {
     }
     return json(res, 404, { error: "not found" });
   } catch (error) {
-    return json(res, 500, { error: error?.stack || String(error) });
+    console.error(error);
+    return json(res, 500, { error: "request failed" });
   }
 });
 

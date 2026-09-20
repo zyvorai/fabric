@@ -228,8 +228,9 @@ function startShim() {
       res.writeHead(result.status, result.headers);
       res.end(result.body);
     } catch (error) {
+      console.error(error);
       res.writeHead(502, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: error?.message || String(error) }));
+      res.end(JSON.stringify({ error: "upstream request failed" }));
     }
   });
   return new Promise((resolve, reject) => {
@@ -337,7 +338,7 @@ async function run(input) {
       state = "cancelled";
       emit("session.cancelled", null);
     } catch (error) {
-      lastError = error?.stack || String(error);
+      lastError = error instanceof Error && error.message ? error.message : "agent failed";
       state = "failed";
       emit("session.failed", { error: lastError });
     }
@@ -394,7 +395,8 @@ const server = http.createServer(async (req, res) => {
     }
     return json(res, 404, { error: "not found" });
   } catch (error) {
-    return json(res, 500, { error: error?.stack || String(error) });
+    console.error(error);
+    return json(res, 500, { error: "request failed" });
   }
 });
 
