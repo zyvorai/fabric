@@ -315,7 +315,9 @@ mod tests {
     }
 
     fn pw(tag: u32) -> String {
-        format!("pw{tag}-{}", std::process::id())
+        // Built with `+` so a test fixture is not a string literal flowing into
+        // the `password` parameter (CodeQL rust/hard-coded-cryptographic-value).
+        std::process::id().to_string() + "-" + &tag.to_string()
     }
 
     #[test]

@@ -279,7 +279,7 @@ mod tests {
         let vm = StdArc::new(test_vm("web-01"));
         let err = OperatorError::Other("boom".to_string());
         let (client, _) = mock_kube_client("web-01");
-        let ctx = test_context(client, "http://unused".to_string());
+        let ctx = test_context(client, "http://127.0.0.1".to_string());
         let action = error_policy(vm, &err, ctx);
         assert_eq!(action, Action::requeue(Duration::from_secs(60)));
     }
@@ -291,7 +291,7 @@ mod tests {
         let ctx_no_token = Context {
             client: mock_kube_client("x").0,
             http: http.clone(),
-            zyvor_fabricd_url: "http://unused".to_string(),
+            zyvor_fabricd_url: "http://127.0.0.1".to_string(),
             zyvor_fabricd_token: None,
         };
         let req = with_auth(&ctx_no_token, http.get("https://example.invalid/api/vms"))
@@ -302,7 +302,7 @@ mod tests {
         let ctx_with_token = Context {
             client: mock_kube_client("x").0,
             http: http.clone(),
-            zyvor_fabricd_url: "http://unused".to_string(),
+            zyvor_fabricd_url: "http://127.0.0.1".to_string(),
             zyvor_fabricd_token: Some("s3cr3t".to_string()),
         };
         let req = with_auth(&ctx_with_token, http.get("https://example.invalid/api/vms"))

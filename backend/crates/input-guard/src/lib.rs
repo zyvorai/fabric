@@ -137,18 +137,51 @@ const BLOCKED_HOSTS: &[&str] = &[
     "metadata",
 ];
 
-fn host_is_allowed(host: &str) -> bool {
-    let host_l = host.to_ascii_lowercase();
-    if host_l.is_empty()
+fn host_name_blocked(host_l: &str) -> bool {
+    host_l.is_empty()
         || BLOCKED_HOSTS.iter().any(|b| *b == host_l)
         || host_l.ends_with(".localhost")
         || host_l.ends_with(".local")
-    {
+}
+
+/// Host discovery probes fabric nodes, which are usually RFC1918 addresses.
+/// Loopback, link-local (including the cloud metadata address), and metadata
+/// names stay blocked.
+fn ip_is_probeable(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let o = v4.octets();
+            !(v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || o[0] == 0)
+        }
+        IpAddr::V6(v6) => {
+            let s0 = v6.segments()[0];
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || (s0 & 0xffc0) == 0xfe80
+                || ((s0 & 0xffe0) == 0x2001 && v6.segments()[1] == 0x0db8))
+        }
+    }
+}
+
+fn host_is_allowed(host: &str, allow_private: bool) -> bool {
+    let host_l = host.to_ascii_lowercase();
+    if host_name_blocked(&host_l) {
         return false;
     }
     match host.parse::<IpAddr>() {
-        Ok(ip) => ip_is_public(ip),
-        // Names are allowed; literal private and link-local addresses are not.
+        Ok(ip) => {
+            if allow_private {
+                ip_is_probeable(ip)
+            } else {
+                ip_is_public(ip)
+            }
+        }
+        // Names are allowed; a dotted-decimal that failed to parse is not an IP.
         // DNS rebinding is limited by refusing redirects to a blocked host.
         Err(_) => !host_l.chars().all(|c| c.is_ascii_digit() || c == '.'),
     }
@@ -170,11 +203,22 @@ pub fn is_safe_probe_host(host: &str) -> bool {
         return false;
     }
     let host = host.trim_matches(['[', ']']);
-    host_is_allowed(host)
+    host_is_allowed(host, true)
 }
 
-/// Full http(s) URL whose host is not an internal address.
+/// Full http(s) URL a content download may fetch. Private and link-local
+/// addresses are rejected.
 pub fn is_safe_outbound_url(raw: &str) -> bool {
+    url_host_allowed(raw, false)
+}
+
+/// Full http(s) URL a host probe may call. Private addresses are allowed;
+/// loopback, link-local, and metadata hosts are not.
+pub fn is_safe_probe_url(raw: &str) -> bool {
+    url_host_allowed(raw, true)
+}
+
+fn url_host_allowed(raw: &str, allow_private: bool) -> bool {
     let raw = raw.trim();
     if raw.len() > 2048 || raw.contains('\0') || raw.contains('\\') {
         return false;
@@ -200,7 +244,7 @@ pub fn is_safe_outbound_url(raw: &str) -> bool {
     } else {
         hostport.split(':').next().unwrap_or("")
     };
-    !host.is_empty() && host_is_allowed(host)
+    !host.is_empty() && host_is_allowed(host, allow_private)
 }
 
 #[cfg(test)]
@@ -227,7 +271,12 @@ mod tests {
         assert!(!is_safe_probe_host("127.0.0.1"));
         assert!(!is_safe_probe_host("169.254.169.254"));
         assert!(!is_safe_probe_host("localhost"));
-        assert!(!is_safe_probe_host("10.1.2.3"));
+        assert!(is_safe_probe_host("10.1.2.3"));
+        assert!(is_safe_probe_host("192.168.1.10"));
+        assert!(is_safe_probe_url("http://10.1.2.3:9095/health"));
+        assert!(!is_safe_probe_url("http://169.254.169.254/latest"));
+        assert!(!is_safe_probe_url("http://127.0.0.1:9095/health"));
+        assert!(!is_safe_outbound_url("http://10.1.2.3/"));
         assert!(!is_safe_probe_host("metadata.google.internal"));
         assert!(!is_safe_outbound_url("http://127.0.0.1/latest"));
         assert!(!is_safe_outbound_url("http://user:pass@example.com/"));

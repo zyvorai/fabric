@@ -1378,8 +1378,9 @@ async fn provision_vm_disk(state: &AppState, vm: &VM) -> Result<(), String> {
 
     let size_gib = if vm.disk > 0 { vm.disk } else { 20 };
     let size_arg = format!("{size_gib}G");
+    let size_arg = input_guard::vet!(&size_arg, "invalid disk size".to_string());
     let output = tokio::process::Command::new("qemu-img")
-        .args(["create", "-f", "qcow2", target, size_arg.as_str()])
+        .args(["create", "-f", "qcow2", target, size_arg])
         .output()
         .await
         .map_err(|e| e.to_string())?;

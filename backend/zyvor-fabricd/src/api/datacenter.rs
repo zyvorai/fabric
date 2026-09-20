@@ -691,15 +691,12 @@ pub async fn discover_host(
 ) -> impl IntoResponse {
     tracing::debug!("datacenter::{}", stringify!(discover_host));
     let address = req.address.trim();
-    if !input_guard::is_safe_probe_host(address) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "Invalid address"})),
-        )
-            .into_response();
-    }
-    let address = if input_guard::is_safe_probe_host(address) {
-        address
+    let port = req.port.unwrap_or(9095);
+    // Check the whole URL. A host-only check leaves the port (and the
+    // formatted string) tainted for CodeQL's request-forgery query.
+    let base = format!("http://{address}:{port}");
+    let base = if input_guard::is_safe_probe_url(&base) {
+        base
     } else {
         return (
             StatusCode::BAD_REQUEST,
@@ -707,8 +704,7 @@ pub async fn discover_host(
         )
             .into_response();
     };
-    let port = req.port.unwrap_or(9095);
-    let url = format!("http://{address}:{port}/health");
+    let url = format!("{base}/health");
 
     // Check if already registered
     let hosts: Vec<HostInfo> = state.store.list_entities("hosts").unwrap_or_else(|e| {
@@ -731,7 +727,7 @@ pub async fn discover_host(
 
     let (hostname, cpus, memory_mb) = if reachable {
         // Try to get system info from the remote host
-        let info_url = format!("http://{address}:{port}/api/system/cpu/topology");
+        let info_url = format!("{base}/api/system/cpu/topology");
         let cpu_info = state
             .http_client
             .get(&info_url)
@@ -749,7 +745,7 @@ pub async fn discover_host(
             None
         };
 
-        let mem_url = format!("http://{address}:{port}/api/system/memory");
+        let mem_url = format!("{base}/api/system/memory");
         let mem_info = state
             .http_client
             .get(&mem_url)
