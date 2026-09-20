@@ -677,7 +677,7 @@ fn run_nft(args: &[&str]) -> Result<()> {
             }
             anyhow::bail!("rejected nft argument");
         }
-        if input_guard::COMMAND_ARGS.contains(*arg) {
+        if input_guard::COMMAND_ARGS.contains(arg) {
             safe.push((*arg).to_string());
             continue;
         }
