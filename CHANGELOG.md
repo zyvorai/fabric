@@ -14,7 +14,15 @@
   a token-budget alert; and a SHA-256 audit chain. `highest_throughput` and
   `lowest_failure` are Maglev strategies. Terraform can manage an AI site.
   Extra runtimes stay fail-closed until `FLUXVM_AI_ALLOW_RUNTIMES` names them.
-  There is no in-process three-node quorum, MIG ioctl, or cross-site byte copy.
+  One process is one Raft voter when `FLUXVM_AI_RAFT_ID`, `FLUXVM_AI_RAFT_PEERS`,
+  and `FLUXVM_AI_RAFT_TOKEN` are set; unset peers leave placement unchanged, and
+  `FLUXVM_AI_CONSENSUS=external` is only a label. A Linux heartbeat reads
+  `nvidia-smi` temperature, power, and ECC when the binary is on `PATH`, and
+  leaves those fields unchanged when it is not. Real PCI MIG create still
+  returns 400. `AiSite.peer_url` streams a verified model digest and stays
+  pending until the peer returns 201. Inference `Upgrade: websocket` is bridged
+  to the selected upstream. `FLUXVM_AI_OTEL_ENDPOINT` exports one gateway span.
+  The operator watches an AI CRD only when that CRD is installed.
   See [docs/ai-workloads.md](docs/ai-workloads.md).
 - **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
   Networking / Meta, with emoji section markers), `--color auto|always|never`,

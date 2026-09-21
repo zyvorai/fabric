@@ -4,8 +4,8 @@
 //! Schema migration and chaos qualification for the inference control plane.
 //!
 //! Same-host file leases resume a rollout after fabricd restarts. They are
-//! not a three-node quorum. Leader loss stays degraded until an external
-//! consensus store is configured.
+//! not a three-node quorum. Leader loss stays degraded until this process
+//! has committed a three-voter Raft membership.
 
 pub const SCHEMA_VERSION: u32 = 2;
 
@@ -54,7 +54,7 @@ pub fn migrate(from: u32) -> Result<u32, String> {
     }
 }
 
-/// `consensus` is true only when an external quorum store is configured.
+/// `consensus` is true only when a three-voter membership has committed.
 pub fn recovery(event: ChaosEvent, consensus: bool) -> Recovery {
     match event {
         ChaosEvent::FabricdCrash
@@ -75,6 +75,8 @@ pub fn recovery(event: ChaosEvent, consensus: bool) -> Recovery {
     }
 }
 
+/// True only after this process has committed a three-voter membership.
+/// `FLUXVM_AI_CONSENSUS=external` is a label and does not create that membership.
 pub fn consensus_configured() -> bool {
     std::env::var("FLUXVM_AI_CONSENSUS")
         .map(|v| v == "external")

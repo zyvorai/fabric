@@ -105,6 +105,10 @@ pub async fn heartbeat(
     if matches!(node.state, NodeState::Joining | NodeState::Offline) {
         node.state = NodeState::Ready;
     }
+    if let Some(text) = super::gpu_probe::query_nvidia_smi() {
+        let samples = super::gpu_probe::parse_nvidia_smi(&text);
+        super::gpu_probe::apply_samples(&mut node.gpus, &samples);
+    }
     state
         .store
         .save_entity(STORE_NODES, &node.id, &node)

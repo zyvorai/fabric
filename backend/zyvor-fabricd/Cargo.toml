@@ -39,7 +39,10 @@ rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", 
 async-stream = "0.3"
 libc = "0.2"
 tokio-stream = "0.1"
-tokio-util = "0.7"
+tokio-util = { version = "0.7", features = ["io"] }
+openraft = { version = "=0.9.21", features = ["serde", "storage-v2"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+rustls-pemfile = "2"
 
 networking = { path = "../networking" }
 api-error = { path = "../crates/api-error" }

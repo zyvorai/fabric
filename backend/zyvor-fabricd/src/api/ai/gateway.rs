@@ -11,8 +11,8 @@
 
 use axum::{
     body::Body,
-    extract::{Path, Request, State},
-    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
+    extract::{ws::WebSocket, FromRequestParts, Path, Request, State},
+    http::{header, request::Parts, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
@@ -306,7 +306,39 @@ async fn gateway_inner(
                 (status, e)
             })?;
     }
-    let req = Request::from_parts(parts, Body::from(body_bytes.clone()));
+    let req = Request::from_parts(parts.clone(), Body::from(body_bytes.clone()));
+    let upstream_path = if path.is_empty() {
+        "/v1/models".to_string()
+    } else if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("/{path}")
+    };
+
+    if websocket_upgrade(&parts.headers) {
+        let switched = proxy_websocket(
+            parts,
+            &ep,
+            &dep,
+            &upstream_path,
+            streams,
+            ConcurrencyGuard {
+                store: state.store.clone(),
+                key_id: if key.prefix == "oidc" {
+                    String::new()
+                } else {
+                    key.id.clone()
+                },
+            },
+        )
+        .await;
+        let status = switched
+            .as_ref()
+            .map(|resp| resp.status().as_u16())
+            .unwrap_or(502);
+        super::otel::emit_gateway(endpoint_name, status, tokens);
+        return switched;
+    }
 
     let resource = format!("ai/openai/{endpoint_name}/{path}");
     audit(
@@ -320,14 +352,6 @@ async fn gateway_inner(
     let dry_run = std::env::var("FLUXVM_AI_DRY_RUN")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
-
-    let upstream_path = if path.is_empty() {
-        "/v1/models".to_string()
-    } else if path.starts_with('/') {
-        path.to_string()
-    } else {
-        format!("/{path}")
-    };
 
     if dry_run && !janus_replica_ready(&dep) {
         audit(
@@ -354,11 +378,13 @@ async fn gateway_inner(
         &dep,
         &upstream_path,
         req,
-        state.store.clone(),
-        if key.prefix == "oidc" {
-            String::new()
-        } else {
-            key.id.clone()
+        ConcurrencyGuard {
+            store: state.store.clone(),
+            key_id: if key.prefix == "oidc" {
+                String::new()
+            } else {
+                key.id.clone()
+            },
         },
         streams,
     )
@@ -367,6 +393,11 @@ async fn gateway_inner(
         Ok(resp) if resp.status().is_success() => "SUCCESS",
         _ => "FAILED",
     };
+    let status = proxied
+        .as_ref()
+        .map(|resp| resp.status().as_u16())
+        .unwrap_or(502);
+    super::otel::emit_gateway(endpoint_name, status, tokens);
     record_breaker(state, endpoint_name, outcome != "SUCCESS");
     audit(
         state,
@@ -476,11 +507,9 @@ async fn proxy_upstream(
     dep: &InferenceDeployment,
     upstream_path: &str,
     req: Request,
-    store: state_store::StateStore,
-    key_id: String,
+    guard: ConcurrencyGuard,
     streams: StreamHold,
 ) -> Result<Response, (StatusCode, String)> {
-    let guard = ConcurrencyGuard { store, key_id };
     let targets = upstream_targets(ep, dep);
     if targets.is_empty() {
         return Err((
@@ -543,7 +572,7 @@ async fn proxy_upstream(
             result = post_upstream(
                 &client,
                 method,
-                &super::upstream::upstream_origin(&transport, &alt, upstream_path),
+                &super::upstream::upstream_origin(&transport, alt, upstream_path),
                 &incoming_type,
                 deadline,
                 &body_bytes,
@@ -1385,6 +1414,155 @@ pub fn dry_run_sse_chunks(model: &str) -> Vec<String> {
 /// Touch key usage for unit tests / quota math.
 pub fn would_reject_quota(key: &InferenceApiKey) -> bool {
     key.request_quota.is_some_and(|q| key.requests_used >= q)
+}
+
+fn mtls_websocket_config(
+    cert_path: &str,
+    key_path: &str,
+    ca_path: &str,
+) -> Result<rustls::ClientConfig, String> {
+    let ca = std::fs::read(ca_path).map_err(|err| format!("backend CA: {err}"))?;
+    let mut roots = rustls::RootCertStore::empty();
+    let mut added = false;
+    for item in rustls_pemfile::certs(&mut std::io::Cursor::new(ca)) {
+        roots
+            .add(item.map_err(|err| format!("backend CA: {err}"))?)
+            .map_err(|err| format!("backend CA: {err}"))?;
+        added = true;
+    }
+    if !added {
+        return Err("backend CA: no certificates".into());
+    }
+    let cert_pem = std::fs::read(cert_path).map_err(|err| format!("backend client cert: {err}"))?;
+    let certs = rustls_pemfile::certs(&mut std::io::Cursor::new(cert_pem))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| format!("backend client cert: {err}"))?;
+    let key_pem = std::fs::read(key_path).map_err(|err| format!("backend client key: {err}"))?;
+    let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(key_pem))
+        .map_err(|err| format!("backend client key: {err}"))?
+        .ok_or_else(|| "backend client key: empty".to_string())?;
+    rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::aws_lc_rs::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .map_err(|err| err.to_string())?
+    .with_root_certificates(roots)
+    .with_client_auth_cert(certs, key)
+    .map_err(|err| format!("backend client identity: {err}"))
+}
+
+fn websocket_upgrade(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::UPGRADE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.eq_ignore_ascii_case("websocket"))
+}
+
+async fn proxy_websocket(
+    mut parts: Parts,
+    ep: &InferenceEndpoint,
+    dep: &InferenceDeployment,
+    upstream_path: &str,
+    streams: StreamHold,
+    guard: ConcurrencyGuard,
+) -> Result<Response, (StatusCode, String)> {
+    let targets = upstream_targets(ep, dep);
+    let primary = targets.first().cloned().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "no ready inference backend (set VIP or wait for replicas)".into(),
+    ))?;
+    let transport = super::upstream::backend_transport(
+        std::env::var("FLUXVM_AI_BACKEND_TLS").ok().as_deref() == Some("1"),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_CERT")
+            .ok()
+            .as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_KEY")
+            .ok()
+            .as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CA").ok().as_deref(),
+    )
+    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+    let url = super::upstream::websocket_origin(&transport, &primary, upstream_path);
+    let connected = match &transport {
+        super::upstream::BackendTransport::Mtls { cert, key, ca } => {
+            let config = mtls_websocket_config(cert, key, ca)
+                .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+            tokio_tungstenite::connect_async_tls_with_config(
+                url.as_str(),
+                None,
+                false,
+                Some(tokio_tungstenite::Connector::Rustls(Arc::new(config))),
+            )
+            .await
+            .map(|(stream, _)| stream)
+        }
+        _ => tokio_tungstenite::connect_async(&url)
+            .await
+            .map(|(stream, _)| stream),
+    };
+    let upstream = connected.map_err(|err| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("upstream websocket: {err}"),
+        )
+    })?;
+    let upgrade = axum::extract::ws::WebSocketUpgrade::from_request_parts(&mut parts, &())
+        .await
+        .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;
+    Ok(upgrade.on_upgrade(move |socket| async move {
+        let _guard = guard;
+        let _streams = streams;
+        bridge_websocket(socket, upstream).await;
+    }))
+}
+
+async fn bridge_websocket(
+    mut down: WebSocket,
+    upstream: tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
+) {
+    use axum::extract::ws::Message as Down;
+    use futures::SinkExt;
+    use tokio_tungstenite::tungstenite::Message as Up;
+    let (mut up_sink, mut up_stream) = upstream.split();
+    loop {
+        tokio::select! {
+            incoming = down.recv() => {
+                let Some(Ok(message)) = incoming else { break };
+                let outgoing = match message {
+                    Down::Text(text) => Up::text(text.to_string()),
+                    Down::Binary(bytes) => Up::binary(bytes),
+                    Down::Ping(bytes) => Up::Ping(bytes),
+                    Down::Pong(bytes) => Up::Pong(bytes),
+                    Down::Close(_) => {
+                        let _ = up_sink.send(Up::Close(None)).await;
+                        break;
+                    }
+                };
+                if up_sink.send(outgoing).await.is_err() {
+                    break;
+                }
+            }
+            outgoing = up_stream.next() => {
+                let Some(Ok(message)) = outgoing else { break };
+                let incoming = match message {
+                    Up::Text(text) => Down::Text(text.to_string().into()),
+                    Up::Binary(bytes) => Down::Binary(bytes),
+                    Up::Ping(bytes) => Down::Ping(bytes),
+                    Up::Pong(bytes) => Down::Pong(bytes),
+                    Up::Close(_) => {
+                        let _ = down.send(Down::Close(None)).await;
+                        break;
+                    }
+                    Up::Frame(_) => continue,
+                };
+                if down.send(incoming).await.is_err() {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

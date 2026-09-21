@@ -16,6 +16,7 @@ use security::{RequireRead, RequireWrite};
 use serde::Deserialize;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
+use subtle::ConstantTimeEq;
 
 use crate::server::AppState;
 
@@ -548,7 +549,8 @@ pub struct ReplicateRequest {
 /// POST /api/ai/models/{name}/replicate
 ///
 /// Records replication to a site. The record is ready when a node at that
-/// site already lists the model in its cache. Bytes are not copied across a WAN.
+/// site already lists the model, or when the site `peer_url` accepts the
+/// digest bytes and returns 201. A missing peer, file, or token stays pending.
 pub async fn replicate(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
@@ -565,21 +567,201 @@ pub async fn replicate(
         .store
         .list_entities(super::STORE_NODES)
         .unwrap_or_default();
-    let ready = nodes.iter().any(|node| {
+    let cached = nodes.iter().any(|node| {
         node.site == body.site && node.cached_models.iter().any(|cached| cached == &name)
     });
+    let copied = if cached {
+        false
+    } else {
+        copy_to_peer(&state, &model, &body.site).await
+    };
     let record = ReplicationRecord {
         id: format!("{name}--{}", body.site),
         model: name,
         site: body.site,
         digest: model.checksum,
-        state: if ready { "ready" } else { "pending" }.into(),
+        state: if cached || copied { "ready" } else { "pending" }.into(),
     };
     state
         .store
         .save_entity(super::STORE_REPLICATIONS, &record.id, &record)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok((StatusCode::ACCEPTED, Json(record)))
+}
+
+async fn copy_to_peer(state: &AppState, model: &ModelArtifact, site_id: &str) -> bool {
+    let Ok(token) = std::env::var("FLUXVM_AI_REPLICATE_TOKEN") else {
+        return false;
+    };
+    if token.is_empty() {
+        return false;
+    }
+    let Some(raw) = model
+        .checksum
+        .as_deref()
+        .filter(|value| valid_digest(value))
+    else {
+        return false;
+    };
+    let digest = raw.to_ascii_lowercase();
+    let Ok(Some(site)) = state
+        .store
+        .get_entity::<super::federation::AiSite>(super::STORE_SITES, site_id)
+    else {
+        return false;
+    };
+    let peer = site.peer_url.trim().trim_end_matches('/');
+    if peer.is_empty() {
+        return false;
+    }
+    let Some(path) = local_digest_file(state, model, digest) else {
+        return false;
+    };
+    let Ok(got) = sha256_file(&path) else {
+        return false;
+    };
+    if got != digest {
+        return false;
+    }
+    let Ok(file) = tokio::fs::File::open(&path).await else {
+        return false;
+    };
+    let url = format!("{peer}/api/ai/models/{}/blobs/{digest}", model.name);
+    let stream = tokio_util::io::ReaderStream::new(file);
+    let response = state
+        .http_client
+        .put(url)
+        .header("x-replicate-token", token)
+        .body(reqwest::Body::wrap_stream(stream))
+        .send()
+        .await;
+    let Ok(response) = response else {
+        return false;
+    };
+    if response.status() != reqwest::StatusCode::CREATED {
+        return false;
+    }
+    let Ok(body) = response.json::<serde_json::Value>().await else {
+        return false;
+    };
+    body.get("digest").and_then(|value| value.as_str()) == Some(digest)
+}
+
+fn local_digest_file(state: &AppState, model: &ModelArtifact, digest: &str) -> Option<PathBuf> {
+    let state_dir = PathBuf::from(&state.config.storage.path);
+    let candidates = [
+        model.local_path.clone().map(PathBuf::from),
+        Some(
+            state_dir
+                .join("ai-models")
+                .join(model_cache::sanitize_name(&model.name)),
+        ),
+        Some(state_dir.join("ai-models").join("blobs").join(digest)),
+    ];
+    candidates.into_iter().flatten().find(|path| path.is_file())
+}
+
+pub fn valid_digest(value: &str) -> bool {
+    value.len() == 64 && value.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// PUT /api/ai/models/{name}/blobs/{digest}
+pub async fn receive_blob(
+    State(state): State<Arc<AppState>>,
+    Path((name, digest)): Path<(String, String)>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Body,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    if !replicate_token_ok(
+        headers
+            .get("x-replicate-token")
+            .and_then(|value| value.to_str().ok()),
+    ) {
+        return Err(err(StatusCode::UNAUTHORIZED, "replicate token is required"));
+    }
+    if !valid_digest(&digest) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "digest must be 64 hex characters",
+        ));
+    }
+    crate::validation::validate_entity_name(&name).map_err(|(s, m)| err(s, m))?;
+    let state_dir = PathBuf::from(&state.config.storage.path);
+    let root = state_dir.join("ai-models").join("blobs");
+    std::fs::create_dir_all(&root)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let partial = root.join(format!(".{digest}.partial"));
+    let dest = root.join(&digest);
+    if let Err(error) = write_hashed_body(body, &partial, &digest).await {
+        let _ = std::fs::remove_file(&partial);
+        return Err(err(StatusCode::BAD_REQUEST, error));
+    }
+    std::fs::rename(&partial, &dest)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if model_cache::confine(&dest, &state_dir).is_err() {
+        let _ = std::fs::remove_file(&dest);
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "blob path escaped the model directory",
+        ));
+    }
+    if let Ok(Some(mut model)) = state.store.get_entity::<ModelArtifact>(STORE_MODELS, &name) {
+        if model.local_path.is_none() {
+            model.local_path = Some(dest.display().to_string());
+            let _ = state.store.save_entity(STORE_MODELS, &name, &model);
+        }
+    }
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::json!({ "digest": digest.to_ascii_lowercase() })),
+    ))
+}
+
+fn replicate_token_ok(got: Option<&str>) -> bool {
+    let Ok(expected) = std::env::var("FLUXVM_AI_REPLICATE_TOKEN") else {
+        return false;
+    };
+    let Some(got) = got else {
+        return false;
+    };
+    expected.len() == got.len() && bool::from(expected.as_bytes().ct_eq(got.as_bytes()))
+}
+
+async fn write_hashed_body(
+    body: axum::body::Body,
+    path: &FsPath,
+    digest: &str,
+) -> Result<(), String> {
+    use futures::StreamExt;
+    use sha2::{Digest, Sha256};
+    use tokio::io::AsyncWriteExt;
+    let mut file = tokio::fs::File::create(path)
+        .await
+        .map_err(|err| err.to_string())?;
+    let mut hasher = Sha256::new();
+    let mut total = 0u64;
+    let mut stream = body.into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|err| err.to_string())?;
+        total = total.saturating_add(chunk.len() as u64);
+        if total > 8 * 1024 * 1024 * 1024 {
+            return Err("model blob exceeds 8 GiB".into());
+        }
+        hasher.update(&chunk);
+        file.write_all(&chunk)
+            .await
+            .map_err(|err| err.to_string())?;
+    }
+    file.flush().await.map_err(|err| err.to_string())?;
+    let got: String = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    if got != digest.to_ascii_lowercase() {
+        return Err("blob digest does not match".into());
+    }
+    Ok(())
 }
 
 /// DELETE /api/ai/models/{name}/cache/{node}

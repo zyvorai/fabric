@@ -16,7 +16,7 @@ pub enum BackendTransport {
     },
 }
 
-fn filled<'a>(value: Option<&'a str>) -> Option<&'a str> {
+fn filled(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
@@ -51,6 +51,14 @@ pub fn upstream_origin(transport: &BackendTransport, target: &str, path: &str) -
     format!("{scheme}://{target}{path}")
 }
 
+pub fn websocket_origin(transport: &BackendTransport, target: &str, path: &str) -> String {
+    let scheme = match transport {
+        BackendTransport::Http => "ws",
+        BackendTransport::Https | BackendTransport::Mtls { .. } => "wss",
+    };
+    format!("{scheme}://{target}{path}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,6 +84,14 @@ mod tests {
                 "/v1/chat/completions"
             ),
             "http://10.0.0.8:8000/v1/chat/completions"
+        );
+        assert_eq!(
+            websocket_origin(&BackendTransport::Http, "10.0.0.8:8000", "/v1/realtime"),
+            "ws://10.0.0.8:8000/v1/realtime"
+        );
+        assert!(
+            websocket_origin(&BackendTransport::Https, "10.0.0.8:8000", "/v1/realtime")
+                .starts_with("wss://")
         );
         assert!(
             upstream_origin(&BackendTransport::Https, "10.0.0.8:8000", "/v1/models")

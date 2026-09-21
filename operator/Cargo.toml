@@ -20,6 +20,7 @@ thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures = "0.3"
+http = "1"
 reqwest = { version = "0.13", features = ["json"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 

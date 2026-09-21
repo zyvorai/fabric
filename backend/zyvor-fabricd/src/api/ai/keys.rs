@@ -25,6 +25,27 @@ use super::types::{
 use super::{audit, err, STORE_ENDPOINTS};
 
 pub(crate) const STORE_API_KEYS: &str = "ai_inference_api_keys";
+pub(crate) const STORE_KEY_POLICIES: &str = "ai_key_policies";
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KeyPolicy {
+    pub endpoint: String,
+    pub max_ttl_secs: i64,
+}
+
+pub fn ttl_within_policy(
+    requested: Option<i64>,
+    max_ttl_secs: i64,
+) -> Result<Option<i64>, &'static str> {
+    if max_ttl_secs <= 0 {
+        return Ok(requested);
+    }
+    match requested {
+        Some(ttl) if ttl > max_ttl_secs => Err("ttl_secs exceeds the endpoint key policy"),
+        Some(ttl) => Ok(Some(ttl)),
+        None => Ok(Some(max_ttl_secs)),
+    }
+}
 
 /// GET /api/ai/keys
 pub async fn list_keys(
@@ -76,6 +97,14 @@ pub async fn create_key(
                 "key tenant must match endpoint tenant",
             ));
         }
+    }
+
+    if let Ok(Some(policy)) = state
+        .store
+        .get_entity::<KeyPolicy>(STORE_KEY_POLICIES, &req.endpoint)
+    {
+        req.ttl_secs = ttl_within_policy(req.ttl_secs, policy.max_ttl_secs)
+            .map_err(|message| err(StatusCode::BAD_REQUEST, message))?;
     }
 
     let secret = generate_secret();
@@ -157,6 +186,35 @@ pub async fn delete_key(
         "SUCCESS",
     );
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// PUT /api/ai/key-policies/{endpoint}
+pub async fn put_key_policy(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(endpoint): Path<String>,
+    Json(body): Json<KeyPolicy>,
+) -> Result<Json<KeyPolicy>, (StatusCode, Json<serde_json::Value>)> {
+    crate::validation::validate_entity_name(&endpoint).map_err(|(s, m)| err(s, m))?;
+    if body.max_ttl_secs < 0 {
+        return Err(err(StatusCode::BAD_REQUEST, "max_ttl_secs must be >= 0"));
+    }
+    let policy = KeyPolicy {
+        endpoint,
+        max_ttl_secs: body.max_ttl_secs,
+    };
+    state
+        .store
+        .save_entity(STORE_KEY_POLICIES, &policy.endpoint, &policy)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    audit(
+        &state,
+        &claims.sub,
+        "UPSERT",
+        &format!("ai/key-policies/{}", policy.endpoint),
+        "SUCCESS",
+    );
+    Ok(Json(policy))
 }
 
 #[derive(Debug, Clone, serde::Deserialize, Default)]

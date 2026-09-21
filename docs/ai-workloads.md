@@ -4,8 +4,9 @@ OpenAI-compatible inference on dedicated NVIDIA GPU VMs, operated through
 Fabric’s API, CLI, and console. Maglev load-balances backends with
 control-plane weight updates. Phases 0–6 cover inventory, routing, autoscaling,
 API keys, sites, and Agent Runtime. Preview 2 adds revisioned rollouts, model
-supply-chain jobs, and gateway limits. Maturity for a single cluster stays
-Preview 2.
+supply-chain jobs, gateway limits, a per-process Raft lease, live `nvidia-smi`
+readings, site-to-site model copy, a WebSocket inference proxy, and optional
+OTLP export. Maturity for a single cluster stays Preview 2.
 
 ## Maturity
 
@@ -173,7 +174,7 @@ chunks instead of one buffered completion.
 | 5 | `site_local` / `cost_optimized` / `energy_optimized` routing, preferred/allowed sites |
 | 6 | Agent Runtime `kind: fabric` credentials + `ZYVOR_FABRIC_INFERENCE_BASE` shim |
 | Harden | OpenAI API-key gateway, `/ai/capacity` + `/ai/events`, console keys/autoscale, golden-image bake script |
-| GitOps | Terraform `zyvor-fabricd_{model_artifact,inference_profile,inference_deployment,inference_endpoint,ai_site}` plus operator CRDs. The operator reconciles `ModelArtifact` and `InferenceDeployment`. The other AI kinds are registered so a missing CRD does not stop the process. |
+| GitOps | Terraform `zyvor-fabricd_{model_artifact,inference_profile,inference_deployment,inference_endpoint,ai_site}` plus operator CRDs. The operator watches each installed AI kind and skips a missing CRD. Installed kinds post to the existing fabricd routes. |
 | Correctness | Exclusive GPU/VIP create, health replacement after three failures, Maglev-before-VIP delete, CIDR network/broadcast skipped, bounded reconcile retry. Still **Preview** |
 
 ## Terraform
@@ -271,7 +272,19 @@ Canary uses a separate replica set and the steps 5% / 300s, 20% / 600s, 50% / 90
 
 Blue/green builds the full new replica set, then switches weights in one save. The old set stays until the rollback window ends.
 
-Maturity stays **Preview 2** for a single cluster. The control plane now records revisioned rollouts, content-addressed model jobs (including format scanning and derived optimization artifacts), gateway limits, optional backend TLS, batch job records, reported GPU temperature and ECC filters, multi-GPU reservation, site policy, chargeback, and chaos recovery classes. A three-node quorum is used only when `FLUXVM_AI_CONSENSUS=external`. MIG profile changes are refused while a device is allocated. Additional runtimes stay fail-closed until listed in `FLUXVM_AI_ALLOW_RUNTIMES`. There is no in-process Raft, MIG ioctl, WebSocket inference proxy, or cross-site model byte copy.
+Maturity stays **Preview 2** for a single cluster. The control plane records revisioned rollouts, content-addressed model jobs (including format scanning and derived optimization artifacts), gateway limits, optional backend TLS, batch job records, reported GPU temperature and ECC filters, multi-GPU reservation, site policy, chargeback, and chaos recovery classes. Additional runtimes stay fail-closed until listed in `FLUXVM_AI_ALLOW_RUNTIMES`. `FLUXVM_AI_CONSENSUS=external` is only a label.
+
+Each `zyvor-fabricd` process is one Raft voter when `FLUXVM_AI_RAFT_ID`, `FLUXVM_AI_RAFT_PEERS` (at least three `id@host:port` entries, including this process), and `FLUXVM_AI_RAFT_TOKEN` are set. The log is `{state}/ai-raft/`. RequestVote and AppendEntries use `POST /api/ai/raft/{vote,append,snapshot}` with `x-raft-token`. The replicated record is the current leader id. AI placement runs only while this process is the committed leader of that membership. With those variables unset, placement stays as it is on a single process. This process never starts the other voters. A missing membership, or fewer than three committed voters, leaves leader-loss recovery degraded.
+
+On Linux, a node heartbeat runs `nvidia-smi` when that binary is on `PATH` and writes `temperature.gpu`, `power.draw`, and `ecc.errors.uncorrected.volatile` onto a matching PCI BDF. A missing binary, a failed command, or a `janus:` id leaves the stored fields unchanged. `POST /api/ai/nodes/{id}/mig` still creates Janus slice records only. A real PCI BDF returns 400. There is no `nvidia-smi mig` and no NVML mode change.
+
+`AiSite.peer_url` is optional. `POST /api/ai/models/{name}/replicate` stays `pending` unless a node at the site already cached the model, or the peer returns 201 from `PUT /api/ai/models/{name}/blobs/{digest}` after the SHA-256 matches. The receiver writes only under its model directory. A missing `peer_url`, a missing file, a hash mismatch, or a wrong `FLUXVM_AI_REPLICATE_TOKEN` does not mark the record `ready`.
+
+An inference request with `Upgrade: websocket` is authenticated on the same gateway path, then bridged to the `ws` or `wss` form of the selected upstream. The upstream is contacted before the client upgrade completes, so a refused upstream is 502. mTLS uses the same client certificate and CA as HTTP. The stream slot is held until the socket closes. A request without the upgrade stays on the HTTP proxy.
+
+When `FLUXVM_AI_OTEL_ENDPOINT` is set, each gateway call exports one OTLP/HTTP span to `{endpoint}/v1/traces` with the endpoint name, HTTP status, and token count. The prompt and the API key are not attributes. Export failure is logged and does not fail the request. Unset leaves the existing tracing subscriber unchanged.
+
+The operator discovers each AI CRD before watching it. A missing kind is logged and skipped, and startup continues. Installed kinds post to the existing fabricd routes: profiles, endpoints, deployment rollouts, nodes, sites, and deployment autoscaling. `InferenceApiKeyPolicy` is stored with `PUT /api/ai/key-policies/{endpoint}` and caps `ttl_secs` on key create. A CRD that is not installed does nothing.
 
 ## Multi-node scheduler (Phase 10)
 
@@ -279,9 +292,9 @@ Register hosts with `POST /api/ai/nodes`. Each node reports site, failure domain
 
 Placement is filter then score: ready state, no taints, residency, free NVIDIA VRAM, then cache hit, preferred site, and failure-domain spread. The same inputs pick the same node. When no nodes are registered, replicas still land on the local FluxVM inventory. A chosen GPU that this FluxVM process does not have is not started here. A replica on an offline node is replaced only when another ready node exists, so the last healthy replica is kept when nothing else can take it.
 
-When `FLUXVM_AI_JANUS_URL` is set and FluxVM reports no host GPU, Fabric reads `GET /api/cluster?config=single_gpu` and stores the device as `janus:node-0:gpu-0` with `source` carried in the model name `janus:…`. The replica address is the Janus host and port. No VFIO bind and no VM are created. The gateway proxies a ready replica at that address even when `FLUXVM_AI_DRY_RUN=1`. That device is the Janus scheduler simulator, not a PCI NVIDIA GPU.
+When `FLUXVM_AI_JANUS_URL` is set and FluxVM reports no NVIDIA GPU, Fabric reads `GET /api/cluster?config=single_gpu` and stores the device as `janus:node-0:gpu-0` with `source` carried in the model name `janus:…`. The replica address is the Janus host and port. No VFIO bind and no VM are created. The gateway proxies a ready replica at that address even when `FLUXVM_AI_DRY_RUN=1`. That device is the Janus scheduler simulator, not a PCI NVIDIA GPU.
 
-`POST /api/ai/nodes/{id}/mig` creates a slice record for a Janus parent when the profile is in the H100 catalog (`1g.10gb`, `1g`, `2g.20gb`, `2g`, `3g.40gb`, `3g`, `7g.80gb`, `7g`) and the memory still fits. `DELETE /api/ai/nodes/{id}/mig/{bdf}` removes that slice when no replica holds it. Placement uses the slice and leaves the parent unschedulable while slices exist. This does not call `nvidia-smi`. A node may report `temperature_c`, `power_watts`, and `ecc_errors` on each GPU (`0` means unknown). `FLUXVM_AI_MAX_GPU_TEMP_C` skips a GPU hotter than that value. `FLUXVM_AI_REJECT_ECC=1` skips a GPU whose reported ECC count is above zero. Those fields are what the node sent. Fabric does not read the driver.
+`POST /api/ai/nodes/{id}/mig` creates a slice record for a Janus parent when the profile is in the H100 catalog (`1g.10gb`, `1g`, `2g.20gb`, `2g`, `3g.40gb`, `3g`, `7g.80gb`, `7g`) and the memory still fits. `DELETE /api/ai/nodes/{id}/mig/{bdf}` removes that slice when no replica holds it. Placement uses the slice and leaves the parent unschedulable while slices exist. MIG create does not call `nvidia-smi`. A heartbeat on Linux does, when `nvidia-smi` is on `PATH`, and fills `temperature_c`, `power_watts`, and `ecc_errors` for a matching PCI BDF. `0` still means unknown. A missing binary, a failed command, or a `janus:` id does not invent those readings and does not clear a value the node already reported. `FLUXVM_AI_MAX_GPU_TEMP_C` skips a GPU hotter than that value. `FLUXVM_AI_REJECT_ECC=1` skips a GPU whose ECC count is above zero.
 
 `POST /api/ai/admit` runs the tenant policy for a JSON body or an `AdmissionReview`. `POST /api/ai/admit/{token}` is the same check when `FLUXVM_AI_ADMIT_TOKEN` is set. The operator chart renders a validating webhook for `InferenceDeployment` only when `admissionWebhook.enabled=true`. An unreachable fabricd fails closed.
 
@@ -293,7 +306,7 @@ The inference gateway still accepts scoped API keys. It also accepts an OIDC JWT
 
 `GET /api/ai/explain/placement/{deployment}` returns the chosen node and why the others were rejected. `GET /api/ai/explain/scaling/{deployment}` reports the instantaneous scale-out, scale-in, or hold signal; the autoscaler still waits its configured seconds before changing the replica count. `GET /api/ai/explain/routing/{endpoint}` says why each replica is included or excluded. `GET /api/ai/explain/failure/{replica}` lists recorded reasons for one replica id or VM name. `POST /api/ai/policies` is a tenant allow-list for model name and source prefix. Optional `deploy_hour_start` and `deploy_hour_end` are UTC hours; both absent means deploys are always allowed, and a start after the end wraps past midnight. No policy means the existing tenant filter still applies. `POST /api/ai/backup` and `POST /api/ai/restore` copy desired-state JSON, not model bytes.
 
-Chargeback is `GET /api/ai/finops`: GPU-seconds, reserved versus ready GPUs, and the current token window. `alert` is true when those tokens exceed `FLUXVM_AI_TOKEN_BUDGET`; unset or `0` does not alert. Each AI audit row extends a SHA-256 chain in the state store. The only runtime that launches by default is vLLM. TensorRT-LLM, Triton, llama.cpp, and text-embeddings-inference launch when named in `FLUXVM_AI_ALLOW_RUNTIMES`. There is no in-process three-node consensus; set `FLUXVM_AI_CONSENSUS=external` only when that store exists. OIDC remains the control-plane login. The inference gateway accepts scoped API keys and an OIDC JWT whose audience is `fabric-inference`. Any other JWT audience is rejected unless `FLUXVM_AI_GATEWAY_ACCEPT_JWT=1`.
+Chargeback is `GET /api/ai/finops`: GPU-seconds, reserved versus ready GPUs, and the current token window. `alert` is true when those tokens exceed `FLUXVM_AI_TOKEN_BUDGET`; unset or `0` does not alert. Each AI audit row extends a SHA-256 chain in the state store. The only runtime that launches by default is vLLM. TensorRT-LLM, Triton, llama.cpp, and text-embeddings-inference launch when named in `FLUXVM_AI_ALLOW_RUNTIMES`. There is no quorum inside one process. Set `FLUXVM_AI_RAFT_ID`, `FLUXVM_AI_RAFT_PEERS`, and `FLUXVM_AI_RAFT_TOKEN` on each voter when a three-process lease is required. `FLUXVM_AI_CONSENSUS=external` does not create that lease. OIDC remains the control-plane login. The inference gateway accepts scoped API keys and an OIDC JWT whose audience is `fabric-inference`. Any other JWT audience is rejected unless `FLUXVM_AI_GATEWAY_ACCEPT_JWT=1`.
 
 ```text
 Scale out when:
@@ -362,7 +375,7 @@ or failure. Fabric does not mark a job succeeded by itself.
 - `license` + `residency` metadata on models; residency copied to deployments. When an endpoint sets `residency`, replicas with no `site` are excluded
 - `InferenceProfile.gpu.count` is 1 to 8. The reconciler reserves that whole group on one node.
 - Deployment revision 1 is written at create. Later revisions and replica sets are the rollout record described above
-- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images. Model jobs run outside the HTTP request: `Registered`, `Resolving`, `Downloading`, `Verifying`, `Scanning`, `Optimizing`, `Ready`, or `Failed` with a durable message and retry count. Scanning counts files (`FLUXVM_AI_MODEL_MAX_FILES`, default 10000) and checks the signature. Optimizing writes a derived artifact and does not replace the source digest. A second job for the same digest joins the first. A partial file is resumed. The job is refused when free disk is below the declared size. `GET /api/ai/model-jobs` and `GET /api/ai/models/{name}/status` report that state. `POST /api/ai/models/{name}/materialize` only records a job. `POST /api/ai/models/{name}/replicate` marks a model ready at a site when a node there already lists it; it does not copy bytes across the WAN.
+- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images. Model jobs run outside the HTTP request: `Registered`, `Resolving`, `Downloading`, `Verifying`, `Scanning`, `Optimizing`, `Ready`, or `Failed` with a durable message and retry count. Scanning counts files (`FLUXVM_AI_MODEL_MAX_FILES`, default 10000) and checks the signature. Optimizing writes a derived artifact and does not replace the source digest. A second job for the same digest joins the first. A partial file is resumed. The job is refused when free disk is below the declared size. `GET /api/ai/model-jobs` and `GET /api/ai/models/{name}/status` report that state. `POST /api/ai/models/{name}/materialize` only records a job. `POST /api/ai/models/{name}/replicate` marks a model ready when a node at the site already lists it, or when `AiSite.peer_url` accepts the digest and returns 201. A missing peer, file, or token stays pending.
 
 ## Multi-site (Phase 5)
 

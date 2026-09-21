@@ -400,6 +400,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/ai/openai/{endpoint}/{*path}",
             axum::routing::any(api::ai::gateway::openai_gateway),
         )
+        .route("/ai/admit", post(api::ai::policy::admit))
+        .route("/ai/admit/{token}", post(api::ai::policy::admit_with_token))
+        .route(
+            "/ai/models/{name}/blobs/{digest}",
+            put(api::ai::model_jobs::receive_blob),
+        )
+        .route("/ai/raft/vote", post(api::ai::raft::vote))
+        .route("/ai/raft/append", post(api::ai::raft::append))
+        .route("/ai/raft/snapshot", post(api::ai::raft::snapshot))
         .with_state(state.clone());
 
     // Protected API routes
@@ -1342,8 +1351,6 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/ai/nodes/{id}/mig/{bdf}",
             axum::routing::delete(api::ai::nodes::delete_mig_slice),
         )
-        .route("/ai/admit", post(api::ai::policy::admit))
-        .route("/ai/admit/{token}", post(api::ai::policy::admit_with_token))
         .route(
             "/ai/sites",
             get(api::ai::sites::list_sites).post(api::ai::sites::put_site),
@@ -1393,6 +1400,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::ai::keys::list_keys).post(api::ai::keys::create_key),
         )
         .route("/ai/keys/{id}/rotate", post(api::ai::keys::rotate_key))
+        .route(
+            "/ai/key-policies/{endpoint}",
+            put(api::ai::keys::put_key_policy),
+        )
         .route(
             "/ai/keys/{id}",
             axum::routing::delete(api::ai::keys::delete_key),

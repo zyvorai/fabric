@@ -39,6 +39,12 @@ pub fn janus_url() -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+/// A display controller is not an inference GPU. Janus is used when none of
+/// the host devices are NVIDIA.
+pub fn is_nvidia(vendor_id: u16, vendor: &str) -> bool {
+    vendor_id == 0x10de || vendor.eq_ignore_ascii_case("nvidia")
+}
+
 /// `http://127.0.0.1:30818` becomes `127.0.0.1:30818`.
 pub fn replica_hostport(url: &str) -> String {
     url.trim_start_matches("https://")
@@ -145,5 +151,7 @@ mod tests {
             "127.0.0.1:30818"
         );
         assert!(is_janus_bdf("janus:node-0:gpu-0"));
+        assert!(is_nvidia(0x10de, "0x10de"));
+        assert!(!is_nvidia(0x102b, "0x102b"));
     }
 }

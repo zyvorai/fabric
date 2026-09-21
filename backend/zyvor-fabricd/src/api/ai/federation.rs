@@ -27,6 +27,9 @@ pub struct AiSite {
     pub last_sync_unix: i64,
     #[serde(default)]
     pub generation: u64,
+    /// fabricd base URL of this site. Empty means bytes are not copied.
+    #[serde(default)]
+    pub peer_url: String,
 }
 
 fn default_reachable() -> bool {
@@ -119,6 +122,7 @@ mod tests {
             models: vec!["qwen".into()],
             last_sync_unix: 1,
             generation: 3,
+            peer_url: String::new(),
         }
     }
 

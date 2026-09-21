@@ -277,8 +277,7 @@ pub async fn reconcile_inference_deployment(
     let namespace = dep.namespace().unwrap_or_default();
     tracing::info!("Reconciling InferenceDeployment {}/{}", namespace, name);
 
-    let api: Api<crate::crd::InferenceDeployment> =
-        Api::namespaced(ctx.client.clone(), &namespace);
+    let api: Api<crate::crd::InferenceDeployment> = Api::namespaced(ctx.client.clone(), &namespace);
     let get_url = format!("{}/api/ai/deployments/{}", ctx.zyvor_fabricd_url, name);
     let get_resp = with_auth(&ctx, ctx.http.get(&get_url)).send().await?;
     let exists = get_resp.status().is_success();
@@ -344,8 +343,10 @@ pub async fn reconcile_inference_deployment(
                         .and_then(|v| v.as_str())
                         .map(str::to_string);
                     if let Some(reps) = st.get("replicas").and_then(|v| v.as_array()) {
-                        status.ready_replicas =
-                            reps.iter().filter(|r| r.get("ready").and_then(|x| x.as_bool()) == Some(true)).count() as u32;
+                        status.ready_replicas = reps
+                            .iter()
+                            .filter(|r| r.get("ready").and_then(|x| x.as_bool()) == Some(true))
+                            .count() as u32;
                     }
                 }
             }
@@ -366,6 +367,205 @@ pub fn error_policy_inference_deployment(
 ) -> Action {
     Action::requeue(Duration::from_secs(60))
 }
+
+async fn ensure_json(
+    ctx: &Context,
+    get_url: &str,
+    write_url: &str,
+    method: &str,
+    body: serde_json::Value,
+) -> Result<(), OperatorError> {
+    let exists = with_auth(ctx, ctx.http.get(get_url))
+        .send()
+        .await?
+        .status()
+        .is_success();
+    if exists {
+        return Ok(());
+    }
+    let request = match method {
+        "PUT" => with_auth(ctx, ctx.http.put(write_url)),
+        _ => with_auth(ctx, ctx.http.post(write_url)),
+    };
+    let response = request.json(&body).send().await?;
+    if !response.status().is_success() {
+        tracing::error!(
+            "fabricd {} {} returned {}",
+            method,
+            write_url,
+            response.status()
+        );
+    }
+    Ok(())
+}
+
+macro_rules! ai_error_policy {
+    ($fn_name:ident, $ty:ty) => {
+        pub fn $fn_name(_object: Arc<$ty>, _error: &OperatorError, _ctx: Arc<Context>) -> Action {
+            Action::requeue(Duration::from_secs(60))
+        }
+    };
+}
+
+pub async fn reconcile_inference_profile(
+    object: Arc<crate::crd::InferenceProfile>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let name = object.name_any();
+    ensure_json(
+        &ctx,
+        &format!("{}/api/ai/profiles/{name}", ctx.zyvor_fabricd_url),
+        &format!("{}/api/ai/profiles", ctx.zyvor_fabricd_url),
+        "POST",
+        json!({
+            "name": name,
+            "runtime": object.spec.runtime,
+            "gpu": { "vendor": "nvidia", "count": object.spec.gpu_count },
+            "cpu": object.spec.cpu,
+            "memory_gib": object.spec.memory_gib
+        }),
+    )
+    .await?;
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+ai_error_policy!(error_policy_inference_profile, crate::crd::InferenceProfile);
+
+pub async fn reconcile_inference_endpoint(
+    object: Arc<crate::crd::InferenceEndpoint>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let name = object.name_any();
+    ensure_json(
+        &ctx,
+        &format!("{}/api/ai/endpoints/{name}", ctx.zyvor_fabricd_url),
+        &format!("{}/api/ai/endpoints", ctx.zyvor_fabricd_url),
+        "POST",
+        json!({
+            "name": name,
+            "deployment": object.spec.deployment,
+            "protocol": object.spec.protocol,
+            "port": 8000
+        }),
+    )
+    .await?;
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+ai_error_policy!(
+    error_policy_inference_endpoint,
+    crate::crd::InferenceEndpoint
+);
+
+pub async fn reconcile_inference_rollout(
+    object: Arc<crate::crd::InferenceRollout>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let deployment = &object.spec.deployment;
+    let get_url = format!("{}/api/ai/deployments/{deployment}", ctx.zyvor_fabricd_url);
+    let response = with_auth(&ctx, ctx.http.get(&get_url)).send().await?;
+    if !response.status().is_success() {
+        return Ok(Action::requeue(Duration::from_secs(60)));
+    }
+    let body: serde_json::Value = response.json().await.unwrap_or(serde_json::json!({}));
+    if body.get("rollout").is_some_and(|value| !value.is_null()) {
+        return Ok(Action::requeue(Duration::from_secs(60)));
+    }
+    let post_url = format!(
+        "{}/api/ai/deployments/{deployment}/rollouts",
+        ctx.zyvor_fabricd_url
+    );
+    let created = with_auth(&ctx, ctx.http.post(&post_url))
+        .json(&json!({ "strategy": object.spec.strategy }))
+        .send()
+        .await?;
+    if !created.status().is_success() {
+        tracing::error!("rollout for {deployment} returned {}", created.status());
+    }
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+ai_error_policy!(error_policy_inference_rollout, crate::crd::InferenceRollout);
+
+pub async fn reconcile_gpu_node(
+    object: Arc<crate::crd::GpuNode>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let name = object.name_any();
+    ensure_json(
+        &ctx,
+        &format!("{}/api/ai/nodes/{name}", ctx.zyvor_fabricd_url),
+        &format!("{}/api/ai/nodes", ctx.zyvor_fabricd_url),
+        "POST",
+        json!({ "id": name, "site": object.spec.site }),
+    )
+    .await?;
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+ai_error_policy!(error_policy_gpu_node, crate::crd::GpuNode);
+
+pub async fn reconcile_ai_site(
+    object: Arc<crate::crd::AiSite>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let name = object.name_any();
+    ensure_json(
+        &ctx,
+        &format!("{}/api/ai/sites/{name}", ctx.zyvor_fabricd_url),
+        &format!("{}/api/ai/sites", ctx.zyvor_fabricd_url),
+        "POST",
+        json!({ "id": name, "residency": object.spec.residency }),
+    )
+    .await?;
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+ai_error_policy!(error_policy_ai_site, crate::crd::AiSite);
+
+pub async fn reconcile_key_policy(
+    object: Arc<crate::crd::InferenceApiKeyPolicy>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let endpoint = &object.spec.endpoint;
+    ensure_json(
+        &ctx,
+        &format!("{}/api/ai/key-policies/{endpoint}", ctx.zyvor_fabricd_url),
+        &format!("{}/api/ai/key-policies/{endpoint}", ctx.zyvor_fabricd_url),
+        "PUT",
+        json!({
+            "endpoint": endpoint,
+            "max_ttl_secs": object.spec.max_ttl_secs
+        }),
+    )
+    .await?;
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+ai_error_policy!(error_policy_key_policy, crate::crd::InferenceApiKeyPolicy);
+
+pub async fn reconcile_autoscaler(
+    object: Arc<crate::crd::InferenceAutoscaler>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let deployment = &object.spec.deployment;
+    let url = format!(
+        "{}/api/ai/deployments/{deployment}/autoscaling",
+        ctx.zyvor_fabricd_url
+    );
+    let response = with_auth(&ctx, ctx.http.put(&url))
+        .json(&json!({
+            "autoscaling": {
+                "enabled": true,
+                "min_replicas": object.spec.min_replicas,
+                "max_replicas": object.spec.max_replicas
+            }
+        }))
+        .send()
+        .await?;
+    if !response.status().is_success() {
+        tracing::error!(
+            "autoscaling update for {deployment} returned {}",
+            response.status()
+        );
+    }
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+ai_error_policy!(error_policy_autoscaler, crate::crd::InferenceAutoscaler);
 
 #[cfg(test)]
 mod tests {

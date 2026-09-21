@@ -135,6 +135,13 @@ pub async fn run_ai_reconcile_controller(state: Arc<AppState>) {
 /// Spawn a background reconcile for a deployment (create / scale).
 pub fn enqueue_deployment_reconcile(state: Arc<AppState>, name: String) {
     tokio::spawn(async move {
+        if let Err(err) = super::raft::start(std::path::Path::new(&state.config.storage.path)).await
+        {
+            tracing::error!("AI raft member did not start: {err}");
+        }
+        if !super::raft::may_place() {
+            return;
+        }
         if let Err(e) = locked_reconcile(&state, &name).await {
             tracing::warn!(deployment = %name, "AI reconcile failed: {e}");
             record_reconcile_error(&state, &name, e);
@@ -663,7 +670,10 @@ async fn create_replica(
     };
 
     let inventory = client.list_host_gpus().await.unwrap_or_default();
-    if inventory.is_empty() {
+    let nvidia = inventory
+        .iter()
+        .any(|gpu| super::janus::is_nvidia(gpu.vendor_id, &gpu.vendor));
+    if !nvidia {
         if let Some(url) = super::janus::janus_url() {
             super::janus::sync_nodes(state, &url).await?;
         }
@@ -683,7 +693,7 @@ async fn create_replica(
         super::scheduler::Placement::Chosen(choice) => Some(choice.bdf.clone()),
     };
 
-    if inventory.is_empty() {
+    if !nvidia {
         if let Some(url) = super::janus::janus_url() {
             let site = dep.preferred_site.clone().or_else(|| Some("janus".into()));
             let ready = scheduled_bdf.is_some();
