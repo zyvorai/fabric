@@ -297,6 +297,11 @@ async fn proxy_upstream(
         ));
     }
 
+    let session = req
+        .headers()
+        .get("x-session-id")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
     let incoming_type = req
         .headers()
         .get(header::CONTENT_TYPE)
@@ -322,6 +327,13 @@ async fn proxy_upstream(
             )
         })?;
     let streaming = wants_stream(&body_bytes);
+    let vip_first = ep.vip.as_deref().is_some_and(|vip| !vip.is_empty());
+    let mut targets = targets;
+    apply_affinity(
+        &mut targets,
+        vip_first,
+        &affinity_key(session.as_deref(), &body_bytes),
+    );
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .build()
@@ -728,6 +740,71 @@ pub fn retry_before_stream<'a>(
         .map(String::as_str)
 }
 
+pub fn affinity_index(key: &str, len: usize) -> Option<usize> {
+    if key.is_empty() || len == 0 {
+        return None;
+    }
+    let mut hash = 2166136261u32;
+    for byte in key.as_bytes() {
+        hash ^= u32::from(*byte);
+        hash = hash.wrapping_mul(16777619);
+    }
+    Some(hash as usize % len)
+}
+
+/// The same key sticks to the same replica even if the slice is rotated.
+pub fn sticky_target(replicas: &[String], key: &str) -> Option<String> {
+    if replicas.is_empty() {
+        return None;
+    }
+    let mut ordered = replicas.to_vec();
+    ordered.sort();
+    let index = affinity_index(key, ordered.len())?;
+    Some(ordered[index].clone())
+}
+
+/// Session id wins. Otherwise the first 64 characters of the prompt are the prefix.
+/// The key is used only to order backends and is not written to the audit log.
+pub fn affinity_key(session: Option<&str>, body: &[u8]) -> String {
+    if let Some(session) = session.map(str::trim).filter(|value| !value.is_empty()) {
+        return session.to_string();
+    }
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return String::new();
+    };
+    let mut text = String::new();
+    if let Some(prompt) = value.get("prompt").and_then(|item| item.as_str()) {
+        text.push_str(prompt);
+    } else if let Some(messages) = value.get("messages").and_then(|item| item.as_array()) {
+        for message in messages {
+            if let Some(content) = message.get("content").and_then(|item| item.as_str()) {
+                text.push_str(content);
+                break;
+            }
+        }
+    }
+    text.chars().take(64).collect()
+}
+
+/// Keep a VIP in front. Move the sticky replica to the first replica slot.
+pub fn apply_affinity(targets: &mut Vec<String>, vip_first: bool, key: &str) {
+    let start = usize::from(vip_first && !targets.is_empty());
+    if start >= targets.len() {
+        return;
+    }
+    let Some(chosen) = sticky_target(&targets[start..], key) else {
+        return;
+    };
+    if targets.get(start).is_some_and(|target| target == &chosen) {
+        return;
+    }
+    let Some(pos) = targets.iter().position(|target| target == &chosen) else {
+        return;
+    };
+    let chosen = targets.remove(pos);
+    targets.insert(start, chosen);
+}
+
 async fn post_upstream(
     client: &reqwest::Client,
     method: &Method,
@@ -871,6 +948,30 @@ mod tests {
         );
         assert_eq!(shed_limit_for(0, RequestPriority::Low), 0);
         assert!(parse_priority(Some("urgent")).is_err());
+    }
+
+    #[test]
+    fn session_affinity_keeps_the_vip_and_sticks_the_same_prefix() {
+        let key = affinity_key(None, br#"{"prompt":"abcdefghijklmnopqrstuvwxyz"}"#);
+        assert_eq!(key, "abcdefghijklmnopqrstuvwxyz");
+        assert_eq!(
+            affinity_key(Some("sess-1"), br#"{"prompt":"other"}"#),
+            "sess-1"
+        );
+        assert_eq!(affinity_index("sess-1", 3), affinity_index("sess-1", 3));
+        let replicas = vec![
+            "10.0.0.2:8000".to_string(),
+            "10.0.0.3:8000".to_string(),
+            "10.0.0.4:8000".to_string(),
+        ];
+        let chosen = sticky_target(&replicas, "sess-1").unwrap();
+        let mut targets = vec!["10.96.0.1:8000".to_string()];
+        targets.extend(replicas);
+        apply_affinity(&mut targets, true, "sess-1");
+        assert_eq!(targets[0], "10.96.0.1:8000");
+        assert_eq!(targets[1], chosen);
+        apply_affinity(&mut targets, true, "sess-1");
+        assert_eq!(targets[1], chosen);
     }
 
     #[test]
