@@ -167,6 +167,13 @@ async fn gateway_inner(
         300,
     )
     .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let priority = parse_priority(
+        parts
+            .headers
+            .get("x-request-priority")
+            .and_then(|v| v.to_str().ok()),
+    )
+    .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     let depths: Vec<u32> = dep
         .status
         .replicas
@@ -179,7 +186,7 @@ async fn gateway_inner(
                 .unwrap_or(0)
         })
         .collect();
-    if shed_queue(&depths, shed_limit()) {
+    if shed_queue(&depths, shed_limit_for(shed_limit(), priority)) {
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
             "inference queue is shedding load".into(),
@@ -421,6 +428,35 @@ pub fn request_deadline_secs(
 /// Shed when any ready replica's queue is above `limit`. `0` disables shedding.
 pub fn shed_queue(queue_depths: &[u32], limit: u32) -> bool {
     limit > 0 && queue_depths.iter().any(|depth| *depth > limit)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestPriority {
+    Low,
+    Normal,
+    High,
+}
+
+pub fn parse_priority(header: Option<&str>) -> Result<RequestPriority, &'static str> {
+    match header.map(str::trim).filter(|value| !value.is_empty()) {
+        None => Ok(RequestPriority::Normal),
+        Some(value) if value.eq_ignore_ascii_case("low") => Ok(RequestPriority::Low),
+        Some(value) if value.eq_ignore_ascii_case("normal") => Ok(RequestPriority::Normal),
+        Some(value) if value.eq_ignore_ascii_case("high") => Ok(RequestPriority::High),
+        Some(_) => Err("x-request-priority must be low, normal, or high"),
+    }
+}
+
+/// Low sheds at half the base queue, high at double. A base of 0 disables shedding.
+pub fn shed_limit_for(base: u32, priority: RequestPriority) -> u32 {
+    if base == 0 {
+        return 0;
+    }
+    match priority {
+        RequestPriority::Low => (base / 2).max(1),
+        RequestPriority::Normal => base,
+        RequestPriority::High => base.saturating_mul(2),
+    }
 }
 
 fn shed_limit() -> u32 {
@@ -827,6 +863,14 @@ mod tests {
         assert!(!shed_queue(&[10, 20], 0));
         assert!(!shed_queue(&[10, 20], 20));
         assert!(shed_queue(&[10, 21], 20));
+        assert_eq!(shed_limit_for(20, parse_priority(Some("low")).unwrap()), 10);
+        assert_eq!(shed_limit_for(20, parse_priority(None).unwrap()), 20);
+        assert_eq!(
+            shed_limit_for(20, parse_priority(Some("HIGH")).unwrap()),
+            40
+        );
+        assert_eq!(shed_limit_for(0, RequestPriority::Low), 0);
+        assert!(parse_priority(Some("urgent")).is_err());
     }
 
     #[test]
