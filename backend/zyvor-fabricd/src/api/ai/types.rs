@@ -51,6 +51,10 @@ pub enum RoutingStrategy {
     CostOptimized,
     /// Prefer backends with lower observed GPU cache pressure (energy proxy).
     EnergyOptimized,
+    /// Prefer backends with higher observed tokens per second.
+    HighestThroughput,
+    /// Prefer backends with a lower observed request failure rate.
+    LowestFailure,
 }
 
 fn default_scale_out_queue() -> u32 {

@@ -234,6 +234,40 @@ pub fn compute_weights(strategy: RoutingStrategy, ready: &[&InferenceReplica]) -
                 clamp_weight(MAX_WEIGHT + 1 - tier)
             })
             .collect(),
+        RoutingStrategy::HighestThroughput => {
+            let rates: Vec<f64> = ready
+                .iter()
+                .map(|r| {
+                    r.metrics
+                        .as_ref()
+                        .map(|m| m.tokens_per_sec.max(0.0))
+                        .unwrap_or(0.0)
+                })
+                .collect();
+            let max_rate = rates.iter().copied().fold(0.0_f64, f64::max);
+            if max_rate <= 0.0 {
+                return ready.iter().map(|_| 1u16).collect();
+            }
+            rates
+                .iter()
+                .map(|rate| {
+                    let score = rate / max_rate;
+                    clamp_weight(((score * f64::from(MAX_WEIGHT)).round() as i32).max(1) as u16)
+                })
+                .collect()
+        }
+        RoutingStrategy::LowestFailure => ready
+            .iter()
+            .map(|r| {
+                let error = r
+                    .metrics
+                    .as_ref()
+                    .map(|m| m.http_error_rate.clamp(0.0, 1.0))
+                    .unwrap_or(0.0);
+                let ok = 1.0 - error;
+                clamp_weight(((ok * f64::from(MAX_WEIGHT)).round() as i32).max(1) as u16)
+            })
+            .collect(),
     }
 }
 
@@ -339,6 +373,8 @@ pub fn parse_vllm_prometheus(text: &str) -> ReplicaMetrics {
         source: Some("vllm_prometheus".into()),
         ..Default::default()
     };
+    let mut succeeded = 0.0_f64;
+    let mut aborted = 0.0_f64;
     for line in text.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -350,6 +386,15 @@ pub fn parse_vllm_prometheus(text: &str) -> ReplicaMetrics {
         let Ok(val) = rest.trim().parse::<f64>() else {
             continue;
         };
+        if name.contains("request_success") {
+            if line.contains("finished_reason=\"abort\"")
+                || line.contains("finished_reason=\"error\"")
+            {
+                aborted += val.max(0.0);
+            } else {
+                succeeded += val.max(0.0);
+            }
+        }
         // Match both `vllm:` and `vllm_` prefixes across versions.
         let n = name.replace(':', "_");
         if n.contains("num_requests_waiting") || n.ends_with("num_requests_waiting") {
@@ -367,12 +412,17 @@ pub fn parse_vllm_prometheus(text: &str) -> ReplicaMetrics {
                 let sum_s = m.ttft_ms / 1000.0;
                 m.ttft_ms = (sum_s / val) * 1000.0;
             }
+        } else if n.contains("avg_generation_throughput") {
+            m.tokens_per_sec = val.max(0.0);
         } else if n.contains("avg_prompt_throughput") || n.contains("prompt_tokens_total") {
-            // best-effort TPS hint
             if m.tokens_per_sec <= 0.0 {
                 m.tokens_per_sec = val.max(0.0);
             }
         }
+    }
+    let finished = succeeded + aborted;
+    if finished > 0.0 {
+        m.http_error_rate = (aborted / finished).clamp(0.0, 1.0);
     }
     m
 }
@@ -453,17 +503,68 @@ mod tests {
     }
 
     #[test]
+    fn highest_throughput_prefers_the_faster_replica() {
+        let mut fast = rep("fast", 0, 0.0, 0.0);
+        let mut slow = rep("slow", 0, 0.0, 0.0);
+        fast.metrics.as_mut().unwrap().tokens_per_sec = 80.0;
+        slow.metrics.as_mut().unwrap().tokens_per_sec = 20.0;
+        let w = compute_weights(RoutingStrategy::HighestThroughput, &[&fast, &slow]);
+        assert!(w[0] > w[1]);
+    }
+
+    #[test]
+    fn lowest_failure_prefers_the_cleaner_replica() {
+        let mut clean = rep("clean", 0, 0.0, 0.0);
+        let mut failing = rep("failing", 0, 0.0, 0.0);
+        clean.metrics.as_mut().unwrap().http_error_rate = 0.0;
+        failing.metrics.as_mut().unwrap().http_error_rate = 0.5;
+        let w = compute_weights(RoutingStrategy::LowestFailure, &[&clean, &failing]);
+        assert!(w[0] > w[1]);
+    }
+
+    #[test]
+    fn parse_vllm_throughput_and_failures() {
+        let text = r#"
+vllm:avg_generation_throughput_toks_per_s 42.5
+vllm:request_success_total{finished_reason="stop"} 8
+vllm:request_success_total{finished_reason="error"} 2
+"#;
+        let m = parse_vllm_prometheus(text);
+        assert!((m.tokens_per_sec - 42.5).abs() < 0.001);
+        assert!((m.http_error_rate - 0.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn throughput_and_failure_change_weight() {
+        let mut fast = rep("fast", 0, 0.0, 0.0);
+        let mut slow = rep("slow", 0, 0.0, 0.0);
+        fast.metrics.as_mut().unwrap().tokens_per_sec = 80.0;
+        slow.metrics.as_mut().unwrap().tokens_per_sec = 20.0;
+        let w = compute_weights(RoutingStrategy::HighestThroughput, &[&fast, &slow]);
+        assert!(w[0] > w[1]);
+        fast.metrics.as_mut().unwrap().http_error_rate = 0.0;
+        slow.metrics.as_mut().unwrap().http_error_rate = 0.5;
+        let w = compute_weights(RoutingStrategy::LowestFailure, &[&fast, &slow]);
+        assert!(w[0] > w[1]);
+    }
+
+    #[test]
     fn parse_vllm_waiting_and_cache() {
         let text = r#"
 # HELP vllm:num_requests_waiting ...
 vllm:num_requests_waiting 7
 vllm:num_requests_running 2
 vllm:gpu_cache_usage_perc 0.42
+vllm:avg_generation_throughput_toks_per_s 40
+vllm:request_success_total{finished_reason="stop"} 8
+vllm:request_success_total{finished_reason="abort"} 2
 "#;
         let m = parse_vllm_prometheus(text);
         assert_eq!(m.queue_depth, 7);
         assert_eq!(m.active_requests, 2);
         assert!((m.gpu_cache_usage - 0.42).abs() < 0.001);
+        assert!((m.tokens_per_sec - 40.0).abs() < 0.001);
+        assert!((m.http_error_rate - 0.2).abs() < 0.001);
     }
 
     #[test]
