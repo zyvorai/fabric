@@ -59,6 +59,9 @@ GET/DELETE /api/ai/endpoints/{name}
 GET/POST   /api/ai/keys
 DELETE     /api/ai/keys/{id}
 GET        /api/ai/gpus
+GET        /api/ai/capacity
+GET        /api/ai/events
+ANY        /api/ai/openai/{endpoint}[/{path}]   # API-key OpenAI gateway (no JWT)
 ```
 
 ## CLI
@@ -73,8 +76,28 @@ zyvorctl ai deployment autoscale qwen3-8b --enable --min 1 --max 4
 zyvorctl ai deployment drain qwen3-8b
 zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
 zyvorctl ai key create edge-key --endpoint qwen3-8b-openai
+zyvorctl ai capacity
 zyvorctl ai gpus
 ```
+
+## OpenAI gateway
+
+Point clients at Fabric (not the Maglev VIP directly) when you need API-key
+auth and request quotas:
+
+```bash
+export OPENAI_BASE_URL=https://fabric.example:9095/api/ai/openai/qwen3-8b-openai
+export OPENAI_API_KEY=fvai_…   # from zyvorctl ai key create
+curl -sk "$OPENAI_BASE_URL/v1/chat/completions" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"model":"qwen3-8b","messages":[{"role":"user","content":"hi"}]}'
+```
+
+The gateway validates the key (endpoint + optional model scope), increments
+`requests_used`, and proxies to the Maglev VIP or a ready replica. Maglev
+itself remains L4 and does not see API keys. Under `FLUXVM_AI_DRY_RUN=1` the
+gateway returns a synthetic chat completion after accepting the key.
 
 ## Phase map
 
@@ -86,6 +109,7 @@ zyvorctl ai gpus
 | 4 | Endpoint API keys, checksum enforcement, residency/license on models, revision audit |
 | 5 | `site_local` / `cost_optimized` / `energy_optimized` routing, preferred/allowed sites |
 | 6 | Agent Runtime `kind: fabric` credentials + `ZYVOR_FABRIC_INFERENCE_BASE` shim |
+| Harden | OpenAI API-key gateway, `/ai/capacity` + `/ai/events`, console keys/autoscale, golden-image bake script |
 
 ## AI-aware Maglev routing (Phase 2+)
 
@@ -165,7 +189,18 @@ Optional `FABRIC_AI_API_KEY` injects an endpoint key created via
 
 ## Golden image runbook
 
-CUDA and vLLM are **not** installed at boot via `apt`. Bake them into a qcow2:
+CUDA and vLLM are **not** installed at boot via `apt`. Bake them into a qcow2.
+
+Helper (needs `virt-customize` / libguestfs-tools on a GPU host):
+
+```bash
+./scripts/bake-ai-vllm-image.sh \
+  /var/lib/libvirt/images/ubuntu-24.04-cloud.qcow2 \
+  /var/lib/zyvor-fabricd/images/vllm-cuda.qcow2
+# then: FLUXVM_AI_IMAGE=/var/lib/zyvor-fabricd/images/vllm-cuda.qcow2
+```
+
+Manual path:
 
 1. Start from an Ubuntu cloud image with NVIDIA driver + CUDA matching the host.
 2. Install vLLM into a venv (or system path) and verify `vllm serve --help`.
@@ -202,9 +237,13 @@ Hardware gate: `fluxvm/scripts/test-gpu-passthrough-lifecycle.sh`.
 
 ## Console
 
-`/app/ai` — Models, Deployments, Endpoints, GPUs tabs.
+`/app/ai` — Models, Deployments, Endpoints, API keys, GPUs. Capacity strip shows
+free/total GPUs; deployments show autoscale bounds and Maglev weights; endpoints
+show the `/api/ai/openai/{name}` gateway path.
 
 ## CI
 
 GitHub Actions workflow `.github/workflows/ai-workloads.yml` runs unit tests for
-routing, autoscaling, rollouts, and API keys on every PR that touches AI paths.
+routing, autoscaling, rollouts, API keys, gateway quota math, and capacity helpers
+on every PR that touches AI paths. Lab smoke:
+`scripts/smoke-ai-workloads-phases.sh` (REST) plus gateway Bearer checks.

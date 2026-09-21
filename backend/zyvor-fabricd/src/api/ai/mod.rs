@@ -13,8 +13,10 @@
 //! Hugging Face download, set `FLUXVM_AI_MODEL_DIR` to a verified local tree.
 
 pub mod autoscaling;
+pub mod capacity;
 pub mod deployments;
 pub mod endpoints;
+pub mod gateway;
 pub mod gpus;
 pub mod keys;
 pub mod maglev;

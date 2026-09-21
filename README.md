@@ -284,8 +284,9 @@ All figures above are counted directly from source (route definitions, router co
 | Naming / clone URL | [docs/NAMING.md](docs/NAMING.md) | | | Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
 | Product positioning | [docs/POSITIONING.md](docs/POSITIONING.md) | | | VM edge dataplane (Network Fabric v4) | [docs/network-fabric-architecture.md](docs/network-fabric-architecture.md) · [operator guide](docs/guides/vm-drivers/fluxvm-dataplane.md) |
 | Product overview + metrics | [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
-| Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
-| FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
+| Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | **AI Workloads (preview)** | [docs/ai-workloads.md](docs/ai-workloads.md) |
+| FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
+| | | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | | | | | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |
 | | | | | Host maintenance | [docs/host-lifecycle.md](docs/host-lifecycle.md) |
 | | | | | User manuals | [docs/user/README.md](docs/user/README.md) |

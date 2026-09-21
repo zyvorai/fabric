@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useCallback, useEffect, useState } from 'react'
-import { Bot, Cpu, Layers, Radio } from 'lucide-react'
+import { Bot, Cpu, KeyRound, Layers, Radio } from 'lucide-react'
 import {
   FabricGpuView,
+  InferenceApiKey,
   InferenceDeployment,
   InferenceEndpoint,
   InferenceProfile,
   ModelArtifact,
+  listCapacity,
   listDeployments,
   listEndpoints,
   listGpus,
+  listKeys,
   listModels,
   listProfiles,
 } from '../api/ai'
@@ -19,7 +22,7 @@ import { PageHeader, EmptyState, Card } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 
-type Tab = 'models' | 'deployments' | 'endpoints' | 'gpus'
+type Tab = 'models' | 'deployments' | 'endpoints' | 'keys' | 'gpus'
 
 export default function AiWorkloads() {
   const [tab, setTab] = useState<Tab>('deployments')
@@ -27,24 +30,30 @@ export default function AiWorkloads() {
   const [profiles, setProfiles] = useState<InferenceProfile[]>([])
   const [deployments, setDeployments] = useState<InferenceDeployment[]>([])
   const [endpoints, setEndpoints] = useState<InferenceEndpoint[]>([])
+  const [keys, setKeys] = useState<InferenceApiKey[]>([])
   const [gpus, setGpus] = useState<FabricGpuView[]>([])
+  const [capacity, setCapacity] = useState<Record<string, unknown> | null>(null)
   const { loading, loadError, run } = usePageLoader('Failed to load AI workloads')
 
   const load = useCallback(() => {
     return run(async () => {
-      const [m, p, d, e, g] = await Promise.all([
+      const [m, p, d, e, k, g, c] = await Promise.all([
         listModels(),
         listProfiles(),
         listDeployments(),
         listEndpoints(),
+        listKeys(),
         listGpus(),
+        listCapacity(),
       ])
       setModels(Array.isArray(m) ? m : [])
       setProfiles(Array.isArray(p) ? p : [])
       setDeployments(Array.isArray(d) ? d : [])
       setEndpoints(Array.isArray(e) ? e : [])
+      setKeys(Array.isArray(k) ? k : [])
       const gItems = Array.isArray(g) ? g : (g as { items?: FabricGpuView[] }).items ?? []
       setGpus(gItems)
+      setCapacity(c && typeof c === 'object' ? (c as Record<string, unknown>) : null)
     })
   }, [run])
 
@@ -56,18 +65,29 @@ export default function AiWorkloads() {
     { id: 'models', label: 'Models', icon: Layers },
     { id: 'deployments', label: 'Deployments', icon: Bot },
     { id: 'endpoints', label: 'Endpoints', icon: Radio },
+    { id: 'keys', label: 'API keys', icon: KeyRound },
     { id: 'gpus', label: 'GPUs', icon: Cpu },
   ]
+
+  const gpusSummary = capacity?.gpus as { total?: number; free?: number; allocated?: number } | undefined
 
   return (
     <div>
       <PageHeader
         title="AI Workloads"
-        description="Preview: deploy vLLM on NVIDIA GPU VMs and expose OpenAI-compatible Maglev endpoints. Aligns with Janus FabricAIJob / FabricGpuNode vocabulary."
+        description="Preview: vLLM on NVIDIA GPU VMs, Maglev endpoints, autoscaling, and an API-key OpenAI gateway."
         onRefresh={() => void load()}
         refreshing={loading}
       />
       <PageLoadBanner title="Could not load AI workloads" headline={loadError} onRetry={() => void load()} />
+
+      {gpusSummary && (
+        <p className="mb-3 text-xs text-[var(--zf-muted)]">
+          Capacity: {gpusSummary.free ?? '—'} free / {gpusSummary.total ?? '—'} GPUs
+          {capacity?.dry_run ? ' · dry-run' : ''}
+          {typeof capacity?.site === 'string' ? ` · site ${capacity.site}` : ''}
+        </p>
+      )}
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {tabs.map((t) => (
@@ -93,6 +113,7 @@ export default function AiWorkloads() {
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Source</th>
                   <th className="px-4 py-3">Format</th>
+                  <th className="px-4 py-3">Residency</th>
                   <th className="px-4 py-3">Local path</th>
                 </tr>
               </thead>
@@ -102,6 +123,7 @@ export default function AiWorkloads() {
                     <td className="px-4 py-3 font-medium">{m.name}</td>
                     <td className="px-4 py-3 font-mono text-xs">{m.source}</td>
                     <td className="px-4 py-3">{m.format}</td>
+                    <td className="px-4 py-3">{m.residency ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs">{m.local_path ?? '—'}</td>
                   </tr>
                 ))}
@@ -121,10 +143,10 @@ export default function AiWorkloads() {
                 <tr className="text-left text-[var(--zf-muted)] border-b border-[var(--zf-hairline)]">
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Model</th>
-                  <th className="px-4 py-3">Profile</th>
                   <th className="px-4 py-3">Replicas</th>
+                  <th className="px-4 py-3">Autoscale</th>
                   <th className="px-4 py-3">Phase</th>
-                  <th className="px-4 py-3">Message</th>
+                  <th className="px-4 py-3">Weights</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,10 +154,18 @@ export default function AiWorkloads() {
                   <tr key={d.name} className="border-b border-[var(--zf-hairline)]">
                     <td className="px-4 py-3 font-medium">{d.name}</td>
                     <td className="px-4 py-3">{d.model}</td>
-                    <td className="px-4 py-3">{d.profile}</td>
                     <td className="px-4 py-3">{d.status.replicas?.filter((r) => r.ready).length ?? 0}/{d.replicas}</td>
+                    <td className="px-4 py-3 text-xs">
+                      {d.autoscaling?.enabled
+                        ? `${d.autoscaling.min_replicas}–${d.autoscaling.max_replicas}`
+                        : 'off'}
+                    </td>
                     <td className="px-4 py-3">{d.status.phase || '—'}</td>
-                    <td className="px-4 py-3 text-xs text-[var(--zf-muted)]">{d.status.message ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {(d.status.replicas ?? [])
+                        .map((r) => r.maglev_weight ?? '—')
+                        .join(', ') || '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -154,9 +184,9 @@ export default function AiWorkloads() {
                 <tr className="text-left text-[var(--zf-muted)] border-b border-[var(--zf-hairline)]">
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Deployment</th>
-                  <th className="px-4 py-3">Protocol</th>
-                  <th className="px-4 py-3">Port</th>
+                  <th className="px-4 py-3">Routing</th>
                   <th className="px-4 py-3">VIP</th>
+                  <th className="px-4 py-3">Gateway</th>
                 </tr>
               </thead>
               <tbody>
@@ -164,9 +194,40 @@ export default function AiWorkloads() {
                   <tr key={e.name} className="border-b border-[var(--zf-hairline)]">
                     <td className="px-4 py-3 font-medium">{e.name}</td>
                     <td className="px-4 py-3">{e.deployment}</td>
-                    <td className="px-4 py-3">{e.protocol}</td>
-                    <td className="px-4 py-3">{e.port}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{e.vip ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{e.routing_strategy ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{e.vip ?? '—'}:{e.port}</td>
+                    <td className="px-4 py-3 font-mono text-xs">/api/ai/openai/{e.name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )
+      )}
+
+      {tab === 'keys' && (
+        keys.length === 0 ? (
+          <EmptyState icon={<KeyRound className="w-8 h-8" />} title="No API keys" description="zyvorctl ai key create NAME --endpoint ENDPOINT" />
+        ) : (
+          <Card className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[var(--zf-muted)] border-b border-[var(--zf-hairline)]">
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Endpoint</th>
+                  <th className="px-4 py-3">Prefix</th>
+                  <th className="px-4 py-3">Used</th>
+                  <th className="px-4 py-3">Quota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((k) => (
+                  <tr key={k.id} className="border-b border-[var(--zf-hairline)]">
+                    <td className="px-4 py-3 font-medium">{k.name}</td>
+                    <td className="px-4 py-3">{k.endpoint}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{k.prefix}…</td>
+                    <td className="px-4 py-3">{k.requests_used}</td>
+                    <td className="px-4 py-3">{k.request_quota ?? '∞'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -177,7 +238,7 @@ export default function AiWorkloads() {
 
       {tab === 'gpus' && (
         gpus.length === 0 ? (
-          <EmptyState icon={<Cpu className="w-8 h-8" />} title="No GPUs reported" description="FluxVM GET /v1/host/gpus returned an empty inventory. Janus can simulate FabricGpuNode fleets offline." />
+          <EmptyState icon={<Cpu className="w-8 h-8" />} title="No host GPUs" description="FluxVM inventory empty — set FLUXVM_AI_DRY_RUN=1 for REST smoke without NVIDIA." />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">

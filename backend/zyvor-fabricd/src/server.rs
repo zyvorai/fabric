@@ -381,6 +381,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let public_auth_routes = Router::new()
         .route("/auth/login", post(api::auth::login))
         .route("/instance", get(api::instance::get_instance))
+        // AI OpenAI gateway — API-key auth (not Fabric JWT)
+        .route(
+            "/ai/openai/{endpoint}",
+            axum::routing::any(api::ai::gateway::openai_gateway_root),
+        )
+        .route(
+            "/ai/openai/{endpoint}/{*path}",
+            axum::routing::any(api::ai::gateway::openai_gateway),
+        )
         .with_state(state.clone());
 
     // Protected API routes
@@ -1247,6 +1256,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::ai::endpoints::get_endpoint).delete(api::ai::endpoints::delete_endpoint),
         )
         .route("/ai/gpus", get(api::ai::gpus::list_gpus))
+        .route("/ai/capacity", get(api::ai::capacity::capacity))
+        .route("/ai/events", get(api::ai::capacity::events))
         .route(
             "/ai/keys",
             get(api::ai::keys::list_keys).post(api::ai::keys::create_key),

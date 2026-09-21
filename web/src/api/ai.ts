@@ -12,6 +12,8 @@ export interface ModelArtifact {
   size_bytes?: number
   tenant?: string
   local_path?: string
+  residency?: string
+  license?: string
   created: string
   updated: string
 }
@@ -34,6 +36,16 @@ export interface InferenceReplica {
   bdf: string
   ready: boolean
   address?: string
+  maglev_weight?: number
+  site?: string
+  draining?: boolean
+}
+
+export interface AutoscalingPolicy {
+  enabled?: boolean
+  min_replicas?: number
+  max_replicas?: number
+  scale_to_zero?: boolean
 }
 
 export interface InferenceDeployment {
@@ -43,6 +55,7 @@ export interface InferenceDeployment {
   replicas: number
   gpus_per_replica?: number
   tenant?: string
+  autoscaling?: AutoscalingPolicy
   status: { phase: string; replicas: InferenceReplica[]; message?: string }
   created: string
   updated: string
@@ -55,9 +68,22 @@ export interface InferenceEndpoint {
   port: number
   service_id?: number
   vip?: string
+  routing_strategy?: string
+  preferred_site?: string
   tenant?: string
   created: string
   updated: string
+}
+
+export interface InferenceApiKey {
+  id: string
+  name: string
+  endpoint: string
+  model?: string
+  prefix: string
+  request_quota?: number
+  requests_used: number
+  created: string
 }
 
 export interface FabricGpuView {
@@ -78,7 +104,9 @@ export const listModels = () => apiGet<ModelArtifact[]>('/api/ai/models')
 export const listProfiles = () => apiGet<InferenceProfile[]>('/api/ai/profiles')
 export const listDeployments = () => apiGet<InferenceDeployment[]>('/api/ai/deployments')
 export const listEndpoints = () => apiGet<InferenceEndpoint[]>('/api/ai/endpoints')
+export const listKeys = () => apiGet<InferenceApiKey[]>('/api/ai/keys')
 export const listGpus = () => apiGet<{ items: FabricGpuView[] } | FabricGpuView[]>('/api/ai/gpus')
+export const listCapacity = () => apiGet<Record<string, unknown>>('/api/ai/capacity')
 
 export const createModel = (body: Partial<ModelArtifact>) =>
   apiPost<ModelArtifact>('/api/ai/models', body)
