@@ -6,11 +6,14 @@ on:
     branches: [main]
     paths:
       - "backend/zyvor-fabricd/src/api/ai/**"
+      - "backend/zyvor-fabricd/src/api/external_auth.rs"
+      - "backend/zyvor-fabricd/src/server.rs"
       - "backend/zyvorctl/src/**"
       - "backend/zyvorctl/src/main.rs"
       - "scripts/smoke-ai-workloads-phases.sh"
       - "docs/ai-workloads.md"
       - "scripts/test-ai-workloads-unit.sh"
+      - "operator/charts/zyvor-fabricd-operator/**"
       - "agent-runtime/src/credentials.rs"
       - "agent-runtime/src/egress.rs"
       - ".github/workflows/ai-workloads.yml"
@@ -18,11 +21,14 @@ on:
     branches: [main]
     paths:
       - "backend/zyvor-fabricd/src/api/ai/**"
+      - "backend/zyvor-fabricd/src/api/external_auth.rs"
+      - "backend/zyvor-fabricd/src/server.rs"
       - "backend/zyvorctl/src/**"
       - "backend/zyvorctl/src/main.rs"
       - "scripts/smoke-ai-workloads-phases.sh"
       - "docs/ai-workloads.md"
       - "scripts/test-ai-workloads-unit.sh"
+      - "operator/charts/zyvor-fabricd-operator/**"
       - "agent-runtime/src/credentials.rs"
       - "agent-runtime/src/egress.rs"
       - ".github/workflows/ai-workloads.yml"
@@ -79,6 +85,7 @@ jobs:
           export FLUXVM_AI_DRY_RUN=1
           export FLUXVM_AI_MODEL_DIR="$ROOT/ai-model-stub"
           export FLUXVM_AI_SITE=lab
+          # Janus stays unset here so CI keeps the synthetic dry-run body.
           BIN="$GITHUB_WORKSPACE/backend/target/debug/zyvor-fabricd"
           "$BIN" > "$ROOT/fabricd.log" 2>&1 &
           echo $! > "$ROOT/pid"
@@ -98,6 +105,29 @@ jobs:
           name: fabricd-log
           path: fabricd.log
           if-no-files-found: ignore
+
+  operator-admit-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Helm
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Template webhook off by default
+        run: |
+          set -euo pipefail
+          out="$(helm template zyvor-fabricd-operator operator/charts/zyvor-fabricd-operator)"
+          echo "$out" | grep -qv ValidatingWebhookConfiguration
+      - name: Template webhook when enabled
+        run: |
+          set -euo pipefail
+          out="$(helm template zyvor-fabricd-operator operator/charts/zyvor-fabricd-operator \
+            --set admissionWebhook.enabled=true \
+            --set admissionWebhook.token=ci-admit-token \
+            --set admissionWebhook.fabricdUrl=https://zyvor-fabricd:9095)"
+          echo "$out" | grep -q ValidatingWebhookConfiguration
+          echo "$out" | grep -q '/api/ai/admit/ci-admit-token'
+          echo "$out" | grep -q 'failurePolicy: Fail'
 
   agent-fabric-cred:
     runs-on: ubuntu-latest

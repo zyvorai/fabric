@@ -1501,6 +1501,19 @@ fn janus_replica_ready(dep: &InferenceDeployment) -> bool {
         .any(|rep| rep.ready && rep.address.as_deref() == Some(hostport.as_str()))
 }
 
+/// Bearer for the Janus OpenAI shim. Only set when the upstream URL is that host.
+fn janus_upstream_key(url: &str) -> Option<String> {
+    let configured = super::janus::janus_url()?;
+    let hostport = super::janus::replica_hostport(&configured);
+    if !url.contains(&hostport) {
+        return None;
+    }
+    std::env::var("FLUXVM_AI_JANUS_API_KEY")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
 /// Session id wins. Otherwise the first 64 characters of the prompt are the prefix.
 /// The key is used only to order backends and is not written to the audit log.
 fn affinity_key(session: Option<&str>, body: &[u8]) -> String {
@@ -1551,7 +1564,7 @@ async fn post_upstream(
     deadline: Duration,
     body: &[u8],
 ) -> Result<reqwest::Response, String> {
-    client
+    let mut request = client
         .request(
             reqwest::Method::from_bytes(method.as_str().as_bytes())
                 .unwrap_or(reqwest::Method::POST),
@@ -1559,10 +1572,11 @@ async fn post_upstream(
         )
         .header(header::CONTENT_TYPE, content_type)
         .timeout(deadline)
-        .body(body.to_vec())
-        .send()
-        .await
-        .map_err(|e| e.to_string())
+        .body(body.to_vec());
+    if let Some(key) = janus_upstream_key(url) {
+        request = request.header(header::AUTHORIZATION, format!("Bearer {key}"));
+    }
+    request.send().await.map_err(|e| e.to_string())
 }
 
 fn dry_run_response(method: &Method, path: &str, model: &str, body_bytes: &[u8]) -> Response {

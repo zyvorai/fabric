@@ -10,3 +10,7 @@ fi
 cd "$ROOT/backend"
 # Single filter matches all ai::* unit modules under the fabricd lib.
 cargo test -p zyvor-fabricd --lib api::ai:: -- --nocapture
+# Focused Preview slices used by the Janus lab path (one filter each).
+cargo test -p zyvor-fabricd --lib api::ai::janus:: -- --nocapture
+cargo test -p zyvor-fabricd --lib api::ai::gpu_orch:: -- --nocapture
+cargo test -p zyvor-fabricd --lib api::ai::gateway::tests::gateway_serves_openai_paths -- --nocapture

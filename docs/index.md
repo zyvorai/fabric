@@ -126,7 +126,7 @@ Detailed documentation for each major feature area.
 | [Networking Overview](networking.md) | Network architecture, SDN stack, and VM edge dataplane |
 | [VM edge dataplane (Network Fabric schema v4)](guides/vm-drivers/fluxvm-dataplane.md) | Fabric proxy of FluxVM TC/eBPF — API, Web, CLI, lab UX |
 | [Service Fabric v6 (Maglev VIP LB)](ebpf-service-fabric.md) | FluxVM Maglev/NAT/DSR/EDT/flows/policy + Fabric leases, HA, FRR/BIRD |
-| [AI Workloads (Preview 2)](ai-workloads.md) | vLLM GPU VMs, revisioned rollouts, gateway limits, backend TLS, batch jobs, Maglev, Terraform, operator CRDs |
+| [AI Workloads (Preview 2)](ai-workloads.md) | vLLM GPU VMs, Janus lab upstream, admit webhook, fabric-inference JWT, revisioned rollouts, gateway limits, Maglev, Terraform, operator CRDs |
 | [User: VM Dataplane](user/pages/infrastructure/dataplane.md) | Console walkthrough for Status / Policy / Effective / Stats / Flows |
 | [User: Edge Dataplane](user/pages/infrastructure/edge-dataplane.md) | Cluster groups / CNP / Maglev Services / health / observe console |
 | [Tutorial 09: Edge Dataplane](tutorials/09-edge-dataplane.md) | End-to-end lab (API + CLI + UX) |
@@ -482,15 +482,18 @@ The REST API is organized into the following endpoint groups:
 
 OpenAI-compatible inference on dedicated NVIDIA GPU VMs: ModelArtifact /
 InferenceProfile / InferenceDeployment / InferenceEndpoint, revisioned
-rollouts, Maglev weighting, gateway rate limits, and an API-key OpenAI
-gateway at `/api/ai/openai/{endpoint}`. Console: `/app/ai`. Still a single-cluster preview.
+rollouts, Maglev weighting, gateway rate limits, an API-key (or
+`fabric-inference` JWT) OpenAI gateway at `/api/ai/openai/{endpoint}`, and an
+optional Janus stand-in when the host has no NVIDIA GPU. Console: `/app/ai`.
+Still a single-cluster preview.
 
 | Document | Description |
 |----------|-------------|
-| [ai-workloads.md](ai-workloads.md) | REST, CLI, phases 0–6 plus Preview 2 gates, golden image, dry-run smoke |
+| [ai-workloads.md](ai-workloads.md) | REST, CLI, Janus lab GPU, admit webhook, phases 0–6 plus Preview 2 gates, golden image, dry-run / CI smoke |
 | [scripts/bake-ai-vllm-image.sh](../scripts/bake-ai-vllm-image.sh) | Bake CUDA + vLLM qcow2 |
 | [terraform-provider/examples/ai-workloads](../terraform-provider/examples/ai-workloads/) | Terraform model/profile/deployment/endpoint |
 | [operator/examples/ai-inference-deployment.yaml](../operator/examples/ai-inference-deployment.yaml) | ModelArtifact + InferenceDeployment CRs |
+| [operator chart admissionWebhook](../operator/charts/zyvor-fabricd-operator/values.yaml) | Opt-in ValidatingWebhook for InferenceDeployment |
 | [Agent Runtime ↔ Fabric](../agent-runtime/README.md#fabric-managed-inference-phase-6) | `kind: fabric` credentials for on-prem models |
 
 ---

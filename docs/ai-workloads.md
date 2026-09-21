@@ -72,6 +72,11 @@ GET        /api/ai/gpus
 GET/POST   /api/ai/nodes
 GET        /api/ai/nodes/{id}
 POST       /api/ai/nodes/{id}/heartbeat
+POST       /api/ai/nodes/{id}/gpus/{bdf}/mig
+POST       /api/ai/nodes/{id}/mig
+DELETE     /api/ai/nodes/{id}/mig/{bdf}
+POST       /api/ai/admit
+POST       /api/ai/admit/{token}
 GET/POST   /api/ai/sites
 GET        /api/ai/sites/{id}
 GET        /api/ai/explain/placement/{deployment}
@@ -88,7 +93,7 @@ POST       /api/ai/models/{name}/materialize
 GET        /api/ai/models/{name}/status
 POST       /api/ai/models/{name}/verify
 POST       /api/ai/models/cache/evict
-ANY        /api/ai/openai/{endpoint}[/{path}]   # API-key OpenAI gateway (no JWT)
+ANY        /api/ai/openai/{endpoint}[/{path}]   # API-key or fabric-inference JWT (no control-plane JWT)
 ```
 
 ## CLI
@@ -110,20 +115,25 @@ zyvorctl ai gpus
 ## OpenAI gateway
 
 Point clients at Fabric (not the Maglev VIP directly) when you need API-key
-auth and request quotas:
+auth, an inference OIDC token, and request quotas:
 
 ```bash
 export OPENAI_BASE_URL=https://fabric.example:9095/api/ai/openai/qwen3-8b-openai
 export OPENAI_API_KEY=fvai_…   # from zyvorctl ai key create
+# or: Authorization: Bearer <OIDC JWT with aud=fabric-inference>
 curl -sk "$OPENAI_BASE_URL/v1/chat/completions" \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H 'content-type: application/json' \
   -d '{"model":"qwen3-8b","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-The gateway validates the key (prefix lookup plus a constant-time HMAC compare,
-endpoint scope, and optional model scope), reserves one lifetime request under
-a per-key lock, then proxies to the Maglev VIP or a ready replica. The upstream
+The gateway validates a scoped API key (prefix lookup plus a constant-time HMAC
+compare, endpoint scope, and optional model scope) or an OIDC JWT whose issuer
+matches an enabled provider and whose audience is exactly `fabric-inference`.
+A control-plane JWT with any other audience is rejected unless
+`FLUXVM_AI_GATEWAY_ACCEPT_JWT=1`. After auth it reserves one lifetime request
+under a per-key lock (OIDC callers skip that persist), then proxies to the Maglev
+VIP or a ready replica. The upstream
 body is streamed (`text/event-stream` and other non-hop headers are preserved).
 There is a total upstream deadline of 120 seconds, overridable with
 `x-request-timeout` from 1 to 300 seconds. The idle timeout between chunks
@@ -151,7 +161,9 @@ and no response byte has arrived. Upstream stays `http://` unless
 `FLUXVM_AI_BACKEND_TLS=1`. With that flag and no client files, the gateway uses
 HTTPS and the process trust store. mTLS needs all three of
 `FLUXVM_AI_BACKEND_CLIENT_CERT`, `FLUXVM_AI_BACKEND_CLIENT_KEY`, and
-`FLUXVM_AI_BACKEND_CA`. A partial set is refused. The body is also limited to
+`FLUXVM_AI_BACKEND_CA`. A partial set is refused. When the chosen upstream is the
+configured Janus hostport, the gateway also sends
+`Authorization: Bearer $FLUXVM_AI_JANUS_API_KEY` if that env is set. The body is also limited to
 `FLUXVM_AI_GATEWAY_MAX_BODY` bytes (default 1 MiB). Context is `max_tokens`
 plus about one token per four prompt characters, and it must fit in
 `FLUXVM_AI_MAX_CONTEXT` (default 32768) and any tighter tenant
@@ -292,7 +304,7 @@ Register hosts with `POST /api/ai/nodes`. Each node reports site, failure domain
 
 Placement is filter then score: ready state, no taints, residency, free NVIDIA VRAM, then cache hit, preferred site, and failure-domain spread. The same inputs pick the same node. When no nodes are registered, replicas still land on the local FluxVM inventory. A chosen GPU that this FluxVM process does not have is not started here. A replica on an offline node is replaced only when another ready node exists, so the last healthy replica is kept when nothing else can take it.
 
-When `FLUXVM_AI_JANUS_URL` is set and FluxVM reports no NVIDIA GPU, Fabric reads `GET /api/cluster?config=single_gpu` and stores the device as `janus:node-0:gpu-0` with `source` carried in the model name `janus:…`. The replica address is the Janus host and port. No VFIO bind and no VM are created. The gateway proxies a ready replica at that address even when `FLUXVM_AI_DRY_RUN=1`. That device is the Janus scheduler simulator, not a PCI NVIDIA GPU.
+When `FLUXVM_AI_JANUS_URL` is set and FluxVM reports no NVIDIA GPU, Fabric reads `GET /api/cluster?config=single_gpu` and stores the device as `janus:node-0:gpu-0` with `source` carried in the model name `janus:…`. A Matrox or other non-NVIDIA display adapter does not count as an inference GPU. The replica address is the Janus host and port. No VFIO bind and no VM are created. The gateway proxies a ready replica at that address even when `FLUXVM_AI_DRY_RUN=1`. Set `FLUXVM_AI_JANUS_API_KEY` to the Janus shim bearer so that hop authenticates. That device is the Janus scheduler simulator, not a PCI NVIDIA GPU.
 
 `POST /api/ai/nodes/{id}/mig` creates a slice record for a Janus parent when the profile is in the H100 catalog (`1g.10gb`, `1g`, `2g.20gb`, `2g`, `3g.40gb`, `3g`, `7g.80gb`, `7g`) and the memory still fits. `DELETE /api/ai/nodes/{id}/mig/{bdf}` removes that slice when no replica holds it. Placement uses the slice and leaves the parent unschedulable while slices exist. MIG create does not call `nvidia-smi`. A heartbeat on Linux does, when `nvidia-smi` is on `PATH`, and fills `temperature_c`, `power_watts`, and `ecc_errors` for a matching PCI BDF. `0` still means unknown. A missing binary, a failed command, or a `janus:` id does not invent those readings and does not clear a value the node already reported. `FLUXVM_AI_MAX_GPU_TEMP_C` skips a GPU hotter than that value. `FLUXVM_AI_REJECT_ECC=1` skips a GPU whose ECC count is above zero.
 
@@ -440,8 +452,11 @@ mounted model directory (`/models`) and starts it.
 
 Set `FLUXVM_AI_DRY_RUN=1` on fabricd to exercise REST/CLI without bind/create.
 Deployments report `DryRun` with synthetic replicas. CI and lab smoke use this
-mode. For full scheduling simulation without hardware, run Janus against a
-`FabricAIJob` export.
+mode when Janus is unset. For a lab GPU stand-in, deploy Janus
+(`./scripts/deploy-remote.sh HOST USER` from the Janus repo), set
+`FLUXVM_AI_JANUS_URL=http://127.0.0.1:30818` and
+`FLUXVM_AI_JANUS_API_KEY` on fabricd, and leave dry-run on. Fabric places on
+`janus:node-0:gpu-0` and proxies chat to that NodePort. Maturity stays **Preview**.
 
 ## FluxVM prerequisites
 
@@ -462,11 +477,22 @@ show the `/api/ai/openai/{name}` gateway path.
 
 ## CI
 
-GitHub Actions workflow `.github/workflows/ai-workloads.yml` runs unit tests for
-routing, autoscaling, rollouts, API keys, gateway quota math, and capacity helpers
-on every PR that touches AI paths. The dry-run smoke job builds
-`zyvor-fabricd` from `backend/Cargo.toml`, restarts fabricd twice and checks that
-the deployment phase and replica ids are unchanged, and requires a streaming
-deployment phase is unchanged, and requires a streaming chat to return two SSE
-chunks (`data:` then `[DONE]`). On failure it uploads `fabricd.log`. Lab smoke
-is the same script: `scripts/smoke-ai-workloads-phases.sh`.
+GitHub Actions workflow `.github/workflows/ai-workloads.yml` runs on every PR
+and push that touches AI paths, the unit/smoke scripts, AI docs, or the operator
+admission webhook chart:
+
+1. **Unit tests** — `scripts/test-ai-workloads-unit.sh` runs
+   `cargo test -p zyvor-fabricd --lib api::ai::` (Janus inventory, MIG catalog,
+   inference audience shape, admit policy, routing, rollouts, keys, limits).
+2. **Janus filters** — the same job also runs the focused filters
+   `api::ai::janus::`, `api::ai::gpu_orch::`, and
+   `api::ai::gateway::tests::gateway_serves_openai_paths`.
+3. **Dry-run smoke** — builds `zyvor-fabricd`, starts it with
+   `FLUXVM_AI_DRY_RUN=1` and no Janus URL (synthetic bodies stay on), and runs
+   `scripts/smoke-ai-workloads-phases.sh`. On failure it uploads `fabricd.log`.
+4. **Operator chart** — `helm template` with the webhook disabled (default) and
+   with `admissionWebhook.enabled=true` plus a token, so the ValidatingWebhook
+   URL includes `/api/ai/admit/{token}`.
+
+Lab smoke is the same phase script. Janus health and a proxied chat stay on the
+lab host; CI does not start a Janus NodePort.
