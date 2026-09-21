@@ -412,12 +412,11 @@ pub fn parse_vllm_prometheus(text: &str) -> ReplicaMetrics {
                 let sum_s = m.ttft_ms / 1000.0;
                 m.ttft_ms = (sum_s / val) * 1000.0;
             }
-        } else if n.contains("avg_generation_throughput") {
+        } else if n.contains("avg_generation_throughput")
+            || ((n.contains("avg_prompt_throughput") || n.contains("prompt_tokens_total"))
+                && m.tokens_per_sec <= 0.0)
+        {
             m.tokens_per_sec = val.max(0.0);
-        } else if n.contains("avg_prompt_throughput") || n.contains("prompt_tokens_total") {
-            if m.tokens_per_sec <= 0.0 {
-                m.tokens_per_sec = val.max(0.0);
-            }
         }
     }
     let finished = succeeded + aborted;
