@@ -126,7 +126,13 @@ There is a total upstream deadline of 120 seconds, overridable with
 `x-request-timeout` from 1 to 300 seconds. The idle timeout between chunks
 defaults to 60 seconds (`FLUXVM_AI_GATEWAY_IDLE_SECS`). Set
 `FLUXVM_AI_SHED_QUEUE` to refuse a request when any ready replica's queue
-depth is above that value; unset or `0` does not shed. Dropping the client cancels the
+depth is above that value; unset or `0` does not shed. A connect failure is
+tried once on another ready replica, and only when the request is not streaming
+and no response byte has arrived. The body is also limited to
+`FLUXVM_AI_GATEWAY_MAX_BODY` bytes (default 1 MiB). Context is `max_tokens`
+plus about one token per four prompt characters, and it must fit in
+`FLUXVM_AI_MAX_CONTEXT` (default 32768) and any tighter tenant
+`max_context_tokens`. The prompt is not stored. Dropping the client cancels the
 upstream request. An audit row is written as `ATTEMPT`, then `SUCCESS` or
 `FAILED`. Maglev itself remains L4 and does not see API keys.
 

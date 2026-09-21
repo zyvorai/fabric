@@ -137,6 +137,17 @@ async fn gateway_inner(
         )
     })?;
     let tokens = keys::requested_tokens(&body_bytes);
+    let context = context_tokens(&body_bytes);
+    let cap = tighter_context_limit(
+        context_limit(),
+        policy_context_cap(state, key.tenant.as_deref()),
+    );
+    if !context_allowed(context, cap) {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            format!("context of {context} tokens exceeds {cap}"),
+        ));
+    }
     if let Some(rpm) = gateway_rpm() {
         admit_endpoint_rate(state, endpoint_name, tokens, rpm)
             .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
@@ -271,10 +282,13 @@ async fn proxy_upstream(
     key_id: String,
 ) -> Result<Response, (StatusCode, String)> {
     let guard = ConcurrencyGuard { store, key_id };
-    let target = resolve_upstream(ep, dep).ok_or((
-        StatusCode::SERVICE_UNAVAILABLE,
-        "no ready inference backend (set VIP or wait for replicas)".into(),
-    ))?;
+    let targets = upstream_targets(ep, dep);
+    if targets.is_empty() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "no ready inference backend (set VIP or wait for replicas)".into(),
+        ));
+    }
 
     let incoming_type = req
         .headers()
@@ -282,7 +296,6 @@ async fn proxy_upstream(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/json")
         .to_string();
-    let url = format!("http://{target}{upstream_path}");
     let deadline = Duration::from_secs(
         request_deadline_secs(
             req.headers()
@@ -293,24 +306,44 @@ async fn proxy_upstream(
         )
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
     );
+    let body_bytes = axum::body::to_bytes(req.into_body(), body_limit())
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                format!("body exceeds {} bytes", body_limit()),
+            )
+        })?;
+    let streaming = wants_stream(&body_bytes);
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .build()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let upstream_body = reqwest::Body::wrap_stream(req.into_body().into_data_stream());
-    let upstream_resp = client
-        .request(
-            reqwest::Method::from_bytes(method.as_str().as_bytes())
-                .unwrap_or(reqwest::Method::POST),
-            &url,
-        )
-        .header(header::CONTENT_TYPE, incoming_type)
-        .timeout(deadline)
-        .body(upstream_body)
-        .send()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("upstream: {e}")))?;
+    let primary = targets[0].clone();
+    let mut result = post_upstream(
+        &client,
+        method,
+        &format!("http://{primary}{upstream_path}"),
+        &incoming_type,
+        deadline,
+        &body_bytes,
+    )
+    .await;
+    if result.is_err() {
+        if let Some(alt) = retry_before_stream(streaming, false, &primary, &targets) {
+            result = post_upstream(
+                &client,
+                method,
+                &format!("http://{alt}{upstream_path}"),
+                &incoming_type,
+                deadline,
+                &body_bytes,
+            )
+            .await;
+        }
+    }
+    let upstream_resp = result.map_err(|e| (StatusCode::BAD_GATEWAY, format!("upstream: {e}")))?;
 
     let status =
         StatusCode::from_u16(upstream_resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
@@ -394,6 +427,82 @@ fn shed_limit() -> u32 {
     std::env::var("FLUXVM_AI_SHED_QUEUE")
         .ok()
         .and_then(|v| v.parse().ok())
+        .unwrap_or(0)
+}
+
+/// Prompt characters divided by 4, plus `max_tokens`. The prompt text is not kept.
+pub fn context_tokens(body: &[u8]) -> u32 {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return 0;
+    };
+    let generated = value
+        .get("max_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let prompt = prompt_chars(&value) as u64 / 4;
+    generated.saturating_add(prompt).min(u64::from(u32::MAX)) as u32
+}
+
+fn prompt_chars(value: &serde_json::Value) -> usize {
+    let mut count = 0usize;
+    for key in ["prompt", "input"] {
+        if let Some(text) = value.get(key).and_then(|v| v.as_str()) {
+            count = count.saturating_add(text.chars().count());
+        }
+    }
+    if let Some(messages) = value.get("messages").and_then(|v| v.as_array()) {
+        for message in messages {
+            if let Some(content) = message.get("content") {
+                count = count.saturating_add(content_chars(content));
+            }
+        }
+    }
+    count
+}
+
+fn content_chars(value: &serde_json::Value) -> usize {
+    match value {
+        serde_json::Value::String(text) => text.chars().count(),
+        serde_json::Value::Array(parts) => parts
+            .iter()
+            .filter_map(|part| part.get("text").and_then(|text| text.as_str()))
+            .map(|text| text.chars().count())
+            .fold(0usize, usize::saturating_add),
+        _ => 0,
+    }
+}
+
+pub fn context_allowed(tokens: u32, limit: u32) -> bool {
+    limit == 0 || tokens <= limit
+}
+
+/// The smaller positive cap. Zero means that side sets no cap.
+pub fn tighter_context_limit(gateway: u32, policy: u32) -> u32 {
+    match (gateway, policy) {
+        (0, 0) => 0,
+        (0, policy) => policy,
+        (gateway, 0) => gateway,
+        (gateway, policy) => gateway.min(policy),
+    }
+}
+
+fn context_limit() -> u32 {
+    std::env::var("FLUXVM_AI_MAX_CONTEXT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(32_768)
+}
+
+fn policy_context_cap(state: &AppState, tenant: Option<&str>) -> u32 {
+    let Some(tenant) = tenant.filter(|tenant| !tenant.is_empty()) else {
+        return 0;
+    };
+    state
+        .store
+        .get_entity::<super::policy::TenantAiPolicy>(super::STORE_POLICIES, tenant)
+        .ok()
+        .flatten()
+        .map(|policy| policy.max_context_tokens)
         .unwrap_or(0)
 }
 
@@ -547,16 +656,62 @@ fn extract_bearer(headers: &axum::http::HeaderMap) -> Option<String> {
     }
 }
 
-fn resolve_upstream(ep: &InferenceEndpoint, dep: &InferenceDeployment) -> Option<String> {
-    if let Some(vip) = ep.vip.as_deref() {
-        return Some(format!("{vip}:{}", ep.port));
+fn upstream_targets(ep: &InferenceEndpoint, dep: &InferenceDeployment) -> Vec<String> {
+    let mut targets = Vec::new();
+    if let Some(vip) = ep.vip.as_deref().filter(|vip| !vip.is_empty()) {
+        targets.push(format!("{vip}:{}", ep.port));
     }
-    dep.status
-        .replicas
+    for rep in &dep.status.replicas {
+        if !rep.ready || rep.draining {
+            continue;
+        }
+        if let Some(addr) = rep.address.as_deref().filter(|addr| !addr.is_empty()) {
+            let target = format!("{addr}:{}", ep.port);
+            if !targets.iter().any(|existing| existing == &target) {
+                targets.push(target);
+            }
+        }
+    }
+    targets
+}
+
+/// One other backend, and only when no response has started.
+/// Streaming requests are not retried.
+pub fn retry_before_stream<'a>(
+    streaming: bool,
+    response_started: bool,
+    tried: &str,
+    candidates: &'a [String],
+) -> Option<&'a str> {
+    if streaming || response_started || tried.is_empty() {
+        return None;
+    }
+    candidates
         .iter()
-        .find(|r| r.ready && !r.draining)
-        .and_then(|r| r.address.as_ref())
-        .map(|a| format!("{a}:{}", ep.port))
+        .find(|candidate| candidate.as_str() != tried)
+        .map(String::as_str)
+}
+
+async fn post_upstream(
+    client: &reqwest::Client,
+    method: &Method,
+    url: &str,
+    content_type: &str,
+    deadline: Duration,
+    body: &[u8],
+) -> Result<reqwest::Response, String> {
+    client
+        .request(
+            reqwest::Method::from_bytes(method.as_str().as_bytes())
+                .unwrap_or(reqwest::Method::POST),
+            url,
+        )
+        .header(header::CONTENT_TYPE, content_type)
+        .timeout(deadline)
+        .body(body.to_vec())
+        .send()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 fn dry_run_response(method: &Method, path: &str, model: &str, body_bytes: &[u8]) -> Response {
@@ -672,6 +827,35 @@ mod tests {
         assert!(!shed_queue(&[10, 20], 0));
         assert!(!shed_queue(&[10, 20], 20));
         assert!(shed_queue(&[10, 21], 20));
+    }
+
+    #[test]
+    fn retry_skips_streaming_and_a_started_response() {
+        let targets = vec![String::from("10.0.0.1:8000"), String::from("10.0.0.2:8000")];
+        assert_eq!(
+            retry_before_stream(false, false, &targets[0], &targets),
+            Some("10.0.0.2:8000")
+        );
+        assert_eq!(
+            retry_before_stream(true, false, &targets[0], &targets),
+            None
+        );
+        assert_eq!(
+            retry_before_stream(false, true, &targets[0], &targets),
+            None
+        );
+        assert_eq!(retry_before_stream(false, false, "", &targets), None);
+    }
+
+    #[test]
+    fn context_counts_prompt_and_max_tokens() {
+        let body = br#"{"messages":[{"role":"user","content":"hello world!!"}],"max_tokens":8}"#;
+        assert_eq!(context_tokens(body), 11);
+        assert!(context_allowed(11, 32));
+        assert!(!context_allowed(33, 32));
+        assert!(context_allowed(100, 0));
+        assert_eq!(tighter_context_limit(32_768, 1024), 1024);
+        assert_eq!(tighter_context_limit(0, 0), 0);
     }
 
     #[test]
