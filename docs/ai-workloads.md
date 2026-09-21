@@ -222,6 +222,8 @@ never sees models or tokens — only weights.
 | `site_local` | Prefer replicas tagged with the endpoint preferred site |
 | `cost_optimized` | Prefer lower `cost_tier` replicas |
 | `energy_optimized` | Prefer lower GPU-cache pressure |
+| `highest_throughput` | Higher weight when observed tokens per second are higher |
+| `lowest_failure` | Higher weight when the share of aborted or errored requests is lower |
 
 A replica is eligible for Maglev only when it is ready, not draining, and its
 last scrape is younger than 30 seconds. A failed scrape or a missing
