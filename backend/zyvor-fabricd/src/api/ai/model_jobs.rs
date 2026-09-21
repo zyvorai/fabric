@@ -614,7 +614,7 @@ async fn copy_to_peer(state: &AppState, model: &ModelArtifact, site_id: &str) ->
     if peer.is_empty() {
         return false;
     }
-    let Some(path) = local_digest_file(state, model, digest) else {
+    let Some(path) = local_digest_file(state, model, &digest) else {
         return false;
     };
     let Ok(got) = sha256_file(&path) else {
@@ -644,7 +644,7 @@ async fn copy_to_peer(state: &AppState, model: &ModelArtifact, site_id: &str) ->
     let Ok(body) = response.json::<serde_json::Value>().await else {
         return false;
     };
-    body.get("digest").and_then(|value| value.as_str()) == Some(digest)
+    body.get("digest").and_then(|value| value.as_str()) == Some(digest.as_str())
 }
 
 fn local_digest_file(state: &AppState, model: &ModelArtifact, digest: &str) -> Option<PathBuf> {

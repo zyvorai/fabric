@@ -12,6 +12,7 @@ Manage virtual machines as native Kubernetes resources. The operator watches `Vi
 - Status subresource reflects real-time VM state
 - Helm chart with RBAC and resource limits for production deployment
 - Leader election for high-availability operator deployments
+- Optional `InferenceDeployment` validating webhook (off by default) that calls fabricd `POST /api/ai/admit/{token}` — see [AI Workloads](../docs/ai-workloads.md)
 
 ## Quick Start
 
@@ -27,6 +28,11 @@ helm upgrade --install zyvor-fabricd-operator ./operator/charts/zyvor-fabricd-op
   --set zyvor-fabricd.url=http://NODE_IP:30095
 # or same-node hostNetwork fabricd:
 #   --set zyvor-fabricd.url=http://127.0.0.1:9095
+
+# Optional InferenceDeployment admit webhook (off by default):
+#   --set admissionWebhook.enabled=true \
+#   --set admissionWebhook.token="$FLUXVM_AI_ADMIT_TOKEN" \
+#   --set admissionWebhook.fabricdUrl=https://zyvor-fabricd:9095
 ```
 
 ### Create a VM

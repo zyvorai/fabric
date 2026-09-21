@@ -26,6 +26,8 @@
   The operator watches an AI CRD only when that CRD is installed. Rate counters
   stay in the local file until Raft peers are set; then the leader applies them
   and a follower forwards instead of keeping a second count.
+  GitHub Actions `ai-workloads.yml` covers unit tests, dry-run smoke, the
+  admit webhook Helm templates, and Agent Runtime credential tests.
   See [docs/ai-workloads.md](docs/ai-workloads.md).
 - **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
   Networking / Meta, with emoji section markers), `--color auto|always|never`,

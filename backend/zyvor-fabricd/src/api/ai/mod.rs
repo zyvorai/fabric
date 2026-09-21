@@ -41,6 +41,7 @@ pub mod otel;
 pub mod placement;
 pub mod policy;
 pub mod profiles;
+pub mod raft;
 pub mod reconcile;
 pub mod revisions;
 pub mod rollouts;

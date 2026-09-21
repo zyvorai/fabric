@@ -483,7 +483,8 @@ admission webhook chart:
 
 1. **Unit tests** — `scripts/test-ai-workloads-unit.sh` runs
    `cargo test -p zyvor-fabricd --lib api::ai::` (Janus inventory, MIG catalog,
-   inference audience shape, admit policy, routing, rollouts, keys, limits).
+   inference audience shape, admit policy, Raft lease counters, routing,
+   rollouts, keys, limits).
 2. **Janus filters** — the same job also runs the focused filters
    `api::ai::janus::`, `api::ai::gpu_orch::`, and
    `api::ai::gateway::tests::gateway_serves_openai_paths`.
@@ -493,6 +494,8 @@ admission webhook chart:
 4. **Operator chart** — `helm template` with the webhook disabled (default) and
    with `admissionWebhook.enabled=true` plus a token, so the ValidatingWebhook
    URL includes `/api/ai/admit/{token}`.
+5. **Agent credentials** — `cargo test` for Agent Runtime fabric credential wiring.
 
 Lab smoke is the same phase script. Janus health and a proxied chat stay on the
-lab host; CI does not start a Janus NodePort.
+lab host; CI does not start a Janus NodePort. Workflow file:
+[`.github/workflows/ai-workloads.yml`](../.github/workflows/ai-workloads.yml).
