@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 use vm_model::{BindMount, CloudInitFile, VMStartOptions, VM};
-use zyvor_fabric_fluxvm_client::{GpuBindRequest, GpuReleaseRequest};
+use zyvor_fabric_fluxvm_client::{FluxVmClient, GpuBindRequest, GpuReleaseRequest};
 
 use crate::server::AppState;
 
@@ -78,6 +78,7 @@ pub async fn locked_reconcile(state: &AppState, name: &str) -> Result<(), String
 /// Periodic reconciler. The first tick is startup recovery.
 pub async fn run_ai_reconcile_controller(state: Arc<AppState>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
+    let sem = Arc::new(tokio::sync::Semaphore::new(4));
     loop {
         interval.tick().await;
         let names: Vec<String> = state
@@ -87,11 +88,24 @@ pub async fn run_ai_reconcile_controller(state: Arc<AppState>) {
             .into_iter()
             .map(|d| d.name)
             .collect();
+        let mut tasks = Vec::new();
         for name in names {
-            if let Err(e) = locked_reconcile(&state, &name).await {
-                tracing::warn!(deployment = %name, "AI reconcile tick: {e}");
-            }
+            let state = state.clone();
+            let sem = sem.clone();
+            tasks.push(tokio::spawn(async move {
+                let Ok(_permit) = sem.acquire().await else {
+                    return;
+                };
+                if let Err(e) = locked_reconcile(&state, &name).await {
+                    tracing::warn!(deployment = %name, "AI reconcile tick: {e}");
+                    record_reconcile_error(&state, &name, e);
+                }
+            }));
         }
+        for task in tasks {
+            let _ = task.await;
+        }
+        retry_deleting_endpoints(&state).await;
         sweep_orphans(&state).await;
     }
 }
@@ -101,17 +115,66 @@ pub fn enqueue_deployment_reconcile(state: Arc<AppState>, name: String) {
     tokio::spawn(async move {
         if let Err(e) = locked_reconcile(&state, &name).await {
             tracing::warn!(deployment = %name, "AI reconcile failed: {e}");
-            if let Ok(Some(mut dep)) = state
-                .store
-                .get_entity::<InferenceDeployment>(STORE_DEPLOYMENTS, &name)
-            {
-                dep.status.phase = "Failed".into();
-                dep.status.message = Some(e);
-                dep.updated = Utc::now();
-                let _ = state.store.save_entity(STORE_DEPLOYMENTS, &name, &dep);
-            }
+            record_reconcile_error(&state, &name, e);
         }
     });
+}
+
+fn record_reconcile_error(state: &AppState, name: &str, error: String) {
+    if let Ok(Some(mut dep)) = state
+        .store
+        .get_entity::<InferenceDeployment>(STORE_DEPLOYMENTS, name)
+    {
+        dep.status.phase = if is_hard_failure(&error) {
+            "Failed".into()
+        } else if is_retryable_fluxvm(&error) {
+            "Pending".into()
+        } else {
+            "Failed".into()
+        };
+        dep.status.message = Some(error);
+        dep.updated = Utc::now();
+        let _ = state.store.save_entity(STORE_DEPLOYMENTS, name, &dep);
+    }
+}
+
+/// FluxVM connect and timeout errors are retried. A missing profile or model is not.
+pub fn is_retryable_fluxvm(error: &str) -> bool {
+    if is_hard_failure(error) {
+        return false;
+    }
+    let lower = error.to_ascii_lowercase();
+    lower.contains("timed out")
+        || lower.contains("timeout")
+        || lower.contains("connection")
+        || lower.contains("connect")
+        || lower.contains("temporarily")
+}
+
+pub fn is_hard_failure(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+    (lower.contains("profile") || lower.contains("model")) && lower.contains("not found")
+}
+
+/// Three failed probes replace the replica. A success clears the streak.
+pub fn note_health(streak: u32, healthy: bool) -> (u32, bool) {
+    if healthy {
+        (0, false)
+    } else {
+        let next = streak.saturating_add(1);
+        (next, next >= 3)
+    }
+}
+
+/// Release the VIP only after Maglev deletion is confirmed.
+pub fn should_release_vip(deleted: bool, confirmed_absent: bool) -> Result<(), &'static str> {
+    if !deleted {
+        return Err("Maglev delete failed; VIP retained");
+    }
+    if !confirmed_absent {
+        return Err("Maglev service still present; VIP retained");
+    }
+    Ok(())
 }
 
 /// Spawn a background Maglev upsert for an endpoint.
@@ -135,6 +198,13 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
         .get_entity(STORE_PROFILES, &dep.profile)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("profile '{}' not found", dep.profile))?;
+
+    if profile.gpu.count != 1 || dep.gpus_per_replica != 1 {
+        return Err(
+            "preview supports exactly one GPU per replica (gpu.count and gpus_per_replica must be 1)"
+                .into(),
+        );
+    }
 
     let model: ModelArtifact = state
         .store
@@ -172,9 +242,9 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
                 for rep in std::mem::take(&mut dep.status.replicas) {
                     if live.contains(&rep.vm_name) {
                         kept.push(rep);
-                    } else {
-                        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rep.bdf);
-                        let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rep.vm_name);
+                    } else if let Err(e) = release_missing_vm(state, &client, &rep).await {
+                        dep.status.message = Some(e);
+                        kept.push(rep);
                     }
                 }
                 for rep in &mut kept {
@@ -191,6 +261,10 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
         }
     }
 
+    if !dry_run {
+        apply_health(state, &mut dep).await;
+    }
+
     // Scale up.
     while dep.status.replicas.len() < dep.replicas as usize {
         let idx = dep.status.replicas.len();
@@ -205,20 +279,6 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
                     .save_entity(STORE_DEPLOYMENTS, &dep.name, &dep)
                     .map_err(|se| se.to_string())?;
                 return Err(e);
-            }
-        }
-    }
-
-    // Health probe ready replicas (skip in dry-run).
-    if !dry_run {
-        for rep in &mut dep.status.replicas {
-            if rep.ready {
-                continue;
-            }
-            if let Some(addr) = rep.address.clone() {
-                if probe_health(&addr, 8000).await {
-                    rep.ready = true;
-                }
             }
         }
     }
@@ -265,7 +325,6 @@ async fn create_replica(
     let vm_name = format!("{}-{}", dep.name, idx);
     crate::validation::validate_vm_name(&vm_name).map_err(|(_, m)| m)?;
 
-    let allocated = allocated_bdfs(state);
     let client = match fluxvm_client(state) {
         Ok(c) => c,
         Err((_, body)) => {
@@ -279,8 +338,7 @@ async fn create_replica(
     };
 
     let inventory = client.list_host_gpus().await.unwrap_or_default();
-    let mut gpu_req = profile.gpu.clone();
-    gpu_req.count = 1;
+    let gpu_req = profile.gpu.clone();
 
     if dry_run {
         let site = dep
@@ -297,6 +355,7 @@ async fn create_replica(
             site,
             cost_tier: Some(1),
             draining: false,
+            unhealthy_streak: 0,
         });
     }
 
@@ -307,24 +366,37 @@ async fn create_replica(
         );
     }
 
-    let picked = place_gpus(&inventory, &gpu_req, &allocated)?;
-    let gpu = picked[0];
-    let bdf = gpu.bdf.clone();
-
-    let reservation = GpuReservation {
-        bdf: bdf.clone(),
-        deployment: dep.name.clone(),
-        vm_name: vm_name.clone(),
+    let mut reserved: Option<(String, Option<u32>)> = None;
+    for _ in 0..32 {
+        let allocated = allocated_bdfs(state);
+        let picked = place_gpus(&inventory, &gpu_req, &allocated)?;
+        let gpu = &picked[0];
+        let bdf = gpu.bdf.clone();
+        let reservation = GpuReservation {
+            bdf: bdf.clone(),
+            deployment: dep.name.clone(),
+            vm_name: vm_name.clone(),
+        };
+        match state
+            .store
+            .try_create_entity(STORE_GPU_RESERVATIONS, &bdf, &reservation)
+        {
+            Ok(_) => {
+                reserved = Some((bdf, gpu.vram_gib));
+                break;
+            }
+            Err(e) if state_store::is_entity_conflict(&e) => continue,
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    let Some((bdf, vram_gib)) = reserved else {
+        return Err("could not reserve a free GPU".into());
     };
-    state
-        .store
-        .save_entity(STORE_GPU_RESERVATIONS, &bdf, &reservation)
-        .map_err(|e| e.to_string())?;
 
     if let Err(e) = client
         .bind_host_gpu(&GpuBindRequest {
             bdf: bdf.clone(),
-            vram_gib: gpu.vram_gib,
+            vram_gib,
         })
         .await
     {
@@ -403,13 +475,23 @@ async fn create_replica(
     };
 
     if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
-        let _ = client
+        match client
             .release_host_gpu(&GpuReleaseRequest {
                 bdf: bdf.clone(),
                 restore_driver: false,
             })
-            .await;
-        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &bdf);
+            .await
+        {
+            Ok(_) => {
+                let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &bdf);
+            }
+            Err(release_err) => {
+                let _ = state.store.delete_vm(&vm_name);
+                return Err(format!(
+                    "start VM {vm_name}: {e}; GPU release {bdf} failed: {release_err}"
+                ));
+            }
+        }
         let _ = state.store.delete_vm(&vm_name);
         return Err(format!("start VM {vm_name}: {e}"));
     }
@@ -442,6 +524,7 @@ async fn create_replica(
             .or_else(|| std::env::var("FLUXVM_AI_SITE").ok()),
         cost_tier: Some(1),
         draining: false,
+        unhealthy_streak: 0,
     })
 }
 
@@ -475,12 +558,13 @@ async fn remove_replica(
         let _ = state.store.delete_vm(&rep.vm_name);
 
         if !rep.bdf.is_empty() && !rep.bdf.starts_with("dry-run-") {
-            let _ = client
+            client
                 .release_host_gpu(&GpuReleaseRequest {
                     bdf: rep.bdf.clone(),
                     restore_driver: false,
                 })
-                .await;
+                .await
+                .map_err(|e| format!("GPU release {}: {e}", rep.bdf))?;
             let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rep.bdf);
         }
         let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rep.vm_name);
@@ -570,9 +654,38 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
 }
 
 pub async fn teardown_endpoint(state: &AppState, ep: &InferenceEndpoint) -> Result<(), String> {
-    if let Ok(client) = fluxvm_client(state) {
-        let _ = client.delete_network_service(&ep.name).await;
+    let mut ep = ep.clone();
+    ep.phase = "Deleting".into();
+    ep.updated = Utc::now();
+    state
+        .store
+        .save_entity(STORE_ENDPOINTS, &ep.name, &ep)
+        .map_err(|e| e.to_string())?;
+
+    let recorded = state
+        .store
+        .get_entity::<MaglevRecord>(STORE_MAGLEV, &ep.name)
+        .ok()
+        .flatten();
+    if recorded.is_some() {
+        let client = fluxvm_client(state).map_err(|(_, body)| {
+            body.0
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("FluxVM unavailable; VIP retained")
+                .to_string()
+        })?;
+        let deleted = client.delete_network_service(&ep.name).await.is_ok();
+        let confirmed_absent = match client.get_network_service(&ep.name).await {
+            Ok(_) => false,
+            Err(e) => {
+                let msg = e.to_string().to_ascii_lowercase();
+                msg.contains("404") || msg.contains("not found")
+            }
+        };
+        should_release_vip(deleted, confirmed_absent).map_err(|e| e.to_string())?;
     }
+
     let _ = state.store.delete_entity(STORE_MAGLEV, &ep.name);
     ipam::release(state, &ep.name);
     Ok(())
@@ -628,16 +741,23 @@ async fn sweep_orphans(state: &AppState) {
         let Ok(client) = fluxvm_client(state) else {
             continue;
         };
-        let _ = client
+        match client
             .release_host_gpu(&GpuReleaseRequest {
                 bdf: rec.bdf.clone(),
                 restore_driver: false,
             })
-            .await;
-        if let Ok(Some(vm)) = client.find_by_name(&rec.vm_name).await {
-            let _ = client.delete_vm(vm.id).await;
+            .await
+        {
+            Ok(_) => {
+                if let Ok(Some(vm)) = client.find_by_name(&rec.vm_name).await {
+                    let _ = client.delete_vm(vm.id).await;
+                }
+                let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rec.bdf);
+            }
+            Err(e) => {
+                tracing::warn!(bdf = %rec.bdf, "orphan GPU release failed: {e}");
+            }
         }
-        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rec.bdf);
     }
 
     let managed: Vec<ManagedVm> = state
@@ -688,6 +808,67 @@ WantedBy=multi-user.target
     )
 }
 
+async fn release_missing_vm(
+    state: &AppState,
+    client: &FluxVmClient,
+    rep: &InferenceReplica,
+) -> Result<(), String> {
+    if !rep.bdf.is_empty() && !rep.bdf.starts_with("dry-run-") {
+        client
+            .release_host_gpu(&GpuReleaseRequest {
+                bdf: rep.bdf.clone(),
+                restore_driver: false,
+            })
+            .await
+            .map_err(|e| format!("GPU release {} failed: {e}", rep.bdf))?;
+        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rep.bdf);
+    }
+    let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rep.vm_name);
+    Ok(())
+}
+
+async fn apply_health(state: &AppState, dep: &mut InferenceDeployment) {
+    let mut replace = Vec::new();
+    for rep in &mut dep.status.replicas {
+        let Some(addr) = rep.address.clone() else {
+            continue;
+        };
+        let healthy = probe_health(&addr, 8000).await;
+        let (streak, replace_now) = note_health(rep.unhealthy_streak, healthy);
+        rep.unhealthy_streak = streak;
+        rep.ready = healthy;
+        if replace_now {
+            replace.push(rep.vm_name.clone());
+        }
+    }
+    for name in replace {
+        let Some(idx) = dep.status.replicas.iter().position(|r| r.vm_name == name) else {
+            continue;
+        };
+        let rep = dep.status.replicas.remove(idx);
+        if let Err(e) = remove_replica(state, dep, &rep).await {
+            dep.status.message = Some(e);
+            let at = idx.min(dep.status.replicas.len());
+            dep.status.replicas.insert(at, rep);
+        }
+    }
+}
+
+async fn retry_deleting_endpoints(state: &AppState) {
+    let endpoints: Vec<InferenceEndpoint> = state
+        .store
+        .list_entities(STORE_ENDPOINTS)
+        .unwrap_or_default();
+    for ep in endpoints.into_iter().filter(|e| e.phase == "Deleting") {
+        match teardown_endpoint(state, &ep).await {
+            Ok(_) => {
+                let _ = state.store.delete_entity(STORE_ENDPOINTS, &ep.name);
+            }
+            Err(e) => tracing::warn!(endpoint = %ep.name, "endpoint delete retry: {e}"),
+        }
+    }
+}
+
 async fn probe_health(addr: &str, port: u16) -> bool {
     let url = format!("http://{addr}:{port}{HEALTH_PATH}");
     let client = reqwest::Client::builder()
@@ -697,4 +878,31 @@ async fn probe_health(addr: &str, port: u16) -> bool {
         return false;
     };
     matches!(client.get(&url).send().await, Ok(r) if r.status().is_success())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn health_replaces_after_three_failures() {
+        assert_eq!(note_health(0, true), (0, false));
+        assert_eq!(note_health(0, false), (1, false));
+        assert_eq!(note_health(2, false), (3, true));
+    }
+
+    #[test]
+    fn failed_maglev_delete_keeps_vip() {
+        assert!(should_release_vip(false, false).is_err());
+        assert!(should_release_vip(true, false).is_err());
+        assert!(should_release_vip(true, true).is_ok());
+    }
+
+    #[test]
+    fn transient_fluxvm_errors_stay_pending() {
+        assert!(is_retryable_fluxvm("connection refused"));
+        assert!(is_retryable_fluxvm("request timed out"));
+        assert!(!is_retryable_fluxvm("profile 'edge' not found"));
+        assert!(is_hard_failure("model 'qwen' not found"));
+    }
 }

@@ -48,8 +48,11 @@ jobs:
       - name: Dry-run REST smoke
         run: |
           set -euo pipefail
-          cargo build -p zyvor-fabricd --bin zyvor-fabricd
           ROOT="$(mktemp -d)"
+          LOG="${GITHUB_WORKSPACE}/fabricd.log"
+          copy_log() { cp "$ROOT/fabricd.log" "$LOG" 2>/dev/null || true; }
+          trap 'copy_log; if [[ -f "$ROOT/pid" ]]; then kill "$(cat "$ROOT/pid")" >/dev/null 2>&1 || true; fi' EXIT
+          cargo build --manifest-path backend/Cargo.toml -p zyvor-fabricd --bin zyvor-fabricd
           mkdir -p "$ROOT/images" "$ROOT/ai-model-stub"
           cat > "$ROOT/fabricd.toml" <<EOF
           [daemon]
@@ -76,9 +79,9 @@ jobs:
           export FLUXVM_AI_DRY_RUN=1
           export FLUXVM_AI_MODEL_DIR="$ROOT/ai-model-stub"
           export FLUXVM_AI_SITE=lab
-          ./target/debug/zyvor-fabricd > "$ROOT/fabricd.log" 2>&1 &
+          BIN="$GITHUB_WORKSPACE/backend/target/debug/zyvor-fabricd"
+          "$BIN" > "$ROOT/fabricd.log" 2>&1 &
           echo $! > "$ROOT/pid"
-          trap 'kill "$(cat "$ROOT/pid")" >/dev/null 2>&1 || true' EXIT
           for _ in $(seq 1 90); do
             if curl -sf "http://127.0.0.1:19095/health" >/dev/null; then
               break
@@ -86,12 +89,15 @@ jobs:
             sleep 1
           done
           curl -sf "http://127.0.0.1:19095/health" >/dev/null
-          FABRIC_URL=http://127.0.0.1:19095 FABRIC_PASS=smoke-pass ./scripts/smoke-ai-workloads-phases.sh
-          if ! curl -sf "http://127.0.0.1:19095/health" >/dev/null; then
-            echo "fabricd log:" >&2
-            cat "$ROOT/fabricd.log" >&2
-            exit 1
-          fi
+          FABRIC_URL=http://127.0.0.1:19095 FABRIC_PASS=smoke-pass \
+            FABRICD_BIN="$BIN" FABRICD_PIDFILE="$ROOT/pid" FABRICD_LOG="$ROOT/fabricd.log" \
+            ./scripts/smoke-ai-workloads-phases.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fabricd-log
+          path: fabricd.log
+          if-no-files-found: ignore
 
   agent-fabric-cred:
     runs-on: ubuntu-latest

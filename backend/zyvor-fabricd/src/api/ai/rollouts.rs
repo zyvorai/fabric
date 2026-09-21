@@ -310,6 +310,7 @@ mod tests {
                     site: None,
                     cost_tier: None,
                     draining: false,
+                    unhealthy_streak: 0,
                 }],
                 message: None,
             },

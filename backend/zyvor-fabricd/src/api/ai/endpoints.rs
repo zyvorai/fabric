@@ -126,6 +126,7 @@ pub async fn create_endpoint(
         preferred_site: req.preferred_site.or(dep.preferred_site.clone()),
         allowed_sites: req.allowed_sites,
         residency: req.residency.or(dep.residency.clone()),
+        phase: String::new(),
         created: now,
         updated: now,
     };
@@ -165,9 +166,9 @@ pub async fn delete_endpoint(
         }
     }
 
-    // Best-effort Maglev teardown before dropping the record.
+    // Maglev must be gone before the VIP can be reused.
     if let Err(e) = reconcile::teardown_endpoint(&state, &ep).await {
-        tracing::warn!("endpoint Maglev teardown for '{name}': {e}");
+        return Err(err(StatusCode::CONFLICT, e));
     }
 
     state

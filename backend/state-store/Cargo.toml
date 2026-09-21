@@ -11,6 +11,7 @@ anyhow.workspace = true
 input-guard = { path = "../crates/input-guard" }
 tracing.workspace = true
 vm-model = { path = "../vm-model" }
+libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"

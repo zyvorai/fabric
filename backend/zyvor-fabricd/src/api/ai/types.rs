@@ -396,6 +396,9 @@ pub struct InferenceReplica {
     /// True while Maglev drain is in progress.
     #[serde(default)]
     pub draining: bool,
+    /// Consecutive failed health probes. Three replaces the replica.
+    #[serde(default)]
+    pub unhealthy_streak: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -494,6 +497,9 @@ pub struct InferenceEndpoint {
     /// Data-residency tag — backends outside this tag get weight 0 / excluded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub residency: Option<String>,
+    /// `Deleting` while Maglev removal is in progress. Empty means active.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub phase: String,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }

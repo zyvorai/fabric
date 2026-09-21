@@ -76,17 +76,24 @@ pub fn next_free(
 }
 
 /// Reserve a VIP for `endpoint`. Idempotent when this endpoint already holds one.
+/// A lost create-new race retries the next free address.
 pub fn reserve(state: &AppState, endpoint: &str) -> Result<String, String> {
     let _guard = ipam_lock().lock().unwrap_or_else(|e| e.into_inner());
-    let all: Vec<VipAllocation> = state.store.list_entities(STORE_VIPS).unwrap_or_default();
-    if let Some(existing) = all.iter().find(|a| a.endpoint == endpoint) {
-        return Ok(existing.vip.clone());
+    for _ in 0..64 {
+        let all: Vec<VipAllocation> = state.store.list_entities(STORE_VIPS).unwrap_or_default();
+        if let Some(existing) = all.iter().find(|a| a.endpoint == endpoint) {
+            return Ok(existing.vip.clone());
+        }
+        let used: HashSet<String> = all.iter().map(|a| a.vip.clone()).collect();
+        let specs = pool_specs();
+        let vip = next_free(&used, &specs, avoid_buggy_ips())?;
+        match save_allocation(state, &vip, endpoint) {
+            Ok(()) => return Ok(vip),
+            Err(e) if e.starts_with("conflict:") => continue,
+            Err(e) => return Err(e),
+        }
     }
-    let used: HashSet<String> = all.iter().map(|a| a.vip.clone()).collect();
-    let specs = pool_specs();
-    let vip = next_free(&used, &specs, avoid_buggy_ips())?;
-    save_allocation(state, &vip, endpoint)?;
-    Ok(vip)
+    Err("could not reserve a VIP".into())
 }
 
 /// Record an explicit VIP (endpoint.spec.vip or a VIP already on the record).
@@ -126,10 +133,13 @@ fn save_allocation(state: &AppState, vip: &str, endpoint: &str) -> Result<(), St
         endpoint: endpoint.to_string(),
         pool: "default".into(),
     };
-    state
-        .store
-        .save_entity(STORE_VIPS, vip, &rec)
-        .map_err(|e| e.to_string())
+    match state.store.try_create_entity(STORE_VIPS, vip, &rec) {
+        Ok(()) => Ok(()),
+        Err(e) if state_store::is_entity_conflict(&e) => {
+            Err(format!("conflict: address {vip} is already reserved"))
+        }
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 fn address_in_pool(vip: &str, specs: &[String], avoid_buggy: bool) -> Result<bool, String> {
@@ -195,7 +205,12 @@ fn first_free_cidr(
     }
     let size = 1u64 << host_bits;
     let base = u32::from(network);
+    // /30 and wider have a network and broadcast address. /31 and /32 do not.
+    let skip_ends = prefix <= 30;
     for i in 0..size {
+        if skip_ends && (i == 0 || i + 1 == size) {
+            continue;
+        }
         let addr = Ipv4Addr::from(base.wrapping_add(i as u32));
         if avoid_buggy && is_buggy_ipv4(addr) {
             continue;
@@ -220,7 +235,10 @@ fn spec_contains(spec: &str, want: Ipv4Addr) -> Result<bool, String> {
         } else {
             u32::MAX << (32 - prefix)
         };
-        return Ok(u32::from(want) & mask == u32::from(network));
+        if u32::from(want) & mask != u32::from(network) {
+            return Ok(false);
+        }
+        return Ok(!is_network_or_broadcast(want, network, prefix));
     }
     if spec.contains('-') {
         return Ok(expand_range(spec)?.into_iter().any(|a| a == want));
@@ -289,6 +307,17 @@ fn is_buggy_ipv4(addr: Ipv4Addr) -> bool {
     o[3] == 0 || o[3] == 255
 }
 
+fn is_network_or_broadcast(addr: Ipv4Addr, network: Ipv4Addr, prefix: u32) -> bool {
+    if prefix > 30 {
+        return false;
+    }
+    let host_bits = 32 - prefix;
+    let size = 1u32 << host_bits;
+    let base = u32::from(network);
+    let n = u32::from(addr);
+    n == base || n == base.wrapping_add(size.wrapping_sub(1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,5 +341,18 @@ mod tests {
         let specs = vec!["10.96.0.0/30".to_string()];
         let used = HashSet::new();
         assert_eq!(next_free(&used, &specs, true).unwrap(), "10.96.0.1");
+    }
+
+    #[test]
+    fn cidr_skips_network_and_broadcast() {
+        let specs = vec!["10.96.0.0/30".to_string()];
+        let mut used = HashSet::new();
+        let a = next_free(&used, &specs, false).unwrap();
+        assert_eq!(a, "10.96.0.1");
+        used.insert(a);
+        let b = next_free(&used, &specs, false).unwrap();
+        assert_eq!(b, "10.96.0.2");
+        used.insert(b);
+        assert!(next_free(&used, &specs, false).is_err());
     }
 }

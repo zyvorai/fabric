@@ -404,6 +404,7 @@ mod tests {
             site: None,
             cost_tier: None,
             draining: false,
+            unhealthy_streak: 0,
         }
     }
 
@@ -468,6 +469,7 @@ vllm:gpu_cache_usage_perc 0.42
             preferred_site: None,
             allowed_sites: Vec::new(),
             residency: Some("lab".into()),
+            phase: String::new(),
             created: Utc::now(),
             updated: Utc::now(),
         };

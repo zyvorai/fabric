@@ -177,17 +177,14 @@ pub fn try_reserve_quota(used: u64, quota: Option<u64>) -> Result<u64, ()> {
 pub async fn consume_request(state: &AppState, key_id: &str) -> Result<InferenceApiKey, String> {
     let lock = key_lock(key_id);
     let _guard = lock.lock().await;
-    let mut key = state
+    let key = state
         .store
-        .get_entity::<InferenceApiKey>(STORE_API_KEYS, key_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "API key not found".to_string())?;
-    key.requests_used = try_reserve_quota(key.requests_used, key.request_quota)
-        .map_err(|_| "API key request quota exceeded".to_string())?;
-    key.last_used = Some(Utc::now());
-    state
-        .store
-        .save_entity(STORE_API_KEYS, &key.id, &key)
+        .update_entity_exclusive(STORE_API_KEYS, key_id, |mut key: InferenceApiKey| {
+            key.requests_used = try_reserve_quota(key.requests_used, key.request_quota)
+                .map_err(|_| "API key request quota exceeded".to_string())?;
+            key.last_used = Some(Utc::now());
+            Ok::<_, String>(key)
+        })
         .map_err(|e| e.to_string())?;
     Ok(key)
 }

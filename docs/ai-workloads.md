@@ -119,7 +119,7 @@ chunks instead of one buffered completion.
 | 6 | Agent Runtime `kind: fabric` credentials + `ZYVOR_FABRIC_INFERENCE_BASE` shim |
 | Harden | OpenAI API-key gateway, `/ai/capacity` + `/ai/events`, console keys/autoscale, golden-image bake script |
 | GitOps | Terraform `zyvor-fabricd_{model_artifact,inference_profile,inference_deployment,inference_endpoint}` + operator `ModelArtifact` / `InferenceDeployment` CRDs |
-| Correctness | Durable reconciler, streaming gateway, Rivora-style VIP pool, key/path/quota hardening. Still **Preview** |
+| Correctness | Exclusive GPU/VIP create, health replacement after three failures, Maglev-before-VIP delete, CIDR network/broadcast skipped, bounded reconcile retry. Still **Preview** |
 
 ## Terraform
 
@@ -189,8 +189,12 @@ Endpoint VIPs are allocated from a pool that uses Rivora AddressPool syntax
 (CIDR, `start-end` range, or a single IPv4 address). Set
 `FLUXVM_AI_ADDRESS_POOL` (comma-separated) or `FLUXVM_AI_SERVICE_CIDR`
 (default `10.96.0.0/16`). `FLUXVM_AI_AVOID_BUGGY_IPS` defaults on and skips
-addresses whose last octet is 0 or 255. Allocations are stored and released
-when the endpoint is deleted. Prefixes larger than /16, and IPv6, stay on the
+addresses whose last octet is 0 or 255. For a prefix of /30 or wider, the
+network and broadcast addresses are also skipped (`10.96.0.0/30` yields only
+`.1` and `.2`). Each address is inserted with `create_new`, so two fabricd
+processes cannot take the same VIP. The address is released only after the
+Maglev service delete is confirmed. If that delete fails, the endpoint stays
+`Deleting` and the VIP is kept. Prefixes larger than /16, and IPv6, stay on the
 Rivora controller.
 
 ## Autoscaling and rollouts (Phase 3)
@@ -222,21 +226,25 @@ zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
 
 ## Reconciliation
 
-`ai_reconcile_controller` runs every 15 seconds. Create, scale, the autoscaler,
-and that loop take a per-deployment lock. Each tick compares the desired
-replica count with recorded VMs, retries guest IP and `GET /health`, recreates
-missing replicas, and releases GPU reservations whose VM is gone. A reservation
-(`bdf`, deployment, VM name) is persisted before `bind_host_gpu`. Placement
-skips those BDFs. Startup is the first tick. The sweep removes reservations
-and Fabric-managed VMs whose deployment is gone, and Maglev services that
-Fabric recorded for an endpoint that no longer exists. It does not delete
-unrelated FluxVM services.
+`ai_reconcile_controller` runs every 15 seconds and reconciles up to four
+deployments at once. Create, scale, the autoscaler, and that loop take a
+per-deployment lock. A GPU reservation file is created with `create_new` before
+`bind_host_gpu`; if the file already exists, that BDF is skipped. The
+reservation is removed only after a successful `release_host_gpu` (or a bind
+that never happened). A disappeared VM is released the same way. Each tick
+probes `GET /health`, including replicas that are already ready. Three
+consecutive failures clear ready, release the GPU, delete the VM, and let
+scale-up replace it. FluxVM connection and timeout errors leave the deployment
+`Pending`. A missing profile or model is `Failed`. Startup is the first tick.
+The sweep removes reservations and Fabric-managed VMs whose deployment is gone,
+and Maglev services that Fabric recorded for an endpoint that no longer exists.
+It does not delete unrelated FluxVM services. Maturity stays **Preview**.
 
 ## Security (Phase 4)
 
 - Per-tenant model / endpoint scoping (existing RBAC + tenant filters)
 - `POST /api/ai/keys` — HMAC-SHA256 with `FLUXVM_AI_KEY_HMAC_SECRET` (a preview default is used when unset). Plaintext is returned once. `GET /api/ai/keys` does not include `secret_hash`
-- Lifetime `request_quota` only. Requests per minute, tokens, and concurrency limits are not enforced yet
+- Lifetime `request_quota` only. The increment flocks the key file so two fabricd processes cannot both consume the last request. Requests per minute, tokens, and concurrency limits are not enforced yet
 - `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file
 - Model paths are canonicalized and must stay under `FLUXVM_AI_MODEL_DIR` or `{state}/ai-models`
 - `license` + `residency` metadata on models; residency copied to deployments. When an endpoint sets `residency`, replicas with no `site` are excluded
@@ -330,5 +338,8 @@ show the `/api/ai/openai/{name}` gateway path.
 
 GitHub Actions workflow `.github/workflows/ai-workloads.yml` runs unit tests for
 routing, autoscaling, rollouts, API keys, gateway quota math, and capacity helpers
-on every PR that touches AI paths. Lab smoke:
-`scripts/smoke-ai-workloads-phases.sh` (REST) plus gateway Bearer checks.
+on every PR that touches AI paths. The dry-run smoke job builds
+`zyvor-fabricd` from `backend/Cargo.toml`, restarts fabricd and checks the
+deployment phase is unchanged, and requires a streaming chat to return two SSE
+chunks (`data:` then `[DONE]`). On failure it uploads `fabricd.log`. Lab smoke
+is the same script: `scripts/smoke-ai-workloads-phases.sh`.

@@ -3649,6 +3649,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "input-guard",
+ "libc",
  "serde",
  "serde_json",
  "tempfile",

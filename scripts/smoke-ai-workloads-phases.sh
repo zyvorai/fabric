@@ -40,8 +40,29 @@ sleep 3
 echo "== status =="
 PHASE1=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
 echo "phase=$PHASE1"
-echo "== reconcile again =="
-sleep 16
+if [[ -n "${FABRICD_BIN:-}" && -n "${FABRICD_PIDFILE:-}" ]]; then
+  echo "== restart fabricd =="
+  old="$(cat "$FABRICD_PIDFILE")"
+  kill "$old" || true
+  for _ in $(seq 1 50); do
+    if ! kill -0 "$old" 2>/dev/null; then
+      break
+    fi
+    sleep 0.2
+  done
+  "$FABRICD_BIN" >> "${FABRICD_LOG:-/tmp/fabricd-smoke.log}" 2>&1 &
+  echo $! > "$FABRICD_PIDFILE"
+  for _ in $(seq 1 90); do
+    if curl -skf "$FABRIC_URL/health" >/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+  curl -skf "$FABRIC_URL/health" >/dev/null
+else
+  echo "== reconcile again =="
+  sleep 16
+fi
 PHASE2=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
 if [[ -z "$PHASE1" || "$PHASE1" == "null" || "$PHASE1" != "$PHASE2" ]]; then
   echo "phase changed across reconcile: $PHASE1 -> $PHASE2" >&2
@@ -62,8 +83,23 @@ curl_json -X POST "$FABRIC_URL/api/ai/deployments/$NAME/drain" "${auth[@]}" \
   -d '{"grace_seconds":5}' | jq -c '{phase:.status.phase,draining:[.status.replicas[].draining]}'
 
 echo "== api key =="
-curl_json -X POST "$FABRIC_URL/api/ai/keys" "${auth[@]}" \
-  -d "{\"name\":\"$NAME-key\",\"endpoint\":\"$NAME-ep\"}" | jq -c '{id:.key.id,prefix:.key.prefix,secret:(.secret|.[0:12])}'
+KEY_JSON=$(curl_json -X POST "$FABRIC_URL/api/ai/keys" "${auth[@]}" \
+  -d "{\"name\":\"$NAME-key\",\"endpoint\":\"$NAME-ep\"}")
+echo "$KEY_JSON" | jq -c '{id:.key.id,prefix:.key.prefix,secret:(.secret|.[0:12])}'
+SECRET=$(echo "$KEY_JSON" | jq -r .secret)
+echo "== sse =="
+SSE=$(curl_json -N -X POST "$FABRIC_URL/api/ai/openai/$NAME-ep/v1/chat/completions" \
+  -H "authorization: Bearer $SECRET" \
+  -H 'content-type: application/json' \
+  -d "{\"model\":\"$NAME-model\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}")
+DATA_LINE=$(printf '%s\n' "$SSE" | grep -n 'data:' | head -1 | cut -d: -f1 || true)
+DONE_LINE=$(printf '%s\n' "$SSE" | grep -n '\[DONE\]' | head -1 | cut -d: -f1 || true)
+if [[ -z "$DATA_LINE" || -z "$DONE_LINE" || "$DATA_LINE" -ge "$DONE_LINE" ]]; then
+  echo "expected two SSE chunks, got:" >&2
+  printf '%s\n' "$SSE" >&2
+  exit 1
+fi
+echo "sse chunks ok"
 
 echo "== cleanup =="
 curl_json -X DELETE "$FABRIC_URL/api/ai/endpoints/$NAME-ep" "${auth[@]}" -o /dev/null -w '%{http_code}\n'

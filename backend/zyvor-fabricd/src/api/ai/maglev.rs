@@ -113,6 +113,7 @@ mod tests {
             site: None,
             cost_tier: None,
             draining,
+            unhealthy_streak: 0,
         }
     }
 

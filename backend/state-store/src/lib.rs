@@ -4,7 +4,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Seek, SeekFrom, Write};
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tracing::warn;
@@ -14,6 +16,34 @@ use vm_model::VM;
 pub struct StateStore {
     path: PathBuf,
     vms: Arc<RwLock<HashMap<String, VM>>>,
+}
+
+/// True when `try_create_entity` lost the race to an existing id.
+pub fn is_entity_conflict(err: &anyhow::Error) -> bool {
+    err.to_string().contains("entity already exists")
+}
+
+struct FlockGuard {
+    fd: std::os::unix::io::RawFd,
+}
+
+impl FlockGuard {
+    fn lock(file: &File) -> Result<Self> {
+        let fd = file.as_raw_fd();
+        let rc = unsafe { libc::flock(fd, libc::LOCK_EX) };
+        if rc != 0 {
+            anyhow::bail!("flock failed: {}", std::io::Error::last_os_error());
+        }
+        Ok(Self { fd })
+    }
+}
+
+impl Drop for FlockGuard {
+    fn drop(&mut self) {
+        unsafe {
+            libc::flock(self.fd, libc::LOCK_UN);
+        }
+    }
 }
 
 /// Generic entity storage helper
@@ -74,6 +104,74 @@ impl StateStore {
                 fs::rename(&tmp_path, &file_path)?;
                 Ok(())
             })
+        })
+    }
+
+    /// Insert an entity only when its file does not exist.
+    ///
+    /// `create_new` is the cross-process lease: two fabricd processes cannot
+    /// both win the same id. Returns an error containing `entity already exists`
+    /// on conflict (`is_entity_conflict`).
+    pub fn try_create_entity<T: Serialize>(
+        &self,
+        subdir: &str,
+        id: &str,
+        entity: &T,
+    ) -> Result<()> {
+        let subdir = Self::entity_subdir(subdir)?;
+        let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
+        Self::validate_entity_id(id)?;
+        let root = self.path.to_string_lossy();
+        let file_path = format!("{root}/{subdir}/{id}.json");
+        input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
+            if let Some((dir, _)) = file_path.rsplit_once('/') {
+                fs::create_dir_all(dir)?;
+            }
+            let content = serde_json::to_string_pretty(entity)?;
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&file_path)
+            {
+                Ok(mut file) => {
+                    file.write_all(content.as_bytes())?;
+                    file.sync_all()?;
+                    Ok(())
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    anyhow::bail!("entity already exists")
+                }
+                Err(e) => Err(e.into()),
+            }
+        })
+    }
+
+    /// Re-read, update, and rewrite one entity while holding an exclusive
+    /// flock on its file. `save_entity` renames over the inode, so quota
+    /// updates must write this same file or two processes can both increment.
+    pub fn update_entity_exclusive<T, E, F>(&self, subdir: &str, id: &str, update: F) -> Result<T>
+    where
+        T: Serialize + for<'de> Deserialize<'de>,
+        F: FnOnce(T) -> std::result::Result<T, E>,
+        E: std::fmt::Display,
+    {
+        let subdir = Self::entity_subdir(subdir)?;
+        let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
+        Self::validate_entity_id(id)?;
+        let root = self.path.to_string_lossy();
+        let file_path = format!("{root}/{subdir}/{id}.json");
+        input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
+            let mut file = OpenOptions::new().read(true).write(true).open(&file_path)?;
+            let _guard = FlockGuard::lock(&file)?;
+            let content = fs::read_to_string(&file_path)?;
+            let current: T = serde_json::from_str(&content)?;
+            let next = update(current).map_err(|e| anyhow::anyhow!("{e}"))?;
+            let encoded = serde_json::to_string_pretty(&next)?;
+            file.seek(SeekFrom::Start(0))?;
+            file.set_len(0)?;
+            file.write_all(encoded.as_bytes())?;
+            file.sync_all()?;
+            Ok(next)
         })
     }
 
@@ -555,5 +653,40 @@ mod tests {
             assert!(vm.is_some());
             assert_eq!(vm.unwrap().cpus, 4);
         }
+    }
+
+    #[test]
+    fn try_create_rejects_a_second_writer() {
+        let (store, _dir) = test_store();
+        store
+            .try_create_entity("leases", "bdf-1", &serde_json::json!({"owner": "a"}))
+            .unwrap();
+        let err = store
+            .try_create_entity("leases", "bdf-1", &serde_json::json!({"owner": "b"}))
+            .unwrap_err();
+        assert!(crate::is_entity_conflict(&err));
+    }
+
+    #[test]
+    fn exclusive_update_increments_once_per_caller() {
+        let (store, _dir) = test_store();
+        store.try_create_entity("counters", "quota", &0u64).unwrap();
+        let store = Arc::new(store);
+        let mut handles = vec![];
+        for _ in 0..8 {
+            let store = store.clone();
+            handles.push(std::thread::spawn(move || {
+                store
+                    .update_entity_exclusive("counters", "quota", |n: u64| {
+                        Ok::<_, String>(n.saturating_add(1))
+                    })
+                    .unwrap();
+            }));
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        let n: u64 = store.get_entity("counters", "quota").unwrap().unwrap();
+        assert_eq!(n, 8);
     }
 }
