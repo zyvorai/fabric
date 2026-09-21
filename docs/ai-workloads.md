@@ -128,7 +128,9 @@ defaults to 60 seconds (`FLUXVM_AI_GATEWAY_IDLE_SECS`). Set
 `FLUXVM_AI_SHED_QUEUE` to refuse a request when any ready replica's queue
 depth is above that value; unset or `0` does not shed. `x-request-priority`
 is `low`, `normal`, or `high`. Low sheds at half that queue and high at double.
-`x-session-id`, or the first 64 characters of the prompt when that header is
+`FLUXVM_AI_MODEL_RPM` and `FLUXVM_AI_USER_RPM` use the same stored one-minute
+window as `FLUXVM_AI_GATEWAY_RPM`. The user window applies only when
+`x-user-id` is set. `x-session-id`, or the first 64 characters of the prompt when that header is
 absent, selects one replica. That replica is placed immediately after the VIP,
 or first when there is no VIP. The prefix is not written to the audit log. A connect failure is
 tried once on another ready replica, and only when the request is not streaming

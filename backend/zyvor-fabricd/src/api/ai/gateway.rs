@@ -149,8 +149,25 @@ async fn gateway_inner(
         ));
     }
     if let Some(rpm) = gateway_rpm() {
-        admit_endpoint_rate(state, endpoint_name, tokens, rpm)
+        admit_scope(state, "endpoint", endpoint_name, tokens, rpm)
             .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    }
+    if let Some(rpm) = model_rpm() {
+        admit_scope(state, "model", &dep.model, tokens, rpm)
+            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    }
+    if let Some(rpm) = user_rpm() {
+        if let Some(user) = user_id(
+            parts
+                .headers
+                .get("x-user-id")
+                .and_then(|value| value.to_str().ok()),
+        )
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+        {
+            admit_scope(state, "user", user, tokens, rpm)
+                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+        }
     }
     if super::circuit::is_open(&load_breaker(state, endpoint_name), Utc::now().timestamp()) {
         return Err((
@@ -413,10 +430,39 @@ fn body_limit() -> usize {
 }
 
 fn gateway_rpm() -> Option<u64> {
-    std::env::var("FLUXVM_AI_GATEWAY_RPM")
+    env_limit("FLUXVM_AI_GATEWAY_RPM")
+}
+
+fn model_rpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_MODEL_RPM")
+}
+
+fn user_rpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_USER_RPM")
+}
+
+fn env_limit(name: &str) -> Option<u64> {
+    std::env::var(name)
         .ok()
-        .and_then(|v| v.parse().ok())
+        .and_then(|value| value.parse().ok())
         .filter(|n| *n > 0)
+}
+
+/// `x-user-id` is optional. When present it must be a short stable identifier.
+pub fn user_id(header: Option<&str>) -> Result<Option<&str>, &'static str> {
+    let Some(raw) = header.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let ok = raw.len() <= 128
+        && !raw.contains("..")
+        && raw
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@'));
+    if ok {
+        Ok(Some(raw))
+    } else {
+        Err("x-user-id must be 1 to 128 letters, digits, or . _ @ -")
+    }
 }
 
 /// `x-request-timeout` is a whole number of seconds. Missing means `default_secs`.
@@ -617,13 +663,14 @@ fn record_breaker(state: &AppState, endpoint: &str, failed: bool) {
         .save_entity(super::STORE_CIRCUITS, endpoint, &next);
 }
 
-fn admit_endpoint_rate(
+fn admit_scope(
     state: &AppState,
-    endpoint: &str,
+    scope: &str,
+    name: &str,
     tokens: u64,
     rpm: u64,
 ) -> Result<(), String> {
-    let id = super::limits::counter_id("endpoint", endpoint);
+    let id = super::limits::counter_id(scope, name);
     let current = state
         .store
         .get_entity::<super::limits::RateCounter>(super::STORE_RATE_COUNTERS, &id)
@@ -948,6 +995,9 @@ mod tests {
         );
         assert_eq!(shed_limit_for(0, RequestPriority::Low), 0);
         assert!(parse_priority(Some("urgent")).is_err());
+        assert_eq!(user_id(None).unwrap(), None);
+        assert_eq!(user_id(Some("ada@lab")).unwrap(), Some("ada@lab"));
+        assert!(user_id(Some("../root")).is_err());
     }
 
     #[test]
