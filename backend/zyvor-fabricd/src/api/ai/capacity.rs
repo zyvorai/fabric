@@ -91,10 +91,7 @@ pub async fn events(
         timestamp: Option<chrono::DateTime<chrono::Utc>>,
     }
 
-    let mut rows: Vec<AuditRow> = state
-        .store
-        .list_entities("audit_logs")
-        .unwrap_or_default();
+    let mut rows: Vec<AuditRow> = state.store.list_entities("audit_logs").unwrap_or_default();
     rows.retain(|r| r.resource.starts_with("ai/") || r.action == "INFER");
     rows.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     rows.truncate(50);

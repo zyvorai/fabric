@@ -290,8 +290,7 @@ pub async fn patch_autoscaling(
     Json(req): Json<super::types::PatchAutoscalingRequest>,
 ) -> Result<Json<InferenceDeployment>, (StatusCode, Json<serde_json::Value>)> {
     let mut dep = load_scoped(&state, &claims, &name)?;
-    if req.autoscaling.max_replicas < req.autoscaling.min_replicas
-        && !req.autoscaling.scale_to_zero
+    if req.autoscaling.max_replicas < req.autoscaling.min_replicas && !req.autoscaling.scale_to_zero
     {
         return Err(err(
             StatusCode::BAD_REQUEST,

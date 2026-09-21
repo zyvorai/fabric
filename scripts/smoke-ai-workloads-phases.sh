@@ -38,7 +38,16 @@ curl_json -X POST "$FABRIC_URL/api/ai/deployments" "${auth[@]}" \
 
 sleep 3
 echo "== status =="
-curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -c '{phase:.status.phase,replicas:(.status.replicas|length),sites:[.status.replicas[].site]}'
+PHASE1=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
+echo "phase=$PHASE1"
+echo "== reconcile again =="
+sleep 16
+PHASE2=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
+if [[ -z "$PHASE1" || "$PHASE1" == "null" || "$PHASE1" != "$PHASE2" ]]; then
+  echo "phase changed across reconcile: $PHASE1 -> $PHASE2" >&2
+  exit 1
+fi
+echo "phase stayed $PHASE2"
 
 echo "== endpoint =="
 curl_json -X POST "$FABRIC_URL/api/ai/endpoints" "${auth[@]}" \

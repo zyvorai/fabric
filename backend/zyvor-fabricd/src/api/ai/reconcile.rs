@@ -14,13 +14,15 @@
 //! status bookkeeping.
 
 use chrono::Utc;
-use std::collections::HashSet;
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, OnceLock};
 use vm_model::{BindMount, CloudInitFile, VMStartOptions, VM};
 use zyvor_fabric_fluxvm_client::{GpuBindRequest, GpuReleaseRequest};
 
 use crate::server::AppState;
 
+use super::ipam;
 use super::maglev::{build_maglev_service_spec, drain_backend};
 use super::placement::place_gpus;
 use super::types::{
@@ -31,11 +33,73 @@ use super::{fluxvm_client, STORE_DEPLOYMENTS, STORE_ENDPOINTS, STORE_MODELS, STO
 const GUEST_MODEL_PATH: &str = "/models";
 const VLLM_UNIT_PATH: &str = "/etc/systemd/system/vllm.service";
 const HEALTH_PATH: &str = "/health";
+const STORE_GPU_RESERVATIONS: &str = "ai_gpu_reservations";
+const STORE_MANAGED_VMS: &str = "ai_managed_vms";
+const STORE_MAGLEV: &str = "ai_maglev_services";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct GpuReservation {
+    bdf: String,
+    deployment: String,
+    vm_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ManagedVm {
+    vm_name: String,
+    deployment: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MaglevRecord {
+    endpoint: String,
+    service: String,
+}
+
+fn deployment_locks() -> &'static Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>> {
+    static LOCKS: OnceLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = OnceLock::new();
+    LOCKS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn deployment_lock(name: &str) -> Arc<tokio::sync::Mutex<()>> {
+    let mut map = deployment_locks().lock().unwrap_or_else(|e| e.into_inner());
+    map.entry(name.to_string())
+        .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+        .clone()
+}
+
+/// Serialize create, scale, autoscaler, and the periodic loop for one deployment.
+pub async fn locked_reconcile(state: &AppState, name: &str) -> Result<(), String> {
+    let lock = deployment_lock(name);
+    let _guard = lock.lock().await;
+    reconcile_deployment(state, name).await
+}
+
+/// Periodic reconciler. The first tick is startup recovery.
+pub async fn run_ai_reconcile_controller(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
+    loop {
+        interval.tick().await;
+        let names: Vec<String> = state
+            .store
+            .list_entities::<InferenceDeployment>(STORE_DEPLOYMENTS)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|d| d.name)
+            .collect();
+        for name in names {
+            if let Err(e) = locked_reconcile(&state, &name).await {
+                tracing::warn!(deployment = %name, "AI reconcile tick: {e}");
+            }
+        }
+        sweep_orphans(&state).await;
+    }
+}
 
 /// Spawn a background reconcile for a deployment (create / scale).
 pub fn enqueue_deployment_reconcile(state: Arc<AppState>, name: String) {
     tokio::spawn(async move {
-        if let Err(e) = reconcile_deployment(&state, &name).await {
+        if let Err(e) = locked_reconcile(&state, &name).await {
             tracing::warn!(deployment = %name, "AI reconcile failed: {e}");
             if let Ok(Some(mut dep)) = state
                 .store
@@ -98,6 +162,34 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
     let dry_run = std::env::var("FLUXVM_AI_DRY_RUN")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
+
+    // Drop replicas whose VM disappeared, then refill guest IPs before scale-up.
+    if !dry_run {
+        if let Ok(client) = fluxvm_client(state) {
+            if let Ok(vms) = client.list_vms().await {
+                let live: HashSet<String> = vms.iter().map(|v| v.name.clone()).collect();
+                let mut kept = Vec::new();
+                for rep in std::mem::take(&mut dep.status.replicas) {
+                    if live.contains(&rep.vm_name) {
+                        kept.push(rep);
+                    } else {
+                        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rep.bdf);
+                        let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rep.vm_name);
+                    }
+                }
+                for rep in &mut kept {
+                    if rep.address.is_none() {
+                        if let Some(vm) = vms.iter().find(|v| v.name == rep.vm_name) {
+                            if let Some(ip) = vm.guest_ip.clone() {
+                                rep.address = Some(ip);
+                            }
+                        }
+                    }
+                }
+                dep.status.replicas = kept;
+            }
+        }
+    }
 
     // Scale up.
     while dep.status.replicas.len() < dep.replicas as usize {
@@ -219,13 +311,26 @@ async fn create_replica(
     let gpu = picked[0];
     let bdf = gpu.bdf.clone();
 
-    client
+    let reservation = GpuReservation {
+        bdf: bdf.clone(),
+        deployment: dep.name.clone(),
+        vm_name: vm_name.clone(),
+    };
+    state
+        .store
+        .save_entity(STORE_GPU_RESERVATIONS, &bdf, &reservation)
+        .map_err(|e| e.to_string())?;
+
+    if let Err(e) = client
         .bind_host_gpu(&GpuBindRequest {
             bdf: bdf.clone(),
             vram_gib: gpu.vram_gib,
         })
         .await
-        .map_err(|e| format!("GPU bind {bdf}: {e}"))?;
+    {
+        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &bdf);
+        return Err(format!("GPU bind {bdf}: {e}"));
+    }
 
     let image = std::env::var("FLUXVM_AI_IMAGE").unwrap_or_else(|_| {
         format!(
@@ -304,9 +409,19 @@ async fn create_replica(
                 restore_driver: false,
             })
             .await;
+        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &bdf);
         let _ = state.store.delete_vm(&vm_name);
         return Err(format!("start VM {vm_name}: {e}"));
     }
+
+    let _ = state.store.save_entity(
+        STORE_MANAGED_VMS,
+        &vm_name,
+        &ManagedVm {
+            vm_name: vm_name.clone(),
+            deployment: dep.name.clone(),
+        },
+    );
 
     // Best-effort guest IP from FluxVM record.
     let address = match client.find_by_name(&vm_name).await {
@@ -366,7 +481,9 @@ async fn remove_replica(
                     restore_driver: false,
                 })
                 .await;
+            let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rep.bdf);
         }
+        let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rep.vm_name);
     } else {
         let _ = state.driver.delete(&rep.vm_name).await;
         let _ = state.store.delete_vm(&rep.vm_name);
@@ -404,10 +521,11 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
         .flatten();
     let max_egress = profile.as_ref().and_then(|p| p.max_egress_mbps);
 
-    let vip = ep
-        .vip
-        .clone()
-        .unwrap_or_else(|| format!("10.96.{}.{}", (name.len() % 250) + 1, 50));
+    let vip = if let Some(existing) = ep.vip.clone() {
+        ipam::adopt(state, &ep.name, &existing)?
+    } else {
+        ipam::reserve(state, &ep.name)?
+    };
 
     let spec = build_maglev_service_spec(&ep.name, &vip, ep.port, &dep.status.replicas, max_egress);
 
@@ -427,6 +545,14 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
             ep.service_id = Some(status.service_id);
             ep.vip = Some(vip);
             ep.updated = Utc::now();
+            let _ = state.store.save_entity(
+                STORE_MAGLEV,
+                &ep.name,
+                &MaglevRecord {
+                    endpoint: ep.name.clone(),
+                    service: ep.name.clone(),
+                },
+            );
             state
                 .store
                 .save_entity(STORE_ENDPOINTS, &ep.name, &ep)
@@ -447,6 +573,8 @@ pub async fn teardown_endpoint(state: &AppState, ep: &InferenceEndpoint) -> Resu
     if let Ok(client) = fluxvm_client(state) {
         let _ = client.delete_network_service(&ep.name).await;
     }
+    let _ = state.store.delete_entity(STORE_MAGLEV, &ep.name);
+    ipam::release(state, &ep.name);
     Ok(())
 }
 
@@ -455,11 +583,90 @@ fn allocated_bdfs(state: &AppState) -> HashSet<String> {
         .store
         .list_entities(STORE_DEPLOYMENTS)
         .unwrap_or_default();
-    deps.into_iter()
+    let mut set: HashSet<String> = deps
+        .into_iter()
         .flat_map(|d| d.status.replicas.into_iter())
         .filter(|r| !r.bdf.is_empty() && !r.bdf.starts_with("dry-run-"))
         .map(|r| r.bdf.to_ascii_lowercase())
-        .collect()
+        .collect();
+    let reserved: Vec<GpuReservation> = state
+        .store
+        .list_entities(STORE_GPU_RESERVATIONS)
+        .unwrap_or_default();
+    for rec in reserved {
+        if !rec.bdf.is_empty() && !rec.bdf.starts_with("dry-run-") {
+            set.insert(rec.bdf.to_ascii_lowercase());
+        }
+    }
+    set
+}
+
+async fn sweep_orphans(state: &AppState) {
+    let dep_names: HashSet<String> = state
+        .store
+        .list_entities::<InferenceDeployment>(STORE_DEPLOYMENTS)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|d| d.name)
+        .collect();
+    let endpoint_names: HashSet<String> = state
+        .store
+        .list_entities::<InferenceEndpoint>(STORE_ENDPOINTS)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|e| e.name)
+        .collect();
+
+    let reservations: Vec<GpuReservation> = state
+        .store
+        .list_entities(STORE_GPU_RESERVATIONS)
+        .unwrap_or_default();
+    for rec in reservations {
+        if dep_names.contains(&rec.deployment) {
+            continue;
+        }
+        let Ok(client) = fluxvm_client(state) else {
+            continue;
+        };
+        let _ = client
+            .release_host_gpu(&GpuReleaseRequest {
+                bdf: rec.bdf.clone(),
+                restore_driver: false,
+            })
+            .await;
+        if let Ok(Some(vm)) = client.find_by_name(&rec.vm_name).await {
+            let _ = client.delete_vm(vm.id).await;
+        }
+        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rec.bdf);
+    }
+
+    let managed: Vec<ManagedVm> = state
+        .store
+        .list_entities(STORE_MANAGED_VMS)
+        .unwrap_or_default();
+    for rec in managed {
+        if dep_names.contains(&rec.deployment) {
+            continue;
+        }
+        if let Ok(client) = fluxvm_client(state) {
+            if let Ok(Some(vm)) = client.find_by_name(&rec.vm_name).await {
+                let _ = client.delete_vm(vm.id).await;
+            }
+        }
+        let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rec.vm_name);
+    }
+
+    let services: Vec<MaglevRecord> = state.store.list_entities(STORE_MAGLEV).unwrap_or_default();
+    for rec in services {
+        if endpoint_names.contains(&rec.endpoint) {
+            continue;
+        }
+        if let Ok(client) = fluxvm_client(state) {
+            let _ = client.delete_network_service(&rec.service).await;
+        }
+        let _ = state.store.delete_entity(STORE_MAGLEV, &rec.endpoint);
+        ipam::release(state, &rec.endpoint);
+    }
 }
 
 fn vllm_systemd_unit(model_path: &str) -> String {

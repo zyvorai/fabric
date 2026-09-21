@@ -8,6 +8,7 @@ use zyvor_fabric_fluxvm_client::{
     NetworkServiceProtocol, NetworkServiceSpec,
 };
 
+use super::eligibility::replica_serving;
 use super::types::InferenceReplica;
 
 /// Build an equal-weight Maglev service from ready replicas.
@@ -31,7 +32,7 @@ pub fn build_maglev_service_spec_weighted(
 ) -> NetworkServiceSpec {
     let backends: Vec<NetworkServiceBackend> = replicas
         .iter()
-        .filter(|r| r.ready)
+        .filter(|r| replica_serving(r))
         .filter_map(|r| {
             let address = r.address.as_ref()?;
             let weight = r.maglev_weight.unwrap_or(1).clamp(1, 32);
@@ -83,44 +84,44 @@ pub fn drain_backend(spec: &mut NetworkServiceSpec, address: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::ai::types::InferenceReplica;
+    use crate::api::ai::types::{InferenceReplica, ReplicaMetrics};
+    use chrono::{Duration, Utc};
+
+    fn fresh() -> Option<ReplicaMetrics> {
+        Some(ReplicaMetrics {
+            source: Some("vllm_prometheus".into()),
+            scraped_at: Some(Utc::now()),
+            ..Default::default()
+        })
+    }
+
+    fn replica(
+        name: &str,
+        ready: bool,
+        address: Option<&str>,
+        draining: bool,
+        weight: Option<u16>,
+        metrics: Option<ReplicaMetrics>,
+    ) -> InferenceReplica {
+        InferenceReplica {
+            vm_name: name.into(),
+            bdf: "0000:01:00.0".into(),
+            ready,
+            address: address.map(str::to_string),
+            metrics,
+            maglev_weight: weight,
+            site: None,
+            cost_tier: None,
+            draining,
+        }
+    }
 
     #[test]
     fn equal_weights_only_ready_with_address() {
         let replicas = vec![
-            InferenceReplica {
-                vm_name: "a".into(),
-                bdf: "0000:01:00.0".into(),
-                ready: true,
-                address: Some("10.0.0.1".into()),
-                metrics: None,
-                maglev_weight: None,
-                site: None,
-                cost_tier: None,
-                draining: false,
-            },
-            InferenceReplica {
-                vm_name: "b".into(),
-                bdf: "0000:02:00.0".into(),
-                ready: false,
-                address: Some("10.0.0.2".into()),
-                metrics: None,
-                maglev_weight: None,
-                site: None,
-                cost_tier: None,
-                draining: false,
-            },
-            InferenceReplica {
-                vm_name: "c".into(),
-                bdf: "0000:03:00.0".into(),
-                ready: true,
-                address: None,
-                metrics: None,
-                maglev_weight: None,
-                site: None,
-                cost_tier: None,
-                draining: false,
-            },
+            replica("a", true, Some("10.0.0.1"), false, None, fresh()),
+            replica("b", false, Some("10.0.0.2"), false, None, fresh()),
+            replica("c", true, None, false, None, fresh()),
         ];
         let spec = build_maglev_service_spec("ai-llm", "10.96.0.50", 8000, &replicas, Some(1000));
         assert_eq!(spec.backends.len(), 1);
@@ -132,19 +133,40 @@ mod tests {
 
     #[test]
     fn weighted_uses_replica_maglev_weight() {
-        let replicas = vec![InferenceReplica {
-            vm_name: "a".into(),
-            bdf: "0000:01:00.0".into(),
-            ready: true,
-            address: Some("10.0.0.1".into()),
-            metrics: None,
-            maglev_weight: Some(8),
-            site: None,
-            cost_tier: None,
-            draining: false,
-        }];
-        let spec = build_maglev_service_spec_weighted("ai-llm", "10.96.0.50", 8000, &replicas, None);
+        let replicas = vec![replica(
+            "a",
+            true,
+            Some("10.0.0.1"),
+            false,
+            Some(8),
+            fresh(),
+        )];
+        let spec =
+            build_maglev_service_spec_weighted("ai-llm", "10.96.0.50", 8000, &replicas, None);
         assert_eq!(spec.backends[0].weight, 8);
+    }
+
+    #[test]
+    fn draining_backend_stays_out_of_the_spec() {
+        let replicas = vec![replica("a", true, Some("10.0.0.1"), true, Some(1), fresh())];
+        let spec = build_maglev_service_spec("ai-llm", "10.96.0.50", 8000, &replicas, None);
+        assert!(spec.backends.is_empty());
+    }
+
+    #[test]
+    fn stale_metrics_are_omitted() {
+        let mut stale = fresh().unwrap();
+        stale.scraped_at = Some(Utc::now() - Duration::seconds(120));
+        let replicas = vec![replica(
+            "a",
+            true,
+            Some("10.0.0.1"),
+            false,
+            Some(8),
+            Some(stale),
+        )];
+        let spec = build_maglev_service_spec("ai-llm", "10.96.0.50", 8000, &replicas, None);
+        assert!(spec.backends.is_empty());
     }
 
     #[test]
@@ -153,17 +175,7 @@ mod tests {
             "ai-llm",
             "10.96.0.50",
             8000,
-            &[InferenceReplica {
-                vm_name: "a".into(),
-                bdf: "0000:01:00.0".into(),
-                ready: true,
-                address: Some("10.0.0.1".into()),
-                metrics: None,
-                maglev_weight: None,
-                site: None,
-                cost_tier: None,
-                draining: false,
-            }],
+            &[replica("a", true, Some("10.0.0.1"), false, None, fresh())],
             None,
         );
         drain_backend(&mut spec, "10.0.0.1");

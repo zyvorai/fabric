@@ -18,7 +18,7 @@ and Agent Runtime fabric providers are included through Phase 6.
 
 - One NVIDIA GPU per QEMU VM (dedicated VFIO passthrough)
 - Runtime: **vLLM** only
-- Model source: `hf://org/name` (+ revision/checksum) or a pre-staged host path
+- Model source: `hf://org/name` or a pre-staged host path. `revision` is stored on the artifact and is not yet passed to the downloader. Checksums for a directory are a sorted manifest (relative path, size, SHA-256), not the first file.
 - Endpoint: Maglev VIP → guest `:8000` (`/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`)
 - Readiness: Fabric HTTP `GET /health` before Maglev `Ready`
 - Manual + automatic replica scaling; drain on delete / maintenance
@@ -94,10 +94,18 @@ curl -sk "$OPENAI_BASE_URL/v1/chat/completions" \
   -d '{"model":"qwen3-8b","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-The gateway validates the key (endpoint + optional model scope), increments
-`requests_used`, and proxies to the Maglev VIP or a ready replica. Maglev
-itself remains L4 and does not see API keys. Under `FLUXVM_AI_DRY_RUN=1` the
-gateway returns a synthetic chat completion after accepting the key.
+The gateway validates the key (prefix lookup plus a constant-time HMAC compare,
+endpoint scope, and optional model scope), reserves one lifetime request under
+a per-key lock, then proxies to the Maglev VIP or a ready replica. The upstream
+body is streamed (`text/event-stream` and other non-hop headers are preserved).
+There is no fixed total timeout; the idle timeout between chunks defaults to
+60 seconds (`FLUXVM_AI_GATEWAY_IDLE_SECS`). Dropping the client cancels the
+upstream request. An audit row is written as `ATTEMPT`, then `SUCCESS` or
+`FAILED`. Maglev itself remains L4 and does not see API keys.
+
+Under `FLUXVM_AI_DRY_RUN=1` the gateway returns a synthetic chat completion
+after accepting the key. A JSON body with `"stream": true` returns two SSE
+chunks instead of one buffered completion.
 
 ## Phase map
 
@@ -111,6 +119,7 @@ gateway returns a synthetic chat completion after accepting the key.
 | 6 | Agent Runtime `kind: fabric` credentials + `ZYVOR_FABRIC_INFERENCE_BASE` shim |
 | Harden | OpenAI API-key gateway, `/ai/capacity` + `/ai/events`, console keys/autoscale, golden-image bake script |
 | GitOps | Terraform `zyvor-fabricd_{model_artifact,inference_profile,inference_deployment,inference_endpoint}` + operator `ModelArtifact` / `InferenceDeployment` CRDs |
+| Correctness | Durable reconciler, streaming gateway, Rivora-style VIP pool, key/path/quota hardening. Still **Preview** |
 
 ## Terraform
 
@@ -168,10 +177,25 @@ never sees models or tokens — only weights.
 | `cost_optimized` | Prefer lower `cost_tier` replicas |
 | `energy_optimized` | Prefer lower GPU-cache pressure |
 
-Background tasks: `ai_routing_controller` (10s), `ai_autoscaler` (15s).
-Under `FLUXVM_AI_DRY_RUN=1` synthetic metrics still diverge Maglev weights.
+A replica is eligible for Maglev only when it is ready, not draining, and its
+last scrape is younger than 30 seconds. A failed scrape or a missing
+`scraped_at` is omitted. Zeros from a failed scrape are not treated as idle.
+
+Background tasks: `ai_routing_controller` (10s), `ai_autoscaler` (15s),
+`ai_reconcile_controller` (15s). Under `FLUXVM_AI_DRY_RUN=1` synthetic metrics
+still diverge Maglev weights.
+
+Endpoint VIPs are allocated from a pool that uses Rivora AddressPool syntax
+(CIDR, `start-end` range, or a single IPv4 address). Set
+`FLUXVM_AI_ADDRESS_POOL` (comma-separated) or `FLUXVM_AI_SERVICE_CIDR`
+(default `10.96.0.0/16`). `FLUXVM_AI_AVOID_BUGGY_IPS` defaults on and skips
+addresses whose last octet is 0 or 255. Allocations are stored and released
+when the endpoint is deleted. Prefixes larger than /16, and IPv6, stay on the
+Rivora controller.
 
 ## Autoscaling and rollouts (Phase 3)
+
+Rollouts are **experimental scaffolding**. The API stores a strategy and bumps `revision`, but there is no revision identity and no promotion or rollback controller. Maturity stays **Preview**.
 
 ```text
 Scale out when:
@@ -182,7 +206,12 @@ Scale out when:
 Scale in when:
   queue_depth < scale_in_queue for scale_in_seconds
   AND replicas > min_replicas (or 0 if scale_to_zero)
+  AND every ready replica has fresh metrics
 ```
+
+Scale-out uses the same quota check as a manual scale. If that check fails, or
+if scale-in is skipped because metrics are missing or stale, the decision is
+recorded on `deployment.status.message` and the replica count is left unchanged.
 
 ```bash
 zyvorctl ai deployment autoscale qwen3-8b --enable --min 1 --max 4 \
@@ -191,21 +220,37 @@ zyvorctl ai deployment drain qwen3-8b --grace-seconds 30
 zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
 ```
 
+## Reconciliation
+
+`ai_reconcile_controller` runs every 15 seconds. Create, scale, the autoscaler,
+and that loop take a per-deployment lock. Each tick compares the desired
+replica count with recorded VMs, retries guest IP and `GET /health`, recreates
+missing replicas, and releases GPU reservations whose VM is gone. A reservation
+(`bdf`, deployment, VM name) is persisted before `bind_host_gpu`. Placement
+skips those BDFs. Startup is the first tick. The sweep removes reservations
+and Fabric-managed VMs whose deployment is gone, and Maglev services that
+Fabric recorded for an endpoint that no longer exists. It does not delete
+unrelated FluxVM services.
+
 ## Security (Phase 4)
 
 - Per-tenant model / endpoint scoping (existing RBAC + tenant filters)
-- `POST /api/ai/keys` — secrets hashed (SHA-256); plaintext returned once
-- `require_checksum` on ModelArtifact rejects unverified materialization
-- `license` + `residency` metadata on models; residency copied to deployments
-- Deployment `revision` increments on scale / drain / rollout / autoscale
-- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images
+- `POST /api/ai/keys` — HMAC-SHA256 with `FLUXVM_AI_KEY_HMAC_SECRET` (a preview default is used when unset). Plaintext is returned once. `GET /api/ai/keys` does not include `secret_hash`
+- Lifetime `request_quota` only. Requests per minute, tokens, and concurrency limits are not enforced yet
+- `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file
+- Model paths are canonicalized and must stay under `FLUXVM_AI_MODEL_DIR` or `{state}/ai-models`
+- `license` + `residency` metadata on models; residency copied to deployments. When an endpoint sets `residency`, replicas with no `site` are excluded
+- `InferenceProfile.gpu.count` must be 1
+- Deployment `revision` increments on scale / drain / rollout / autoscale. Rollout strategy is stored only; see the experimental note above
+- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images. `revision` is stored and is not passed to the downloader yet
 
 ## Multi-site (Phase 5)
 
 Tag replicas with `FLUXVM_AI_SITE` (or deployment `preferred_site`). Endpoints
 may set `preferred_site`, `allowed_sites`, and `residency`. Routing strategy
 `site_local` biases Maglev weights toward the preferred site and never
-includes backends outside `residency` / `allowed_sites`.
+includes backends outside `residency` / `allowed_sites`. A replica with no
+`site` is excluded when `residency` or `allowed_sites` is set.
 
 ## Agent Runtime convergence (Phase 6)
 

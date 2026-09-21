@@ -12,16 +12,18 @@
 use axum::{
     body::Body,
     extract::{Path, Request, State},
-    http::{header, Method, StatusCode},
+    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use chrono::Utc;
+use futures::StreamExt;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::server::AppState;
 
-use super::keys::{self, STORE_API_KEYS};
+use super::keys::{self};
 use super::types::{InferenceApiKey, InferenceDeployment, InferenceEndpoint};
 use super::{audit, STORE_DEPLOYMENTS, STORE_ENDPOINTS};
 
@@ -53,12 +55,7 @@ pub async fn openai_gateway_root(
     Path(endpoint_name): Path<String>,
     req: Request,
 ) -> Response {
-    openai_gateway(
-        State(state),
-        Path((endpoint_name, String::new())),
-        req,
-    )
-    .await
+    openai_gateway(State(state), Path((endpoint_name, String::new())), req).await
 }
 
 async fn gateway_inner(
@@ -72,7 +69,10 @@ async fn gateway_inner(
         return Ok(Response::builder()
             .status(StatusCode::NO_CONTENT)
             .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-            .header(header::ACCESS_CONTROL_ALLOW_HEADERS, "authorization, content-type")
+            .header(
+                header::ACCESS_CONTROL_ALLOW_HEADERS,
+                "authorization, content-type",
+            )
             .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
             .body(Body::empty())
             .unwrap());
@@ -83,25 +83,14 @@ async fn gateway_inner(
         "missing or invalid Authorization: Bearer <api-key>".into(),
     ))?;
 
-    let mut key = keys::verify_api_key(state, &secret).ok_or((
-        StatusCode::UNAUTHORIZED,
-        "invalid API key".into(),
-    ))?;
+    let mut key = keys::verify_api_key(state, &secret)
+        .ok_or((StatusCode::UNAUTHORIZED, "invalid API key".into()))?;
 
     if key.endpoint != endpoint_name {
         return Err((
             StatusCode::FORBIDDEN,
             format!("API key is not scoped to endpoint '{endpoint_name}'"),
         ));
-    }
-
-    if let Some(quota) = key.request_quota {
-        if key.requests_used >= quota {
-            return Err((
-                StatusCode::TOO_MANY_REQUESTS,
-                "API key request quota exceeded".into(),
-            ));
-        }
     }
 
     let ep: InferenceEndpoint = state
@@ -131,16 +120,22 @@ async fn gateway_inner(
         }
     }
 
-    // Consume one request unit (best-effort persist).
-    key.requests_used = key.requests_used.saturating_add(1);
-    key.last_used = Some(Utc::now());
-    let _ = state.store.save_entity(STORE_API_KEYS, &key.id, &key);
+    key = keys::consume_request(state, &key.id).await.map_err(|e| {
+        let status = if e.contains("quota") {
+            StatusCode::TOO_MANY_REQUESTS
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+        (status, e)
+    })?;
+
+    let resource = format!("ai/openai/{endpoint_name}/{path}");
     audit(
         state,
         &format!("apikey:{}", key.prefix),
         "INFER",
-        &format!("ai/openai/{endpoint_name}/{path}"),
-        "SUCCESS",
+        &resource,
+        "ATTEMPT",
     );
 
     let dry_run = std::env::var("FLUXVM_AI_DRY_RUN")
@@ -156,59 +151,147 @@ async fn gateway_inner(
     };
 
     if dry_run {
-        return Ok(dry_run_response(&method, &upstream_path, &dep.model));
+        let body_bytes = axum::body::to_bytes(req.into_body(), 1024 * 1024)
+            .await
+            .unwrap_or_default();
+        audit(
+            state,
+            &format!("apikey:{}", key.prefix),
+            "INFER",
+            &resource,
+            "SUCCESS",
+        );
+        return Ok(dry_run_response(
+            &method,
+            &upstream_path,
+            &dep.model,
+            &body_bytes,
+        ));
     }
 
-    let target = resolve_upstream(&ep, &dep).ok_or((
+    let proxied = proxy_upstream(&method, &ep, &dep, &upstream_path, req).await;
+    let outcome = match &proxied {
+        Ok(resp) if resp.status().is_success() => "SUCCESS",
+        _ => "FAILED",
+    };
+    audit(
+        state,
+        &format!("apikey:{}", key.prefix),
+        "INFER",
+        &resource,
+        outcome,
+    );
+    proxied
+}
+
+async fn proxy_upstream(
+    method: &Method,
+    ep: &InferenceEndpoint,
+    dep: &InferenceDeployment,
+    upstream_path: &str,
+    req: Request,
+) -> Result<Response, (StatusCode, String)> {
+    let target = resolve_upstream(ep, dep).ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "no ready inference backend (set VIP or wait for replicas)".into(),
     ))?;
 
-    let body_bytes = axum::body::to_bytes(req.into_body(), 16 * 1024 * 1024)
-        .await
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("read body: {e}")))?;
-
+    let incoming_type = req
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/json")
+        .to_string();
     let url = format!("http://{target}{upstream_path}");
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
+        .connect_timeout(Duration::from_secs(10))
         .build()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let mut upstream = client.request(
-        reqwest::Method::from_bytes(method.as_str().as_bytes())
-            .unwrap_or(reqwest::Method::POST),
-        &url,
-    );
-    if !body_bytes.is_empty() {
-        upstream = upstream
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(body_bytes.to_vec());
-    }
-
-    let upstream_resp = upstream
+    let upstream_body = reqwest::Body::wrap_stream(req.into_body().into_data_stream());
+    let upstream_resp = client
+        .request(
+            reqwest::Method::from_bytes(method.as_str().as_bytes())
+                .unwrap_or(reqwest::Method::POST),
+            &url,
+        )
+        .header(header::CONTENT_TYPE, incoming_type)
+        .body(upstream_body)
         .send()
         .await
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("upstream: {e}")))?;
 
     let status =
         StatusCode::from_u16(upstream_resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-    let content_type = upstream_resp
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("application/json")
-        .to_string();
-    let bytes = upstream_resp
-        .bytes()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("upstream body: {e}")))?;
+    let mut builder = Response::builder().status(status);
+    if let Some(headers) = builder.headers_mut() {
+        copy_response_headers(upstream_resp.headers(), headers);
+    }
+    let idle = idle_timeout();
+    let stream = async_stream::stream! {
+        let mut chunks = upstream_resp.bytes_stream();
+        loop {
+            match tokio::time::timeout(idle, chunks.next()).await {
+                Ok(Some(Ok(bytes))) => yield Ok::<_, std::io::Error>(bytes),
+                Ok(Some(Err(e))) => {
+                    yield Err(std::io::Error::other(e));
+                    break;
+                }
+                Ok(None) => break,
+                Err(_) => {
+                    yield Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "upstream idle timeout",
+                    ));
+                    break;
+                }
+            }
+        }
+    };
+    builder
+        .body(Body::from_stream(stream))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
 
-    Ok(Response::builder()
-        .status(status)
-        .header(header::CONTENT_TYPE, content_type)
-        .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-        .body(Body::from(bytes))
-        .unwrap())
+fn idle_timeout() -> Duration {
+    let secs = std::env::var("FLUXVM_AI_GATEWAY_IDLE_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(60u64);
+    Duration::from_secs(secs)
+}
+
+fn copy_response_headers(from: &HeaderMap, to: &mut HeaderMap) {
+    for (name, value) in from {
+        if is_hop(name.as_str()) {
+            continue;
+        }
+        if let (Ok(n), Ok(v)) = (
+            HeaderName::from_bytes(name.as_str().as_bytes()),
+            HeaderValue::from_bytes(value.as_bytes()),
+        ) {
+            to.insert(n, v);
+        }
+    }
+    to.insert(
+        header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_static("*"),
+    );
+}
+
+fn is_hop(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "connection"
+            | "keep-alive"
+            | "proxy-authenticate"
+            | "proxy-authorization"
+            | "te"
+            | "trailers"
+            | "transfer-encoding"
+            | "upgrade"
+            | "content-length"
+    )
 }
 
 fn extract_bearer(headers: &axum::http::HeaderMap) -> Option<String> {
@@ -236,8 +319,24 @@ fn resolve_upstream(ep: &InferenceEndpoint, dep: &InferenceDeployment) -> Option
         .map(|a| format!("{a}:{}", ep.port))
 }
 
-fn dry_run_response(method: &Method, path: &str, model: &str) -> Response {
-    let body = if path.contains("chat/completions") || (method == Method::POST && path.contains("completions")) {
+fn dry_run_response(method: &Method, path: &str, model: &str, body_bytes: &[u8]) -> Response {
+    if wants_stream(body_bytes) {
+        let chunks = dry_run_sse_chunks(model);
+        let stream = futures::stream::iter(
+            chunks
+                .into_iter()
+                .map(|c| Ok::<_, std::io::Error>(axum::body::Bytes::from(c))),
+        );
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+            .body(Body::from_stream(stream))
+            .unwrap();
+    }
+    let body = if path.contains("chat/completions")
+        || (method == Method::POST && path.contains("completions"))
+    {
         serde_json::json!({
             "id": "chatcmpl-fabric-dry-run",
             "object": "chat.completion",
@@ -268,16 +367,31 @@ fn dry_run_response(method: &Method, path: &str, model: &str) -> Response {
     };
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "application/json"), (header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")],
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::ACCESS_CONTROL_ALLOW_ORIGIN, "*"),
+        ],
         Json(body),
     )
         .into_response()
 }
 
+pub fn wants_stream(body: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(body);
+    text.contains("\"stream\":true") || text.contains("\"stream\": true")
+}
+
+/// Two SSE chunks. The gateway yields them as separate stream items.
+pub fn dry_run_sse_chunks(model: &str) -> Vec<String> {
+    vec![
+        format!("data: {{\"model\":\"{model}\",\"choices\":[{{\"delta\":{{\"content\":\"Fabric\"}}}}]}}\n\n"),
+        "data: [DONE]\n\n".into(),
+    ]
+}
+
 /// Touch key usage for unit tests / quota math.
 pub fn would_reject_quota(key: &InferenceApiKey) -> bool {
-    key.request_quota
-        .is_some_and(|q| key.requests_used >= q)
+    key.request_quota.is_some_and(|q| key.requests_used >= q)
 }
 
 #[cfg(test)]
@@ -302,5 +416,18 @@ mod tests {
         assert!(would_reject_quota(&key));
         key.requests_used = 1;
         assert!(!would_reject_quota(&key));
+    }
+
+    #[test]
+    fn dry_run_sse_is_two_chunks() {
+        let body = br#"{"model":"m","stream": true}"#;
+        assert!(wants_stream(body));
+        assert!(!wants_stream(br#"{"stream":false}"#));
+        let chunks = dry_run_sse_chunks("mistral");
+        assert_eq!(chunks.len(), 2);
+        assert!(chunks[0].starts_with("data: "));
+        assert!(chunks[0].contains("Fabric"));
+        assert!(!chunks[0].contains("[DONE]"));
+        assert!(chunks[1].contains("[DONE]"));
     }
 }

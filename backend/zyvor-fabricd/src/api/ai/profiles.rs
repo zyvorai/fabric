@@ -66,10 +66,7 @@ pub async fn create_profile(
 ) -> Result<(StatusCode, Json<InferenceProfile>), (StatusCode, Json<serde_json::Value>)> {
     crate::validation::validate_entity_name(&req.name).map_err(|(s, m)| err(s, m))?;
     if req.runtime != "vllm" {
-        return Err(err(
-            StatusCode::BAD_REQUEST,
-            "runtime must be 'vllm' (MVP)",
-        ));
+        return Err(err(StatusCode::BAD_REQUEST, "runtime must be 'vllm' (MVP)"));
     }
     if req.gpu.vendor.trim().is_empty() {
         return Err(err(StatusCode::BAD_REQUEST, "gpu.vendor is required"));
@@ -78,6 +75,12 @@ pub async fn create_profile(
         return Err(err(
             StatusCode::BAD_REQUEST,
             "cpu and memory_gib must be greater than 0",
+        ));
+    }
+    if req.gpu.count != 1 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "gpu.count must be 1 (one GPU per replica)",
         ));
     }
 

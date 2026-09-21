@@ -183,7 +183,9 @@ pub struct InferenceApiKey {
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tenant: Option<String>,
-    /// SHA-256 hex of the secret (never return the secret after create).
+    /// HMAC-SHA256 hex of the secret. Persisted in the entity store.
+    /// API responses use `InferenceApiKeyView`, which omits this field —
+    /// `skip_serializing` here would erase the hash on the next save.
     pub secret_hash: String,
     /// Prefix for display (first 8 chars of secret).
     pub prefix: String,
@@ -208,9 +210,45 @@ pub struct CreateApiKeyRequest {
     pub request_quota: Option<u64>,
 }
 
+/// API view of an inference key. `secret_hash` is never serialized.
+#[derive(Debug, Clone, Serialize)]
+pub struct InferenceApiKeyView {
+    pub id: String,
+    pub name: String,
+    pub endpoint: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
+    pub prefix: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_quota: Option<u64>,
+    pub requests_used: u64,
+    pub created: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_used: Option<DateTime<Utc>>,
+}
+
+impl From<&InferenceApiKey> for InferenceApiKeyView {
+    fn from(key: &InferenceApiKey) -> Self {
+        Self {
+            id: key.id.clone(),
+            name: key.name.clone(),
+            endpoint: key.endpoint.clone(),
+            model: key.model.clone(),
+            tenant: key.tenant.clone(),
+            prefix: key.prefix.clone(),
+            request_quota: key.request_quota,
+            requests_used: key.requests_used,
+            created: key.created,
+            last_used: key.last_used,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct CreateApiKeyResponse {
-    pub key: InferenceApiKey,
+    pub key: InferenceApiKeyView,
     /// Plaintext secret — shown once.
     pub secret: String,
 }

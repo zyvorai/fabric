@@ -317,6 +317,11 @@ impl Server {
             "ai_autoscaler",
             crate::api::ai::autoscaling::run_ai_autoscaler
         );
+        spawn_bg!(
+            self.state,
+            "ai_reconcile_controller",
+            crate::api::ai::reconcile::run_ai_reconcile_controller
+        );
 
         let handle = axum_server::Handle::new();
         let shutdown_handle = handle.clone();
@@ -1221,11 +1226,13 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/ai/deployments",
-            get(api::ai::deployments::list_deployments).post(api::ai::deployments::create_deployment),
+            get(api::ai::deployments::list_deployments)
+                .post(api::ai::deployments::create_deployment),
         )
         .route(
             "/ai/deployments/{name}",
-            get(api::ai::deployments::get_deployment).delete(api::ai::deployments::delete_deployment),
+            get(api::ai::deployments::get_deployment)
+                .delete(api::ai::deployments::delete_deployment),
         )
         .route(
             "/ai/deployments/{name}/scale",

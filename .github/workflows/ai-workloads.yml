@@ -6,7 +6,9 @@ on:
     branches: [main]
     paths:
       - "backend/zyvor-fabricd/src/api/ai/**"
-      - "backend/zyvorctl/src/cli.rs"
+      - "backend/zyvorctl/src/**"
+      - "backend/zyvorctl/src/main.rs"
+      - "scripts/smoke-ai-workloads-phases.sh"
       - "docs/ai-workloads.md"
       - "scripts/test-ai-workloads-unit.sh"
       - "agent-runtime/src/credentials.rs"
@@ -16,7 +18,9 @@ on:
     branches: [main]
     paths:
       - "backend/zyvor-fabricd/src/api/ai/**"
-      - "backend/zyvorctl/src/cli.rs"
+      - "backend/zyvorctl/src/**"
+      - "backend/zyvorctl/src/main.rs"
+      - "scripts/smoke-ai-workloads-phases.sh"
       - "docs/ai-workloads.md"
       - "scripts/test-ai-workloads-unit.sh"
       - "agent-runtime/src/credentials.rs"
@@ -33,6 +37,61 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev clang pkg-config libssl-dev
       - name: AI unit tests
         run: ./scripts/test-ai-workloads-unit.sh
+
+  fabricd-ai-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev clang pkg-config libssl-dev jq
+      - name: Dry-run REST smoke
+        run: |
+          set -euo pipefail
+          cargo build -p zyvor-fabricd --bin zyvor-fabricd
+          ROOT="$(mktemp -d)"
+          mkdir -p "$ROOT/images" "$ROOT/ai-model-stub"
+          cat > "$ROOT/fabricd.toml" <<EOF
+          [daemon]
+          listen = "127.0.0.1:19095"
+
+          [storage]
+          path = "$ROOT"
+          image_path = "$ROOT/images"
+
+          [network]
+          bridge = "br0"
+
+          [auth]
+          enabled = true
+          db_path = "$ROOT/auth.db"
+          jwt_secret = "ci-smoke-secret-not-for-production-use"
+          default_admin_password = "smoke-pass"
+
+          [tls]
+          enabled = false
+          EOF
+          export ZYVOR_FABRICD_CONFIG="$ROOT/fabricd.toml"
+          export ZYVOR_FABRICD_ADMIN_PASSWORD=smoke-pass
+          export FLUXVM_AI_DRY_RUN=1
+          export FLUXVM_AI_MODEL_DIR="$ROOT/ai-model-stub"
+          export FLUXVM_AI_SITE=lab
+          ./target/debug/zyvor-fabricd > "$ROOT/fabricd.log" 2>&1 &
+          echo $! > "$ROOT/pid"
+          trap 'kill "$(cat "$ROOT/pid")" >/dev/null 2>&1 || true' EXIT
+          for _ in $(seq 1 90); do
+            if curl -sf "http://127.0.0.1:19095/health" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -sf "http://127.0.0.1:19095/health" >/dev/null
+          FABRIC_URL=http://127.0.0.1:19095 FABRIC_PASS=smoke-pass ./scripts/smoke-ai-workloads-phases.sh
+          if ! curl -sf "http://127.0.0.1:19095/health" >/dev/null; then
+            echo "fabricd log:" >&2
+            cat "$ROOT/fabricd.log" >&2
+            exit 1
+          fi
 
   agent-fabric-cred:
     runs-on: ubuntu-latest

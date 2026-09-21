@@ -34,7 +34,10 @@ pub async fn drain_deployment(
     let targets: Vec<String> = match &req.replica {
         Some(r) => {
             if !dep.status.replicas.iter().any(|x| x.vm_name == *r) {
-                return Err(err(StatusCode::NOT_FOUND, format!("replica '{r}' not found")));
+                return Err(err(
+                    StatusCode::NOT_FOUND,
+                    format!("replica '{r}' not found"),
+                ));
             }
             vec![r.clone()]
         }
@@ -199,8 +202,7 @@ fn should_rollback(dep: &InferenceDeployment, err_thresh: f64, ttft_thresh: f64)
     let n = ready.len() as f64;
     let avg_err = ready.iter().map(|m| m.http_error_rate).sum::<f64>() / n;
     let avg_ttft = ready.iter().map(|m| m.ttft_ms).sum::<f64>() / n;
-    (err_thresh > 0.0 && avg_err > err_thresh)
-        || (ttft_thresh > 0.0 && avg_ttft > ttft_thresh)
+    (err_thresh > 0.0 && avg_err > err_thresh) || (ttft_thresh > 0.0 && avg_ttft > ttft_thresh)
 }
 
 async fn drain_endpoints_for(
@@ -245,7 +247,8 @@ async fn drain_endpoints_for(
             .unwrap_or(0);
         for b in &mut spec.backends {
             if b.address == address {
-                b.drain_until_unix_ms = Some(now_ms.saturating_add(grace_seconds.saturating_mul(1000)));
+                b.drain_until_unix_ms =
+                    Some(now_ms.saturating_add(grace_seconds.saturating_mul(1000)));
             }
         }
         let _ = client.upsert_network_service(&spec).await;

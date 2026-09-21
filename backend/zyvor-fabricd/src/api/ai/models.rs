@@ -89,7 +89,13 @@ pub async fn create_model(
     }
 
     let state_dir = std::path::PathBuf::from(&state.config.storage.path);
-    if req.require_checksum && req.checksum.as_ref().map(|c| c.trim().is_empty()).unwrap_or(true) {
+    if req.require_checksum
+        && req
+            .checksum
+            .as_ref()
+            .map(|c| c.trim().is_empty())
+            .unwrap_or(true)
+    {
         return Err(err(
             StatusCode::BAD_REQUEST,
             "require_checksum is set but no checksum was provided",

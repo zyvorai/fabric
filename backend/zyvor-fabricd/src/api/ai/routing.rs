@@ -8,10 +8,12 @@
 //! never learns about models or tokens — only weights change.
 
 use chrono::Utc;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::server::AppState;
 
+use super::eligibility::replica_serving;
 use super::maglev::build_maglev_service_spec_weighted;
 use super::types::{
     InferenceDeployment, InferenceEndpoint, InferenceReplica, ReplicaMetrics, RoutingStrategy,
@@ -82,7 +84,9 @@ pub async fn refresh_endpoint_weights(
 
     let ready = filter_replicas_for_endpoint(ep, &dep.status.replicas);
     let weights = match ep.routing_strategy {
-        RoutingStrategy::SiteLocal => compute_site_local_weights(&ready, ep.preferred_site.as_deref()),
+        RoutingStrategy::SiteLocal => {
+            compute_site_local_weights(&ready, ep.preferred_site.as_deref())
+        }
         other => compute_weights(other, &ready),
     };
     let named_weights: Vec<(String, u16)> = ready
@@ -90,15 +94,16 @@ pub async fn refresh_endpoint_weights(
         .zip(weights.iter().copied())
         .map(|(r, w)| (r.vm_name.clone(), w))
         .collect();
+    let weighted_names: HashSet<String> = named_weights.iter().map(|(n, _)| n.clone()).collect();
 
     for (name, w) in named_weights {
-        if let Some(slot) = dep
-            .status
-            .replicas
-            .iter_mut()
-            .find(|r| r.vm_name == name)
-        {
+        if let Some(slot) = dep.status.replicas.iter_mut().find(|r| r.vm_name == name) {
             slot.maglev_weight = Some(w);
+        }
+    }
+    for slot in &mut dep.status.replicas {
+        if !weighted_names.contains(&slot.vm_name) || !replica_serving(slot) {
+            slot.maglev_weight = None;
         }
     }
     dep.updated = Utc::now();
@@ -237,13 +242,12 @@ pub fn filter_replicas_for_endpoint<'a>(
 ) -> Vec<&'a InferenceReplica> {
     replicas
         .iter()
-        .filter(|r| r.ready && !r.draining)
+        .filter(|r| replica_serving(r))
         .filter(|r| {
             if let Some(res) = ep.residency.as_deref() {
                 match r.site.as_deref() {
                     Some(s) if s == res => true,
-                    Some(_) => false,
-                    None => true, // unknown site: allow until tagged
+                    _ => false,
                 }
             } else {
                 true
@@ -255,7 +259,7 @@ pub fn filter_replicas_for_endpoint<'a>(
             }
             match r.site.as_deref() {
                 Some(s) => ep.allowed_sites.iter().any(|a| a == s),
-                None => true,
+                None => false,
             }
         })
         .collect()
@@ -272,7 +276,10 @@ fn clamp_weight(w: u16) -> u16 {
 }
 
 /// Site-local Maglev weights using the endpoint's preferred site (Phase 5).
-pub fn compute_site_local_weights(ready: &[&InferenceReplica], preferred: Option<&str>) -> Vec<u16> {
+pub fn compute_site_local_weights(
+    ready: &[&InferenceReplica],
+    preferred: Option<&str>,
+) -> Vec<u16> {
     if ready.is_empty() {
         return Vec::new();
     }
@@ -438,5 +445,35 @@ vllm:gpu_cache_usage_perc 0.42
         assert_eq!(m.queue_depth, 7);
         assert_eq!(m.active_requests, 2);
         assert!((m.gpu_cache_usage - 0.42).abs() < 0.001);
+    }
+
+    #[test]
+    fn residency_excludes_untagged_replicas() {
+        let mut tagged = rep("tagged", 0, 0.0, 0.0);
+        tagged.site = Some("lab".into());
+        tagged.metrics.as_mut().unwrap().scraped_at = Some(Utc::now());
+        tagged.metrics.as_mut().unwrap().source = Some("vllm_prometheus".into());
+        let mut untagged = rep("untagged", 0, 0.0, 0.0);
+        untagged.metrics.as_mut().unwrap().scraped_at = Some(Utc::now());
+        untagged.metrics.as_mut().unwrap().source = Some("vllm_prometheus".into());
+        let ep = InferenceEndpoint {
+            name: "ep".into(),
+            deployment: "dep".into(),
+            protocol: "openai".into(),
+            port: 8000,
+            service_id: None,
+            vip: None,
+            routing_strategy: RoutingStrategy::LeastQueue,
+            tenant: None,
+            preferred_site: None,
+            allowed_sites: Vec::new(),
+            residency: Some("lab".into()),
+            created: Utc::now(),
+            updated: Utc::now(),
+        };
+        let replicas = [tagged, untagged];
+        let kept = filter_replicas_for_endpoint(&ep, &replicas);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].vm_name, "tagged");
     }
 }

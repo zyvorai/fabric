@@ -15,9 +15,11 @@
 pub mod autoscaling;
 pub mod capacity;
 pub mod deployments;
+pub mod eligibility;
 pub mod endpoints;
 pub mod gateway;
 pub mod gpus;
+pub mod ipam;
 pub mod keys;
 pub mod maglev;
 pub mod model_cache;

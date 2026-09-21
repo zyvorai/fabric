@@ -5136,6 +5136,7 @@ dependencies = [
  "sha2",
  "site-recovery",
  "state-store",
+ "subtle",
  "tar",
  "tempfile",
  "thiserror 2.0.20",

@@ -11,9 +11,10 @@ use chrono::Utc;
 
 use crate::server::AppState;
 
+use super::eligibility::metrics_fresh;
 use super::reconcile;
-use super::types::{AutoscalingPolicy, InferenceDeployment};
-use super::STORE_DEPLOYMENTS;
+use super::types::{AutoscalingPolicy, InferenceDeployment, InferenceProfile};
+use super::{STORE_DEPLOYMENTS, STORE_PROFILES};
 
 /// Background loop evaluating autoscaling policies.
 pub async fn run_ai_autoscaler(state: Arc<AppState>) {
@@ -139,6 +140,60 @@ async fn apply_scale(
         .ok_or_else(|| format!("deployment '{name}' not found"))?;
     if dep.replicas == replicas {
         return Ok(());
+    }
+    if replicas < dep.replicas
+        && dep
+            .status
+            .replicas
+            .iter()
+            .any(|r| r.ready && !metrics_fresh(r.metrics.as_ref()))
+    {
+        dep.status.message =
+            Some("autoscaler skipped scale-in: replica metrics missing or stale".into());
+        dep.updated = Utc::now();
+        state
+            .store
+            .save_entity(STORE_DEPLOYMENTS, &dep.name, &dep)
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    if replicas > dep.replicas {
+        let gpus_per = dep.gpus_per_replica.max(1);
+        let new_gpus = replicas.saturating_mul(gpus_per);
+        let profile = state
+            .store
+            .get_entity::<InferenceProfile>(STORE_PROFILES, &dep.profile)
+            .ok()
+            .flatten();
+        let (cpus, memory_mb) = match &profile {
+            Some(p) => (
+                p.cpu.saturating_mul(replicas),
+                (p.memory_gib as u64)
+                    .saturating_mul(1024)
+                    .saturating_mul(replicas as u64),
+            ),
+            None => (0, 0),
+        };
+        if let Err(e) = crate::api::quotas::check_quota_enforcement(
+            state,
+            cpus,
+            memory_mb,
+            0,
+            &[],
+            dep.tenant.as_deref(),
+            replicas,
+            0,
+            None,
+            new_gpus,
+            Some(dep.name.as_str()),
+        )
+        .await
+        {
+            dep.status.message = Some(format!("autoscaler skipped scale-out: {e}"));
+            dep.updated = Utc::now();
+            let _ = state.store.save_entity(STORE_DEPLOYMENTS, &dep.name, &dep);
+            return Ok(());
+        }
     }
     tracing::info!(
         deployment = %name,

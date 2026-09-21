@@ -12,12 +12,15 @@ use axum::{
 use chrono::Utc;
 use security::{RequireRead, RequireWrite};
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
+use subtle::ConstantTimeEq;
 
 use crate::server::AppState;
 
 use super::types::{
-    CreateApiKeyRequest, CreateApiKeyResponse, InferenceApiKey, InferenceEndpoint, TenantQuery,
+    CreateApiKeyRequest, CreateApiKeyResponse, InferenceApiKey, InferenceApiKeyView,
+    InferenceEndpoint, TenantQuery,
 };
 use super::{audit, err, STORE_ENDPOINTS};
 
@@ -28,7 +31,7 @@ pub async fn list_keys(
     RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(q): Query<TenantQuery>,
-) -> Result<Json<Vec<InferenceApiKey>>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<Vec<InferenceApiKeyView>>, (StatusCode, Json<serde_json::Value>)> {
     let tenant_filter = crate::tenant_scope::apply_list_tenant_filter(&claims, q.tenant)
         .map_err(|(s, m)| err(s, m))?;
 
@@ -41,7 +44,8 @@ pub async fn list_keys(
         items.retain(|k| k.tenant.as_deref() == Some(t.as_str()));
     }
     items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(Json(items))
+    let views = items.iter().map(InferenceApiKeyView::from).collect();
+    Ok(Json(views))
 }
 
 /// POST /api/ai/keys
@@ -107,7 +111,10 @@ pub async fn create_key(
 
     Ok((
         StatusCode::CREATED,
-        Json(CreateApiKeyResponse { key, secret }),
+        Json(CreateApiKeyResponse {
+            key: InferenceApiKeyView::from(&key),
+            secret,
+        }),
     ))
 }
 
@@ -144,16 +151,89 @@ pub async fn delete_key(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Validate a bearer/token against stored hashes. Returns the key on match.
+fn key_locks() -> &'static Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>> {
+    static LOCKS: OnceLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = OnceLock::new();
+    LOCKS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub fn key_lock(id: &str) -> Arc<tokio::sync::Mutex<()>> {
+    let mut map = key_locks().lock().unwrap_or_else(|e| e.into_inner());
+    map.entry(id.to_string())
+        .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+        .clone()
+}
+
+/// Sequential quota step. The per-key mutex in `consume_request` is what
+/// serializes callers; this helper is the decision itself.
+pub fn try_reserve_quota(used: u64, quota: Option<u64>) -> Result<u64, ()> {
+    if quota.is_some_and(|q| used >= q) {
+        return Err(());
+    }
+    Ok(used.saturating_add(1))
+}
+
+/// Re-read the key under its lock, reject when the lifetime quota is spent,
+/// then increment and persist before the gateway proxies.
+pub async fn consume_request(state: &AppState, key_id: &str) -> Result<InferenceApiKey, String> {
+    let lock = key_lock(key_id);
+    let _guard = lock.lock().await;
+    let mut key = state
+        .store
+        .get_entity::<InferenceApiKey>(STORE_API_KEYS, key_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "API key not found".to_string())?;
+    key.requests_used = try_reserve_quota(key.requests_used, key.request_quota)
+        .map_err(|_| "API key request quota exceeded".to_string())?;
+    key.last_used = Some(Utc::now());
+    state
+        .store
+        .save_entity(STORE_API_KEYS, &key.id, &key)
+        .map_err(|e| e.to_string())?;
+    Ok(key)
+}
+
+/// Validate a bearer token: prefix lookup, then a constant-time HMAC compare.
 pub fn verify_api_key(state: &AppState, secret: &str) -> Option<InferenceApiKey> {
+    let prefix: String = secret.chars().take(8).collect();
     let hash = hash_secret(secret);
     let keys: Vec<InferenceApiKey> = state.store.list_entities(STORE_API_KEYS).ok()?;
-    keys.into_iter().find(|k| k.secret_hash == hash)
+    keys.into_iter()
+        .find(|k| k.prefix == prefix && bool::from(k.secret_hash.as_bytes().ct_eq(hash.as_bytes())))
 }
 
 pub fn hash_secret(secret: &str) -> String {
-    let digest = Sha256::digest(secret.as_bytes());
-    digest.iter().map(|b| format!("{:02x}", b)).collect()
+    let key = std::env::var("FLUXVM_AI_KEY_HMAC_SECRET")
+        .unwrap_or_else(|_| "fabric-ai-preview-hmac".into());
+    let digest = hmac_sha256(key.as_bytes(), secret.as_bytes());
+    digest.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn hmac_sha256(key: &[u8], msg: &[u8]) -> [u8; 32] {
+    const BLOCK: usize = 64;
+    let mut key_block = [0u8; BLOCK];
+    if key.len() > BLOCK {
+        let digested = Sha256::digest(key);
+        key_block[..32].copy_from_slice(&digested);
+    } else {
+        key_block[..key.len()].copy_from_slice(key);
+    }
+    let mut ipad = [0x36u8; BLOCK];
+    let mut opad = [0x5cu8; BLOCK];
+    for i in 0..BLOCK {
+        ipad[i] ^= key_block[i];
+        opad[i] ^= key_block[i];
+    }
+    let mut inner = Sha256::new();
+    inner.update(ipad);
+    inner.update(msg);
+    let inner_hash = inner.finalize();
+    let mut outer = Sha256::new();
+    outer.update(opad);
+    outer.update(&inner_hash);
+    let out = outer.finalize();
+    let mut arr = [0u8; 32];
+    arr.copy_from_slice(&out);
+    arr
 }
 
 fn generate_secret() -> String {
@@ -172,5 +252,33 @@ mod tests {
     fn hash_is_stable() {
         assert_eq!(hash_secret("abc"), hash_secret("abc"));
         assert_ne!(hash_secret("abc"), hash_secret("abd"));
+    }
+
+    #[test]
+    fn list_view_omits_secret_hash() {
+        let key = InferenceApiKey {
+            id: "aik_1".into(),
+            name: "n".into(),
+            endpoint: "e".into(),
+            model: None,
+            tenant: None,
+            secret_hash: "deadbeef".into(),
+            prefix: "fvai_abc".into(),
+            request_quota: Some(2),
+            requests_used: 0,
+            created: Utc::now(),
+            last_used: None,
+        };
+        let json = serde_json::to_string(&InferenceApiKeyView::from(&key)).unwrap();
+        assert!(!json.contains("secret_hash"));
+        assert!(!json.contains("deadbeef"));
+    }
+
+    #[test]
+    fn sequential_quota_cannot_exceed() {
+        let mut used = 0u64;
+        used = try_reserve_quota(used, Some(2)).unwrap();
+        used = try_reserve_quota(used, Some(2)).unwrap();
+        assert!(try_reserve_quota(used, Some(2)).is_err());
     }
 }
