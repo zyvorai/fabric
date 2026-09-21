@@ -6,7 +6,7 @@
 - **AI Workloads stay Preview 2** on a single cluster. The control plane now
   records revisioned rolling, canary, and blue/green rollouts; content-addressed
   model jobs with format scanning and derived artifacts; hierarchical gateway
-  request and token windows; key rotation with an overlap; deploy-hour policy;
+  request and token windows, plus in-flight stream caps; key rotation with an overlap; deploy-hour policy;
   a token-budget alert; and a SHA-256 audit chain. `highest_throughput` and
   `lowest_failure` are Maglev strategies. Terraform can manage an AI site.
   Extra runtimes stay fail-closed until `FLUXVM_AI_ALLOW_RUNTIMES` names them.

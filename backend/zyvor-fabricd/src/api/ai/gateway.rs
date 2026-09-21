@@ -162,19 +162,29 @@ async fn gateway_inner(
     if let Some(daily) = daily_tokens() {
         admit_daily(state, tokens, daily).map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
     }
-    if let Some((rpm, tpm)) = rate_window(global_rpm(), global_tpm()) {
-        admit_scope(state, "global", "fabric", tokens, rpm, tpm)
-            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    let mut streams = StreamHold {
+        store: state.store.clone(),
+        ids: Vec::new(),
+    };
+    if let Some((rpm, tpm, cap)) = traffic_caps(global_rpm(), global_tpm(), global_streams()) {
+        if let Some(id) = admit_scope(state, "global", "fabric", tokens, rpm, tpm, cap)
+            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
+        {
+            streams.ids.push(id);
+        }
     }
-    if let Some((rpm, tpm)) = rate_window(tenant_rpm(), tenant_tpm()) {
+    if let Some((rpm, tpm, cap)) = traffic_caps(tenant_rpm(), tenant_tpm(), tenant_streams()) {
         if let Some(tenant) = tenant_rate_name(key.tenant.as_deref())
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            admit_scope(state, "tenant", tenant, tokens, rpm, tpm)
-                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+            if let Some(id) = admit_scope(state, "tenant", tenant, tokens, rpm, tpm, cap)
+                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
+            {
+                streams.ids.push(id);
+            }
         }
     }
-    if let Some((rpm, tpm)) = rate_window(project_rpm(), project_tpm()) {
+    if let Some((rpm, tpm, cap)) = traffic_caps(project_rpm(), project_tpm(), project_streams()) {
         if let Some(project) = project_id(
             parts
                 .headers
@@ -183,19 +193,28 @@ async fn gateway_inner(
         )
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            admit_scope(state, "project", project, tokens, rpm, tpm)
-                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+            if let Some(id) = admit_scope(state, "project", project, tokens, rpm, tpm, cap)
+                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
+            {
+                streams.ids.push(id);
+            }
         }
     }
-    if let Some((rpm, tpm)) = rate_window(gateway_rpm(), gateway_tpm()) {
-        admit_scope(state, "endpoint", endpoint_name, tokens, rpm, tpm)
-            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    if let Some((rpm, tpm, cap)) = traffic_caps(gateway_rpm(), gateway_tpm(), gateway_streams()) {
+        if let Some(id) = admit_scope(state, "endpoint", endpoint_name, tokens, rpm, tpm, cap)
+            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
+        {
+            streams.ids.push(id);
+        }
     }
-    if let Some((rpm, tpm)) = rate_window(model_rpm(), model_tpm()) {
-        admit_scope(state, "model", &dep.model, tokens, rpm, tpm)
-            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    if let Some((rpm, tpm, cap)) = traffic_caps(model_rpm(), model_tpm(), model_streams()) {
+        if let Some(id) = admit_scope(state, "model", &dep.model, tokens, rpm, tpm, cap)
+            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
+        {
+            streams.ids.push(id);
+        }
     }
-    if let Some((rpm, tpm)) = rate_window(user_rpm(), user_tpm()) {
+    if let Some((rpm, tpm, cap)) = traffic_caps(user_rpm(), user_tpm(), user_streams()) {
         if let Some(user) = user_id(
             parts
                 .headers
@@ -204,8 +223,11 @@ async fn gateway_inner(
         )
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            admit_scope(state, "user", user, tokens, rpm, tpm)
-                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+            if let Some(id) = admit_scope(state, "user", user, tokens, rpm, tpm, cap)
+                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
+            {
+                streams.ids.push(id);
+            }
         }
     }
     if super::circuit::is_open(&load_breaker(state, endpoint_name), Utc::now().timestamp()) {
@@ -307,6 +329,7 @@ async fn gateway_inner(
         req,
         state.store.clone(),
         key.id.clone(),
+        streams,
     )
     .await;
     let outcome = match &proxied {
@@ -322,6 +345,29 @@ async fn gateway_inner(
         outcome,
     );
     proxied
+}
+
+struct StreamHold {
+    store: state_store::StateStore,
+    ids: Vec<String>,
+}
+
+impl Drop for StreamHold {
+    fn drop(&mut self) {
+        for id in &self.ids {
+            release_stream(&self.store, id);
+        }
+    }
+}
+
+fn release_stream(store: &state_store::StateStore, id: &str) {
+    let _ = store.update_entity_exclusive(
+        super::STORE_RATE_COUNTERS,
+        id,
+        |counter: super::limits::RateCounter| {
+            Ok::<_, String>(super::limits::release_inflight(counter))
+        },
+    );
 }
 
 struct ConcurrencyGuard {
@@ -343,6 +389,7 @@ async fn proxy_upstream(
     req: Request,
     store: state_store::StateStore,
     key_id: String,
+    streams: StreamHold,
 ) -> Result<Response, (StatusCode, String)> {
     let guard = ConcurrencyGuard { store, key_id };
     let targets = upstream_targets(ep, dep);
@@ -429,6 +476,7 @@ async fn proxy_upstream(
     let idle = idle_timeout();
     let stream = async_stream::stream! {
         let _guard = guard;
+        let _streams = streams;
         let mut chunks = upstream_resp.bytes_stream();
         loop {
             match tokio::time::timeout(idle, chunks.next()).await {
@@ -514,6 +562,50 @@ fn model_tpm() -> Option<u64> {
 
 fn user_tpm() -> Option<u64> {
     env_limit("FLUXVM_AI_USER_TPM")
+}
+
+fn global_streams() -> Option<u32> {
+    env_streams("FLUXVM_AI_GLOBAL_STREAMS")
+}
+
+fn tenant_streams() -> Option<u32> {
+    env_streams("FLUXVM_AI_TENANT_STREAMS")
+}
+
+fn project_streams() -> Option<u32> {
+    env_streams("FLUXVM_AI_PROJECT_STREAMS")
+}
+
+fn gateway_streams() -> Option<u32> {
+    env_streams("FLUXVM_AI_GATEWAY_STREAMS")
+}
+
+fn model_streams() -> Option<u32> {
+    env_streams("FLUXVM_AI_MODEL_STREAMS")
+}
+
+fn user_streams() -> Option<u32> {
+    env_streams("FLUXVM_AI_USER_STREAMS")
+}
+
+fn env_streams(name: &str) -> Option<u32> {
+    env_limit(name).and_then(|value| u32::try_from(value).ok())
+}
+
+/// One stored window when any cap is set. Zero means that cap is off.
+pub fn traffic_caps(
+    rpm: Option<u64>,
+    tpm: Option<u64>,
+    streams: Option<u32>,
+) -> Option<(u64, u64, u32)> {
+    let rpm = rpm.unwrap_or(0);
+    let tpm = tpm.unwrap_or(0);
+    let streams = streams.unwrap_or(0);
+    if rpm == 0 && tpm == 0 && streams == 0 {
+        None
+    } else {
+        Some((rpm, tpm, streams))
+    }
 }
 
 /// One stored window when either cap is set. Zero means that cap is off.
@@ -825,7 +917,8 @@ fn admit_scope(
     tokens: u64,
     rpm: u64,
     tpm: u64,
-) -> Result<(), String> {
+    streams: u32,
+) -> Result<Option<String>, String> {
     let id = super::limits::counter_id(scope, name);
     let current = state
         .store
@@ -839,6 +932,7 @@ fn admit_scope(
             tokens: 0,
             day_started_unix: 0,
             day_tokens: 0,
+            inflight: 0,
         });
     if state
         .store
@@ -858,12 +952,12 @@ fn admit_scope(
             super::STORE_RATE_COUNTERS,
             &id,
             |counter: super::limits::RateCounter| {
-                super::limits::admit(counter, Utc::now().timestamp(), tokens, rpm, tpm)
+                super::limits::admit(counter, Utc::now().timestamp(), tokens, rpm, tpm, streams)
             },
         )
         .map_err(|e| e.to_string())?;
     let _ = updated;
-    Ok(())
+    Ok(if streams > 0 { Some(id) } else { None })
 }
 
 fn admit_daily(state: &AppState, tokens: u64, daily: u64) -> Result<(), String> {
@@ -875,6 +969,7 @@ fn admit_daily(state: &AppState, tokens: u64, daily: u64) -> Result<(), String> 
         tokens: 0,
         day_started_unix: 0,
         day_tokens: 0,
+        inflight: 0,
     };
     if state
         .store
@@ -1260,6 +1355,9 @@ mod tests {
         assert_eq!(rate_window(Some(10), None), Some((10, 0)));
         assert_eq!(rate_window(None, Some(40)), Some((0, 40)));
         assert_eq!(rate_window(Some(10), Some(40)), Some((10, 40)));
+        assert_eq!(traffic_caps(None, None, None), None);
+        assert_eq!(traffic_caps(None, None, Some(2)), Some((0, 0, 2)));
+        assert_eq!(traffic_caps(Some(10), None, Some(2)), Some((10, 0, 2)));
     }
 
     #[test]

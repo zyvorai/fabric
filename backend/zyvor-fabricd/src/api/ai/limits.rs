@@ -20,6 +20,9 @@ pub struct RateCounter {
     pub day_started_unix: i64,
     #[serde(default)]
     pub day_tokens: u64,
+    /// In-flight calls. The minute window does not clear this.
+    #[serde(default)]
+    pub inflight: u32,
 }
 
 pub fn admit(
@@ -28,6 +31,7 @@ pub fn admit(
     requested_tokens: u64,
     requests_per_minute: u64,
     tokens_per_minute: u64,
+    streams: u32,
 ) -> Result<RateCounter, String> {
     if now_unix.saturating_sub(counter.window_started_unix) >= 60 {
         counter.window_started_unix = now_unix;
@@ -47,9 +51,25 @@ pub fn admit(
             counter.id, tokens_per_minute
         ));
     }
-    counter.requests = counter.requests.saturating_add(1);
-    counter.tokens = counter.tokens.saturating_add(tokens);
+    if streams > 0 && counter.inflight.saturating_add(1) > streams {
+        return Err(format!(
+            "stream limit exceeded for {} ({streams} in flight)",
+            counter.id
+        ));
+    }
+    if requests_per_minute > 0 || tokens_per_minute > 0 {
+        counter.requests = counter.requests.saturating_add(1);
+        counter.tokens = counter.tokens.saturating_add(tokens);
+    }
+    if streams > 0 {
+        counter.inflight = counter.inflight.saturating_add(1);
+    }
     Ok(counter)
+}
+
+pub fn release_inflight(mut counter: RateCounter) -> RateCounter {
+    counter.inflight = counter.inflight.saturating_sub(1);
+    counter
 }
 
 const DAY_SECS: i64 = 86_400;
@@ -99,11 +119,12 @@ mod tests {
             tokens: 0,
             day_started_unix: 0,
             day_tokens: 0,
+            inflight: 0,
         };
-        let admitted = admit(counter, 61, 1, 2, 0).unwrap();
+        let admitted = admit(counter, 61, 1, 2, 0, 0).unwrap();
         assert_eq!(admitted.requests, 1);
-        let again = admit(admitted.clone(), 61, 1, 2, 0).unwrap();
-        assert!(admit(again, 61, 1, 2, 0).is_err());
+        let again = admit(admitted.clone(), 61, 1, 2, 0, 0).unwrap();
+        assert!(admit(again, 61, 1, 2, 0, 0).is_err());
     }
 
     #[test]
@@ -115,8 +136,9 @@ mod tests {
             tokens: 8,
             day_started_unix: 0,
             day_tokens: 0,
+            inflight: 0,
         };
-        assert!(admit(counter, 10, 4, 0, 10).is_err());
+        assert!(admit(counter, 10, 4, 0, 10, 0).is_err());
     }
 
     #[test]
@@ -128,11 +150,12 @@ mod tests {
             tokens: 0,
             day_started_unix: 0,
             day_tokens: 0,
+            inflight: 0,
         };
-        let next = admit(counter, 10, 4, 2, 6).unwrap();
+        let next = admit(counter, 10, 4, 2, 6, 0).unwrap();
         assert_eq!(next.requests, 1);
         assert_eq!(next.tokens, 4);
-        assert!(admit(next, 10, 4, 2, 6).is_err());
+        assert!(admit(next, 10, 4, 2, 6, 0).is_err());
     }
 
     #[test]
@@ -144,10 +167,31 @@ mod tests {
             tokens: 0,
             day_started_unix: 1_000,
             day_tokens: 9,
+            inflight: 0,
         };
         assert!(admit_day(counter.clone(), 1_000, 2, 10).is_err());
         let next = admit_day(counter, 1_000 + 86_400, 2, 10).unwrap();
         assert_eq!(next.day_tokens, 2);
         assert_eq!(next.requests, 0);
+    }
+
+    #[test]
+    fn stream_cap_survives_the_minute_window_and_releases() {
+        let counter = RateCounter {
+            id: "global:fabric".into(),
+            window_started_unix: 10,
+            requests: 4,
+            tokens: 9,
+            day_started_unix: 0,
+            day_tokens: 0,
+            inflight: 1,
+        };
+        assert!(admit(counter.clone(), 80, 1, 0, 0, 1).is_err());
+        let released = release_inflight(counter);
+        assert_eq!(released.inflight, 0);
+        assert_eq!(released.requests, 4);
+        let next = admit(released, 80, 1, 0, 0, 1).unwrap();
+        assert_eq!(next.inflight, 1);
+        assert_eq!(next.requests, 4);
     }
 }
