@@ -200,6 +200,173 @@ pub fn error_policy_container_group(
     Action::requeue(Duration::from_secs(60))
 }
 
+pub async fn reconcile_model_artifact(
+    ma: Arc<crate::crd::ModelArtifact>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let name = ma.name_any();
+    let namespace = ma.namespace().unwrap_or_default();
+    tracing::info!("Reconciling ModelArtifact {}/{}", namespace, name);
+
+    let api: Api<crate::crd::ModelArtifact> = Api::namespaced(ctx.client.clone(), &namespace);
+    let get_url = format!("{}/api/ai/models/{}", ctx.zyvor_fabricd_url, name);
+    let exists = with_auth(&ctx, ctx.http.get(&get_url))
+        .send()
+        .await?
+        .status()
+        .is_success();
+
+    if !exists {
+        let create_url = format!("{}/api/ai/models", ctx.zyvor_fabricd_url);
+        let body = json!({
+            "name": name,
+            "source": ma.spec.source,
+            "format": ma.spec.format,
+            "revision": ma.spec.revision,
+            "checksum": ma.spec.checksum,
+            "tenant": ma.spec.tenant,
+        });
+        let resp = with_auth(&ctx, ctx.http.post(&create_url))
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            tracing::error!("Failed to create ModelArtifact: {:?}", resp.text().await?);
+            return Ok(Action::requeue(Duration::from_secs(30)));
+        }
+    }
+
+    let mut status = crate::crd::ModelArtifactStatus::default();
+    if let Ok(resp) = with_auth(&ctx, ctx.http.get(&get_url)).send().await {
+        if resp.status().is_success() {
+            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                status.local_path = body
+                    .get("local_path")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string);
+                status.ready = status.local_path.is_some();
+                status.message = Some(if status.ready {
+                    "materialized".into()
+                } else {
+                    "registered (local_path pending)".into()
+                });
+            }
+        }
+    }
+
+    let patch = json!({ "status": status });
+    let _ = api
+        .patch_status(&name, &PatchParams::default(), &Patch::Merge(&patch))
+        .await?;
+    Ok(Action::requeue(Duration::from_secs(300)))
+}
+
+pub fn error_policy_model_artifact(
+    _ma: Arc<crate::crd::ModelArtifact>,
+    _error: &OperatorError,
+    _ctx: Arc<Context>,
+) -> Action {
+    Action::requeue(Duration::from_secs(60))
+}
+
+pub async fn reconcile_inference_deployment(
+    dep: Arc<crate::crd::InferenceDeployment>,
+    ctx: Arc<Context>,
+) -> Result<Action, OperatorError> {
+    let name = dep.name_any();
+    let namespace = dep.namespace().unwrap_or_default();
+    tracing::info!("Reconciling InferenceDeployment {}/{}", namespace, name);
+
+    let api: Api<crate::crd::InferenceDeployment> =
+        Api::namespaced(ctx.client.clone(), &namespace);
+    let get_url = format!("{}/api/ai/deployments/{}", ctx.zyvor_fabricd_url, name);
+    let get_resp = with_auth(&ctx, ctx.http.get(&get_url)).send().await?;
+    let exists = get_resp.status().is_success();
+
+    if !exists {
+        let create_url = format!("{}/api/ai/deployments", ctx.zyvor_fabricd_url);
+        let body = json!({
+            "name": name,
+            "model": dep.spec.model,
+            "profile": dep.spec.profile,
+            "replicas": dep.spec.replicas,
+            "tenant": dep.spec.tenant,
+        });
+        let resp = with_auth(&ctx, ctx.http.post(&create_url))
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            tracing::error!(
+                "Failed to create InferenceDeployment: {:?}",
+                resp.text().await?
+            );
+            return Ok(Action::requeue(Duration::from_secs(30)));
+        }
+    } else if let Ok(body) = get_resp.json::<serde_json::Value>().await {
+        let current = body.get("replicas").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        if current != dep.spec.replicas {
+            let scale_url = format!(
+                "{}/api/ai/deployments/{}/scale",
+                ctx.zyvor_fabricd_url, name
+            );
+            let scale_body = json!({ "replicas": dep.spec.replicas });
+            let resp = with_auth(&ctx, ctx.http.post(&scale_url))
+                .json(&scale_body)
+                .send()
+                .await?;
+            if !resp.status().is_success() {
+                tracing::warn!(
+                    "Failed to scale InferenceDeployment '{}': {:?}",
+                    name,
+                    resp.text().await
+                );
+            }
+        }
+    }
+
+    let mut status = crate::crd::InferenceDeploymentStatus {
+        phase: "Unknown".into(),
+        message: None,
+        ready_replicas: 0,
+    };
+    if let Ok(resp) = with_auth(&ctx, ctx.http.get(&get_url)).send().await {
+        if resp.status().is_success() {
+            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                if let Some(st) = body.get("status") {
+                    status.phase = st
+                        .get("phase")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown")
+                        .to_string();
+                    status.message = st
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string);
+                    if let Some(reps) = st.get("replicas").and_then(|v| v.as_array()) {
+                        status.ready_replicas =
+                            reps.iter().filter(|r| r.get("ready").and_then(|x| x.as_bool()) == Some(true)).count() as u32;
+                    }
+                }
+            }
+        }
+    }
+
+    let patch = json!({ "status": status });
+    let _ = api
+        .patch_status(&name, &PatchParams::default(), &Patch::Merge(&patch))
+        .await?;
+    Ok(Action::requeue(Duration::from_secs(60)))
+}
+
+pub fn error_policy_inference_deployment(
+    _dep: Arc<crate::crd::InferenceDeployment>,
+    _error: &OperatorError,
+    _ctx: Arc<Context>,
+) -> Action {
+    Action::requeue(Duration::from_secs(60))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

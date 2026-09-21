@@ -75,6 +75,10 @@ func (p *fabricdProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewStoragePoolResource,
 		NewNetworkPolicyResource,
 		NewVMSnapshotResource,
+		NewModelArtifactResource,
+		NewInferenceProfileResource,
+		NewInferenceDeploymentResource,
+		NewInferenceEndpointResource,
 	}
 }
 

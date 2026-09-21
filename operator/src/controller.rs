@@ -11,7 +11,7 @@ use kube::{
 use std::sync::Arc;
 
 use crate::{
-    crd::{ContainerGroup, VirtualMachine},
+    crd::{ContainerGroup, InferenceDeployment, ModelArtifact, VirtualMachine},
     reconcile,
 };
 
@@ -25,6 +25,8 @@ pub struct Context {
 pub async fn run(client: Client) -> Result<()> {
     let vms = Api::<VirtualMachine>::all(client.clone());
     let container_groups = Api::<ContainerGroup>::all(client.clone());
+    let model_artifacts = Api::<ModelArtifact>::all(client.clone());
+    let inference_deployments = Api::<InferenceDeployment>::all(client.clone());
 
     let zyvor_fabricd_url = std::env::var("ZYVOR_FABRICD_URL")
         .unwrap_or_else(|_| "http://zyvor-fabricd:9095".to_string());
@@ -56,7 +58,7 @@ pub async fn run(client: Client) -> Result<()> {
         .run(
             reconcile::reconcile_container_group,
             reconcile::error_policy_container_group,
-            context,
+            context.clone(),
         )
         .for_each(|res| async move {
             match res {
@@ -65,7 +67,39 @@ pub async fn run(client: Client) -> Result<()> {
             }
         });
 
-    tokio::join!(vm_controller, container_group_controller);
+    let model_artifact_controller = Controller::new(model_artifacts, Config::default())
+        .run(
+            reconcile::reconcile_model_artifact,
+            reconcile::error_policy_model_artifact,
+            context.clone(),
+        )
+        .for_each(|res| async move {
+            match res {
+                Ok(o) => tracing::info!("Reconciled ModelArtifact: {:?}", o),
+                Err(e) => tracing::error!("ModelArtifact reconcile error: {:?}", e),
+            }
+        });
+
+    let inference_deployment_controller =
+        Controller::new(inference_deployments, Config::default())
+            .run(
+                reconcile::reconcile_inference_deployment,
+                reconcile::error_policy_inference_deployment,
+                context,
+            )
+            .for_each(|res| async move {
+                match res {
+                    Ok(o) => tracing::info!("Reconciled InferenceDeployment: {:?}", o),
+                    Err(e) => tracing::error!("InferenceDeployment reconcile error: {:?}", e),
+                }
+            });
+
+    tokio::join!(
+        vm_controller,
+        container_group_controller,
+        model_artifact_controller,
+        inference_deployment_controller
+    );
 
     Ok(())
 }

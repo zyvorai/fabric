@@ -126,7 +126,7 @@ Detailed documentation for each major feature area.
 | [Networking Overview](networking.md) | Network architecture, SDN stack, and VM edge dataplane |
 | [VM edge dataplane (Network Fabric schema v4)](guides/vm-drivers/fluxvm-dataplane.md) | Fabric proxy of FluxVM TC/eBPF — API, Web, CLI, lab UX |
 | [Service Fabric v6 (Maglev VIP LB)](ebpf-service-fabric.md) | FluxVM Maglev/NAT/DSR/EDT/flows/policy + Fabric leases, HA, FRR/BIRD |
-| [AI Workloads (preview)](ai-workloads.md) | vLLM GPU VMs, Maglev endpoints, autoscaling, API-key OpenAI gateway |
+| [AI Workloads (preview)](ai-workloads.md) | vLLM GPU VMs, Maglev endpoints, autoscaling, API-key OpenAI gateway, Terraform + operator CRDs |
 | [User: VM Dataplane](user/pages/infrastructure/dataplane.md) | Console walkthrough for Status / Policy / Effective / Stats / Flows |
 | [User: Edge Dataplane](user/pages/infrastructure/edge-dataplane.md) | Cluster groups / CNP / Maglev Services / health / observe console |
 | [Tutorial 09: Edge Dataplane](tutorials/09-edge-dataplane.md) | End-to-end lab (API + CLI + UX) |
@@ -489,6 +489,8 @@ at `/api/ai/openai/{endpoint}`. Console: `/app/ai`.
 |----------|-------------|
 | [ai-workloads.md](ai-workloads.md) | REST, CLI, phases 0–6 + harden, golden image, dry-run smoke |
 | [scripts/bake-ai-vllm-image.sh](../scripts/bake-ai-vllm-image.sh) | Bake CUDA + vLLM qcow2 |
+| [terraform-provider/examples/ai-workloads](../terraform-provider/examples/ai-workloads/) | Terraform model/profile/deployment/endpoint |
+| [operator/examples/ai-inference-deployment.yaml](../operator/examples/ai-inference-deployment.yaml) | ModelArtifact + InferenceDeployment CRs |
 | [Agent Runtime ↔ Fabric](../agent-runtime/README.md#fabric-managed-inference-phase-6) | `kind: fabric` credentials for on-prem models |
 
 ---

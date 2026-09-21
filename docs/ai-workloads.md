@@ -110,6 +110,46 @@ gateway returns a synthetic chat completion after accepting the key.
 | 5 | `site_local` / `cost_optimized` / `energy_optimized` routing, preferred/allowed sites |
 | 6 | Agent Runtime `kind: fabric` credentials + `ZYVOR_FABRIC_INFERENCE_BASE` shim |
 | Harden | OpenAI API-key gateway, `/ai/capacity` + `/ai/events`, console keys/autoscale, golden-image bake script |
+| GitOps | Terraform `zyvor-fabricd_{model_artifact,inference_profile,inference_deployment,inference_endpoint}` + operator `ModelArtifact` / `InferenceDeployment` CRDs |
+
+## Terraform
+
+```hcl
+resource "zyvor-fabricd_model_artifact" "qwen" {
+  name   = "qwen3-8b"
+  source = "hf://Qwen/Qwen3-8B"
+  format = "safetensors"
+}
+
+resource "zyvor-fabricd_inference_profile" "edge" {
+  name             = "edge-24g"
+  minimum_vram_gib = 24
+  cpu              = 8
+  memory_gib       = 32
+}
+
+resource "zyvor-fabricd_inference_deployment" "qwen" {
+  name     = "qwen3-8b"
+  model    = zyvor-fabricd_model_artifact.qwen.name
+  profile  = zyvor-fabricd_inference_profile.edge.name
+  replicas = 2
+}
+
+resource "zyvor-fabricd_inference_endpoint" "qwen" {
+  name       = "qwen3-8b-openai"
+  deployment = zyvor-fabricd_inference_deployment.qwen.name
+}
+```
+
+See `terraform-provider/examples/ai-workloads/`.
+
+## Kubernetes operator
+
+```bash
+kubectl apply -f operator/examples/ai-inference-deployment.yaml
+# CRDs: ModelArtifact, InferenceDeployment (zyvor-fabricd.io/v1alpha1)
+# Create InferenceProfile via zyvorctl or Terraform before the Deployment CR.
+```
 
 ## AI-aware Maglev routing (Phase 2+)
 

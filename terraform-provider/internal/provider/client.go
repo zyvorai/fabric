@@ -205,3 +205,179 @@ func (c *Client) CreateVMSnapshot(ctx context.Context, vmName, snapshotName, des
 func (c *Client) DeleteVMSnapshot(ctx context.Context, vmName, snapshotID string) error {
 	return c.do(ctx, http.MethodDelete, "/api/vms/"+vmName+"/snapshots/"+snapshotID, nil, nil)
 }
+
+// --- AI Workloads -----------------------------------------------------------
+
+type modelArtifactRecord struct {
+	Name      string  `json:"name"`
+	Source    string  `json:"source"`
+	Format    string  `json:"format"`
+	Revision  *string `json:"revision"`
+	Checksum  *string `json:"checksum"`
+	Tenant    *string `json:"tenant"`
+	LocalPath *string `json:"local_path"`
+}
+
+type createModelArtifactRequest struct {
+	Name     string  `json:"name"`
+	Source   string  `json:"source"`
+	Format   string  `json:"format"`
+	Revision *string `json:"revision,omitempty"`
+	Checksum *string `json:"checksum,omitempty"`
+	Tenant   *string `json:"tenant,omitempty"`
+}
+
+func (c *Client) GetModelArtifact(ctx context.Context, name string) (*modelArtifactRecord, error) {
+	var m modelArtifactRecord
+	if err := c.do(ctx, http.MethodGet, "/api/ai/models/"+name, nil, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+func (c *Client) CreateModelArtifact(ctx context.Context, req createModelArtifactRequest) (*modelArtifactRecord, error) {
+	var m modelArtifactRecord
+	if err := c.do(ctx, http.MethodPost, "/api/ai/models", req, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+func (c *Client) DeleteModelArtifact(ctx context.Context, name string) error {
+	return c.do(ctx, http.MethodDelete, "/api/ai/models/"+name, nil, nil)
+}
+
+type inferenceProfileRecord struct {
+	Name      string `json:"name"`
+	Runtime   string `json:"runtime"`
+	GPU       gpuReq `json:"gpu"`
+	CPU       int64  `json:"cpu"`
+	MemoryGiB int64  `json:"memory_gib"`
+}
+
+type gpuReq struct {
+	Vendor          string `json:"vendor"`
+	Count           int64  `json:"count"`
+	MinimumVramGiB  int64  `json:"minimum_vram_gib"`
+}
+
+type createInferenceProfileRequest struct {
+	Name      string `json:"name"`
+	Runtime   string `json:"runtime"`
+	GPU       gpuReq `json:"gpu"`
+	CPU       int64  `json:"cpu"`
+	MemoryGiB int64  `json:"memory_gib"`
+}
+
+func (c *Client) GetInferenceProfile(ctx context.Context, name string) (*inferenceProfileRecord, error) {
+	var p inferenceProfileRecord
+	if err := c.do(ctx, http.MethodGet, "/api/ai/profiles/"+name, nil, &p); err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (c *Client) CreateInferenceProfile(ctx context.Context, req createInferenceProfileRequest) (*inferenceProfileRecord, error) {
+	var p inferenceProfileRecord
+	if err := c.do(ctx, http.MethodPost, "/api/ai/profiles", req, &p); err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (c *Client) DeleteInferenceProfile(ctx context.Context, name string) error {
+	return c.do(ctx, http.MethodDelete, "/api/ai/profiles/"+name, nil, nil)
+}
+
+type inferenceDeploymentRecord struct {
+	Name     string                        `json:"name"`
+	Model    string                        `json:"model"`
+	Profile  string                        `json:"profile"`
+	Replicas int64                         `json:"replicas"`
+	Tenant   *string                       `json:"tenant"`
+	Status   inferenceDeploymentStatusJSON `json:"status"`
+}
+
+type inferenceDeploymentStatusJSON struct {
+	Phase   string `json:"phase"`
+	Message string `json:"message"`
+}
+
+type createInferenceDeploymentRequest struct {
+	Name     string  `json:"name"`
+	Model    string  `json:"model"`
+	Profile  string  `json:"profile"`
+	Replicas int64   `json:"replicas"`
+	Tenant   *string `json:"tenant,omitempty"`
+}
+
+type scaleInferenceDeploymentRequest struct {
+	Replicas int64 `json:"replicas"`
+}
+
+func (c *Client) GetInferenceDeployment(ctx context.Context, name string) (*inferenceDeploymentRecord, error) {
+	var d inferenceDeploymentRecord
+	if err := c.do(ctx, http.MethodGet, "/api/ai/deployments/"+name, nil, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (c *Client) CreateInferenceDeployment(ctx context.Context, req createInferenceDeploymentRequest) (*inferenceDeploymentRecord, error) {
+	var d inferenceDeploymentRecord
+	if err := c.do(ctx, http.MethodPost, "/api/ai/deployments", req, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (c *Client) ScaleInferenceDeployment(ctx context.Context, name string, replicas int64) (*inferenceDeploymentRecord, error) {
+	var d inferenceDeploymentRecord
+	if err := c.do(ctx, http.MethodPost, "/api/ai/deployments/"+name+"/scale", scaleInferenceDeploymentRequest{Replicas: replicas}, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (c *Client) DeleteInferenceDeployment(ctx context.Context, name string) error {
+	return c.do(ctx, http.MethodDelete, "/api/ai/deployments/"+name, nil, nil)
+}
+
+type inferenceEndpointRecord struct {
+	Name             string  `json:"name"`
+	Deployment       string  `json:"deployment"`
+	Protocol         string  `json:"protocol"`
+	Port             int64   `json:"port"`
+	VIP              *string `json:"vip"`
+	RoutingStrategy  string  `json:"routing_strategy"`
+}
+
+type createInferenceEndpointRequest struct {
+	Name            string  `json:"name"`
+	Deployment      string  `json:"deployment"`
+	Protocol        string  `json:"protocol"`
+	Port            int64   `json:"port"`
+	VIP             *string `json:"vip,omitempty"`
+	RoutingStrategy string  `json:"routing_strategy"`
+}
+
+func (c *Client) GetInferenceEndpoint(ctx context.Context, name string) (*inferenceEndpointRecord, error) {
+	var e inferenceEndpointRecord
+	if err := c.do(ctx, http.MethodGet, "/api/ai/endpoints/"+name, nil, &e); err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+func (c *Client) CreateInferenceEndpoint(ctx context.Context, req createInferenceEndpointRequest) (*inferenceEndpointRecord, error) {
+	var e inferenceEndpointRecord
+	if err := c.do(ctx, http.MethodPost, "/api/ai/endpoints", req, &e); err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+func (c *Client) DeleteInferenceEndpoint(ctx context.Context, name string) error {
+	return c.do(ctx, http.MethodDelete, "/api/ai/endpoints/"+name, nil, nil)
+}
+

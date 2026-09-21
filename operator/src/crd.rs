@@ -84,6 +84,78 @@ fn default_tpm_version() -> String {
 }
 
 // ---------------------------------------------------------------------------
+// AI Workloads — ModelArtifact + InferenceDeployment (preview).
+// Translators to /api/ai/* — see docs/ai-workloads.md.
+// ---------------------------------------------------------------------------
+
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "ModelArtifact",
+    plural = "modelartifacts",
+    shortname = "ma",
+    status = "ModelArtifactStatus",
+    namespaced
+)]
+#[kube(printcolumn = r#"{"name":"Source", "type":"string", "jsonPath":".spec.source"}"#)]
+#[kube(printcolumn = r#"{"name":"Age", "type":"date", "jsonPath":".metadata.creationTimestamp"}"#)]
+pub struct ModelArtifactSpec {
+    pub source: String,
+    pub format: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, Default)]
+pub struct ModelArtifactStatus {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_path: Option<String>,
+    #[serde(default)]
+    pub ready: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "InferenceDeployment",
+    plural = "inferencedeployments",
+    shortname = "infdep",
+    status = "InferenceDeploymentStatus",
+    namespaced
+)]
+#[kube(printcolumn = r#"{"name":"Phase", "type":"string", "jsonPath":".status.phase"}"#)]
+#[kube(printcolumn = r#"{"name":"Replicas", "type":"integer", "jsonPath":".spec.replicas"}"#)]
+#[kube(printcolumn = r#"{"name":"Age", "type":"date", "jsonPath":".metadata.creationTimestamp"}"#)]
+pub struct InferenceDeploymentSpec {
+    /// ModelArtifact name (must exist in fabricd).
+    pub model: String,
+    /// InferenceProfile name (must exist in fabricd).
+    pub profile: String,
+    #[serde(default = "default_replicas")]
+    pub replicas: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, Default)]
+pub struct InferenceDeploymentStatus {
+    #[serde(default)]
+    pub phase: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub ready_replicas: u32,
+}
+
+// ---------------------------------------------------------------------------
 // ContainerGroup — FluxVM Secure Containers workload, sibling to
 // VirtualMachine. Its `reconcile_container_group` (see reconcile.rs) is a
 // thin translator to fabric's own `/api/container-groups/*` REST API,
