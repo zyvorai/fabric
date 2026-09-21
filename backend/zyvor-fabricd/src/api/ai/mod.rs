@@ -13,22 +13,33 @@
 //! Hugging Face download, set `FLUXVM_AI_MODEL_DIR` to a verified local tree.
 
 pub mod autoscaling;
+pub mod backup;
 pub mod capacity;
 pub mod deployments;
 pub mod eligibility;
 pub mod endpoints;
+pub mod explain;
+pub mod federation;
+pub mod finops;
 pub mod gateway;
 pub mod gpus;
 pub mod ipam;
 pub mod keys;
 pub mod maglev;
 pub mod model_cache;
+pub mod model_jobs;
 pub mod models;
+pub mod nodes;
 pub mod placement;
+pub mod policy;
 pub mod profiles;
 pub mod reconcile;
+pub mod revisions;
 pub mod rollouts;
 pub mod routing;
+pub mod runtime;
+pub mod scheduler;
+pub mod sites;
 pub mod types;
 
 use crate::server::AppState;
@@ -38,6 +49,14 @@ pub(crate) const STORE_MODELS: &str = "ai_model_artifacts";
 pub(crate) const STORE_PROFILES: &str = "ai_inference_profiles";
 pub(crate) const STORE_DEPLOYMENTS: &str = "ai_inference_deployments";
 pub(crate) const STORE_ENDPOINTS: &str = "ai_inference_endpoints";
+pub(crate) const STORE_REVISIONS: &str = "ai_deployment_revisions";
+pub(crate) const STORE_REPLICA_SETS: &str = "ai_replica_sets";
+pub(crate) const STORE_ROLLOUTS: &str = "ai_rollouts";
+pub(crate) const STORE_MODEL_JOBS: &str = "ai_model_jobs";
+pub(crate) const STORE_NODES: &str = "ai_inference_nodes";
+pub(crate) const STORE_SITES: &str = "ai_sites";
+pub(crate) const STORE_POLICIES: &str = "ai_tenant_policies";
+pub(crate) const STORE_EDGE: &str = "ai_edge_snapshots";
 
 pub(crate) fn fluxvm_client(
     state: &AppState,

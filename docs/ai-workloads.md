@@ -11,6 +11,9 @@ and Agent Runtime fabric providers are included through Phase 6.
 |---|---|
 | Service Fabric Maglev | GA |
 | Fabric AI Workloads Phases 0–6 | **Preview** |
+| Revisioned rollouts, model jobs, gateway limits | **Preview 2** |
+| Multi-node GPU scheduler | **Preview** |
+| Multi-site federation, explain, policy, backup, vLLM-only runtime | **Preview** |
 | In-tree `flux-vm` multi-vCPU | Experimental until `scripts/test-kvm-smp-boot.sh` is green on lab hardware |
 | Machina local LLM | Separate roadmap product — not Fabric |
 
@@ -18,7 +21,7 @@ and Agent Runtime fabric providers are included through Phase 6.
 
 - One NVIDIA GPU per QEMU VM (dedicated VFIO passthrough)
 - Runtime: **vLLM** only
-- Model source: `hf://org/name` or a pre-staged host path. `revision` is stored on the artifact and is not yet passed to the downloader. Checksums for a directory are a sorted manifest (relative path, size, SHA-256), not the first file.
+- Model source: `hf://org/name` or a pre-staged host path. A model job passes the stored Hugging Face `revision` to the downloader and keeps bytes under `{state}/ai-models` by digest. Checksums for a directory are a sorted manifest (relative path, size, SHA-256), not the first file.
 - Endpoint: Maglev VIP → guest `:8000` (`/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`)
 - Readiness: Fabric HTTP `GET /health` before Maglev `Ready`
 - Manual + automatic replica scaling; drain on delete / maintenance
@@ -53,14 +56,30 @@ POST       /api/ai/deployments/{name}/scale
 PUT        /api/ai/deployments/{name}/autoscaling
 POST       /api/ai/deployments/{name}/drain
 POST       /api/ai/deployments/{name}/rollout
+POST       /api/ai/deployments/{name}/rollouts
+POST       /api/ai/deployments/{name}/rollouts/{id}/pause|resume|promote|rollback
+GET/POST   /api/ai/deployments/{name}/revisions
+GET        /api/ai/deployments/{name}/revisions/{revision}
 GET        /api/ai/deployments/{name}/metrics
 GET/POST   /api/ai/endpoints
 GET/DELETE /api/ai/endpoints/{name}
 GET/POST   /api/ai/keys
 DELETE     /api/ai/keys/{id}
 GET        /api/ai/gpus
+GET/POST   /api/ai/nodes
+GET        /api/ai/nodes/{id}
+POST       /api/ai/nodes/{id}/heartbeat
+GET/POST   /api/ai/sites
+GET        /api/ai/sites/{id}
+GET        /api/ai/explain/placement/{deployment}
+POST       /api/ai/policies
+POST       /api/ai/backup
+POST       /api/ai/restore
 GET        /api/ai/capacity
 GET        /api/ai/events
+GET        /api/ai/model-jobs
+POST       /api/ai/models/{name}/materialize
+GET        /api/ai/models/{name}/status
 ANY        /api/ai/openai/{endpoint}[/{path}]   # API-key OpenAI gateway (no JWT)
 ```
 
@@ -197,9 +216,33 @@ absent, including a delete that returns 404. If Maglev is still present, or
 FluxVM cannot be reached, the endpoint stays `Deleting` and the VIP is kept. Prefixes larger than /16, and IPv6, stay on the
 Rivora controller.
 
-## Autoscaling and rollouts (Phase 3)
+## Autoscaling and rollouts (Preview 2)
 
-Rollouts are **experimental scaffolding**. The API stores a strategy and bumps `revision`, but there is no revision identity and no promotion or rollback controller. Maturity stays **Preview**.
+Creating a deployment writes revision 1 and one replica set. `status.replicas` stays the union of every replica set, so the gateway and console keep reading one list. A rollout is a stored record (`strategy`, `from_revision`, `to_revision`, `max_surge`, `max_unavailable`, `phase`) advanced by the 15-second reconciler under the deployment lease. A restart continues that phase instead of starting over.
+
+Rolling update adds one new-revision replica, bounded by `max_surge`, waits until it has been ready for the minimum healthy duration, gives it Maglev weight, then drains one old replica, bounded by `max_unavailable`. A failed new replica does not remove the last ready replica of the previous revision. When every replica is on the new revision, the old revision is `Superseded`.
+
+Canary uses a separate replica set and the steps 5% / 300s, 20% / 600s, 50% / 900s, and 100%. Maglev weight is the step weight on the new revision versus the old one. The rollout pauses when the mean error rate or time-to-first-token exceeds the rollback thresholds. `pause`, `resume`, `promote`, and `rollback` continue, finish, or restore the previous revision. Rollback sets the previous revision back to `Active`, restores its Maglev weights, and stops the new set. It does not delete the last healthy old replica.
+
+Blue/green builds the full new replica set, then switches weights in one save. The old set stays until the rollback window ends.
+
+Maturity stays **Preview**. Phases 11–17 below are records and gates, not a production cloud.
+
+## Multi-node scheduler (Phase 10)
+
+Register hosts with `POST /api/ai/nodes`. Each node reports site, failure domain, GPUs, free CPU and memory, cached models, and taints. `POST /api/ai/nodes/{id}/heartbeat` refreshes it. A heartbeat older than 60 seconds marks the node offline for scheduling.
+
+Placement is filter then score: ready state, no taints, residency, free NVIDIA VRAM, then cache hit, preferred site, and failure-domain spread. The same inputs pick the same node. When no nodes are registered, replicas still land on the local FluxVM inventory. A chosen GPU that this FluxVM process does not have is not started here. A replica on an offline node is replaced only when another ready node exists, so the last healthy replica is kept when nothing else can take it.
+
+MIG, NVLink topology, and a per-node agent are not in this slice. An unhealthy GPU or a MIG slice that does not match the request is not scheduled.
+
+## Sites, policy, and the rest of the roadmap (Phases 11–17)
+
+`POST /api/ai/sites` records a site. Routing spills from a saturated preferred site only to `failover_sites`, and never to a site outside `residency`. `minimum_sites` and `max_replicas_per_site` are enforced by the scheduler. A disconnected site may keep serving a snapshot until `fail_closed_unix` (`edge_may_serve`).
+
+`GET /api/ai/explain/placement/{deployment}` returns the chosen node and why the others were rejected. `POST /api/ai/policies` is a tenant allow-list for model name and source prefix; no policy means the existing tenant filter still applies. `POST /api/ai/backup` and `POST /api/ai/restore` copy desired-state JSON, not model bytes.
+
+Chargeback is `gpu_seconds` and `token_charge` on recorded usage. The only launchable runtime is vLLM; TensorRT-LLM, Triton, and llama.cpp fail closed. This is not Beta or GA: there is no three-node consensus, OIDC, MIG reconfiguration, Kubernetes admission webhooks, or a second inference runtime.
 
 ```text
 Scale out when:
@@ -254,13 +297,13 @@ stays **Preview**.
 
 - Per-tenant model / endpoint scoping (existing RBAC + tenant filters)
 - `POST /api/ai/keys` — HMAC-SHA256 with `FLUXVM_AI_KEY_HMAC_SECRET` (a preview default is used when unset). Plaintext is returned once. `GET /api/ai/keys` does not include `secret_hash`
-- Lifetime `request_quota` only. The increment flocks the key file so two fabricd processes cannot both consume the last request. Requests per minute, tokens, and concurrency limits are not enforced yet
+- Lifetime `request_quota`, plus optional per-key `tokens_per_minute` and `max_concurrent`. The gateway updates the key file under the same exclusive lock as the lifetime quota. In-flight count drops when the client cancels or the upstream stream ends. If the upstream usage object is missing, the request's `max_tokens` is the token count (or 1). Distributed counters across nodes are not in this slice
 - `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file
 - Model paths are canonicalized and must stay under `FLUXVM_AI_MODEL_DIR` or `{state}/ai-models`
 - `license` + `residency` metadata on models; residency copied to deployments. When an endpoint sets `residency`, replicas with no `site` are excluded
 - `InferenceProfile.gpu.count` must be 1
-- Deployment `revision` increments on scale / drain / rollout / autoscale. Rollout strategy is stored only; see the experimental note above
-- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images. `revision` is stored and is not passed to the downloader yet
+- Deployment revision 1 is written at create. Later revisions and replica sets are the rollout record described above
+- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images. Model jobs run outside the HTTP request: `Registered`, `Resolving`, `Downloading`, `Verifying`, `Ready`, or `Failed` with a durable message and retry count. A second job for the same digest joins the first. A partial file is resumed. The job is refused when free disk is below the declared size. `GET /api/ai/model-jobs` and `GET /api/ai/models/{name}/status` report that state. `POST /api/ai/models/{name}/materialize` only records a job
 
 ## Multi-site (Phase 5)
 

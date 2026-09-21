@@ -407,6 +407,15 @@ mod tests {
             cost_tier: None,
             draining: false,
             unhealthy_streak: 0,
+            deployment: String::new(),
+            revision: 0,
+            model_digest: String::new(),
+            profile_digest: String::new(),
+            host: String::new(),
+            generation: 0,
+            lifecycle: String::new(),
+            health: String::new(),
+            created_at: None,
         }
     }
 

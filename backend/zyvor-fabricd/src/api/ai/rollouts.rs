@@ -117,12 +117,33 @@ pub async fn rollout_deployment(
         ));
     }
 
+    let to_revision = dep.revision.saturating_add(1);
+    let model_name = req
+        .target_model
+        .clone()
+        .unwrap_or_else(|| dep.model.clone());
+    let rev = super::types::InferenceDeploymentRevision {
+        id: super::revisions::revision_id(&dep.name, to_revision),
+        deployment: dep.name.clone(),
+        revision: to_revision,
+        model: model_name,
+        model_digest: String::new(),
+        profile: dep.profile.clone(),
+        runtime_config_digest: String::new(),
+        desired_replicas: dep.replicas,
+        created_at: Utc::now(),
+        state: super::types::RevisionState::Pending,
+    };
+    state
+        .store
+        .save_entity(super::STORE_REVISIONS, &rev.id, &rev)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     let canary = if matches!(req.strategy, RolloutStrategy::Canary) {
         req.canary_percent.clamp(1, 50)
     } else {
         0
     };
-
     dep.rollout = Some(RolloutSpec {
         strategy: req.strategy,
         canary_percent: canary,
@@ -130,46 +151,42 @@ pub async fn rollout_deployment(
         rollback_error_rate: req.rollback_error_rate,
         rollback_ttft_ms: req.rollback_ttft_ms,
     });
+    let steps = if matches!(req.strategy, RolloutStrategy::Canary) {
+        super::revisions::default_canary_steps()
+    } else {
+        vec![]
+    };
+    let run = super::types::RolloutRun {
+        id: format!("{}--rollout-{}", dep.name, to_revision),
+        deployment: dep.name.clone(),
+        strategy: req.strategy,
+        from_revision: dep.revision,
+        to_revision,
+        max_surge: 1,
+        max_unavailable: 1,
+        min_ready_secs: 0,
+        phase: super::types::RolloutPhase::Progressing,
+        step_index: 0,
+        steps,
+        rollback_error_rate: req.rollback_error_rate,
+        rollback_ttft_ms: req.rollback_ttft_ms,
+        rollback_window_secs: 600,
+        step_started_unix: 0,
+        promoted_at: None,
+        message: Some("rollout persisted; controller will resume".into()),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    state
+        .store
+        .save_entity(super::STORE_ROLLOUTS, &run.id, &run)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    if let Some(ref m) = req.target_model {
-        dep.model = m.clone();
-    }
-
-    // Canary / blue-green: weight half the fleet down so new replicas get traffic.
-    match req.strategy {
-        RolloutStrategy::Canary => {
-            let n = dep.status.replicas.len();
-            if n > 0 {
-                let canary_n = ((n as u32 * u32::from(canary)) / 100).max(1) as usize;
-                for (i, rep) in dep.status.replicas.iter_mut().enumerate() {
-                    if i < canary_n {
-                        rep.maglev_weight = Some(32);
-                    } else {
-                        rep.maglev_weight = Some(1);
-                    }
-                }
-            }
-            dep.status.phase = "Canary".into();
-            dep.status.message = Some(format!("canary {canary}% traffic on new revision"));
-        }
-        RolloutStrategy::BlueGreen => {
-            for rep in &mut dep.status.replicas {
-                rep.draining = true;
-                rep.maglev_weight = Some(1);
-            }
-            // Scale up by current count to bring up green, then drain blue.
-            let green = dep.replicas.max(1);
-            dep.replicas = dep.replicas.saturating_add(green);
-            dep.status.phase = "BlueGreen".into();
-            dep.status.message = Some("blue/green: scaling green fleet".into());
-        }
-        RolloutStrategy::Rolling => {
-            dep.status.phase = "Rolling".into();
-            dep.status.message = Some("rolling update enqueued".into());
-        }
-    }
-
-    dep.revision = dep.revision.saturating_add(1);
+    dep.status.phase = "Rolling".into();
+    dep.status.message = Some(format!(
+        "rollout {} -> {} persisted",
+        run.from_revision, run.to_revision
+    ));
     dep.updated = Utc::now();
     state
         .store
@@ -256,7 +273,170 @@ async fn drain_endpoints_for(
     Ok(())
 }
 
-fn load_scoped(
+pub(crate) async fn set_rollout_phase(
+    state: &AppState,
+    claims: &security::Claims,
+    deployment: &str,
+    id: &str,
+    phase: super::types::RolloutPhase,
+) -> Result<Json<super::types::RolloutRun>, (StatusCode, Json<serde_json::Value>)> {
+    let _ = load_scoped(state, claims, deployment)?;
+    let mut run = state
+        .store
+        .get_entity::<super::types::RolloutRun>(super::STORE_ROLLOUTS, id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "rollout not found"))?;
+    if run.deployment != deployment {
+        return Err(err(StatusCode::NOT_FOUND, "rollout not found"));
+    }
+    run.phase = phase;
+    run.updated_at = Utc::now();
+    state
+        .store
+        .save_entity(super::STORE_ROLLOUTS, id, &run)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(run))
+}
+
+/// POST /api/ai/deployments/{name}/rollouts
+pub async fn create_rollout(
+    claims: RequireWrite,
+    state: State<Arc<AppState>>,
+    name: Path<String>,
+    Json(body): Json<super::types::CreateRolloutBody>,
+) -> Result<Json<InferenceDeployment>, (StatusCode, Json<serde_json::Value>)> {
+    let req = RolloutRequest {
+        strategy: body.strategy,
+        canary_percent: body.steps.first().map(|s| s.weight).unwrap_or(5),
+        target_model: body.target_model,
+        rollback_error_rate: body.rollback_error_rate,
+        rollback_ttft_ms: body.rollback_ttft_ms,
+    };
+    rollout_deployment(claims, state, name, Json(req)).await
+}
+
+pub async fn pause_rollout(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, id)): Path<(String, String)>,
+) -> Result<Json<super::types::RolloutRun>, (StatusCode, Json<serde_json::Value>)> {
+    set_rollout_phase(
+        &state,
+        &claims,
+        &name,
+        &id,
+        super::types::RolloutPhase::Paused,
+    )
+    .await
+}
+
+pub async fn resume_rollout(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, id)): Path<(String, String)>,
+) -> Result<Json<super::types::RolloutRun>, (StatusCode, Json<serde_json::Value>)> {
+    set_rollout_phase(
+        &state,
+        &claims,
+        &name,
+        &id,
+        super::types::RolloutPhase::Progressing,
+    )
+    .await
+}
+
+pub async fn promote_rollout(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, id)): Path<(String, String)>,
+) -> Result<Json<super::types::RolloutRun>, (StatusCode, Json<serde_json::Value>)> {
+    let mut run = set_rollout_phase(
+        &state,
+        &claims,
+        &name,
+        &id,
+        super::types::RolloutPhase::Succeeded,
+    )
+    .await?
+    .0;
+    if let Ok(Some(mut dep)) = state
+        .store
+        .get_entity::<InferenceDeployment>(STORE_DEPLOYMENTS, &name)
+    {
+        if let Some(rev) = super::revisions::list_revisions(&state, &name)
+            .into_iter()
+            .find(|r| r.revision == run.to_revision)
+        {
+            dep.model = rev.model;
+            dep.revision = rev.revision;
+        }
+        for rep in &mut dep.status.replicas {
+            if rep.revision == run.to_revision {
+                rep.draining = false;
+                rep.maglev_weight = Some(32);
+            } else if rep.revision == run.from_revision {
+                rep.draining = true;
+                rep.maglev_weight = Some(1);
+            }
+        }
+        dep.updated = Utc::now();
+        let _ = state.store.save_entity(STORE_DEPLOYMENTS, &dep.name, &dep);
+        super::revisions::note_revision_states(
+            &state,
+            &name,
+            run.from_revision,
+            run.to_revision,
+            super::types::RevisionState::Superseded,
+            super::types::RevisionState::Active,
+        );
+    }
+    run.promoted_at = Some(Utc::now());
+    run.message = Some("promoted".into());
+    let _ = state.store.save_entity(super::STORE_ROLLOUTS, &id, &run);
+    Ok(Json(run))
+}
+
+pub async fn rollback_rollout(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, id)): Path<(String, String)>,
+) -> Result<Json<super::types::RolloutRun>, (StatusCode, Json<serde_json::Value>)> {
+    let mut run = set_rollout_phase(
+        &state,
+        &claims,
+        &name,
+        &id,
+        super::types::RolloutPhase::RollingBack,
+    )
+    .await?
+    .0;
+    if let Ok(Some(mut dep)) = state
+        .store
+        .get_entity::<InferenceDeployment>(STORE_DEPLOYMENTS, &name)
+    {
+        super::revisions::restore_old_weights(
+            &mut dep.status.replicas,
+            run.from_revision,
+            run.to_revision,
+        );
+        dep.revision = run.from_revision;
+        dep.updated = Utc::now();
+        let _ = state.store.save_entity(STORE_DEPLOYMENTS, &dep.name, &dep);
+        super::revisions::note_revision_states(
+            &state,
+            &name,
+            run.from_revision,
+            run.to_revision,
+            super::types::RevisionState::Active,
+            super::types::RevisionState::RollingBack,
+        );
+    }
+    run.message = Some("previous revision restored".into());
+    let _ = state.store.save_entity(super::STORE_ROLLOUTS, &id, &run);
+    Ok(Json(run))
+}
+
+pub(crate) fn load_scoped(
     state: &AppState,
     claims: &security::Claims,
     name: &str,
@@ -294,6 +474,10 @@ mod tests {
             revision: 0,
             preferred_site: None,
             residency: None,
+            allowed_sites: vec![],
+            failover_sites: vec![],
+            minimum_sites: 0,
+            max_replicas_per_site: 0,
             status: crate::api::ai::types::InferenceDeploymentStatus {
                 phase: "Ready".into(),
                 replicas: vec![InferenceReplica {
@@ -313,6 +497,15 @@ mod tests {
                     cost_tier: None,
                     draining: false,
                     unhealthy_streak: 0,
+                    deployment: String::new(),
+                    revision: 0,
+                    model_digest: String::new(),
+                    profile_digest: String::new(),
+                    host: String::new(),
+                    generation: 0,
+                    lifecycle: String::new(),
+                    health: String::new(),
+                    created_at: None,
                 }],
                 message: None,
             },

@@ -40,6 +40,12 @@ sleep 3
 echo "== status =="
 PHASE1=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
 echo "phase=$PHASE1"
+REV1=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME/revisions" "${auth[@]}" | jq -r '.[0].revision')
+echo "revision=$REV1"
+if [[ "$REV1" != "1" ]]; then
+  echo "expected revision 1, got $REV1"
+  exit 1
+fi
 if [[ -n "${FABRICD_BIN:-}" && -n "${FABRICD_PIDFILE:-}" ]]; then
   restart_fabricd() {
     echo "== restart fabricd =="

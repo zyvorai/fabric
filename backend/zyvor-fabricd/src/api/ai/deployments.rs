@@ -185,6 +185,10 @@ pub async fn create_deployment(
         revision: 1,
         preferred_site: req.preferred_site,
         residency: req.residency.or(model.residency.clone()),
+        allowed_sites: req.allowed_sites,
+        failover_sites: req.failover_sites,
+        minimum_sites: req.minimum_sites,
+        max_replicas_per_site: req.max_replicas_per_site,
         status: InferenceDeploymentStatus {
             phase: "Pending".into(),
             replicas: vec![],
@@ -194,10 +198,17 @@ pub async fn create_deployment(
         updated: now,
     };
 
+    super::policy::enforce(&state, dep.tenant.as_deref(), &model.name, &model.source)
+        .map_err(|e| err(StatusCode::FORBIDDEN, e))?;
+
     state
         .store
         .save_entity(STORE_DEPLOYMENTS, &dep.name, &dep)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let digest = model.checksum.clone().unwrap_or_default();
+    super::revisions::seed_revision(&state, &dep, &digest)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     reconcile::enqueue_deployment_reconcile(state.clone(), dep.name.clone());
 

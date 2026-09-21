@@ -15,7 +15,7 @@ use std::sync::Arc;
 use crate::server::AppState;
 
 use super::types::{CreateModelArtifactRequest, ModelArtifact, TenantQuery};
-use super::{audit, err, model_cache, STORE_MODELS};
+use super::{audit, err, STORE_MODELS};
 
 /// GET /api/ai/models
 pub async fn list_models(
@@ -88,7 +88,6 @@ pub async fn create_model(
         ));
     }
 
-    let state_dir = std::path::PathBuf::from(&state.config.storage.path);
     if req.require_checksum
         && req
             .checksum
@@ -101,41 +100,16 @@ pub async fn create_model(
             "require_checksum is set but no checksum was provided",
         ));
     }
-    let (local_path, verified) = match model_cache::materialize_model(
-        &req.name,
-        &req.source,
-        req.checksum.as_deref(),
-        &state_dir,
-    ) {
-        Ok((path, hex)) => {
-            if req.require_checksum && hex.is_none() {
-                return Err(err(
-                    StatusCode::BAD_REQUEST,
-                    "checksum verification required but could not be completed",
-                ));
-            }
-            (Some(path.to_string_lossy().into_owned()), hex)
-        }
-        Err(e) if req.source.starts_with("hf://") && !req.require_checksum => {
-            // Allow registering the artifact without a host download so the
-            // REST layer can be smoke-tested GPU-less; reconcile will fail
-            // clearly until FLUXVM_AI_MODEL_DIR or huggingface-cli is set.
-            tracing::warn!("model '{}' materialize deferred: {e}", req.name);
-            (None, None)
-        }
-        Err(e) => return Err(err(StatusCode::BAD_REQUEST, e)),
-    };
-
     let now = Utc::now();
-    let model = ModelArtifact {
+    let mut model = ModelArtifact {
         name: req.name.clone(),
-        source: req.source,
+        source: req.source.clone(),
         revision: req.revision,
-        checksum: verified.or(req.checksum),
+        checksum: req.checksum,
         format: req.format,
         size_bytes: req.size_bytes,
         tenant: req.tenant,
-        local_path,
+        local_path: None,
         license: req.license,
         residency: req.residency,
         require_checksum: req.require_checksum,
@@ -147,6 +121,27 @@ pub async fn create_model(
         .store
         .save_entity(STORE_MODELS, &model.name, &model)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let job = super::model_jobs::register(&state, &model)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    if super::model_jobs::source_is_local(&model.source) {
+        if let Some(done) = super::model_jobs::drive_until_terminal(&state, &job.id) {
+            if done.state == super::types::ModelJobState::Failed {
+                let _ = state.store.delete_entity(STORE_MODELS, &model.name);
+                let _ = state.store.delete_entity(super::STORE_MODEL_JOBS, &job.id);
+                return Err(err(
+                    StatusCode::BAD_REQUEST,
+                    done.message.unwrap_or_else(|| "model job failed".into()),
+                ));
+            }
+        }
+        if let Ok(Some(saved)) = state
+            .store
+            .get_entity::<ModelArtifact>(STORE_MODELS, &model.name)
+        {
+            model = saved;
+        }
+    }
 
     audit(
         &state,

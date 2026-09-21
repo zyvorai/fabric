@@ -120,14 +120,23 @@ async fn gateway_inner(
         }
     }
 
-    key = keys::consume_request(state, &key.id).await.map_err(|e| {
-        let status = if e.contains("quota") {
-            StatusCode::TOO_MANY_REQUESTS
-        } else {
-            StatusCode::INTERNAL_SERVER_ERROR
-        };
-        (status, e)
-    })?;
+    let (parts, body) = req.into_parts();
+    let body_bytes = axum::body::to_bytes(body, 1024 * 1024)
+        .await
+        .unwrap_or_default();
+    let tokens = keys::requested_tokens(&body_bytes);
+    key = keys::consume_request(state, &key.id, tokens)
+        .await
+        .map_err(|e| {
+            let status = if e.contains("quota") || e.contains("token") || e.contains("concurrency")
+            {
+                StatusCode::TOO_MANY_REQUESTS
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, e)
+        })?;
+    let req = Request::from_parts(parts, Body::from(body_bytes.clone()));
 
     let resource = format!("ai/openai/{endpoint_name}/{path}");
     audit(
@@ -151,9 +160,6 @@ async fn gateway_inner(
     };
 
     if dry_run {
-        let body_bytes = axum::body::to_bytes(req.into_body(), 1024 * 1024)
-            .await
-            .unwrap_or_default();
         audit(
             state,
             &format!("apikey:{}", key.prefix),
@@ -161,6 +167,7 @@ async fn gateway_inner(
             &resource,
             "SUCCESS",
         );
+        keys::release_concurrency(state, &key.id);
         return Ok(dry_run_response(
             &method,
             &upstream_path,
@@ -169,7 +176,16 @@ async fn gateway_inner(
         ));
     }
 
-    let proxied = proxy_upstream(&method, &ep, &dep, &upstream_path, req).await;
+    let proxied = proxy_upstream(
+        &method,
+        &ep,
+        &dep,
+        &upstream_path,
+        req,
+        state.store.clone(),
+        key.id.clone(),
+    )
+    .await;
     let outcome = match &proxied {
         Ok(resp) if resp.status().is_success() => "SUCCESS",
         _ => "FAILED",
@@ -184,13 +200,27 @@ async fn gateway_inner(
     proxied
 }
 
+struct ConcurrencyGuard {
+    store: state_store::StateStore,
+    key_id: String,
+}
+
+impl Drop for ConcurrencyGuard {
+    fn drop(&mut self) {
+        keys::release_concurrency_store(&self.store, &self.key_id);
+    }
+}
+
 async fn proxy_upstream(
     method: &Method,
     ep: &InferenceEndpoint,
     dep: &InferenceDeployment,
     upstream_path: &str,
     req: Request,
+    store: state_store::StateStore,
+    key_id: String,
 ) -> Result<Response, (StatusCode, String)> {
+    let guard = ConcurrencyGuard { store, key_id };
     let target = resolve_upstream(ep, dep).ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "no ready inference backend (set VIP or wait for replicas)".into(),
@@ -229,6 +259,7 @@ async fn proxy_upstream(
     }
     let idle = idle_timeout();
     let stream = async_stream::stream! {
+        let _guard = guard;
         let mut chunks = upstream_resp.bytes_stream();
         loop {
             match tokio::time::timeout(idle, chunks.next()).await {
@@ -409,7 +440,12 @@ mod tests {
             secret_hash: "h".into(),
             prefix: "fvai_".into(),
             request_quota: Some(2),
+            tokens_per_minute: None,
+            max_concurrent: None,
             requests_used: 2,
+            tokens_used_window: 0,
+            window_started_unix: 0,
+            inflight: 0,
             created: Utc::now(),
             last_used: None,
         };

@@ -322,6 +322,11 @@ impl Server {
             "ai_reconcile_controller",
             crate::api::ai::reconcile::run_ai_reconcile_controller
         );
+        spawn_bg!(
+            self.state,
+            "ai_model_jobs",
+            crate::api::ai::model_jobs::run_model_job_controller
+        );
 
         let handle = axum_server::Handle::new();
         let shutdown_handle = handle.clone();
@@ -1217,6 +1222,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::ai::models::get_model).delete(api::ai::models::delete_model),
         )
         .route(
+            "/ai/models/{name}/materialize",
+            post(api::ai::model_jobs::materialize),
+        )
+        .route(
+            "/ai/models/{name}/status",
+            get(api::ai::model_jobs::model_status),
+        )
+        .route("/ai/model-jobs", get(api::ai::model_jobs::list_jobs))
+        .route(
             "/ai/profiles",
             get(api::ai::profiles::list_profiles).post(api::ai::profiles::create_profile),
         )
@@ -1251,6 +1265,35 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(api::ai::rollouts::rollout_deployment),
         )
         .route(
+            "/ai/deployments/{name}/revisions",
+            get(api::ai::revisions::list_deployment_revisions)
+                .post(api::ai::revisions::create_revision),
+        )
+        .route(
+            "/ai/deployments/{name}/revisions/{revision}",
+            get(api::ai::revisions::get_revision),
+        )
+        .route(
+            "/ai/deployments/{name}/rollouts",
+            post(api::ai::rollouts::create_rollout),
+        )
+        .route(
+            "/ai/deployments/{name}/rollouts/{id}/pause",
+            post(api::ai::rollouts::pause_rollout),
+        )
+        .route(
+            "/ai/deployments/{name}/rollouts/{id}/resume",
+            post(api::ai::rollouts::resume_rollout),
+        )
+        .route(
+            "/ai/deployments/{name}/rollouts/{id}/promote",
+            post(api::ai::rollouts::promote_rollout),
+        )
+        .route(
+            "/ai/deployments/{name}/rollouts/{id}/rollback",
+            post(api::ai::rollouts::rollback_rollout),
+        )
+        .route(
             "/ai/deployments/{name}/metrics",
             get(api::ai::deployments::deployment_metrics),
         )
@@ -1263,6 +1306,24 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::ai::endpoints::get_endpoint).delete(api::ai::endpoints::delete_endpoint),
         )
         .route("/ai/gpus", get(api::ai::gpus::list_gpus))
+        .route(
+            "/ai/nodes",
+            get(api::ai::nodes::list_nodes).post(api::ai::nodes::create_node),
+        )
+        .route("/ai/nodes/{id}", get(api::ai::nodes::get_node))
+        .route("/ai/nodes/{id}/heartbeat", post(api::ai::nodes::heartbeat))
+        .route(
+            "/ai/sites",
+            get(api::ai::sites::list_sites).post(api::ai::sites::put_site),
+        )
+        .route("/ai/sites/{id}", get(api::ai::sites::get_site))
+        .route(
+            "/ai/explain/placement/{deployment}",
+            get(api::ai::explain::explain_placement),
+        )
+        .route("/ai/policies", post(api::ai::policy::put_policy))
+        .route("/ai/backup", post(api::ai::backup::export_state))
+        .route("/ai/restore", post(api::ai::backup::restore_state))
         .route("/ai/capacity", get(api::ai::capacity::capacity))
         .route("/ai/events", get(api::ai::capacity::events))
         .route(

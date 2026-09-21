@@ -37,6 +37,7 @@ base64 = "0.23"
 jsonwebtoken = { version = "11", features = ["aws_lc_rs"] }
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std", "tls12"] }
 async-stream = "0.3"
+libc = "0.2"
 tokio-stream = "0.1"
 tokio-util = "0.7"
 

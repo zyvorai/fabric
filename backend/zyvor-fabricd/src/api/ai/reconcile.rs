@@ -30,7 +30,9 @@ use super::placement::place_gpus;
 use super::types::{
     InferenceDeployment, InferenceEndpoint, InferenceProfile, InferenceReplica, ModelArtifact,
 };
-use super::{fluxvm_client, STORE_DEPLOYMENTS, STORE_ENDPOINTS, STORE_MODELS, STORE_PROFILES};
+use super::{
+    fluxvm_client, STORE_DEPLOYMENTS, STORE_ENDPOINTS, STORE_MODELS, STORE_NODES, STORE_PROFILES,
+};
 
 const GUEST_MODEL_PATH: &str = "/models";
 const VLLM_UNIT_PATH: &str = "/etc/systemd/system/vllm.service";
@@ -170,6 +172,7 @@ pub fn is_retryable_fluxvm(error: &str) -> bool {
         || lower.contains("connect")
         || lower.contains("temporarily")
         || lower.contains("lease held")
+        || lower.contains("no local_path")
 }
 
 pub fn is_hard_failure(error: &str) -> bool {
@@ -276,6 +279,22 @@ pub fn enqueue_endpoint_reconcile(state: Arc<AppState>, name: String) {
     });
 }
 
+/// Mean error rate and time-to-first-token across ready replicas that have metrics.
+pub fn mean_replica_signals(replicas: &[InferenceReplica]) -> (f64, f64) {
+    let ready: Vec<_> = replicas
+        .iter()
+        .filter(|r| r.ready)
+        .filter_map(|r| r.metrics.as_ref())
+        .collect();
+    if ready.is_empty() {
+        return (0.0, 0.0);
+    }
+    let n = ready.len() as f64;
+    let err = ready.iter().map(|m| m.http_error_rate).sum::<f64>() / n;
+    let ttft = ready.iter().map(|m| m.ttft_ms).sum::<f64>() / n;
+    (err, ttft)
+}
+
 pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), String> {
     let mut dep: InferenceDeployment = state
         .store
@@ -298,6 +317,7 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
                 .into(),
         );
     }
+    super::runtime::require_supported(&profile.runtime)?;
 
     let model: ModelArtifact = state
         .store
@@ -310,15 +330,30 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
         .clone()
         .ok_or_else(|| "model has no local_path; re-create ModelArtifact".to_string())?;
 
-    // Scale down first.
-    while dep.status.replicas.len() > dep.replicas as usize {
-        let Some(victim) = dep.status.replicas.pop() else {
-            break;
-        };
-        if let Err(e) = remove_replica(state, &dep, &victim).await {
-            tracing::warn!("scale-down replica {}: {e}", victim.vm_name);
-            dep.status.replicas.push(victim);
-            break;
+    replace_replicas_on_lost_nodes(state, &mut dep).await;
+
+    // Scale down first. A rollout keeps the previous replica set, and extra
+    // replicas are chosen from the revision that is no longer current.
+    let now_unix = Utc::now().timestamp();
+    let retain = super::revisions::latest_rollout(state, &dep.name)
+        .as_ref()
+        .is_some_and(|run| super::revisions::retain_second_fleet(run, now_unix));
+    if !retain {
+        while dep.status.replicas.len() > dep.replicas as usize {
+            let idx = dep
+                .status
+                .replicas
+                .iter()
+                .rposition(|r| r.revision != 0 && r.revision != dep.revision)
+                .unwrap_or(dep.status.replicas.len() - 1);
+            let victim = dep.status.replicas.remove(idx);
+            if let Err(e) = remove_replica(state, &dep, &victim).await {
+                tracing::warn!("scale-down replica {}: {e}", victim.vm_name);
+                dep.status
+                    .replicas
+                    .insert(idx.min(dep.status.replicas.len()), victim);
+                break;
+            }
         }
     }
 
@@ -390,6 +425,108 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
         if dry_run { " (FLUXVM_AI_DRY_RUN)" } else { "" }
     ));
     dep.updated = Utc::now();
+    super::revisions::sync_replica_sets(state, &mut dep);
+    if let Some(mut run) = super::revisions::active_rollout(state, &dep.name) {
+        if matches!(
+            run.strategy,
+            super::types::RolloutStrategy::BlueGreen | super::types::RolloutStrategy::Canary
+        ) {
+            let mut new_count = dep
+                .status
+                .replicas
+                .iter()
+                .filter(|r| r.revision == run.to_revision)
+                .count();
+            let cap = (dep.replicas as usize).saturating_mul(2);
+            while new_count < dep.replicas as usize && dep.status.replicas.len() < cap {
+                let ordinal = next_replica_ordinal(&dep.status.replicas);
+                match create_replica(state, &dep, &profile, &model_host, ordinal, dry_run).await {
+                    Ok(mut rep) => {
+                        rep.revision = run.to_revision;
+                        rep.deployment = dep.name.clone();
+                        dep.status.replicas.push(rep);
+                        new_count += 1;
+                    }
+                    Err(e) => {
+                        dep.status.message = Some(e);
+                        break;
+                    }
+                }
+            }
+        }
+        let (mean_error, mean_ttft) = mean_replica_signals(&dep.status.replicas);
+        let promote = super::revisions::advance_rollout(
+            &mut run,
+            &mut dep.status.replicas,
+            Utc::now().timestamp(),
+            dep.replicas,
+            mean_error,
+            mean_ttft,
+        );
+        if promote {
+            if let Some(rev) = super::revisions::list_revisions(state, &dep.name)
+                .into_iter()
+                .find(|r| r.revision == run.to_revision)
+            {
+                dep.model = rev.model;
+                dep.revision = rev.revision;
+            }
+            super::revisions::note_revision_states(
+                state,
+                &dep.name,
+                run.from_revision,
+                run.to_revision,
+                super::types::RevisionState::Superseded,
+                super::types::RevisionState::Active,
+            );
+        }
+        run.updated_at = Utc::now();
+        let _ = state
+            .store
+            .save_entity(super::STORE_ROLLOUTS, &run.id, &run);
+        if run.message.as_deref() == Some("create one new-revision replica")
+            && dep.status.replicas.len() < dep.replicas as usize + run.max_surge.max(1) as usize
+        {
+            dep.status.message = run.message.clone();
+            let ordinal = next_replica_ordinal(&dep.status.replicas);
+            if let Ok(mut rep) =
+                create_replica(state, &dep, &profile, &model_host, ordinal, dry_run).await
+            {
+                rep.revision = run.to_revision;
+                rep.deployment = dep.name.clone();
+                dep.status.replicas.push(rep);
+            }
+        } else if run.message.as_deref() == Some("remove one drained old replica") {
+            if let Some(idx) = dep
+                .status
+                .replicas
+                .iter()
+                .position(|r| r.revision == run.from_revision && r.draining)
+            {
+                let victim = dep.status.replicas.remove(idx);
+                if super::revisions::protect_last_healthy(
+                    dep.status
+                        .replicas
+                        .iter()
+                        .filter(|r| r.revision == run.from_revision && r.ready && !r.draining)
+                        .count() as u32,
+                    dep.status
+                        .replicas
+                        .iter()
+                        .filter(|r| r.revision == run.to_revision && r.ready)
+                        .count() as u32,
+                ) {
+                    dep.status.replicas.insert(idx, victim);
+                } else if let Err(e) = remove_replica(state, &dep, &victim).await {
+                    tracing::warn!("rollout remove {}: {e}", victim.vm_name);
+                    dep.status.replicas.insert(idx, victim);
+                }
+            }
+        } else if let Some(msg) = run.message.clone() {
+            dep.status.message = Some(msg);
+        }
+        super::revisions::sync_replica_sets(state, &mut dep);
+    }
     state
         .store
         .save_entity(STORE_DEPLOYMENTS, &dep.name, &dep)
@@ -405,6 +542,96 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
     }
 
     Ok(())
+}
+
+fn registered_nodes(state: &AppState) -> Vec<super::types::InferenceNode> {
+    state.store.list_entities(STORE_NODES).unwrap_or_default()
+}
+
+fn site_replica_counts(
+    dep: &InferenceDeployment,
+    nodes: &[super::types::InferenceNode],
+) -> Vec<(String, u32)> {
+    let mut counts: Vec<(String, u32)> = Vec::new();
+    for rep in &dep.status.replicas {
+        let site = rep.site.clone().filter(|s| !s.is_empty()).or_else(|| {
+            nodes
+                .iter()
+                .find(|n| n.id == rep.host)
+                .map(|n| n.site.clone())
+                .filter(|s| !s.is_empty())
+        });
+        let Some(site) = site else { continue };
+        if let Some((_, n)) = counts.iter_mut().find(|(s, _)| s == &site) {
+            *n = n.saturating_add(1);
+        } else {
+            counts.push((site, 1));
+        }
+    }
+    counts
+}
+
+pub(crate) fn schedule_request(
+    state: &AppState,
+    dep: &InferenceDeployment,
+    profile: &InferenceProfile,
+) -> super::scheduler::ScheduleRequest {
+    let nodes = registered_nodes(state);
+    let deployments: Vec<InferenceDeployment> = state
+        .store
+        .list_entities(STORE_DEPLOYMENTS)
+        .unwrap_or_default();
+    let mut allocated = Vec::new();
+    for other in &deployments {
+        for rep in &other.status.replicas {
+            if !rep.host.is_empty() && !rep.bdf.is_empty() {
+                allocated.push((rep.host.clone(), rep.bdf.clone()));
+            }
+        }
+    }
+    let occupied_domains = dep
+        .status
+        .replicas
+        .iter()
+        .filter_map(|rep| nodes.iter().find(|n| n.id == rep.host))
+        .map(|n| n.failure_domain.clone())
+        .filter(|d| !d.is_empty())
+        .collect();
+    super::scheduler::ScheduleRequest {
+        vendor: profile.gpu.vendor.clone(),
+        minimum_vram_gib: profile.gpu.minimum_vram_gib,
+        preferred_site: dep.preferred_site.clone(),
+        residency: dep.residency.clone(),
+        model: dep.model.clone(),
+        cpu: profile.cpu,
+        memory_gib: profile.memory_gib,
+        allocated,
+        occupied_domains,
+        allowed_sites: dep.allowed_sites.clone(),
+        max_replicas_per_site: dep.max_replicas_per_site,
+        site_counts: site_replica_counts(dep, &nodes),
+        mig_profile: String::new(),
+    }
+}
+
+async fn replace_replicas_on_lost_nodes(state: &AppState, dep: &mut InferenceDeployment) {
+    let nodes = registered_nodes(state);
+    if nodes.is_empty() {
+        return;
+    }
+    let now = Utc::now().timestamp();
+    let mut kept = Vec::new();
+    for rep in std::mem::take(&mut dep.status.replicas) {
+        if super::scheduler::should_replace_lost(&nodes, &rep.host, now) {
+            if let Err(e) = remove_replica(state, dep, &rep).await {
+                tracing::warn!("node-loss replace {}: {e}", rep.vm_name);
+                kept.push(rep);
+            }
+        } else {
+            kept.push(rep);
+        }
+    }
+    dep.status.replicas = kept;
 }
 
 async fn create_replica(
@@ -433,6 +660,19 @@ async fn create_replica(
 
     let inventory = client.list_host_gpus().await.unwrap_or_default();
     let gpu_req = profile.gpu.clone();
+    let scheduled = super::scheduler::decide(
+        &registered_nodes(state),
+        &schedule_request(state, dep, profile),
+        Utc::now().timestamp(),
+    )?;
+    let scheduled_host = match &scheduled {
+        super::scheduler::Placement::Legacy => String::new(),
+        super::scheduler::Placement::Chosen(choice) => choice.node_id.clone(),
+    };
+    let scheduled_bdf = match &scheduled {
+        super::scheduler::Placement::Legacy => None,
+        super::scheduler::Placement::Chosen(choice) => Some(choice.bdf.clone()),
+    };
 
     if dry_run {
         let site = dep
@@ -443,7 +683,7 @@ async fn create_replica(
             replica_id,
             ordinal,
             vm_name,
-            bdf: format!("dry-run-{ordinal}"),
+            bdf: scheduled_bdf.unwrap_or_else(|| format!("dry-run-{ordinal}")),
             ready: true,
             address: Some(format!("10.255.0.{}", ordinal + 1)),
             metrics: None,
@@ -452,6 +692,15 @@ async fn create_replica(
             cost_tier: Some(1),
             draining: false,
             unhealthy_streak: 0,
+            deployment: String::new(),
+            revision: 0,
+            model_digest: String::new(),
+            profile_digest: String::new(),
+            host: scheduled_host,
+            generation: 0,
+            lifecycle: String::new(),
+            health: String::new(),
+            created_at: None,
         });
     }
 
@@ -461,10 +710,24 @@ async fn create_replica(
                 .into(),
         );
     }
+    if let Some(ref want) = scheduled_bdf {
+        if !inventory.iter().any(|g| g.bdf.eq_ignore_ascii_case(want)) {
+            return Err(format!(
+                "scheduled onto node {scheduled_host} GPU {want}, which this FluxVM inventory does not have"
+            ));
+        }
+    }
 
     let mut reserved: Option<(String, Option<u32>)> = None;
     for _ in 0..32 {
-        let allocated = allocated_bdfs(state);
+        let mut allocated = allocated_bdfs(state);
+        if let Some(ref want) = scheduled_bdf {
+            for gpu in &inventory {
+                if !gpu.bdf.eq_ignore_ascii_case(want) {
+                    allocated.insert(gpu.bdf.to_ascii_lowercase());
+                }
+            }
+        }
         let picked = place_gpus(&inventory, &gpu_req, &allocated)?;
         let gpu = &picked[0];
         let bdf = gpu.bdf.clone();
@@ -642,6 +905,15 @@ async fn create_replica(
         cost_tier: Some(1),
         draining: false,
         unhealthy_streak: 0,
+        deployment: dep.name.clone(),
+        revision: 0,
+        model_digest: String::new(),
+        profile_digest: String::new(),
+        host: scheduled_host,
+        generation: 0,
+        lifecycle: "provisioning".into(),
+        health: "unknown".into(),
+        created_at: Some(Utc::now()),
     })
 }
 
@@ -1316,6 +1588,15 @@ mod tests {
             cost_tier: None,
             draining: false,
             unhealthy_streak: 3,
+            deployment: "dep".into(),
+            revision: 1,
+            model_digest: String::new(),
+            profile_digest: String::new(),
+            host: String::new(),
+            generation: 1,
+            lifecycle: "ready".into(),
+            health: "unhealthy".into(),
+            created_at: None,
         }
     }
 

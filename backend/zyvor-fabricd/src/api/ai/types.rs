@@ -18,6 +18,10 @@ fn default_port() -> u16 {
 fn default_one_u32() -> u32 {
     1
 }
+
+fn default_true() -> bool {
+    true
+}
 fn default_gpus_per_replica() -> u32 {
     1
 }
@@ -172,6 +176,226 @@ fn default_drain_grace() -> u64 {
     30
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RevisionState {
+    #[default]
+    Pending,
+    Provisioning,
+    Testing,
+    Active,
+    Superseded,
+    RollingBack,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InferenceDeploymentRevision {
+    pub id: String,
+    pub deployment: String,
+    pub revision: u64,
+    pub model: String,
+    pub model_digest: String,
+    pub profile: String,
+    pub runtime_config_digest: String,
+    pub desired_replicas: u32,
+    pub created_at: DateTime<Utc>,
+    pub state: RevisionState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InferenceReplicaSet {
+    pub id: String,
+    pub deployment: String,
+    pub revision: u64,
+    pub desired: u32,
+    pub ready: u32,
+    pub replicas: Vec<InferenceReplica>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanaryStep {
+    pub weight: u8,
+    pub duration_secs: u64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RolloutPhase {
+    #[default]
+    Progressing,
+    Paused,
+    Succeeded,
+    RollingBack,
+    Failed,
+}
+
+/// Persisted rollout. A restart continues `phase` instead of starting over.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RolloutRun {
+    pub id: String,
+    pub deployment: String,
+    pub strategy: RolloutStrategy,
+    pub from_revision: u64,
+    pub to_revision: u64,
+    pub max_surge: u32,
+    pub max_unavailable: u32,
+    pub min_ready_secs: u64,
+    pub phase: RolloutPhase,
+    pub step_index: u32,
+    pub steps: Vec<CanaryStep>,
+    pub rollback_error_rate: f64,
+    pub rollback_ttft_ms: f64,
+    #[serde(default)]
+    pub rollback_window_secs: u64,
+    /// Unix time when the current canary step started. A restart keeps this
+    /// so the step duration is not restarted.
+    #[serde(default)]
+    pub step_started_unix: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub promoted_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRevisionRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRolloutBody {
+    #[serde(default)]
+    pub strategy: RolloutStrategy,
+    #[serde(default)]
+    pub target_model: Option<String>,
+    #[serde(default)]
+    pub max_surge: Option<u32>,
+    #[serde(default)]
+    pub max_unavailable: Option<u32>,
+    #[serde(default)]
+    pub steps: Vec<CanaryStep>,
+    #[serde(default = "default_error_rate")]
+    pub rollback_error_rate: f64,
+    #[serde(default = "default_ttft_ms")]
+    pub rollback_ttft_ms: f64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelJobState {
+    Registered,
+    Resolving,
+    Downloading,
+    Verifying,
+    Ready,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelJob {
+    pub id: String,
+    pub model: String,
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
+    pub state: ModelJobState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub retries: u32,
+    #[serde(default)]
+    pub bytes_written: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub joined_job: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// A Fabric host that can run an inference VM. Heartbeats expire.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeState {
+    Joining,
+    Ready,
+    Draining,
+    Maintenance,
+    Offline,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeGpu {
+    pub bdf: String,
+    #[serde(default = "default_nvidia")]
+    pub vendor: String,
+    #[serde(default)]
+    pub vram_gib: u32,
+    #[serde(default)]
+    pub model: String,
+    /// Unhealthy devices are quarantined and not scheduled.
+    #[serde(default = "default_true")]
+    pub healthy: bool,
+    /// Empty means a full GPU. A non-empty value is the required MIG slice.
+    #[serde(default)]
+    pub mig_profile: String,
+}
+
+fn default_nvidia() -> String {
+    "nvidia".into()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InferenceNode {
+    pub id: String,
+    #[serde(default)]
+    pub site: String,
+    #[serde(default)]
+    pub failure_domain: String,
+    pub state: NodeState,
+    /// Unix seconds. `0` means the declared state is used as-is.
+    #[serde(default)]
+    pub heartbeat_unix: i64,
+    #[serde(default)]
+    pub gpus: Vec<NodeGpu>,
+    #[serde(default)]
+    pub taints: Vec<String>,
+    /// `0` means the node did not report a CPU remainder.
+    #[serde(default)]
+    pub cpu_free: u32,
+    #[serde(default)]
+    pub memory_gib_free: u32,
+    #[serde(default)]
+    pub cached_models: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateNodeRequest {
+    pub id: String,
+    #[serde(default)]
+    pub site: String,
+    #[serde(default)]
+    pub failure_domain: String,
+    #[serde(default)]
+    pub gpus: Vec<NodeGpu>,
+    #[serde(default)]
+    pub taints: Vec<String>,
+    #[serde(default)]
+    pub cpu_free: u32,
+    #[serde(default)]
+    pub memory_gib_free: u32,
+    #[serde(default)]
+    pub cached_models: Vec<String>,
+}
+
 /// Per-endpoint API key (Phase 4). Secret is stored hashed; plaintext returned once.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InferenceApiKey {
@@ -191,8 +415,20 @@ pub struct InferenceApiKey {
     pub prefix: String,
     #[serde(default)]
     pub request_quota: Option<u64>,
+    /// Optional tokens admitted per 60-second window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_per_minute: Option<u64>,
+    /// Optional in-flight request cap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_concurrent: Option<u32>,
     #[serde(default)]
     pub requests_used: u64,
+    #[serde(default)]
+    pub tokens_used_window: u64,
+    #[serde(default)]
+    pub window_started_unix: i64,
+    #[serde(default)]
+    pub inflight: u32,
     pub created: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_used: Option<DateTime<Utc>>,
@@ -208,6 +444,10 @@ pub struct CreateApiKeyRequest {
     pub tenant: Option<String>,
     #[serde(default)]
     pub request_quota: Option<u64>,
+    #[serde(default)]
+    pub tokens_per_minute: Option<u64>,
+    #[serde(default)]
+    pub max_concurrent: Option<u32>,
 }
 
 /// API view of an inference key. `secret_hash` is never serialized.
@@ -223,6 +463,10 @@ pub struct InferenceApiKeyView {
     pub prefix: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_quota: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_per_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_concurrent: Option<u32>,
     pub requests_used: u64,
     pub created: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -239,6 +483,8 @@ impl From<&InferenceApiKey> for InferenceApiKeyView {
             tenant: key.tenant.clone(),
             prefix: key.prefix.clone(),
             request_quota: key.request_quota,
+            tokens_per_minute: key.tokens_per_minute,
+            max_concurrent: key.max_concurrent,
             requests_used: key.requests_used,
             created: key.created,
             last_used: key.last_used,
@@ -405,6 +651,28 @@ pub struct InferenceReplica {
     /// Consecutive failed health probes. Three replaces the replica.
     #[serde(default)]
     pub unhealthy_streak: u32,
+    /// Parent deployment name. Empty on records written before revisions.
+    #[serde(default)]
+    pub deployment: String,
+    /// Revision this replica belongs to.
+    #[serde(default)]
+    pub revision: u64,
+    #[serde(default)]
+    pub model_digest: String,
+    #[serde(default)]
+    pub profile_digest: String,
+    #[serde(default)]
+    pub host: String,
+    #[serde(default)]
+    pub generation: u64,
+    /// pending, provisioning, ready, draining, failed, superseded.
+    #[serde(default)]
+    pub lifecycle: String,
+    /// healthy, unhealthy, unknown.
+    #[serde(default)]
+    pub health: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -443,6 +711,16 @@ pub struct InferenceDeployment {
     /// Data-residency constraint — never place outside this tag.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub residency: Option<String>,
+    /// Empty means every site that matches residency is allowed.
+    #[serde(default)]
+    pub allowed_sites: Vec<String>,
+    #[serde(default)]
+    pub failover_sites: Vec<String>,
+    #[serde(default)]
+    pub minimum_sites: u32,
+    /// `0` means no per-site replica cap.
+    #[serde(default)]
+    pub max_replicas_per_site: u32,
     #[serde(default)]
     pub status: InferenceDeploymentStatus,
     pub created: DateTime<Utc>,
@@ -464,6 +742,14 @@ pub struct CreateInferenceDeploymentRequest {
     pub preferred_site: Option<String>,
     #[serde(default)]
     pub residency: Option<String>,
+    #[serde(default)]
+    pub allowed_sites: Vec<String>,
+    #[serde(default)]
+    pub failover_sites: Vec<String>,
+    #[serde(default)]
+    pub minimum_sites: u32,
+    #[serde(default)]
+    pub max_replicas_per_site: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]

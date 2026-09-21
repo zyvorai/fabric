@@ -91,7 +91,12 @@ pub async fn create_key(
         secret_hash,
         prefix: secret.chars().take(8).collect(),
         request_quota: req.request_quota,
+        tokens_per_minute: req.tokens_per_minute,
+        max_concurrent: req.max_concurrent,
         requests_used: 0,
+        tokens_used_window: 0,
+        window_started_unix: 0,
+        inflight: 0,
         created: now,
         last_used: None,
     };
@@ -174,19 +179,71 @@ pub fn try_reserve_quota(used: u64, quota: Option<u64>) -> Result<u64, ()> {
 
 /// Re-read the key under its lock, reject when the lifetime quota is spent,
 /// then increment and persist before the gateway proxies.
-pub async fn consume_request(state: &AppState, key_id: &str) -> Result<InferenceApiKey, String> {
+pub async fn consume_request(
+    state: &AppState,
+    key_id: &str,
+    requested_tokens: u64,
+) -> Result<InferenceApiKey, String> {
     let lock = key_lock(key_id);
     let _guard = lock.lock().await;
+    let now = Utc::now().timestamp();
     let key = state
         .store
-        .update_entity_exclusive(STORE_API_KEYS, key_id, |mut key: InferenceApiKey| {
-            key.requests_used = try_reserve_quota(key.requests_used, key.request_quota)
-                .map_err(|_| "API key request quota exceeded".to_string())?;
-            key.last_used = Some(Utc::now());
-            Ok::<_, String>(key)
+        .update_entity_exclusive(STORE_API_KEYS, key_id, |key: InferenceApiKey| {
+            admit_limits(key, now, requested_tokens.max(1))
         })
         .map_err(|e| e.to_string())?;
     Ok(key)
+}
+
+pub fn release_concurrency(state: &AppState, key_id: &str) {
+    release_concurrency_store(&state.store, key_id);
+}
+
+pub fn release_concurrency_store(store: &state_store::StateStore, key_id: &str) {
+    let _ = store.update_entity_exclusive(STORE_API_KEYS, key_id, |mut key: InferenceApiKey| {
+        key.inflight = key.inflight.saturating_sub(1);
+        Ok::<_, String>(key)
+    });
+}
+
+/// Store-backed token window and in-flight cap. Not a process-local counter.
+pub fn admit_limits(
+    mut key: InferenceApiKey,
+    now_unix: i64,
+    requested_tokens: u64,
+) -> Result<InferenceApiKey, String> {
+    if now_unix.saturating_sub(key.window_started_unix) >= 60 {
+        key.window_started_unix = now_unix;
+        key.tokens_used_window = 0;
+    }
+    if let Some(limit) = key.tokens_per_minute {
+        if key.tokens_used_window.saturating_add(requested_tokens) > limit {
+            return Err("API key token rate exceeded".into());
+        }
+        key.tokens_used_window = key.tokens_used_window.saturating_add(requested_tokens);
+    }
+    if let Some(max) = key.max_concurrent {
+        if key.inflight >= max {
+            return Err("API key concurrency exceeded".into());
+        }
+    }
+    key.inflight = key.inflight.saturating_add(1);
+    key.requests_used = try_reserve_quota(key.requests_used, key.request_quota)
+        .map_err(|_| "API key request quota exceeded".to_string())?;
+    key.last_used = Some(Utc::now());
+    Ok(key)
+}
+
+pub fn requested_tokens(body: &[u8]) -> u64 {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return 1;
+    };
+    value
+        .get("max_tokens")
+        .and_then(|v| v.as_u64())
+        .filter(|n| *n > 0)
+        .unwrap_or(1)
 }
 
 /// Validate a bearer token: prefix lookup, then a constant-time HMAC compare.
@@ -262,7 +319,12 @@ mod tests {
             secret_hash: "deadbeef".into(),
             prefix: "fvai_abc".into(),
             request_quota: Some(2),
+            tokens_per_minute: None,
+            max_concurrent: None,
             requests_used: 0,
+            tokens_used_window: 0,
+            window_started_unix: 0,
+            inflight: 0,
             created: Utc::now(),
             last_used: None,
         };
@@ -277,5 +339,32 @@ mod tests {
         used = try_reserve_quota(used, Some(2)).unwrap();
         used = try_reserve_quota(used, Some(2)).unwrap();
         assert!(try_reserve_quota(used, Some(2)).is_err());
+    }
+
+    #[test]
+    fn token_and_concurrency_limits_are_exclusive() {
+        let mut key = InferenceApiKey {
+            id: "aik_1".into(),
+            name: "n".into(),
+            endpoint: "e".into(),
+            model: None,
+            tenant: None,
+            secret_hash: "h".into(),
+            prefix: "fvai_abc".into(),
+            request_quota: None,
+            tokens_per_minute: Some(10),
+            max_concurrent: Some(1),
+            requests_used: 0,
+            tokens_used_window: 0,
+            window_started_unix: 1_000,
+            inflight: 0,
+            created: Utc::now(),
+            last_used: None,
+        };
+        key = admit_limits(key, 1_010, 4).unwrap();
+        assert_eq!(key.tokens_used_window, 4);
+        assert_eq!(key.inflight, 1);
+        assert!(admit_limits(key, 1_020, 1).is_err());
+        assert_eq!(requested_tokens(br#"{"max_tokens":16}"#), 16);
     }
 }

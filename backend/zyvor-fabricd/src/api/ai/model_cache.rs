@@ -14,14 +14,15 @@ use std::path::{Path, PathBuf};
 /// Resolve a host-local model directory for `source`.
 ///
 /// The resolved path must stay under `FLUXVM_AI_MODEL_DIR` or
-/// `{state_dir}/ai-models` after canonicalization. `revision` on the
-/// artifact is stored by the API and is not passed to the downloader yet.
+/// `{state_dir}/ai-models` after canonicalization. `revision` is forwarded
+/// to `huggingface-cli download --revision` for `hf://` sources.
 ///
 /// Returns `(local_path, verified_checksum_hex)`.
 pub fn materialize_model(
     name: &str,
     source: &str,
     checksum: Option<&str>,
+    revision: Option<&str>,
     state_dir: &Path,
 ) -> Result<(PathBuf, Option<String>), String> {
     if let Ok(stub) = std::env::var("FLUXVM_AI_MODEL_DIR") {
@@ -60,7 +61,7 @@ pub fn materialize_model(
     if let Some(repo) = source.strip_prefix("hf://") {
         let dest = state_dir.join("ai-models").join(sanitize_name(name));
         std::fs::create_dir_all(&dest).map_err(|e| format!("mkdir {}: {e}", dest.display()))?;
-        download_hf(repo, &dest)?;
+        download_hf(repo, &dest, revision)?;
         let dest = confine(&dest, state_dir)?;
         let verified = verify_checksum_if_requested(&dest, checksum)?;
         return Ok((dest, verified));
@@ -101,7 +102,7 @@ fn allowed_roots(state_dir: &Path) -> Vec<PathBuf> {
     roots
 }
 
-fn sanitize_name(name: &str) -> String {
+pub(crate) fn sanitize_name(name: &str) -> String {
     name.chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
@@ -113,13 +114,17 @@ fn sanitize_name(name: &str) -> String {
         .collect()
 }
 
-fn download_hf(repo: &str, dest: &Path) -> Result<(), String> {
-    // `ModelArtifact.revision` is stored on the record and is not forwarded
-    // here yet. Prefer huggingface-cli when present; otherwise leave a marker
-    // so the reconciler can surface a clear "model not ready" message without
+fn download_hf(repo: &str, dest: &Path, revision: Option<&str>) -> Result<(), String> {
+    // Prefer huggingface-cli when present; otherwise leave a marker so the
+    // reconciler can surface a clear "model not ready" message without
     // pulling multi-GB blobs during unit tests / GPU-less smoke tests.
-    let status = std::process::Command::new("huggingface-cli")
-        .args(["download", repo, "--local-dir", &dest.to_string_lossy()])
+    // An existing partial directory is left in place so the CLI can resume.
+    let mut cmd = std::process::Command::new("huggingface-cli");
+    cmd.args(["download", repo, "--local-dir", &dest.to_string_lossy()]);
+    if let Some(rev) = revision.map(str::trim).filter(|s| !s.is_empty()) {
+        cmd.args(["--revision", rev]);
+    }
+    let status = cmd
         .env("HF_TOKEN", std::env::var("HF_TOKEN").unwrap_or_default())
         .status();
 
@@ -259,6 +264,7 @@ mod tests {
             "mistral",
             "hf://mistralai/Mistral-7B-v0.1",
             None,
+            None,
             Path::new("/tmp"),
         )
         .unwrap();
@@ -271,7 +277,8 @@ mod tests {
         let _guard = model_env_lock().lock().unwrap();
         std::env::remove_var("FLUXVM_AI_MODEL_DIR");
         let state = tempfile::tempdir().unwrap();
-        let err = materialize_model("x", "file:///etc/passwd", None, state.path()).unwrap_err();
+        let err =
+            materialize_model("x", "file:///etc/passwd", None, None, state.path()).unwrap_err();
         assert!(err.contains("outside"), "{err}");
     }
 
@@ -285,7 +292,7 @@ mod tests {
         let file = models.join("w.bin");
         std::fs::write(&file, b"abc").unwrap();
         let source = format!("file://{}", file.display());
-        let (path, _) = materialize_model("x", &source, None, state.path()).unwrap();
+        let (path, _) = materialize_model("x", &source, None, None, state.path()).unwrap();
         assert!(path.ends_with("w.bin"));
     }
 
