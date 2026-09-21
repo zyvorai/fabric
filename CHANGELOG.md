@@ -29,7 +29,9 @@
   GitHub Actions `ai-workloads.yml` covers unit tests, dry-run smoke, the
   admit webhook Helm templates, and Agent Runtime credential tests.
   Maglev accepts an IP hostport from a Janus replica and skips the upsert
-  when every ready replica is a Janus device so the gateway can proxy alone.
+  when every ready replica is a Janus or `dry-run-*` device so the gateway
+  can proxy alone. Lab k3s can enable the InferenceDeployment admit webhook
+  against host fabricd with the chart `admissionWebhook` values.
   See [docs/ai-workloads.md](docs/ai-workloads.md).
 - **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
   Networking / Meta, with emoji section markers), `--color auto|always|never`,

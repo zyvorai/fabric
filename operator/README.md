@@ -32,7 +32,10 @@ helm upgrade --install zyvor-fabricd-operator ./operator/charts/zyvor-fabricd-op
 # Optional InferenceDeployment admit webhook (off by default):
 #   --set admissionWebhook.enabled=true \
 #   --set admissionWebhook.token="$FLUXVM_AI_ADMIT_TOKEN" \
-#   --set admissionWebhook.fabricdUrl=https://zyvor-fabricd:9095
+#   --set admissionWebhook.fabricdUrl=https://NODE_IP:9095 \
+#   --set admissionWebhook.caBundle="$(base64 -w0 /etc/zyvor-fabricd/tls/server.crt)"
+# Lab k3s can install CRDs + webhook with replicaCount=0 so only admission
+# runs against fabricd on the host (no operator pod required for that check).
 ```
 
 ### Create a VM

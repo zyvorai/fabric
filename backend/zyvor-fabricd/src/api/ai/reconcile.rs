@@ -1083,16 +1083,19 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
     // only accepts IP backends, so an empty table means leave VIP reserved and
     // skip the FluxVM upsert instead of logging a 422 every tick. Janus BDFs
     // also skip Maglev even when the hostport parses as 127.0.0.1:port — the
-    // lab FluxVM dataplane is not the path for that simulator.
+    // lab FluxVM dataplane is not the path for that simulator. Dry-run BDFs
+    // (`dry-run-*`) are synthetic and must not hit Maglev either.
     let serving: Vec<_> = dep
         .status
         .replicas
         .iter()
         .filter(|r| super::eligibility::replica_serving(r))
         .collect();
-    let janus_only =
-        !serving.is_empty() && serving.iter().all(|r| super::janus::is_janus_bdf(&r.bdf));
-    if spec.backends.is_empty() || janus_only {
+    let skip_maglev = !serving.is_empty()
+        && serving.iter().all(|r| {
+            super::janus::is_janus_bdf(&r.bdf) || r.bdf.starts_with("dry-run-")
+        });
+    if spec.backends.is_empty() || skip_maglev {
         ep.vip = Some(vip);
         ep.updated = Utc::now();
         let _ = state.store.save_entity(STORE_ENDPOINTS, &ep.name, &ep);
