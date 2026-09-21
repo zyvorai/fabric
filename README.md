@@ -5,17 +5,18 @@
   <img src="web/public/zyvor-logo.png" alt="Zyvor Fabric" width="360">
 </picture>
 
-### Private cloud control plane for Linux — VMs, networking, storage, and security from one daemon.
+### Private cloud control plane for Linux — VMs, networking, storage, security, and AI inference from one daemon.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/zyvorai/fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ci.yml)
+[![AI Workloads](https://github.com/zyvorai/fabric/actions/workflows/ai-workloads.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ai-workloads.yml)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?logo=rust&logoColor=white)](backend/)
 [![React](https://img.shields.io/badge/react-19.2-61DAFB?logo=react&logoColor=white)](web/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-ready-326CE5?logo=kubernetes&logoColor=white)](docs/KUBERNETES.md)
 [![Built on FluxVM](https://img.shields.io/badge/VM%20engine-FluxVM-8a2be2)](https://github.com/zyvorai/fluxvm)
 [![Built on GuestKit](https://img.shields.io/badge/guest%20tooling-GuestKit-2ea44f)](https://github.com/zyvorai/guestkit)
 
-**[Quick start](#quick-start)** · **[Is this for you?](#is-this-for-you)** · **[Compare](docs/guides/decision-support/comparison-matrix.md)** · **[FAQ](docs/quick-reference/faq.md)** · **[Deploy](#deploy)** · **[Docs](#documentation)**
+**[Quick start](#quick-start)** · **[AI Workloads](#ai-workloads-beta)** · **[Is this for you?](#is-this-for-you)** · **[Compare](docs/guides/decision-support/comparison-matrix.md)** · **[FAQ](docs/quick-reference/faq.md)** · **[Deploy](#deploy)** · **[Docs](#documentation)**
 
 </div>
 
@@ -23,9 +24,9 @@
 
 ## What is Zyvor Fabric?
 
-**Zyvor Fabric** is a production-grade private cloud control plane for Linux. One 15MB Rust daemon (`zyvor-fabricd`) gives you VM lifecycle, software-defined networking, pluggable storage, and security policy — managed through four interfaces (**CLI, Web, Kubernetes operator, Terraform**) that all talk to the same API, so nothing drifts between them.
+**Zyvor Fabric** is a production-grade private cloud control plane for Linux. One ~15MB Rust daemon (`zyvor-fabricd`) gives you VM lifecycle, software-defined networking, pluggable storage, security policy, and **OpenAI-compatible AI inference** — managed through four interfaces (**CLI, Web, Kubernetes operator, Terraform**) that all talk to the same API, so nothing drifts between them.
 
-It targets the gap between two extremes: **manual QEMU/KVM + shell scripts** (no security, no multi-user access, doesn't scale) and **VMware/OpenStack-class stacks** (hundreds to thousands of packages, dedicated ops teams, days to stand up). Fabric deploys in about 5 minutes, runs on any Linux server with KVM — no vCenter, no systemd hard-requirement — and still ships the things enterprise buyers actually ask for: RBAC, audit logging, HA clustering, live migration, GPU passthrough, and a 780+-endpoint REST API for automation.
+It targets the gap between two extremes: **manual QEMU/KVM + shell scripts** (no security, no multi-user access, doesn't scale) and **VMware/OpenStack-class stacks** (hundreds to thousands of packages, dedicated ops teams, days to stand up). Fabric deploys in about 5 minutes, runs on any Linux server with KVM — no vCenter, no systemd hard-requirement — and still ships the things enterprise buyers actually ask for: RBAC, audit logging, HA clustering, live migration, GPU passthrough, Maglev load balancing, and a 780+-endpoint REST API for automation.
 
 Fabric doesn't implement VM execution itself — that's a deliberate design choice, not a gap. It's the orchestration, API, auth, and UX layer on top of two independent sibling projects: **[FluxVM](https://github.com/zyvorai/fluxvm)** (the VM engine) and **[GuestKit](https://github.com/zyvorai/guestkit)** (offline disk tooling). Each is independently useful, Apache-2.0 licensed, and separately adoptable.
 
@@ -70,6 +71,7 @@ zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 | Local eval with containers | `make docker-up` → [docs/DOCKER.md](docs/DOCKER.md) |
 | Bare-metal remote host | `./scripts/deploy remote USER@HOST` |
 | **Kubernetes (k3s lab / Helm)** | [`./scripts/deploy k8s USER@HOST`](#run-on-kubernetes) → [docs/KUBERNETES.md](docs/KUBERNETES.md) |
+| **AI inference (Beta)** | [Tutorial 15](docs/tutorials/15-ai-workloads.md) · [docs/ai-workloads.md](docs/ai-workloads.md) · console `/app/ai` |
 | Declarative VMs | `zyvorctl apply -f config.yaml` |
 | Terraform | [terraform-provider/](terraform-provider/) |
 | K8s operator (CRDs → API) | [operator/](operator/) |
@@ -99,6 +101,7 @@ curl -sf http://127.0.0.1:7788/readyz | jq .
 | Scripting vs. GUI is usually either/or | CLI (`zyvorctl`) + web console + Terraform + Kubernetes operator, all first-class |
 | Enterprise needs RBAC, audit, and encryption | JWT auth, 3-tier RBAC, audit export, encryption at rest |
 | GPU passthrough is bolted on elsewhere | Generic PCI/VFIO passthrough REST API on Linux KVM |
+| Inference needs a second control plane | **AI Workloads (Beta)** — models, Maglev backends, OpenAI gateway, Janus lab GPU or real NVIDIA VMs |
 | Guest images ship without your tooling | Offline image customization via [GuestKit](https://github.com/zyvorai/guestkit) |
 
 Full capability tour and metrics: **[docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md)**. Every feature, exhaustively: **[FEATURES.md](FEATURES.md)**.
@@ -113,6 +116,7 @@ Zyvor Fabric is a strong fit when:
 - **You need API-first automation** — a 780+-endpoint REST API for infrastructure-as-code, CI/CD pipelines, or custom tooling, not a GUI-only or XML-RPC-only product.
 - **You're running single-host or small-cluster deployments** — lightweight VM management without the operational overhead of full cluster orchestration platforms.
 - **You're security-conscious** — PAM/LDAP/OIDC authentication, role-based access control, audit logging, and network policy enforcement are built in, not bolted on.
+- **You want private inference next to the VMs** — register a model, deploy replicas, Maglev-weight them, and front them with API keys or `aud=fabric-inference` JWTs ([Tutorial 15](docs/tutorials/15-ai-workloads.md)).
 
 Look elsewhere when:
 
@@ -256,6 +260,34 @@ Fabric puts **operator UX (API · Web · CLI)** on top of FluxVM's **TC/eBPF VM-
 
 ---
 
+## AI Workloads (Beta)
+
+OpenAI-compatible inference on the same daemon — no separate AI control plane.
+
+| | |
+|---|---|
+| **Maturity** | Single-cluster **Beta** · multi-site HA store stays Preview · **not GA** |
+| **Console** | `/app/ai` — Models, Deployments, Endpoints, API keys, Nodes |
+| **CLI** | `zyvorctl ai model \| profile \| deploy \| endpoint \| key \| gpus \| node \| capacity` |
+| **Gateway** | `/api/ai/openai/{endpoint}/v1/chat/completions` |
+| **Lab without NVIDIA** | Set `FLUXVM_AI_JANUS_URL` — [Zyvor Janus](https://github.com/zyvorai/janus) is the virtual upstream |
+| **Real GPUs** | FluxVM inventory + VFIO VM + runtime image (`FLUXVM_AI_IMAGE`) |
+| **Runtimes** | `vllm`, `tensorrt-llm`, `triton`, `llama.cpp`, `tei` by default · deny/allow via env |
+| **MIG** | Janus records always · PCI via `FLUXVM_AI_PCI_MIG=1` |
+
+```bash
+zyvorctl ai model add demo-qwen --source hf://Qwen/Qwen3-8B
+zyvorctl ai profile add demo-24g --runtime vllm --gpu 1 --vram 24 --cpu 8 --memory 32
+zyvorctl ai deploy demo-qwen --profile demo-24g --replicas 1
+zyvorctl ai endpoint expose demo-qwen --openai-compatible
+zyvorctl ai key create demo-key --endpoint demo-qwen-openai
+# → POST $FABRIC_URL/api/ai/openai/demo-qwen-openai/v1/chat/completions
+```
+
+**Guides:** [Tutorial 15 — how to use](docs/tutorials/15-ai-workloads.md) · [Full reference](docs/ai-workloads.md) · [Website tutorial](https://zyvor.dev/docs/zyvor-fabric-manual/ai-workloads) · Lab smoke: `./scripts/smoke-ai-janus-lab.sh`
+
+---
+
 ## Platform at a glance
 
 | Metric | Value |
@@ -284,12 +316,14 @@ All figures above are counted directly from source (route definitions, router co
 | Naming / clone URL | [docs/NAMING.md](docs/NAMING.md) | | | Networking (SDN + modes) | [docs/networking.md](docs/networking.md) |
 | Product positioning | [docs/POSITIONING.md](docs/POSITIONING.md) | | | VM edge dataplane (Network Fabric v4) | [docs/network-fabric-architecture.md](docs/network-fabric-architecture.md) · [operator guide](docs/guides/vm-drivers/fluxvm-dataplane.md) |
 | Product overview + metrics | [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
-| Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | **AI Workloads (Preview 2)** | [docs/ai-workloads.md](docs/ai-workloads.md) |
-| FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
+| Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | **AI Workloads (Beta)** | [docs/ai-workloads.md](docs/ai-workloads.md) · [Tutorial 15](docs/tutorials/15-ai-workloads.md) |
+| FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | Agent Runtime | [agent-runtime/README.md](agent-runtime/README.md) · [Tutorials 11–14](docs/tutorials/README.md) |
+| | | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | | | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | | | | | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |
 | | | | | Host maintenance | [docs/host-lifecycle.md](docs/host-lifecycle.md) |
 | | | | | User manuals | [docs/user/README.md](docs/user/README.md) |
+| | | | | Tutorials index | [docs/tutorials/README.md](docs/tutorials/README.md) |
 | | | | | Governance / branch protection | [docs/GOVERNANCE.md](docs/GOVERNANCE.md) |
 | | | | | Project stats (generated) | [docs/generated/project-stats.md](docs/generated/project-stats.md) |
 | | | | | Full catalog | [docs/index.md](docs/index.md) |
