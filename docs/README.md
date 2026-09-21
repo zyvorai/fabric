@@ -20,7 +20,7 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 | **FluxVM VM driver** — config, capability matrix, gaps | [guides/vm-drivers/fluxvm.md](guides/vm-drivers/fluxvm.md) |
 | **VM edge dataplane** (Network Fabric schema v4) | [fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md) · [Tutorial 09](tutorials/09-edge-dataplane.md) |
 | **Service Fabric v6** (Maglev VIP LB + HA + identity/L7 policy) | [ebpf-service-fabric.md](ebpf-service-fabric.md) · [examples](examples/service-fabric-v3/) · [phase 5](service-fabric-phase5.md) · [phase 6](service-fabric-phase6.md) |
-| **AI Workloads** (Beta single cluster: Janus lab GPU, PCI MIG flag, admit webhook, rollouts, gateway limits, batch jobs, known runtimes) | [ai-workloads.md](ai-workloads.md) |
+| **AI Workloads** (Beta: Janus / NVIDIA, OpenAI gateway, MIG, admit) | [ai-workloads.md](ai-workloads.md) · [Tutorial 15](tutorials/15-ai-workloads.md) |
 | **Enterprise identity** (SCIM 2.0) | [scim-identity.md](scim-identity.md) |
 | **OpenStack compatibility** (Keystone/Nova/…) | [openstack-compat.md](openstack-compat.md) · [Tutorial 08](tutorials/08-openstack-clients.md) |
 | **Host maintenance evacuation** | [host-lifecycle.md](host-lifecycle.md) |

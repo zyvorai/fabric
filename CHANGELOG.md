@@ -41,7 +41,9 @@
   and delete are `zyvorctl ai node mig-create|mig-delete`.
   `scripts/smoke-ai-janus-lab.sh` covers health, chat, MIG, and admit on a
   Janus-enabled lab. Remote deploy also refreshes `/usr/local/bin/zyvorctl` so
-  lab PATH does not keep a stale binary.
+  lab PATH does not keep a stale binary. Operator docs include Tutorial 15
+  (`docs/tutorials/15-ai-workloads.md`) and the website manual page
+  `/docs/zyvor-fabric-manual/ai-workloads`.
   See [docs/ai-workloads.md](docs/ai-workloads.md).
 - **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
   Networking / Meta, with emoji section markers), `--color auto|always|never`,

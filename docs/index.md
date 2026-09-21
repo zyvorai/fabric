@@ -34,6 +34,7 @@ Step-by-step walkthroughs for common workflows.
 | [07 Logging & compliance](tutorials/07-logging-compliance.md) | Journals, scans, secrets |
 | [08 OpenStack Clients](tutorials/08-openstack-clients.md) | Drive Fabric with `openstack` CLI / curl (Keystone/Nova/…) |
 | [09 Edge dataplane](tutorials/09-edge-dataplane.md) | FluxVM Network Fabric via Fabric API / CLI / UI |
+| [15 AI Workloads](tutorials/15-ai-workloads.md) | OpenAI inference: Janus or NVIDIA, gateway, MIG (Beta) |
 | [OpenStack Compatibility reference](openstack-compat.md) | Endpoints, public URL, limitations |
 | [Proven infrastructure](proven-infra/README.md) | Compatibility matrix, SLOs, chaos, upgrade/rollback (#14–#17) |
 
@@ -485,12 +486,14 @@ InferenceProfile / InferenceDeployment / InferenceEndpoint, revisioned
 rollouts, Maglev weighting, gateway rate limits, an API-key (or
 `fabric-inference` JWT) OpenAI gateway at `/api/ai/openai/{endpoint}`, and an
 optional Janus stand-in when the host has no NVIDIA GPU. Console: `/app/ai`.
-Still a single-cluster preview.
+**Single-cluster Beta** (not GA). Multi-site HA store stays Preview.
 
 | Document | Description |
 |----------|-------------|
-| [ai-workloads.md](ai-workloads.md) | REST, CLI, Janus lab GPU, PCI MIG flag, admit webhook, phases 0–6 plus Beta gates, golden image, dry-run / CI smoke |
+| [ai-workloads.md](ai-workloads.md) | Full reference: REST, CLI, Janus, PCI MIG, admit, Raft, runtimes |
+| [Tutorial 15](tutorials/15-ai-workloads.md) | Operator how-to: model → chat → MIG |
 | [scripts/bake-ai-vllm-image.sh](../scripts/bake-ai-vllm-image.sh) | Bake CUDA + vLLM qcow2 |
+| [scripts/smoke-ai-janus-lab.sh](../scripts/smoke-ai-janus-lab.sh) | Lab smoke: health, chat, MIG, admit |
 | [terraform-provider/examples/ai-workloads](../terraform-provider/examples/ai-workloads/) | Terraform model/profile/deployment/endpoint |
 | [operator/examples/ai-inference-deployment.yaml](../operator/examples/ai-inference-deployment.yaml) | ModelArtifact + InferenceDeployment CRs |
 | [operator chart admissionWebhook](../operator/charts/zyvor-fabricd-operator/values.yaml) | Opt-in ValidatingWebhook for InferenceDeployment |

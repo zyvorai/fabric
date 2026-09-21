@@ -10,6 +10,45 @@ OTLP export, PCI MIG behind `FLUXVM_AI_PCI_MIG`, and known runtimes enabled by
 default. **Single-cluster AI Workloads are Beta.** Multi-site HA store stays Preview.
 Do not treat this as GA.
 
+## How to use (start here)
+
+Step-by-step operator walkthrough (Janus lab GPU **or** real NVIDIA):
+
+- **In-repo tutorial:** [tutorials/15-ai-workloads.md](tutorials/15-ai-workloads.md)
+- **Website tutorial:** https://zyvor.dev/docs/zyvor-fabric-manual/ai-workloads
+- **Blog intro:** https://zyvor.dev/blog/fabric-ai-workloads-tutorial
+- **Lab smoke:** `FABRIC_URL=https://127.0.0.1:9095 ./scripts/smoke-ai-janus-lab.sh`
+
+### Shortest path (CLI)
+
+```bash
+export FABRIC_URL=https://127.0.0.1:9095 ZYVOR_FABRIC_URL=$FABRIC_URL
+# Obtain ZYVOR_FABRIC_TOKEN via POST /api/auth/login (admin password file)
+
+zyvorctl ai gpus
+zyvorctl ai node list
+zyvorctl ai model add demo-qwen --source hf://Qwen/Qwen3-8B
+zyvorctl ai profile add demo-24g --runtime vllm --gpu 1 --vram 24 --cpu 8 --memory 32
+zyvorctl ai deploy demo-qwen --profile demo-24g --replicas 1
+# Leave preferred_site unset when only Janus GPUs exist (site=janus)
+zyvorctl ai endpoint expose demo-qwen --openai-compatible
+zyvorctl ai key create demo-key --endpoint demo-qwen-openai
+# Then: POST $FABRIC_URL/api/ai/openai/demo-qwen-openai/v1/chat/completions
+```
+
+### Console
+
+Open `/app/ai` after sign-in: **Models**, **Deployments**, **Endpoints**, **API keys**, **Nodes** (Janus inventory and MIG fields).
+
+### Runtimes and MIG
+
+| Topic | Behavior |
+|---|---|
+| Runtimes | `vllm`, `tensorrt-llm`, `triton`, `llama.cpp`, `tei` launch by default; `FLUXVM_AI_DENY_RUNTIMES` blocks; `FLUXVM_AI_ALLOW_RUNTIMES` is a strict allowlist when set |
+| Janus MIG | Record-only slices via `zyvorctl ai node mig-create` (no `nvidia-smi`) |
+| PCI MIG | Requires `FLUXVM_AI_PCI_MIG=1`; optional `FLUXVM_AI_PCI_MIG_RECORD_ONLY=1` without driver |
+| Raft | `FLUXVM_AI_RAFT_ID` / `PEERS` / `TOKEN` — three processes; rate counters and audit tip on the leader |
+
 ## Maturity
 
 | Capability | Status |
