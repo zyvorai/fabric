@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useCallback, useEffect, useState } from 'react'
-import { Bot, Cpu, KeyRound, Layers, Radio } from 'lucide-react'
+import { Bot, Cpu, KeyRound, Layers, Radio, Server } from 'lucide-react'
 import {
   FabricGpuView,
   InferenceApiKey,
   InferenceDeployment,
   InferenceEndpoint,
+  InferenceNode,
   InferenceProfile,
   ModelArtifact,
   listCapacity,
@@ -16,13 +17,14 @@ import {
   listGpus,
   listKeys,
   listModels,
+  listNodes,
   listProfiles,
 } from '../api/ai'
 import { PageHeader, EmptyState, Card } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 
-type Tab = 'models' | 'deployments' | 'endpoints' | 'keys' | 'gpus'
+type Tab = 'models' | 'deployments' | 'endpoints' | 'keys' | 'gpus' | 'nodes'
 
 export default function AiWorkloads() {
   const [tab, setTab] = useState<Tab>('deployments')
@@ -32,18 +34,20 @@ export default function AiWorkloads() {
   const [endpoints, setEndpoints] = useState<InferenceEndpoint[]>([])
   const [keys, setKeys] = useState<InferenceApiKey[]>([])
   const [gpus, setGpus] = useState<FabricGpuView[]>([])
+  const [nodes, setNodes] = useState<InferenceNode[]>([])
   const [capacity, setCapacity] = useState<Record<string, unknown> | null>(null)
   const { loading, loadError, run } = usePageLoader('Failed to load AI workloads')
 
   const load = useCallback(() => {
     return run(async () => {
-      const [m, p, d, e, k, g, c] = await Promise.all([
+      const [m, p, d, e, k, g, n, c] = await Promise.all([
         listModels(),
         listProfiles(),
         listDeployments(),
         listEndpoints(),
         listKeys(),
         listGpus(),
+        listNodes(),
         listCapacity(),
       ])
       setModels(Array.isArray(m) ? m : [])
@@ -53,6 +57,8 @@ export default function AiWorkloads() {
       setKeys(Array.isArray(k) ? k : [])
       const gItems = Array.isArray(g) ? g : (g as { items?: FabricGpuView[] }).items ?? []
       setGpus(gItems)
+      const nItems = Array.isArray(n) ? n : (n as { items?: InferenceNode[] }).items ?? []
+      setNodes(nItems)
       setCapacity(c && typeof c === 'object' ? (c as Record<string, unknown>) : null)
     })
   }, [run])
@@ -66,16 +72,32 @@ export default function AiWorkloads() {
     { id: 'deployments', label: 'Deployments', icon: Bot },
     { id: 'endpoints', label: 'Endpoints', icon: Radio },
     { id: 'keys', label: 'API keys', icon: KeyRound },
-    { id: 'gpus', label: 'GPUs', icon: Cpu },
+    { id: 'nodes', label: 'Nodes', icon: Server },
+    { id: 'gpus', label: 'Host GPUs', icon: Cpu },
   ]
 
   const gpusSummary = capacity?.gpus as { total?: number; free?: number; allocated?: number } | undefined
+  const nodeGpuRows = nodes.flatMap((node) =>
+    (node.gpus ?? []).map((gpu) => ({
+      key: `${node.id}:${gpu.bdf}`,
+      node: node.id,
+      site: node.site ?? '—',
+      state: node.state ?? '—',
+      bdf: gpu.bdf,
+      model: gpu.model ?? '—',
+      vram: gpu.vram_gib,
+      mig: gpu.mig_profile || (gpu.parent_bdf ? 'slice' : ''),
+      parent: gpu.parent_bdf || '',
+      healthy: gpu.healthy !== false,
+      janus: (gpu.bdf ?? '').startsWith('janus:') || (gpu.model ?? '').startsWith('janus:'),
+    })),
+  )
 
   return (
     <div>
       <PageHeader
         title="AI Workloads"
-        description="Preview: vLLM on NVIDIA GPU VMs, Maglev endpoints, autoscaling, and an API-key OpenAI gateway."
+        description="Preview: vLLM on NVIDIA GPU VMs, Maglev endpoints, optional Janus lab upstream, and an API-key OpenAI gateway."
         onRefresh={() => void load()}
         refreshing={loading}
       />
@@ -86,6 +108,7 @@ export default function AiWorkloads() {
           Capacity: {gpusSummary.free ?? '—'} free / {gpusSummary.total ?? '—'} GPUs
           {capacity?.dry_run ? ' · dry-run' : ''}
           {typeof capacity?.site === 'string' ? ` · site ${capacity.site}` : ''}
+          {nodes.length > 0 ? ` · ${nodes.length} inference node(s)` : ''}
         </p>
       )}
 
@@ -190,13 +213,13 @@ export default function AiWorkloads() {
                 </tr>
               </thead>
               <tbody>
-                {endpoints.map((e) => (
-                  <tr key={e.name} className="border-b border-[var(--zf-hairline)]">
-                    <td className="px-4 py-3 font-medium">{e.name}</td>
-                    <td className="px-4 py-3">{e.deployment}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{e.routing_strategy ?? '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{e.vip ?? '—'}:{e.port}</td>
-                    <td className="px-4 py-3 font-mono text-xs">/api/ai/openai/{e.name}</td>
+                {endpoints.map((ep) => (
+                  <tr key={ep.name} className="border-b border-[var(--zf-hairline)]">
+                    <td className="px-4 py-3 font-medium">{ep.name}</td>
+                    <td className="px-4 py-3">{ep.deployment}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{ep.routing_strategy ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{ep.vip ?? '—'}:{ep.port}</td>
+                    <td className="px-4 py-3 font-mono text-xs">/api/ai/openai/{ep.name}</td>
                   </tr>
                 ))}
               </tbody>
@@ -236,9 +259,50 @@ export default function AiWorkloads() {
         )
       )}
 
+      {tab === 'nodes' && (
+        nodeGpuRows.length === 0 ? (
+          <EmptyState
+            icon={<Server className="w-8 h-8" />}
+            title="No inference nodes"
+            description="Set FLUXVM_AI_JANUS_URL for a lab GPU stand-in, or POST /api/ai/nodes for a real host."
+          />
+        ) : (
+          <Card className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[var(--zf-muted)] border-b border-[var(--zf-hairline)]">
+                  <th className="px-4 py-3">Node</th>
+                  <th className="px-4 py-3">Site</th>
+                  <th className="px-4 py-3">State</th>
+                  <th className="px-4 py-3">BDF</th>
+                  <th className="px-4 py-3">Model</th>
+                  <th className="px-4 py-3">VRAM</th>
+                  <th className="px-4 py-3">MIG</th>
+                  <th className="px-4 py-3">Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nodeGpuRows.map((row) => (
+                  <tr key={row.key} className="border-b border-[var(--zf-hairline)]">
+                    <td className="px-4 py-3 font-medium">{row.node}</td>
+                    <td className="px-4 py-3">{row.site}</td>
+                    <td className="px-4 py-3">{row.state}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{row.bdf}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{row.model}</td>
+                    <td className="px-4 py-3">{row.vram != null ? `${row.vram} GiB` : '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{row.mig || '—'}</td>
+                    <td className="px-4 py-3">{row.janus ? 'janus' : row.healthy ? 'pci' : 'unhealthy'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )
+      )}
+
       {tab === 'gpus' && (
         gpus.length === 0 ? (
-          <EmptyState icon={<Cpu className="w-8 h-8" />} title="No host GPUs" description="FluxVM inventory empty — set FLUXVM_AI_DRY_RUN=1 for REST smoke without NVIDIA." />
+          <EmptyState icon={<Cpu className="w-8 h-8" />} title="No host GPUs" description="FluxVM inventory empty — set FLUXVM_AI_JANUS_URL or FLUXVM_AI_DRY_RUN=1 for lab paths without NVIDIA." />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">

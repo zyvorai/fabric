@@ -102,12 +102,37 @@ export interface FabricGpuView {
   allocated_to?: { deployment: string; tenant?: string; vm_name: string }
 }
 
+export interface NodeGpu {
+  bdf: string
+  vendor?: string
+  vram_gib?: number
+  model?: string
+  healthy?: boolean
+  mig_profile?: string
+  parent_bdf?: string
+  temperature_c?: number
+  power_watts?: number
+  ecc_errors?: number
+}
+
+export interface InferenceNode {
+  id: string
+  site?: string
+  failure_domain?: string
+  state?: string
+  heartbeat_unix?: number
+  gpus?: NodeGpu[]
+  taints?: string[]
+  cached_models?: string[]
+}
+
 export const listModels = () => apiGet<ModelArtifact[]>('/api/ai/models')
 export const listProfiles = () => apiGet<InferenceProfile[]>('/api/ai/profiles')
 export const listDeployments = () => apiGet<InferenceDeployment[]>('/api/ai/deployments')
 export const listEndpoints = () => apiGet<InferenceEndpoint[]>('/api/ai/endpoints')
 export const listKeys = () => apiGet<InferenceApiKey[]>('/api/ai/keys')
 export const listGpus = () => apiGet<{ items: FabricGpuView[] } | FabricGpuView[]>('/api/ai/gpus')
+export const listNodes = () => apiGet<InferenceNode[] | { items?: InferenceNode[] }>('/api/ai/nodes')
 export const listCapacity = () => apiGet<Record<string, unknown>>('/api/ai/capacity')
 
 export const createModel = (body: Partial<ModelArtifact>) =>

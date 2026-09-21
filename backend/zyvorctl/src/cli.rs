@@ -920,6 +920,8 @@ enum AiCmd {
     Key(AiKeyCmd),
     /// List host GPUs (FluxVM inventory + Fabric allocation)
     Gpus,
+    /// List inference nodes (Janus lab inventory or registered hosts)
+    Nodes,
     /// Aggregate GPU / replica capacity
     Capacity,
     /// Recent AI audit events
@@ -3085,6 +3087,10 @@ impl Cli {
                 },
                 AiCmd::Gpus => {
                     let val = api_get(&client, "/ai/gpus").await?;
+                    print_value(&val, fmt);
+                }
+                AiCmd::Nodes => {
+                    let val = api_get(&client, "/ai/nodes").await?;
                     print_value(&val, fmt);
                 }
                 AiCmd::Capacity => {

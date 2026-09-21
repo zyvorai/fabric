@@ -110,6 +110,7 @@ zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
 zyvorctl ai key create edge-key --endpoint qwen3-8b-openai
 zyvorctl ai capacity
 zyvorctl ai gpus
+zyvorctl ai nodes
 ```
 
 ## OpenAI gateway
@@ -473,7 +474,8 @@ Hardware gate: `fluxvm/scripts/test-gpu-passthrough-lifecycle.sh`.
 
 ## Console
 
-`/app/ai` — Models, Deployments, Endpoints, API keys, GPUs. Capacity strip shows
+`/app/ai` — Models, Deployments, Endpoints, API keys, Nodes (Janus or registered
+hosts), and Host GPUs (FluxVM PCI inventory). Capacity strip shows
 free/total GPUs; deployments show autoscale bounds and Maglev weights; endpoints
 show the `/api/ai/openai/{name}` gateway path.
 
@@ -499,5 +501,8 @@ admission webhook chart:
 5. **Agent credentials** — `cargo test` for Agent Runtime fabric credential wiring.
 
 Lab smoke is the same phase script. Janus health and a proxied chat stay on the
-lab host; CI does not start a Janus NodePort. Workflow file:
+lab host; CI does not start a Janus NodePort. On a lab with
+`FLUXVM_AI_JANUS_URL` set, run
+[`scripts/smoke-ai-janus-lab.sh`](../scripts/smoke-ai-janus-lab.sh) for nodes,
+gateway chat, MIG catalog, and admit. Workflow file:
 [`.github/workflows/ai-workloads.yml`](../.github/workflows/ai-workloads.yml).
