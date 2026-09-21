@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -61,13 +62,36 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 	if err != nil {
 		return err
 	}
+	if res.StatusCode == http.StatusNotFound {
+		return &APIError{Status: res.StatusCode, Method: method, Path: path, Body: strings.TrimSpace(string(data))}
+	}
 	if res.StatusCode >= 400 {
-		return fmt.Errorf("API %s %s: %s", method, path, strings.TrimSpace(string(data)))
+		return &APIError{Status: res.StatusCode, Method: method, Path: path, Body: strings.TrimSpace(string(data))}
 	}
 	if out == nil || len(data) == 0 {
 		return nil
 	}
 	return json.Unmarshal(data, out)
+}
+
+// APIError is an HTTP failure from fabricd. Status 404 means the object is gone.
+type APIError struct {
+	Status int
+	Method string
+	Path   string
+	Body   string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("API %s %s: %s", e.Method, e.Path, e.Body)
+}
+
+func IsNotFound(err error) bool {
+	var api *APIError
+	if !errors.As(err, &api) {
+		return false
+	}
+	return api.Status == http.StatusNotFound
 }
 
 type vmRecord struct {
@@ -150,12 +174,12 @@ type networkPolicyRecord struct {
 }
 
 type createNetworkPolicyRequest struct {
-	Name              string            `json:"name"`
-	Description       string            `json:"description"`
-	EndpointSelector  labelSelector     `json:"endpoint_selector"`
-	Ingress           []any             `json:"ingress"`
-	Egress            []any             `json:"egress"`
-	Enabled           bool              `json:"enabled"`
+	Name             string        `json:"name"`
+	Description      string        `json:"description"`
+	EndpointSelector labelSelector `json:"endpoint_selector"`
+	Ingress          []any         `json:"ingress"`
+	Egress           []any         `json:"egress"`
+	Enabled          bool          `json:"enabled"`
 }
 
 type labelSelector struct {
@@ -165,12 +189,12 @@ type labelSelector struct {
 func (c *Client) CreateNetworkPolicy(ctx context.Context, name, description string, enabled bool, labels map[string]string) (*networkPolicyRecord, error) {
 	var policy networkPolicyRecord
 	req := createNetworkPolicyRequest{
-		Name:        name,
-		Description: description,
-		Enabled:     enabled,
+		Name:             name,
+		Description:      description,
+		Enabled:          enabled,
 		EndpointSelector: labelSelector{MatchLabels: labels},
-		Ingress:     []any{},
-		Egress:      []any{},
+		Ingress:          []any{},
+		Egress:           []any{},
 	}
 	if err := c.do(ctx, http.MethodPost, "/api/network-policies", req, &policy); err != nil {
 		return nil, err
@@ -256,9 +280,9 @@ type inferenceProfileRecord struct {
 }
 
 type gpuReq struct {
-	Vendor          string `json:"vendor"`
-	Count           int64  `json:"count"`
-	MinimumVramGiB  int64  `json:"minimum_vram_gib"`
+	Vendor         string `json:"vendor"`
+	Count          int64  `json:"count"`
+	MinimumVramGiB int64  `json:"minimum_vram_gib"`
 }
 
 type createInferenceProfileRequest struct {
@@ -344,12 +368,12 @@ func (c *Client) DeleteInferenceDeployment(ctx context.Context, name string) err
 }
 
 type inferenceEndpointRecord struct {
-	Name             string  `json:"name"`
-	Deployment       string  `json:"deployment"`
-	Protocol         string  `json:"protocol"`
-	Port             int64   `json:"port"`
-	VIP              *string `json:"vip"`
-	RoutingStrategy  string  `json:"routing_strategy"`
+	Name            string  `json:"name"`
+	Deployment      string  `json:"deployment"`
+	Protocol        string  `json:"protocol"`
+	Port            int64   `json:"port"`
+	VIP             *string `json:"vip"`
+	RoutingStrategy string  `json:"routing_strategy"`
 }
 
 type createInferenceEndpointRequest struct {
@@ -380,4 +404,3 @@ func (c *Client) CreateInferenceEndpoint(ctx context.Context, req createInferenc
 func (c *Client) DeleteInferenceEndpoint(ctx context.Context, name string) error {
 	return c.do(ctx, http.MethodDelete, "/api/ai/endpoints/"+name, nil, nil)
 }
-

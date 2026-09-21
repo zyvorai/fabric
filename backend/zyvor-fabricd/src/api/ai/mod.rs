@@ -15,6 +15,7 @@
 pub mod autoscaling;
 pub mod backup;
 pub mod capacity;
+pub mod circuit;
 pub mod deployments;
 pub mod eligibility;
 pub mod endpoints;
@@ -22,9 +23,12 @@ pub mod explain;
 pub mod federation;
 pub mod finops;
 pub mod gateway;
+pub mod gpu_orch;
 pub mod gpus;
 pub mod ipam;
 pub mod keys;
+pub mod lifecycle;
+pub mod limits;
 pub mod maglev;
 pub mod model_cache;
 pub mod model_jobs;
@@ -40,7 +44,12 @@ pub mod routing;
 pub mod runtime;
 pub mod scheduler;
 pub mod sites;
+pub mod supply;
 pub mod types;
+
+pub(crate) const STORE_CIRCUITS: &str = "ai_gateway_circuits";
+pub(crate) const STORE_RATE_COUNTERS: &str = "ai_rate_counters";
+pub(crate) const STORE_REPLICATIONS: &str = "ai_model_replications";
 
 use crate::server::AppState;
 use zyvor_fabric_fluxvm_client::FluxVmClient;

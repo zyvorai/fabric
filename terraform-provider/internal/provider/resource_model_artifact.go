@@ -113,7 +113,11 @@ func (r *modelArtifactResource) Read(ctx context.Context, req resource.ReadReque
 	}
 	m, err := r.client.GetModelArtifact(ctx, state.Name.ValueString())
 	if err != nil {
-		resp.State.RemoveResource(ctx)
+		if IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
 	applyModelArtifact(m, &state)

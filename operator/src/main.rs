@@ -20,7 +20,10 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Starting zyvor-fabricd Kubernetes operator");
+    tracing::info!(
+        "Starting zyvor-fabricd Kubernetes operator; AI kinds: {}",
+        crate::crd::production_ai_kinds().join(", ")
+    );
 
     // kube and reqwest pull in rustls with both the `ring` and `aws-lc-rs`
     // crypto-provider backends available transitively, so rustls can't pick

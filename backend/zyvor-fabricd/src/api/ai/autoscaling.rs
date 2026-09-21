@@ -95,6 +95,69 @@ async fn evaluate_one(
     Ok(())
 }
 
+/// Instantaneous scale signal. The live autoscaler still waits
+/// `scale_out_seconds` or `scale_in_seconds` before it changes `replicas`.
+pub fn explain_scale(dep: &InferenceDeployment) -> ScaleSignal {
+    let (avg_queue, avg_ttft, ready) = aggregate_metrics(dep);
+    let current = dep.replicas;
+    let base = |action, reason, next| ScaleSignal {
+        action,
+        reason,
+        current,
+        next,
+        ready,
+        avg_queue,
+        avg_ttft,
+    };
+    if !dep.autoscaling.enabled {
+        return base("hold", "autoscaling disabled", current);
+    }
+    let policy = &dep.autoscaling;
+    let want_out = ready > 0
+        && (avg_queue > f64::from(policy.scale_out_queue)
+            || (policy.scale_out_ttft_ms > 0.0 && avg_ttft > policy.scale_out_ttft_ms));
+    let want_in = avg_queue < f64::from(policy.scale_in_queue)
+        && (policy.scale_out_ttft_ms <= 0.0 || avg_ttft < policy.scale_out_ttft_ms * 0.5);
+    if want_out {
+        let next = next_replicas(current, policy, 1);
+        if next <= current {
+            return base("hold", "already at max replicas", current);
+        }
+        return base(
+            "scale_out",
+            "queue or TTFT is above the scale-out threshold",
+            next,
+        );
+    }
+    if want_in {
+        if dep
+            .status
+            .replicas
+            .iter()
+            .any(|r| r.ready && !metrics_fresh(r.metrics.as_ref()))
+        {
+            return base(
+                "hold",
+                "scale-in skipped: replica metrics missing or stale",
+                current,
+            );
+        }
+        let next = next_replicas(current, policy, -1);
+        if next >= current {
+            return base("hold", "already at min replicas", current);
+        }
+        return base(
+            "scale_in",
+            "queue and TTFT are below the scale-in threshold",
+            next,
+        );
+    }
+    if ready == 0 {
+        return base("hold", "no ready replica", current);
+    }
+    base("hold", "queue and TTFT are inside the hold band", current)
+}
+
 fn aggregate_metrics(dep: &InferenceDeployment) -> (f64, f64, usize) {
     let ready: Vec<_> = dep.status.replicas.iter().filter(|r| r.ready).collect();
     if ready.is_empty() {
@@ -213,6 +276,18 @@ async fn apply_scale(
         .map_err(|e| e.to_string())?;
     reconcile::enqueue_deployment_reconcile(state.clone(), dep.name.clone());
     Ok(())
+}
+
+/// Instantaneous autoscaler reading. Duration gates stay in the background loop.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScaleSignal {
+    pub action: &'static str,
+    pub reason: &'static str,
+    pub current: u32,
+    pub next: u32,
+    pub ready: usize,
+    pub avg_queue: f64,
+    pub avg_ttft: f64,
 }
 
 /// Pure decision helper for unit tests.

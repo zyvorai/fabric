@@ -30,6 +30,8 @@ pub struct ScheduleRequest {
     pub site_counts: Vec<(String, u32)>,
     /// Empty means a full GPU, not a MIG slice.
     pub mig_profile: String,
+    /// When true, only NVLink-attached devices are eligible.
+    pub require_nvlink: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -179,6 +181,7 @@ fn free_gpu<'a>(node: &'a InferenceNode, req: &ScheduleRequest) -> Option<&'a No
         gpu.vendor.eq_ignore_ascii_case(&vendor)
             && gpu.vram_gib >= req.minimum_vram_gib
             && gpu.healthy
+            && (!req.require_nvlink || gpu.nvlink)
             && (req.mig_profile.is_empty() || gpu.mig_profile == req.mig_profile)
             && !req
                 .allocated
@@ -223,6 +226,8 @@ mod tests {
                 model: "L40S".into(),
                 healthy: true,
                 mig_profile: String::new(),
+                parent_bdf: String::new(),
+                nvlink: true,
             }],
             taints: vec![],
             cpu_free: 16,
@@ -246,6 +251,7 @@ mod tests {
             max_replicas_per_site: 0,
             site_counts: vec![],
             mig_profile: String::new(),
+            require_nvlink: false,
         }
     }
 

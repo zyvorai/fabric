@@ -124,7 +124,11 @@ func (r *inferenceDeploymentResource) Read(ctx context.Context, req resource.Rea
 	}
 	d, err := r.client.GetInferenceDeployment(ctx, state.Name.ValueString())
 	if err != nil {
-		resp.State.RemoveResource(ctx)
+		if IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
 	applyDeployment(d, &state)

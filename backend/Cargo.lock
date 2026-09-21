@@ -5110,6 +5110,7 @@ dependencies = [
  "jsonwebtoken",
  "k8s-pod-client",
  "lettre",
+ "libc",
  "lifecycle-manager",
  "migration",
  "nat-gateway",

@@ -65,11 +65,14 @@ pub async fn create_profile(
     Json(mut req): Json<CreateInferenceProfileRequest>,
 ) -> Result<(StatusCode, Json<InferenceProfile>), (StatusCode, Json<serde_json::Value>)> {
     crate::validation::validate_entity_name(&req.name).map_err(|(s, m)| err(s, m))?;
-    if req.runtime != "vllm" {
-        return Err(err(StatusCode::BAD_REQUEST, "runtime must be 'vllm' (MVP)"));
+    if req.gpu.count == 0 || req.gpu.count > 8 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "gpu.count must be between 1 and 8",
+        ));
     }
-    if req.gpu.vendor.trim().is_empty() {
-        return Err(err(StatusCode::BAD_REQUEST, "gpu.vendor is required"));
+    if let Err(msg) = super::runtime::require_supported(&req.runtime) {
+        return Err(err(StatusCode::BAD_REQUEST, msg));
     }
     if req.cpu == 0 || req.memory_gib == 0 {
         return Err(err(
@@ -77,11 +80,8 @@ pub async fn create_profile(
             "cpu and memory_gib must be greater than 0",
         ));
     }
-    if req.gpu.count != 1 {
-        return Err(err(
-            StatusCode::BAD_REQUEST,
-            "gpu.count must be 1 (one GPU per replica)",
-        ));
+    if req.gpu.vendor.trim().is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "gpu.vendor is required"));
     }
 
     req.tenant = crate::tenant_scope::apply_create_tenant(&claims, req.tenant)

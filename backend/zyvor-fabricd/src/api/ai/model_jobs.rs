@@ -13,6 +13,7 @@ use axum::{
 };
 use chrono::Utc;
 use security::{RequireRead, RequireWrite};
+use serde::Deserialize;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 
@@ -74,7 +75,11 @@ pub fn find_join<'a>(jobs: &'a [ModelJob], job: &ModelJob) -> Option<&'a ModelJo
                 && other.digest.as_deref().or(other.checksum.as_deref()) == Some(digest)
                 && matches!(
                     other.state,
-                    ModelJobState::Downloading | ModelJobState::Verifying | ModelJobState::Ready
+                    ModelJobState::Downloading
+                        | ModelJobState::Verifying
+                        | ModelJobState::Scanning
+                        | ModelJobState::Optimizing
+                        | ModelJobState::Ready
                 )
         }) {
             return Some(other);
@@ -90,6 +95,8 @@ pub fn find_join<'a>(jobs: &'a [ModelJob], job: &ModelJob) -> Option<&'a ModelJo
                 ModelJobState::Resolving
                     | ModelJobState::Downloading
                     | ModelJobState::Verifying
+                    | ModelJobState::Scanning
+                    | ModelJobState::Optimizing
                     | ModelJobState::Ready
             )
     })
@@ -112,6 +119,9 @@ pub fn register(state: &AppState, model: &ModelArtifact) -> Result<ModelJob, Str
         retries: 0,
         bytes_written: 0,
         joined_job: None,
+        local_path: None,
+        optimize: model.optimize.clone(),
+        derived_digest: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -253,28 +263,119 @@ fn step(state: &AppState, job: &mut ModelJob) -> Result<(), String> {
                 FsPath::new(&path),
                 job.checksum.as_deref(),
             )?;
+            let scan = model_cache::scan_model_format(FsPath::new(&path))?;
+            if !scan.blocked.is_empty() {
+                return Err(format!("unsafe model file: {}", scan.blocked.join(", ")));
+            }
             if let Some(hex) = verified.or(job.digest.clone()) {
                 job.digest = Some(hex);
             }
-            if let Some(mut model) = state
+            job.local_path = Some(path);
+            job.state = ModelJobState::Scanning;
+            job.message = Some("scanning".into());
+            Ok(())
+        }
+        ModelJobState::Scanning => {
+            let path = job
+                .local_path
+                .clone()
+                .ok_or_else(|| "model job has no downloaded path".to_string())?;
+            let scan = model_cache::scan_model_format(FsPath::new(&path))?;
+            if !scan.blocked.is_empty() {
+                return Err(format!("unsafe model format: {}", scan.blocked.join(", ")));
+            }
+            super::supply::file_count_allowed(scan.files, super::supply::max_files())?;
+            if let Some(model) = state
                 .store
                 .get_entity::<ModelArtifact>(STORE_MODELS, &job.model)
                 .map_err(|e| e.to_string())?
             {
-                model.local_path = Some(path);
-                model.checksum = job.digest.clone().or(model.checksum);
-                model.updated = Utc::now();
-                state
-                    .store
-                    .save_entity(STORE_MODELS, &model.name, &model)
-                    .map_err(|e| e.to_string())?;
+                if let Some(signature) = model.signature.as_deref() {
+                    super::supply::require_signature(job.digest.as_deref(), signature)?;
+                }
             }
-            job.state = ModelJobState::Ready;
-            job.message = Some("ready".into());
+            if job.optimize.as_deref().is_some_and(|kind| !kind.is_empty()) {
+                job.state = ModelJobState::Optimizing;
+                job.message = Some("optimizing".into());
+            } else {
+                publish_ready(state, job)?;
+            }
+            Ok(())
+        }
+        ModelJobState::Optimizing => {
+            let kind = super::supply::optimization_kind(job.optimize.as_deref().unwrap_or(""))?;
+            let source = job
+                .digest
+                .clone()
+                .filter(|d| !d.is_empty())
+                .ok_or_else(|| "optimization requires a source digest".to_string())?;
+            let derived = super::supply::derived_digest(&source, kind);
+            write_derived_artifact(state, job, kind, &derived)?;
+            job.derived_digest = Some(derived);
+            publish_ready(state, job)?;
             Ok(())
         }
         ModelJobState::Ready | ModelJobState::Failed => Ok(()),
     }
+}
+
+fn publish_ready(state: &AppState, job: &mut ModelJob) -> Result<(), String> {
+    if let Some(mut model) = state
+        .store
+        .get_entity::<ModelArtifact>(STORE_MODELS, &job.model)
+        .map_err(|e| e.to_string())?
+    {
+        model.local_path = job.local_path.clone();
+        model.checksum = job.digest.clone().or(model.checksum);
+        model.updated = Utc::now();
+        state
+            .store
+            .save_entity(STORE_MODELS, &model.name, &model)
+            .map_err(|e| e.to_string())?;
+    }
+    job.state = ModelJobState::Ready;
+    job.message = Some("ready".into());
+    Ok(())
+}
+
+fn write_derived_artifact(
+    state: &AppState,
+    job: &ModelJob,
+    kind: &str,
+    derived: &str,
+) -> Result<(), String> {
+    let name = format!("{}--{kind}", job.model);
+    let now = Utc::now();
+    let mut artifact = state
+        .store
+        .get_entity::<ModelArtifact>(STORE_MODELS, &name)
+        .map_err(|e| e.to_string())?
+        .unwrap_or(ModelArtifact {
+            name: name.clone(),
+            source: job.source.clone(),
+            revision: job.revision.clone(),
+            checksum: None,
+            format: kind.to_string(),
+            size_bytes: None,
+            tenant: None,
+            local_path: job.local_path.clone(),
+            license: None,
+            residency: None,
+            require_checksum: true,
+            signature: None,
+            optimize: None,
+            derived_from: Some(job.model.clone()),
+            created: now,
+            updated: now,
+        });
+    artifact.checksum = Some(derived.to_string());
+    artifact.local_path = job.local_path.clone();
+    artifact.derived_from = Some(job.model.clone());
+    artifact.updated = now;
+    state
+        .store
+        .save_entity(STORE_MODELS, &name, &artifact)
+        .map_err(|e| e.to_string())
 }
 
 fn free_bytes(path: &FsPath) -> Result<u64, String> {
@@ -321,7 +422,7 @@ pub async fn run_model_job_controller(state: Arc<AppState>) {
 
 /// Drive a local or stub source to a terminal state before the handler returns.
 pub fn drive_until_terminal(state: &AppState, id: &str) -> Option<ModelJob> {
-    for _ in 0..6 {
+    for _ in 0..8 {
         drive_job(state, id);
         if let Ok(Some(job)) = state.store.get_entity::<ModelJob>(STORE_MODEL_JOBS, id) {
             if matches!(job.state, ModelJobState::Ready | ModelJobState::Failed) {
@@ -384,6 +485,175 @@ pub async fn model_status(
         .map(Json)
 }
 
+/// POST /api/ai/models/{name}/verify
+///
+/// Re-checks the stored checksum and refuses pickle weights. This does not
+/// verify a signature.
+pub async fn verify_model(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    let model = state
+        .store
+        .get_entity::<ModelArtifact>(STORE_MODELS, &name)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "ModelArtifact not found"))?;
+    let path = model
+        .local_path
+        .as_deref()
+        .ok_or_else(|| err(StatusCode::BAD_REQUEST, "model has no local_path"))?;
+    let path = FsPath::new(path);
+    let state_dir = PathBuf::from(&state.config.storage.path);
+    let path =
+        model_cache::confine(path, &state_dir).map_err(|e| err(StatusCode::BAD_REQUEST, e))?;
+    if let Err(e) = model_cache::verify_checksum_if_requested(&path, model.checksum.as_deref()) {
+        return Err(err(StatusCode::BAD_REQUEST, e));
+    }
+    let scan =
+        model_cache::scan_model_format(&path).map_err(|e| err(StatusCode::BAD_REQUEST, e))?;
+    let ok = scan.blocked.is_empty();
+    let status = if ok {
+        StatusCode::OK
+    } else {
+        StatusCode::BAD_REQUEST
+    };
+    Ok((
+        status,
+        Json(serde_json::json!({
+            "name": name,
+            "ok": ok,
+            "safetensors": scan.safetensors,
+            "files": scan.files,
+            "blocked": scan.blocked,
+        })),
+    ))
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReplicationRecord {
+    pub id: String,
+    pub model: String,
+    pub site: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    pub state: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReplicateRequest {
+    pub site: String,
+}
+
+/// POST /api/ai/models/{name}/replicate
+///
+/// Records replication to a site. The record is ready when a node at that
+/// site already lists the model in its cache. Bytes are not copied across a WAN.
+pub async fn replicate(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(body): Json<ReplicateRequest>,
+) -> Result<(StatusCode, Json<ReplicationRecord>), (StatusCode, Json<serde_json::Value>)> {
+    crate::validation::validate_entity_name(&body.site).map_err(|(s, m)| err(s, m))?;
+    let model = state
+        .store
+        .get_entity::<ModelArtifact>(STORE_MODELS, &name)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "ModelArtifact not found"))?;
+    let nodes: Vec<super::types::InferenceNode> = state
+        .store
+        .list_entities(super::STORE_NODES)
+        .unwrap_or_default();
+    let ready = nodes.iter().any(|node| {
+        node.site == body.site && node.cached_models.iter().any(|cached| cached == &name)
+    });
+    let record = ReplicationRecord {
+        id: format!("{name}--{}", body.site),
+        model: name,
+        site: body.site,
+        digest: model.checksum,
+        state: if ready { "ready" } else { "pending" }.into(),
+    };
+    state
+        .store
+        .save_entity(super::STORE_REPLICATIONS, &record.id, &record)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok((StatusCode::ACCEPTED, Json(record)))
+}
+
+/// DELETE /api/ai/models/{name}/cache/{node}
+pub async fn delete_node_cache(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((name, node)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let deployments: Vec<super::types::InferenceDeployment> = state
+        .store
+        .list_entities(super::STORE_DEPLOYMENTS)
+        .unwrap_or_default();
+    let referenced = deployments.iter().any(|dep| {
+        dep.model == name
+            && dep
+                .status
+                .replicas
+                .iter()
+                .any(|rep| rep.host == node || (node == "local" && rep.host.is_empty()))
+    });
+    if referenced {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "model cache is referenced by a running replica",
+        ));
+    }
+    if node != "local" {
+        let mut stored = state
+            .store
+            .get_entity::<super::types::InferenceNode>(super::STORE_NODES, &node)
+            .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .ok_or_else(|| err(StatusCode::NOT_FOUND, "inference node not found"))?;
+        stored.cached_models.retain(|cached| cached != &name);
+        state
+            .store
+            .save_entity(super::STORE_NODES, &node, &stored)
+            .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+    let mut removed = false;
+    let local = node == "local"
+        || std::env::var("FLUXVM_AI_NODE_ID")
+            .ok()
+            .is_some_and(|id| id == node);
+    if local {
+        if let Some(mut model) = state
+            .store
+            .get_entity::<ModelArtifact>(STORE_MODELS, &name)
+            .ok()
+            .flatten()
+        {
+            if let Some(path) = model.local_path.clone() {
+                let path = FsPath::new(&path);
+                let state_dir = PathBuf::from(&state.config.storage.path);
+                if model_cache::is_managed_cache(path, &state_dir) {
+                    if path.is_dir() {
+                        let _ = std::fs::remove_dir_all(path);
+                    } else {
+                        let _ = std::fs::remove_file(path);
+                    }
+                    removed = true;
+                }
+            }
+            model.local_path = None;
+            model.updated = Utc::now();
+            let _ = state.store.save_entity(STORE_MODELS, &name, &model);
+        }
+    }
+    Ok(Json(serde_json::json!({
+        "model": name,
+        "node": node,
+        "bytes_removed": removed,
+    })))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -401,6 +671,9 @@ mod tests {
             retries: 0,
             bytes_written: 0,
             joined_job: None,
+            local_path: None,
+            optimize: None,
+            derived_digest: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

@@ -113,6 +113,9 @@ pub async fn create_model(
         license: req.license,
         residency: req.residency,
         require_checksum: req.require_checksum,
+        signature: req.signature,
+        optimize: req.optimize,
+        derived_from: None,
         created: now,
         updated: now,
     };
@@ -196,4 +199,101 @@ pub async fn delete_model(
         "SUCCESS",
     );
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, serde::Deserialize, Default)]
+pub struct EvictCacheRequest {
+    pub budget_bytes: Option<u64>,
+}
+
+/// POST /api/ai/models/cache/evict
+///
+/// Removes unreferenced directories under `{state}/ai-models` until the
+/// declared budget. Deployment-referenced models and the shared
+/// `FLUXVM_AI_MODEL_DIR` stub are kept. The ModelArtifact record stays.
+pub async fn evict_cache(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    body: Option<Json<EvictCacheRequest>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let requested = body.and_then(|Json(req)| req.budget_bytes);
+    let budget = match requested {
+        Some(n) => n,
+        None => std::env::var("FLUXVM_AI_MODEL_CACHE_BYTES")
+            .ok()
+            .and_then(|v| v.trim().parse().ok())
+            .ok_or_else(|| {
+                err(
+                    StatusCode::BAD_REQUEST,
+                    "budget_bytes is required, or set FLUXVM_AI_MODEL_CACHE_BYTES",
+                )
+            })?,
+    };
+
+    let models: Vec<ModelArtifact> = state
+        .store
+        .list_entities(STORE_MODELS)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let deps: Vec<super::types::InferenceDeployment> = state
+        .store
+        .list_entities(super::STORE_DEPLOYMENTS)
+        .unwrap_or_default();
+    let state_dir = std::path::PathBuf::from(&state.config.storage.path);
+
+    let mut candidates = Vec::new();
+    for model in &models {
+        if let Some(ref tenant) = claims.tenant {
+            if model.tenant.as_deref() != Some(tenant.as_str()) {
+                continue;
+            }
+        }
+        let Some(path) = model.local_path.as_deref() else {
+            continue;
+        };
+        let path = std::path::Path::new(path);
+        if !super::model_cache::is_managed_cache(path, &state_dir) {
+            continue;
+        }
+        candidates.push(super::model_cache::CacheCandidate {
+            name: model.name.clone(),
+            size_bytes: model.size_bytes.unwrap_or(0),
+            last_used_unix: model.updated.timestamp(),
+            referenced: deps.iter().any(|d| d.model == model.name),
+        });
+    }
+    let plan = super::model_cache::plan_eviction(&candidates, budget);
+    let mut evicted = Vec::new();
+    for name in &plan.evict {
+        if deps.iter().any(|d| d.model == *name) {
+            continue;
+        }
+        let mut model = state
+            .store
+            .get_entity::<ModelArtifact>(STORE_MODELS, name)
+            .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .ok_or_else(|| err(StatusCode::NOT_FOUND, "ModelArtifact not found"))?;
+        if let Some(path) = model.local_path.as_deref() {
+            let path = std::path::PathBuf::from(path);
+            if super::model_cache::is_managed_cache(&path, &state_dir) {
+                if path.is_dir() {
+                    let _ = std::fs::remove_dir_all(&path);
+                } else if path.is_file() {
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
+        }
+        model.local_path = None;
+        model.updated = Utc::now();
+        state
+            .store
+            .save_entity(STORE_MODELS, &model.name, &model)
+            .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        evicted.push(name.clone());
+    }
+    audit(&state, &claims.sub, "EVICT", "ai/models/cache", "SUCCESS");
+    Ok(Json(serde_json::json!({
+        "evicted": evicted,
+        "retained_bytes": plan.retained_bytes,
+        "over_budget": plan.over_budget,
+    })))
 }

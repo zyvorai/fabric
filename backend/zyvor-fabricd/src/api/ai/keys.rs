@@ -246,8 +246,19 @@ pub fn requested_tokens(body: &[u8]) -> u64 {
         .unwrap_or(1)
 }
 
+pub fn hmac_key() -> Result<String, String> {
+    let require = std::env::var("FLUXVM_AI_REQUIRE_HMAC").ok().as_deref() == Some("1");
+    match std::env::var("FLUXVM_AI_KEY_HMAC_SECRET") {
+        Ok(value) if !value.is_empty() && value != "fabric-ai-preview-hmac" => Ok(value),
+        Ok(value) if !value.is_empty() && !require => Ok(value),
+        _ if require => Err("FLUXVM_AI_KEY_HMAC_SECRET must be set to a non-default value".into()),
+        _ => Ok("fabric-ai-preview-hmac".into()),
+    }
+}
+
 /// Validate a bearer token: prefix lookup, then a constant-time HMAC compare.
 pub fn verify_api_key(state: &AppState, secret: &str) -> Option<InferenceApiKey> {
+    hmac_key().ok()?;
     let prefix: String = secret.chars().take(8).collect();
     let hash = hash_secret(secret);
     let keys: Vec<InferenceApiKey> = state.store.list_entities(STORE_API_KEYS).ok()?;
@@ -256,8 +267,7 @@ pub fn verify_api_key(state: &AppState, secret: &str) -> Option<InferenceApiKey>
 }
 
 pub fn hash_secret(secret: &str) -> String {
-    let key = std::env::var("FLUXVM_AI_KEY_HMAC_SECRET")
-        .unwrap_or_else(|_| "fabric-ai-preview-hmac".into());
+    let key = hmac_key().unwrap_or_else(|_| "fabric-ai-preview-hmac".into());
     let digest = hmac_sha256(key.as_bytes(), secret.as_bytes());
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }

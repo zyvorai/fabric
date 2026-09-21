@@ -311,11 +311,14 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("profile '{}' not found", dep.profile))?;
 
-    if profile.gpu.count != 1 || dep.gpus_per_replica != 1 {
-        return Err(
-            "preview supports exactly one GPU per replica (gpu.count and gpus_per_replica must be 1)"
-                .into(),
-        );
+    if profile.gpu.count == 0
+        || profile.gpu.count > 8
+        || dep.gpus_per_replica != profile.gpu.count.max(1)
+    {
+        return Err(format!(
+            "gpu.count must be 1..=8 and match gpus_per_replica (profile {}, deployment {})",
+            profile.gpu.count, dep.gpus_per_replica
+        ));
     }
     super::runtime::require_supported(&profile.runtime)?;
 
@@ -611,6 +614,7 @@ pub(crate) fn schedule_request(
         max_replicas_per_site: dep.max_replicas_per_site,
         site_counts: site_replica_counts(dep, &nodes),
         mig_profile: String::new(),
+        require_nvlink: false,
     }
 }
 
@@ -718,57 +722,86 @@ async fn create_replica(
         }
     }
 
-    let mut reserved: Option<(String, Option<u32>)> = None;
+    let mut reserved: Vec<(String, Option<u32>)> = Vec::new();
     for _ in 0..32 {
+        reserved.clear();
         let mut allocated = allocated_bdfs(state);
-        if let Some(ref want) = scheduled_bdf {
-            for gpu in &inventory {
-                if !gpu.bdf.eq_ignore_ascii_case(want) {
-                    allocated.insert(gpu.bdf.to_ascii_lowercase());
+        if gpu_req.count <= 1 {
+            if let Some(ref want) = scheduled_bdf {
+                for gpu in &inventory {
+                    if !gpu.bdf.eq_ignore_ascii_case(want) {
+                        allocated.insert(gpu.bdf.to_ascii_lowercase());
+                    }
                 }
             }
         }
         let picked = place_gpus(&inventory, &gpu_req, &allocated)?;
-        let gpu = &picked[0];
-        let bdf = gpu.bdf.clone();
-        let now = Utc::now().timestamp();
-        let reservation = GpuReservation {
-            bdf: bdf.clone(),
-            deployment: dep.name.clone(),
-            vm_name: vm_name.clone(),
-            owner: fabricd_owner().to_string(),
-            created_unix: now,
-            expires_unix: now.saturating_add(ipam::RESERVATION_TTL_SECS),
-        };
-        match state
-            .store
-            .try_create_entity(STORE_GPU_RESERVATIONS, &bdf, &reservation)
-        {
-            Ok(_) => {
-                reserved = Some((bdf, gpu.vram_gib));
-                break;
+        if let Some(ref want) = scheduled_bdf {
+            if !picked.iter().any(|gpu| gpu.bdf.eq_ignore_ascii_case(want)) {
+                return Err(format!(
+                    "scheduled GPU {want} was not in the reserved group"
+                ));
             }
-            Err(e) if state_store::is_entity_conflict(&e) => {
-                let _ = release_stale_gpu_reservation(state, &bdf);
-                continue;
+        }
+        let mut conflict = false;
+        for gpu in &picked {
+            let bdf = gpu.bdf.clone();
+            let now = Utc::now().timestamp();
+            let reservation = GpuReservation {
+                bdf: bdf.clone(),
+                deployment: dep.name.clone(),
+                vm_name: vm_name.clone(),
+                owner: fabricd_owner().to_string(),
+                created_unix: now,
+                expires_unix: now.saturating_add(ipam::RESERVATION_TTL_SECS),
+            };
+            match state
+                .store
+                .try_create_entity(STORE_GPU_RESERVATIONS, &bdf, &reservation)
+            {
+                Ok(_) => reserved.push((bdf, gpu.vram_gib)),
+                Err(e) if state_store::is_entity_conflict(&e) => {
+                    let _ = release_stale_gpu_reservation(state, &bdf);
+                    for (held, _) in reserved.drain(..) {
+                        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &held);
+                    }
+                    conflict = true;
+                    break;
+                }
+                Err(e) => return Err(e.to_string()),
             }
-            Err(e) => return Err(e.to_string()),
+        }
+        if !conflict {
+            break;
         }
     }
-    let Some((bdf, vram_gib)) = reserved else {
-        return Err("could not reserve a free GPU".into());
-    };
-
-    if let Err(e) = client
-        .bind_host_gpu(&GpuBindRequest {
-            bdf: bdf.clone(),
-            vram_gib,
-        })
-        .await
-    {
-        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &bdf);
-        return Err(format!("GPU bind {bdf}: {e}"));
+    let need = gpu_req.count.max(1) as usize;
+    if reserved.len() != need {
+        return Err("could not reserve a free GPU group".into());
     }
+
+    for (bdf, vram_gib) in &reserved {
+        if let Err(e) = client
+            .bind_host_gpu(&GpuBindRequest {
+                bdf: bdf.clone(),
+                vram_gib: *vram_gib,
+            })
+            .await
+        {
+            for (held, _) in &reserved {
+                let _ = client
+                    .release_host_gpu(&GpuReleaseRequest {
+                        bdf: held.clone(),
+                        restore_driver: false,
+                    })
+                    .await;
+                let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, held);
+            }
+            return Err(format!("GPU bind {bdf}: {e}"));
+        }
+    }
+    let bdf = reserved[0].0.clone();
+    let vfio_devices: Vec<String> = reserved.iter().map(|(bdf, _)| bdf.clone()).collect();
 
     let image = std::env::var("FLUXVM_AI_IMAGE").unwrap_or_else(|_| {
         format!(
@@ -784,7 +817,8 @@ async fn create_replica(
         labels.insert("tenant".into(), t.clone());
     }
 
-    let vllm_unit = vllm_systemd_unit(GUEST_MODEL_PATH);
+    let exec = super::runtime::guest_exec(&profile.runtime, GUEST_MODEL_PATH, need as u32)?;
+    let vllm_unit = inference_systemd_unit(&exec);
     let vm = VM {
         name: vm_name.clone(),
         state: vm_model::VMState::Stopped,
@@ -833,7 +867,7 @@ async fn create_replica(
             destination: Some(GUEST_MODEL_PATH.into()),
             read_only: true,
         }],
-        vfio_devices: vec![bdf.clone()],
+        vfio_devices,
         cloud_init_write_files: vm.cloud_init_write_files.clone(),
         cloud_init_runcmd: vm.cloud_init_runcmd.clone(),
         ssh_authorized_keys: vec!["ssh-ed25519 AAAA fabric-ai-placeholder".into()],
@@ -841,21 +875,23 @@ async fn create_replica(
     };
 
     if let Err(e) = state.driver.start_with_options(&vm, &opts).await {
-        match client
-            .release_host_gpu(&GpuReleaseRequest {
-                bdf: bdf.clone(),
-                restore_driver: false,
-            })
-            .await
-        {
-            Ok(_) => {
-                let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &bdf);
-            }
-            Err(release_err) => {
-                let _ = state.store.delete_vm(&vm_name);
-                return Err(format!(
-                    "start VM {vm_name}: {e}; GPU release {bdf} failed: {release_err}"
-                ));
+        for (held, _) in &reserved {
+            match client
+                .release_host_gpu(&GpuReleaseRequest {
+                    bdf: held.clone(),
+                    restore_driver: false,
+                })
+                .await
+            {
+                Ok(_) => {
+                    let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, held);
+                }
+                Err(release_err) => {
+                    let _ = state.store.delete_vm(&vm_name);
+                    return Err(format!(
+                        "start VM {vm_name}: {e}; GPU release {held} failed: {release_err}"
+                    ));
+                }
             }
         }
         let _ = state.store.delete_vm(&vm_name);
@@ -870,18 +906,20 @@ async fn create_replica(
             deployment: dep.name.clone(),
         },
     );
-    let _ = state.store.save_entity(
-        STORE_GPU_RESERVATIONS,
-        &bdf,
-        &GpuReservation {
-            bdf: bdf.clone(),
-            deployment: dep.name.clone(),
-            vm_name: vm_name.clone(),
-            owner: fabricd_owner().to_string(),
-            created_unix: Utc::now().timestamp(),
-            expires_unix: 0,
-        },
-    );
+    for (held, _) in &reserved {
+        let _ = state.store.save_entity(
+            STORE_GPU_RESERVATIONS,
+            held,
+            &GpuReservation {
+                bdf: held.clone(),
+                deployment: dep.name.clone(),
+                vm_name: vm_name.clone(),
+                owner: fabricd_owner().to_string(),
+                created_unix: Utc::now().timestamp(),
+                expires_unix: 0,
+            },
+        );
+    }
 
     // Best-effort guest IP from FluxVM record.
     let address = match client.find_by_name(&vm_name).await {
@@ -947,14 +985,7 @@ async fn remove_replica(
         let _ = state.store.delete_vm(&rep.vm_name);
 
         if !rep.bdf.is_empty() && !rep.bdf.starts_with("dry-run-") {
-            client
-                .release_host_gpu(&GpuReleaseRequest {
-                    bdf: rep.bdf.clone(),
-                    restore_driver: false,
-                })
-                .await
-                .map_err(|e| format!("GPU release {}: {e}", rep.bdf))?;
-            let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rep.bdf);
+            release_vm_gpus(state, &client, &rep.vm_name, &rep.bdf).await?;
         }
         let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rep.vm_name);
     } else {
@@ -1446,16 +1477,16 @@ async fn sweep_orphans(state: &AppState) {
     }
 }
 
-fn vllm_systemd_unit(model_path: &str) -> String {
+fn inference_systemd_unit(exec: &str) -> String {
     format!(
         r#"[Unit]
-Description=vLLM OpenAI-compatible server (Fabric AI preview)
+Description=Fabric inference runtime
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/vllm serve {model_path} --host 0.0.0.0 --port 8000
+ExecStart={exec}
 Restart=on-failure
 RestartSec=5
 
@@ -1465,20 +1496,45 @@ WantedBy=multi-user.target
     )
 }
 
+async fn release_vm_gpus(
+    state: &AppState,
+    client: &FluxVmClient,
+    vm_name: &str,
+    primary: &str,
+) -> Result<(), String> {
+    let mut bdfs = Vec::new();
+    if !primary.is_empty() {
+        bdfs.push(primary.to_string());
+    }
+    let rows: Vec<GpuReservation> = state
+        .store
+        .list_entities(STORE_GPU_RESERVATIONS)
+        .unwrap_or_default();
+    for row in rows {
+        if row.vm_name == vm_name && !bdfs.iter().any(|bdf| bdf.eq_ignore_ascii_case(&row.bdf)) {
+            bdfs.push(row.bdf);
+        }
+    }
+    for bdf in bdfs {
+        client
+            .release_host_gpu(&GpuReleaseRequest {
+                bdf: bdf.clone(),
+                restore_driver: false,
+            })
+            .await
+            .map_err(|e| format!("GPU release {bdf}: {e}"))?;
+        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &bdf);
+    }
+    Ok(())
+}
+
 async fn release_missing_vm(
     state: &AppState,
     client: &FluxVmClient,
     rep: &InferenceReplica,
 ) -> Result<(), String> {
     if !rep.bdf.is_empty() && !rep.bdf.starts_with("dry-run-") {
-        client
-            .release_host_gpu(&GpuReleaseRequest {
-                bdf: rep.bdf.clone(),
-                restore_driver: false,
-            })
-            .await
-            .map_err(|e| format!("GPU release {} failed: {e}", rep.bdf))?;
-        let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rep.bdf);
+        release_vm_gpus(state, client, &rep.vm_name, &rep.bdf).await?;
     }
     let _ = state.store.delete_entity(STORE_MANAGED_VMS, &rep.vm_name);
     Ok(())

@@ -237,6 +237,32 @@ pub fn compute_weights(strategy: RoutingStrategy, ready: &[&InferenceReplica]) -
     }
 }
 
+/// Why this replica is excluded from the endpoint, or `None` when it may receive weight.
+pub fn routing_exclusion(ep: &InferenceEndpoint, rep: &InferenceReplica) -> Option<&'static str> {
+    if !rep.ready {
+        return Some("not ready");
+    }
+    if rep.draining {
+        return Some("draining");
+    }
+    if !super::eligibility::metrics_fresh(rep.metrics.as_ref()) {
+        return Some("metrics missing or stale");
+    }
+    if let Some(res) = ep.residency.as_deref() {
+        if !matches!(rep.site.as_deref(), Some(s) if s == res) {
+            return Some("outside residency");
+        }
+    }
+    if !ep.allowed_sites.is_empty() {
+        match rep.site.as_deref() {
+            Some(s) if ep.allowed_sites.iter().any(|a| a == s) => {}
+            Some(_) => return Some("site not allowed"),
+            None => return Some("replica has no site"),
+        }
+    }
+    None
+}
+
 /// Apply residency / site allow-list filtering before weight compute (Phase 5).
 pub fn filter_replicas_for_endpoint<'a>(
     ep: &InferenceEndpoint,
@@ -244,23 +270,7 @@ pub fn filter_replicas_for_endpoint<'a>(
 ) -> Vec<&'a InferenceReplica> {
     replicas
         .iter()
-        .filter(|r| replica_serving(r))
-        .filter(|r| {
-            if let Some(res) = ep.residency.as_deref() {
-                matches!(r.site.as_deref(), Some(s) if s == res)
-            } else {
-                true
-            }
-        })
-        .filter(|r| {
-            if ep.allowed_sites.is_empty() {
-                return true;
-            }
-            match r.site.as_deref() {
-                Some(s) => ep.allowed_sites.iter().any(|a| a == s),
-                None => false,
-            }
-        })
+        .filter(|r| routing_exclusion(ep, r).is_none())
         .collect()
 }
 

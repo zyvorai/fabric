@@ -72,6 +72,9 @@ POST       /api/ai/nodes/{id}/heartbeat
 GET/POST   /api/ai/sites
 GET        /api/ai/sites/{id}
 GET        /api/ai/explain/placement/{deployment}
+GET        /api/ai/explain/scaling/{deployment}
+GET        /api/ai/explain/routing/{endpoint}
+GET        /api/ai/explain/failure/{replica}
 POST       /api/ai/policies
 POST       /api/ai/backup
 POST       /api/ai/restore
@@ -80,6 +83,8 @@ GET        /api/ai/events
 GET        /api/ai/model-jobs
 POST       /api/ai/models/{name}/materialize
 GET        /api/ai/models/{name}/status
+POST       /api/ai/models/{name}/verify
+POST       /api/ai/models/cache/evict
 ANY        /api/ai/openai/{endpoint}[/{path}]   # API-key OpenAI gateway (no JWT)
 ```
 
@@ -117,8 +122,11 @@ The gateway validates the key (prefix lookup plus a constant-time HMAC compare,
 endpoint scope, and optional model scope), reserves one lifetime request under
 a per-key lock, then proxies to the Maglev VIP or a ready replica. The upstream
 body is streamed (`text/event-stream` and other non-hop headers are preserved).
-There is no fixed total timeout; the idle timeout between chunks defaults to
-60 seconds (`FLUXVM_AI_GATEWAY_IDLE_SECS`). Dropping the client cancels the
+There is a total upstream deadline of 120 seconds, overridable with
+`x-request-timeout` from 1 to 300 seconds. The idle timeout between chunks
+defaults to 60 seconds (`FLUXVM_AI_GATEWAY_IDLE_SECS`). Set
+`FLUXVM_AI_SHED_QUEUE` to refuse a request when any ready replica's queue
+depth is above that value; unset or `0` does not shed. Dropping the client cancels the
 upstream request. An audit row is written as `ATTEMPT`, then `SUCCESS` or
 `FAILED`. Maglev itself remains L4 and does not see API keys.
 
@@ -226,7 +234,7 @@ Canary uses a separate replica set and the steps 5% / 300s, 20% / 600s, 50% / 90
 
 Blue/green builds the full new replica set, then switches weights in one save. The old set stays until the rollback window ends.
 
-Maturity stays **Preview**. Phases 11–17 below are records and gates, not a production cloud.
+Maturity stays **Preview 2** for a single cluster. The control plane now records revisioned rollouts, content-addressed model jobs (including format scanning and derived optimization artifacts), gateway limits, multi-GPU reservation, site policy, chargeback, and chaos recovery classes. A three-node quorum is used only when `FLUXVM_AI_CONSENSUS=external`. MIG profile changes are refused while a device is allocated. Additional runtimes stay fail-closed until listed in `FLUXVM_AI_ALLOW_RUNTIMES`.
 
 ## Multi-node scheduler (Phase 10)
 
@@ -240,9 +248,9 @@ MIG, NVLink topology, and a per-node agent are not in this slice. An unhealthy G
 
 `POST /api/ai/sites` records a site. Routing spills from a saturated preferred site only to `failover_sites`, and never to a site outside `residency`. `minimum_sites` and `max_replicas_per_site` are enforced by the scheduler. A disconnected site may keep serving a snapshot until `fail_closed_unix` (`edge_may_serve`).
 
-`GET /api/ai/explain/placement/{deployment}` returns the chosen node and why the others were rejected. `POST /api/ai/policies` is a tenant allow-list for model name and source prefix; no policy means the existing tenant filter still applies. `POST /api/ai/backup` and `POST /api/ai/restore` copy desired-state JSON, not model bytes.
+`GET /api/ai/explain/placement/{deployment}` returns the chosen node and why the others were rejected. `GET /api/ai/explain/scaling/{deployment}` reports the instantaneous scale-out, scale-in, or hold signal; the autoscaler still waits its configured seconds before changing the replica count. `GET /api/ai/explain/routing/{endpoint}` says why each replica is included or excluded. `GET /api/ai/explain/failure/{replica}` lists recorded reasons for one replica id or VM name. `POST /api/ai/policies` is a tenant allow-list for model name and source prefix; no policy means the existing tenant filter still applies. `POST /api/ai/backup` and `POST /api/ai/restore` copy desired-state JSON, not model bytes.
 
-Chargeback is `gpu_seconds` and `token_charge` on recorded usage. The only launchable runtime is vLLM; TensorRT-LLM, Triton, and llama.cpp fail closed. This is not Beta or GA: there is no three-node consensus, OIDC, MIG reconfiguration, Kubernetes admission webhooks, or a second inference runtime.
+Chargeback is `GET /api/ai/finops`: GPU-seconds, reserved versus ready GPUs, and the current token window. The only runtime that launches by default is vLLM. TensorRT-LLM, Triton, llama.cpp, and text-embeddings-inference launch when named in `FLUXVM_AI_ALLOW_RUNTIMES`. There is no in-process three-node consensus; set `FLUXVM_AI_CONSENSUS=external` only when that store exists. OIDC remains the control-plane login. The inference gateway accepts scoped API keys and refuses control-plane JWTs unless `FLUXVM_AI_GATEWAY_ACCEPT_JWT=1`.
 
 ```text
 Scale out when:
@@ -298,7 +306,7 @@ stays **Preview**.
 - Per-tenant model / endpoint scoping (existing RBAC + tenant filters)
 - `POST /api/ai/keys` — HMAC-SHA256 with `FLUXVM_AI_KEY_HMAC_SECRET` (a preview default is used when unset). Plaintext is returned once. `GET /api/ai/keys` does not include `secret_hash`
 - Lifetime `request_quota`, plus optional per-key `tokens_per_minute` and `max_concurrent`. The gateway updates the key file under the same exclusive lock as the lifetime quota. In-flight count drops when the client cancels or the upstream stream ends. If the upstream usage object is missing, the request's `max_tokens` is the token count (or 1). Distributed counters across nodes are not in this slice
-- `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file
+- `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file. `POST /api/ai/models/{name}/verify` repeats that check and refuses `.pkl`, `.pickle`, `.pt`, and `.pth` files. A `.safetensors` file is counted and preferred; a `.bin` file is not treated as a pickle. Signatures are not verified.
 - Model paths are canonicalized and must stay under `FLUXVM_AI_MODEL_DIR` or `{state}/ai-models`
 - `license` + `residency` metadata on models; residency copied to deployments. When an endpoint sets `residency`, replicas with no `site` are excluded
 - `InferenceProfile.gpu.count` must be 1
@@ -361,7 +369,8 @@ mounted model directory (`/models`) and starts it.
 
 - Public Hugging Face: Fabric downloads on the host, verifies checksum, bind-mounts into the guest.
 - Private: read `HF_TOKEN` from the **host** environment (same boundary as the Agent Runtime credential broker). Never bake the token into the image.
-- Offline / lab: set `FLUXVM_AI_MODEL_DIR=/path/to/weights` so create skips the download.
+- Offline / lab: set `FLUXVM_AI_MODEL_DIR=/path/to/weights` so create skips the download. That stub directory is not part of the managed cache.
+- `POST /api/ai/models/cache/evict` with `budget_bytes` (or `FLUXVM_AI_MODEL_CACHE_BYTES`) deletes the oldest unreferenced directories under `{state}/ai-models`. A model named by any deployment is kept. The artifact record remains so it can be materialized again.
 
 ### GPU-less smoke
 

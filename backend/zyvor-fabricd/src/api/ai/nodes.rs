@@ -111,3 +111,94 @@ pub async fn heartbeat(
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(node))
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub struct MigRequest {
+    pub profile: String,
+}
+
+fn allocated_bdfs(state: &AppState) -> Vec<(String, String)> {
+    let deployments: Vec<super::types::InferenceDeployment> = state
+        .store
+        .list_entities(super::STORE_DEPLOYMENTS)
+        .unwrap_or_default();
+    deployments
+        .iter()
+        .flat_map(|dep| dep.status.replicas.iter())
+        .filter(|rep| !rep.bdf.is_empty())
+        .map(|rep| (rep.host.clone(), rep.bdf.clone()))
+        .collect()
+}
+
+fn set_gpu_health(
+    state: &AppState,
+    id: &str,
+    bdf: &str,
+    healthy: bool,
+) -> Result<Json<InferenceNode>, (StatusCode, Json<serde_json::Value>)> {
+    let mut node = state
+        .store
+        .get_entity::<InferenceNode>(STORE_NODES, id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "inference node not found"))?;
+    let gpu = node
+        .gpus
+        .iter_mut()
+        .find(|gpu| gpu.bdf.eq_ignore_ascii_case(bdf))
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "GPU not found on node"))?;
+    gpu.healthy = healthy;
+    state
+        .store
+        .save_entity(STORE_NODES, id, &node)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(node))
+}
+
+/// POST /api/ai/nodes/{id}/gpus/{bdf}/quarantine
+pub async fn quarantine_gpu(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((id, bdf)): Path<(String, String)>,
+) -> Result<Json<InferenceNode>, (StatusCode, Json<serde_json::Value>)> {
+    set_gpu_health(&state, &id, &bdf, false)
+}
+
+/// POST /api/ai/nodes/{id}/gpus/{bdf}/restore
+pub async fn restore_gpu(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((id, bdf)): Path<(String, String)>,
+) -> Result<Json<InferenceNode>, (StatusCode, Json<serde_json::Value>)> {
+    set_gpu_health(&state, &id, &bdf, true)
+}
+
+/// POST /api/ai/nodes/{id}/gpus/{bdf}/mig
+pub async fn set_mig(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((id, bdf)): Path<(String, String)>,
+    Json(body): Json<MigRequest>,
+) -> Result<Json<InferenceNode>, (StatusCode, Json<serde_json::Value>)> {
+    if !super::gpu_orch::mig_reconfigure_allowed(&bdf, &allocated_bdfs(&state)) {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "MIG profile cannot change while the GPU is allocated",
+        ));
+    }
+    let mut node = state
+        .store
+        .get_entity::<InferenceNode>(STORE_NODES, &id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "inference node not found"))?;
+    let gpu = node
+        .gpus
+        .iter_mut()
+        .find(|gpu| gpu.bdf.eq_ignore_ascii_case(&bdf))
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "GPU not found on node"))?;
+    gpu.mig_profile = body.profile;
+    state
+        .store
+        .save_entity(STORE_NODES, &id, &node)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(node))
+}

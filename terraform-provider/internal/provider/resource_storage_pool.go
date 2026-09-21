@@ -100,7 +100,11 @@ func (r *storagePoolResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 	pool, err := r.client.GetStoragePool(ctx, state.Name.ValueString())
 	if err != nil {
-		resp.State.RemoveResource(ctx)
+		if IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
 	state.PoolType = types.StringValue(pool.Type)

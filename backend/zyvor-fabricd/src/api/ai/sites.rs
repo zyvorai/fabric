@@ -62,3 +62,31 @@ pub async fn put_site(
     );
     Ok(Json(site))
 }
+
+/// DELETE /api/ai/sites/{id}
+pub async fn delete_site(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    if state
+        .store
+        .get_entity::<AiSite>(STORE_SITES, &id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .is_none()
+    {
+        return Err(err(StatusCode::NOT_FOUND, "site not found"));
+    }
+    state
+        .store
+        .delete_entity(STORE_SITES, &id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    audit(
+        &state,
+        &claims.sub,
+        "DELETE",
+        &format!("ai/sites/{id}"),
+        "SUCCESS",
+    );
+    Ok(StatusCode::NO_CONTENT)
+}

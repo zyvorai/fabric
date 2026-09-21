@@ -1229,6 +1229,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/ai/models/{name}/status",
             get(api::ai::model_jobs::model_status),
         )
+        .route(
+            "/ai/models/{name}/verify",
+            post(api::ai::model_jobs::verify_model),
+        )
+        .route(
+            "/ai/models/{name}/replicate",
+            post(api::ai::model_jobs::replicate),
+        )
+        .route(
+            "/ai/models/{name}/cache/{node}",
+            delete(api::ai::model_jobs::delete_node_cache),
+        )
+        .route("/ai/models/cache/evict", post(api::ai::models::evict_cache))
         .route("/ai/model-jobs", get(api::ai::model_jobs::list_jobs))
         .route(
             "/ai/profiles",
@@ -1313,18 +1326,46 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/ai/nodes/{id}", get(api::ai::nodes::get_node))
         .route("/ai/nodes/{id}/heartbeat", post(api::ai::nodes::heartbeat))
         .route(
+            "/ai/nodes/{id}/gpus/{bdf}/quarantine",
+            post(api::ai::nodes::quarantine_gpu),
+        )
+        .route(
+            "/ai/nodes/{id}/gpus/{bdf}/restore",
+            post(api::ai::nodes::restore_gpu),
+        )
+        .route(
+            "/ai/nodes/{id}/gpus/{bdf}/mig",
+            post(api::ai::nodes::set_mig),
+        )
+        .route(
             "/ai/sites",
             get(api::ai::sites::list_sites).post(api::ai::sites::put_site),
         )
-        .route("/ai/sites/{id}", get(api::ai::sites::get_site))
+        .route(
+            "/ai/sites/{id}",
+            get(api::ai::sites::get_site).delete(api::ai::sites::delete_site),
+        )
         .route(
             "/ai/explain/placement/{deployment}",
             get(api::ai::explain::explain_placement),
+        )
+        .route(
+            "/ai/explain/scaling/{deployment}",
+            get(api::ai::explain::explain_scaling),
+        )
+        .route(
+            "/ai/explain/routing/{endpoint}",
+            get(api::ai::explain::explain_routing),
+        )
+        .route(
+            "/ai/explain/failure/{replica}",
+            get(api::ai::explain::explain_failure),
         )
         .route("/ai/policies", post(api::ai::policy::put_policy))
         .route("/ai/backup", post(api::ai::backup::export_state))
         .route("/ai/restore", post(api::ai::backup::restore_state))
         .route("/ai/capacity", get(api::ai::capacity::capacity))
+        .route("/ai/finops", get(api::ai::finops::report))
         .route("/ai/events", get(api::ai::capacity::events))
         .route(
             "/ai/keys",

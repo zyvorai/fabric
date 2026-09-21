@@ -164,7 +164,11 @@ func (r *inferenceProfileResource) Read(ctx context.Context, req resource.ReadRe
 	}
 	p, err := r.client.GetInferenceProfile(ctx, state.Name.ValueString())
 	if err != nil {
-		resp.State.RemoveResource(ctx)
+		if IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
 	applyProfile(p, &state)

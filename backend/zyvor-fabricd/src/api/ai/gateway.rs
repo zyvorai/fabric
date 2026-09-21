@@ -66,22 +66,30 @@ async fn gateway_inner(
 ) -> Result<Response, (StatusCode, String)> {
     let method = req.method().clone();
     if method == Method::OPTIONS {
-        return Ok(Response::builder()
-            .status(StatusCode::NO_CONTENT)
-            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-            .header(
-                header::ACCESS_CONTROL_ALLOW_HEADERS,
-                "authorization, content-type",
-            )
-            .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
-            .body(Body::empty())
-            .unwrap());
+        return Ok(cors_response());
     }
 
     let secret = extract_bearer(req.headers()).ok_or((
         StatusCode::UNAUTHORIZED,
         "missing or invalid Authorization: Bearer <api-key>".into(),
     ))?;
+    if let Err(msg) = reject_control_plane_jwt(&secret) {
+        return Err((StatusCode::UNAUTHORIZED, msg.into()));
+    }
+
+    let upstream_hint = if path.is_empty() {
+        "/v1/models".to_string()
+    } else if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("/{path}")
+    };
+    if !inference_path_allowed(&upstream_hint) {
+        return Err((
+            StatusCode::NOT_FOUND,
+            format!("inference path '{upstream_hint}' is not served"),
+        ));
+    }
 
     let mut key = keys::verify_api_key(state, &secret)
         .ok_or((StatusCode::UNAUTHORIZED, "invalid API key".into()))?;
@@ -121,10 +129,51 @@ async fn gateway_inner(
     }
 
     let (parts, body) = req.into_parts();
-    let body_bytes = axum::body::to_bytes(body, 1024 * 1024)
-        .await
-        .unwrap_or_default();
+    let limit = body_limit();
+    let body_bytes = axum::body::to_bytes(body, limit).await.map_err(|_| {
+        (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            format!("body exceeds {limit} bytes"),
+        )
+    })?;
     let tokens = keys::requested_tokens(&body_bytes);
+    if let Some(rpm) = gateway_rpm() {
+        admit_endpoint_rate(state, endpoint_name, tokens, rpm)
+            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    }
+    if super::circuit::is_open(&load_breaker(state, endpoint_name), Utc::now().timestamp()) {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "inference circuit is open".into(),
+        ));
+    }
+    request_deadline_secs(
+        parts
+            .headers
+            .get("x-request-timeout")
+            .and_then(|v| v.to_str().ok()),
+        120,
+        300,
+    )
+    .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let depths: Vec<u32> = dep
+        .status
+        .replicas
+        .iter()
+        .filter(|rep| rep.ready)
+        .map(|rep| {
+            rep.metrics
+                .as_ref()
+                .map(|metrics| metrics.queue_depth)
+                .unwrap_or(0)
+        })
+        .collect();
+    if shed_queue(&depths, shed_limit()) {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "inference queue is shedding load".into(),
+        ));
+    }
     key = keys::consume_request(state, &key.id, tokens)
         .await
         .map_err(|e| {
@@ -190,6 +239,7 @@ async fn gateway_inner(
         Ok(resp) if resp.status().is_success() => "SUCCESS",
         _ => "FAILED",
     };
+    record_breaker(state, endpoint_name, outcome != "SUCCESS");
     audit(
         state,
         &format!("apikey:{}", key.prefix),
@@ -233,6 +283,16 @@ async fn proxy_upstream(
         .unwrap_or("application/json")
         .to_string();
     let url = format!("http://{target}{upstream_path}");
+    let deadline = Duration::from_secs(
+        request_deadline_secs(
+            req.headers()
+                .get("x-request-timeout")
+                .and_then(|value| value.to_str().ok()),
+            120,
+            300,
+        )
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
+    );
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .build()
@@ -246,6 +306,7 @@ async fn proxy_upstream(
             &url,
         )
         .header(header::CONTENT_TYPE, incoming_type)
+        .timeout(deadline)
         .body(upstream_body)
         .send()
         .await
@@ -292,6 +353,157 @@ fn idle_timeout() -> Duration {
     Duration::from_secs(secs)
 }
 
+fn body_limit() -> usize {
+    std::env::var("FLUXVM_AI_GATEWAY_MAX_BODY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1024 * 1024)
+}
+
+fn gateway_rpm() -> Option<u64> {
+    std::env::var("FLUXVM_AI_GATEWAY_RPM")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|n| *n > 0)
+}
+
+/// `x-request-timeout` is a whole number of seconds. Missing means `default_secs`.
+pub fn request_deadline_secs(
+    header: Option<&str>,
+    default_secs: u64,
+    max_secs: u64,
+) -> Result<u64, &'static str> {
+    let Some(raw) = header.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(default_secs);
+    };
+    let secs: u64 = raw
+        .parse()
+        .map_err(|_| "x-request-timeout must be a whole number of seconds")?;
+    if secs == 0 || secs > max_secs {
+        return Err("x-request-timeout is outside the allowed range");
+    }
+    Ok(secs)
+}
+
+/// Shed when any ready replica's queue is above `limit`. `0` disables shedding.
+pub fn shed_queue(queue_depths: &[u32], limit: u32) -> bool {
+    limit > 0 && queue_depths.iter().any(|depth| *depth > limit)
+}
+
+fn shed_limit() -> u32 {
+    std::env::var("FLUXVM_AI_SHED_QUEUE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0)
+}
+
+fn cors_origin() -> String {
+    std::env::var("FLUXVM_AI_CORS_ORIGIN").unwrap_or_else(|_| "*".into())
+}
+
+fn cors_origin_value() -> HeaderValue {
+    HeaderValue::from_str(&cors_origin()).unwrap_or_else(|_| HeaderValue::from_static("*"))
+}
+
+fn cors_response() -> Response {
+    Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, cors_origin_value())
+        .header(
+            header::ACCESS_CONTROL_ALLOW_HEADERS,
+            "authorization, content-type",
+        )
+        .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
+        .body(Body::empty())
+        .unwrap()
+}
+
+pub fn inference_path_allowed(path: &str) -> bool {
+    let path = path.trim_start_matches('/');
+    matches!(
+        path,
+        "" | "v1/models"
+            | "v1/chat/completions"
+            | "v1/completions"
+            | "v1/embeddings"
+            | "v1/rerank"
+            | "v1/batches"
+    ) || path.starts_with("v1/batches/")
+}
+
+pub fn reject_control_plane_jwt(secret: &str) -> Result<(), &'static str> {
+    let jwt = secret.split('.').count() == 3 && !secret.starts_with("fvai_");
+    let accept = std::env::var("FLUXVM_AI_GATEWAY_ACCEPT_JWT")
+        .map(|v| v == "1")
+        .unwrap_or(false);
+    if jwt && !accept {
+        Err("inference gateway accepts scoped API keys")
+    } else {
+        Ok(())
+    }
+}
+
+fn load_breaker(state: &AppState, endpoint: &str) -> super::circuit::Breaker {
+    state
+        .store
+        .get_entity(super::STORE_CIRCUITS, endpoint)
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+}
+
+fn record_breaker(state: &AppState, endpoint: &str, failed: bool) {
+    let now = Utc::now().timestamp();
+    let next = super::circuit::observe(load_breaker(state, endpoint), failed, now);
+    let _ = state
+        .store
+        .save_entity(super::STORE_CIRCUITS, endpoint, &next);
+}
+
+fn admit_endpoint_rate(
+    state: &AppState,
+    endpoint: &str,
+    tokens: u64,
+    rpm: u64,
+) -> Result<(), String> {
+    let id = super::limits::counter_id("endpoint", endpoint);
+    let current = state
+        .store
+        .get_entity::<super::limits::RateCounter>(super::STORE_RATE_COUNTERS, &id)
+        .ok()
+        .flatten()
+        .unwrap_or(super::limits::RateCounter {
+            id: id.clone(),
+            window_started_unix: 0,
+            requests: 0,
+            tokens: 0,
+        });
+    if state
+        .store
+        .get_entity::<super::limits::RateCounter>(super::STORE_RATE_COUNTERS, &id)
+        .ok()
+        .flatten()
+        .is_none()
+    {
+        state
+            .store
+            .save_entity(super::STORE_RATE_COUNTERS, &id, &current)
+            .map_err(|e| e.to_string())?;
+    }
+    let updated = state
+        .store
+        .update_entity_exclusive(
+            super::STORE_RATE_COUNTERS,
+            &id,
+            |counter: super::limits::RateCounter| {
+                super::limits::admit(counter, Utc::now().timestamp(), tokens, rpm, 0)
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    let _ = updated;
+    Ok(())
+}
+
 fn copy_response_headers(from: &HeaderMap, to: &mut HeaderMap) {
     for (name, value) in from {
         if is_hop(name.as_str()) {
@@ -304,10 +516,7 @@ fn copy_response_headers(from: &HeaderMap, to: &mut HeaderMap) {
             to.insert(n, v);
         }
     }
-    to.insert(
-        header::ACCESS_CONTROL_ALLOW_ORIGIN,
-        HeaderValue::from_static("*"),
-    );
+    to.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, cors_origin_value());
 }
 
 fn is_hop(name: &str) -> bool {
@@ -455,6 +664,17 @@ mod tests {
     }
 
     #[test]
+    fn deadline_and_shed_gates() {
+        assert_eq!(request_deadline_secs(None, 120, 300).unwrap(), 120);
+        assert_eq!(request_deadline_secs(Some("30"), 120, 300).unwrap(), 30);
+        assert!(request_deadline_secs(Some("0"), 120, 300).is_err());
+        assert!(request_deadline_secs(Some("301"), 120, 300).is_err());
+        assert!(!shed_queue(&[10, 20], 0));
+        assert!(!shed_queue(&[10, 20], 20));
+        assert!(shed_queue(&[10, 21], 20));
+    }
+
+    #[test]
     fn dry_run_sse_is_two_chunks() {
         let body = br#"{"model":"m","stream": true}"#;
         assert!(wants_stream(body));
@@ -465,5 +685,15 @@ mod tests {
         assert!(chunks[0].contains("Fabric"));
         assert!(!chunks[0].contains("[DONE]"));
         assert!(chunks[1].contains("[DONE]"));
+    }
+
+    #[test]
+    fn gateway_serves_openai_paths_and_refuses_a_control_plane_jwt() {
+        assert!(inference_path_allowed("/v1/chat/completions"));
+        assert!(inference_path_allowed("/v1/rerank"));
+        assert!(inference_path_allowed("/v1/batches/job-1"));
+        assert!(!inference_path_allowed("/v1/admin"));
+        assert!(reject_control_plane_jwt("fvai_abc.def.ghi").is_ok());
+        assert!(reject_control_plane_jwt("aaa.bbb.ccc").is_err());
     }
 }

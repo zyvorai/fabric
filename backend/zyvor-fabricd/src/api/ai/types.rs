@@ -293,6 +293,8 @@ pub enum ModelJobState {
     Resolving,
     Downloading,
     Verifying,
+    Scanning,
+    Optimizing,
     Ready,
     Failed,
 }
@@ -317,6 +319,15 @@ pub struct ModelJob {
     pub bytes_written: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub joined_job: Option<String>,
+    /// Downloaded tree. Set before scanning so a restart can continue.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_path: Option<String>,
+    /// Optimization kind. Empty skips the optimizing state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optimize: Option<String>,
+    /// Digest of a derived artifact. The source `digest` is left unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_digest: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -347,6 +358,11 @@ pub struct NodeGpu {
     /// Empty means a full GPU. A non-empty value is the required MIG slice.
     #[serde(default)]
     pub mig_profile: String,
+    /// Parent device when this record is a MIG slice.
+    #[serde(default)]
+    pub parent_bdf: String,
+    #[serde(default)]
+    pub nvlink: bool,
 }
 
 fn default_nvidia() -> String {
@@ -551,6 +567,15 @@ pub struct ModelArtifact {
     /// When true, create fails if checksum cannot be verified (Phase 4).
     #[serde(default)]
     pub require_checksum: bool,
+    /// HMAC-SHA256 hex of `checksum`, keyed by `FLUXVM_AI_MODEL_SIGNING_KEY`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// When set, materialization writes a derived artifact and keeps this digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optimize: Option<String>,
+    /// Source artifact name when this record is an optimization output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_from: Option<String>,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
 }
@@ -574,6 +599,10 @@ pub struct CreateModelArtifactRequest {
     pub residency: Option<String>,
     #[serde(default)]
     pub require_checksum: bool,
+    #[serde(default)]
+    pub signature: Option<String>,
+    #[serde(default)]
+    pub optimize: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

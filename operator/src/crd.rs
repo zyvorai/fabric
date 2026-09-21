@@ -155,6 +155,107 @@ pub struct InferenceDeploymentStatus {
     pub ready_replicas: u32,
 }
 
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "InferenceProfile",
+    plural = "inferenceprofiles",
+    namespaced
+)]
+pub struct InferenceProfileSpec {
+    #[serde(default = "default_vllm_runtime")]
+    pub runtime: String,
+    #[serde(default = "default_replicas")]
+    pub gpu_count: u32,
+    pub cpu: u32,
+    pub memory_gib: u32,
+}
+
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "InferenceEndpoint",
+    plural = "inferenceendpoints",
+    namespaced
+)]
+pub struct InferenceEndpointSpec {
+    pub deployment: String,
+    #[serde(default = "default_openai")]
+    pub protocol: String,
+}
+
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "InferenceRollout",
+    plural = "inferencerollouts",
+    namespaced
+)]
+pub struct InferenceRolloutSpec {
+    pub deployment: String,
+    #[serde(default = "default_rolling")]
+    pub strategy: String,
+}
+
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "GpuNode",
+    plural = "gpunodes",
+    namespaced
+)]
+pub struct GpuNodeSpec {
+    pub site: String,
+}
+
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "AiSite",
+    plural = "aisites",
+    namespaced
+)]
+pub struct AiSiteSpec {
+    #[serde(default)]
+    pub residency: String,
+}
+
+fn default_vllm_runtime() -> String {
+    "vllm".into()
+}
+
+fn default_openai() -> String {
+    "openai".into()
+}
+
+fn default_rolling() -> String {
+    "rolling".into()
+}
+
+pub fn production_ai_kinds() -> &'static [&'static str] {
+    let _ = (
+        std::any::type_name::<InferenceProfile>(),
+        std::any::type_name::<InferenceEndpoint>(),
+        std::any::type_name::<InferenceRollout>(),
+        std::any::type_name::<GpuNode>(),
+        std::any::type_name::<AiSite>(),
+    );
+    &[
+        "ModelArtifact",
+        "InferenceProfile",
+        "InferenceDeployment",
+        "InferenceEndpoint",
+        "InferenceRollout",
+        "GpuNode",
+        "AiSite",
+    ]
+}
+
 // ---------------------------------------------------------------------------
 // ContainerGroup — FluxVM Secure Containers workload, sibling to
 // VirtualMachine. Its `reconcile_container_group` (see reconcile.rs) is a
