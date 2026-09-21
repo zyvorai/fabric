@@ -183,16 +183,27 @@ async fn gateway_inner(
         return Err((StatusCode::PAYLOAD_TOO_LARGE, msg.into()));
     }
     if let Some(daily) = daily_tokens() {
-        admit_daily(state, tokens, daily).map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+        admit_daily_routed(state, tokens, daily).await?;
     }
     let mut streams = StreamHold {
         store: state.store.clone(),
         ids: Vec::new(),
+        remote: None,
+        replicated: super::raft::peers_configured(),
     };
     if let Some((rpm, tpm, cap)) = traffic_caps(global_rpm(), global_tpm(), global_streams()) {
-        if let Some(id) = admit_scope(state, "global", "fabric", tokens, rpm, tpm, cap)
-            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
-        {
+        let admitted = admit_scope_routed(
+            state,
+            &mut streams.remote,
+            "global",
+            "fabric",
+            tokens,
+            rpm,
+            tpm,
+            cap,
+        )
+        .await?;
+        if let Some(id) = admitted {
             streams.ids.push(id);
         }
     }
@@ -200,9 +211,18 @@ async fn gateway_inner(
         if let Some(tenant) = tenant_rate_name(key.tenant.as_deref())
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            if let Some(id) = admit_scope(state, "tenant", tenant, tokens, rpm, tpm, cap)
-                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
-            {
+            let admitted = admit_scope_routed(
+                state,
+                &mut streams.remote,
+                "tenant",
+                tenant,
+                tokens,
+                rpm,
+                tpm,
+                cap,
+            )
+            .await?;
+            if let Some(id) = admitted {
                 streams.ids.push(id);
             }
         }
@@ -216,24 +236,51 @@ async fn gateway_inner(
         )
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            if let Some(id) = admit_scope(state, "project", project, tokens, rpm, tpm, cap)
-                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
-            {
+            let admitted = admit_scope_routed(
+                state,
+                &mut streams.remote,
+                "project",
+                project,
+                tokens,
+                rpm,
+                tpm,
+                cap,
+            )
+            .await?;
+            if let Some(id) = admitted {
                 streams.ids.push(id);
             }
         }
     }
     if let Some((rpm, tpm, cap)) = traffic_caps(gateway_rpm(), gateway_tpm(), gateway_streams()) {
-        if let Some(id) = admit_scope(state, "endpoint", endpoint_name, tokens, rpm, tpm, cap)
-            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
-        {
+        let admitted = admit_scope_routed(
+            state,
+            &mut streams.remote,
+            "endpoint",
+            endpoint_name,
+            tokens,
+            rpm,
+            tpm,
+            cap,
+        )
+        .await?;
+        if let Some(id) = admitted {
             streams.ids.push(id);
         }
     }
     if let Some((rpm, tpm, cap)) = traffic_caps(model_rpm(), model_tpm(), model_streams()) {
-        if let Some(id) = admit_scope(state, "model", &dep.model, tokens, rpm, tpm, cap)
-            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
-        {
+        let admitted = admit_scope_routed(
+            state,
+            &mut streams.remote,
+            "model",
+            &dep.model,
+            tokens,
+            rpm,
+            tpm,
+            cap,
+        )
+        .await?;
+        if let Some(id) = admitted {
             streams.ids.push(id);
         }
     }
@@ -246,9 +293,18 @@ async fn gateway_inner(
         )
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            if let Some(id) = admit_scope(state, "user", user, tokens, rpm, tpm, cap)
-                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?
-            {
+            let admitted = admit_scope_routed(
+                state,
+                &mut streams.remote,
+                "user",
+                user,
+                tokens,
+                rpm,
+                tpm,
+                cap,
+            )
+            .await?;
+            if let Some(id) = admitted {
                 streams.ids.push(id);
             }
         }
@@ -332,7 +388,10 @@ async fn gateway_inner(
             },
         )
         .await;
-        let status = switched.as_ref().map(|resp| resp.status().as_u16()).unwrap_or(502);
+        let status = switched
+            .as_ref()
+            .map(|resp| resp.status().as_u16())
+            .unwrap_or(502);
         super::otel::emit_gateway(endpoint_name, status, tokens);
         return switched;
     }
@@ -390,7 +449,10 @@ async fn gateway_inner(
         Ok(resp) if resp.status().is_success() => "SUCCESS",
         _ => "FAILED",
     };
-    let status = proxied.as_ref().map(|resp| resp.status().as_u16()).unwrap_or(502);
+    let status = proxied
+        .as_ref()
+        .map(|resp| resp.status().as_u16())
+        .unwrap_or(502);
     super::otel::emit_gateway(endpoint_name, status, tokens);
     record_breaker(state, endpoint_name, outcome != "SUCCESS");
     audit(
@@ -406,10 +468,34 @@ async fn gateway_inner(
 struct StreamHold {
     store: state_store::StateStore,
     ids: Vec<String>,
+    remote: Option<String>,
+    replicated: bool,
 }
 
 impl Drop for StreamHold {
     fn drop(&mut self) {
+        if self.ids.is_empty() {
+            return;
+        }
+        if let Some(addr) = self.remote.clone() {
+            let ids = std::mem::take(&mut self.ids);
+            tokio::spawn(async move {
+                for id in ids {
+                    let _ = remote_limit(&addr, super::raft::LeaseCommand::Release { id }).await;
+                }
+            });
+            return;
+        }
+        if self.replicated {
+            let ids = std::mem::take(&mut self.ids);
+            tokio::spawn(async move {
+                for id in ids {
+                    let _ =
+                        super::raft::write_counter(super::raft::LeaseCommand::Release { id }).await;
+                }
+            });
+            return;
+        }
         for id in &self.ids {
             release_stream(&self.store, id);
         }
@@ -1067,6 +1153,150 @@ fn record_breaker(state: &AppState, endpoint: &str, failed: bool) {
         .save_entity(super::STORE_CIRCUITS, endpoint, &next);
 }
 
+async fn remote_limit(
+    addr: &str,
+    command: super::raft::LeaseCommand,
+) -> Result<super::raft::LeaseResponse, (StatusCode, String)> {
+    let token = std::env::var("FLUXVM_AI_RAFT_TOKEN").unwrap_or_default();
+    let url = format!("http://{addr}/api/ai/raft/limits");
+    let response = reqwest::Client::new()
+        .post(url)
+        .header("x-raft-token", token)
+        .json(&command)
+        .send()
+        .await
+        .map_err(|err| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("raft limit: {err}"),
+            )
+        })?;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        return Err((StatusCode::UNAUTHORIZED, "raft token rejected".into()));
+    }
+    if !response.status().is_success() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            format!("raft limit returned {}", response.status()),
+        ));
+    }
+    response.json().await.map_err(|err| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            format!("raft limit: {err}"),
+        )
+    })
+}
+
+fn limit_reply(
+    response: super::raft::LeaseResponse,
+) -> Result<Option<String>, (StatusCode, String)> {
+    match response {
+        super::raft::LeaseResponse::Admitted { stream_id } => Ok(stream_id),
+        super::raft::LeaseResponse::Rejected { message } => {
+            Err((StatusCode::TOO_MANY_REQUESTS, message))
+        }
+        super::raft::LeaseResponse::Released => Ok(None),
+        super::raft::LeaseResponse::Leader { .. } => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unexpected raft limit reply".into(),
+        )),
+    }
+}
+
+async fn admit_scope_routed(
+    state: &AppState,
+    remote: &mut Option<String>,
+    scope: &str,
+    name: &str,
+    tokens: u64,
+    rpm: u64,
+    tpm: u64,
+    cap: u32,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let id = super::limits::counter_id(scope, name);
+    match super::raft::counter_home() {
+        super::raft::CounterHome::Local if super::raft::peers_configured() => {
+            let response = super::raft::write_counter(super::raft::LeaseCommand::Admit {
+                id,
+                now: 0,
+                tokens,
+                rpm,
+                tpm,
+                streams: cap,
+            })
+            .await
+            .map_err(|err| (StatusCode::SERVICE_UNAVAILABLE, err))?;
+            limit_reply(response)
+        }
+        super::raft::CounterHome::Local => admit_scope(state, scope, name, tokens, rpm, tpm, cap)
+            .map_err(|err| (StatusCode::TOO_MANY_REQUESTS, err)),
+        super::raft::CounterHome::Leader(addr) => {
+            if remote.is_none() {
+                *remote = Some(addr.clone());
+            }
+            let response = remote_limit(
+                &addr,
+                super::raft::LeaseCommand::Admit {
+                    id,
+                    now: 0,
+                    tokens,
+                    rpm,
+                    tpm,
+                    streams: cap,
+                },
+            )
+            .await?;
+            limit_reply(response)
+        }
+        super::raft::CounterHome::Unavailable => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "AI raft leader is not elected; rate counters are not split".into(),
+        )),
+    }
+}
+
+async fn admit_daily_routed(
+    state: &AppState,
+    tokens: u64,
+    daily: u64,
+) -> Result<(), (StatusCode, String)> {
+    let id = super::limits::counter_id("global", "day");
+    match super::raft::counter_home() {
+        super::raft::CounterHome::Local if super::raft::peers_configured() => {
+            let response = super::raft::write_counter(super::raft::LeaseCommand::AdmitDay {
+                id,
+                now: 0,
+                tokens,
+                daily,
+            })
+            .await
+            .map_err(|err| (StatusCode::SERVICE_UNAVAILABLE, err))?;
+            limit_reply(response).map(|_| ())
+        }
+        super::raft::CounterHome::Local => {
+            admit_daily(state, tokens, daily).map_err(|err| (StatusCode::TOO_MANY_REQUESTS, err))
+        }
+        super::raft::CounterHome::Leader(addr) => {
+            let response = remote_limit(
+                &addr,
+                super::raft::LeaseCommand::AdmitDay {
+                    id,
+                    now: 0,
+                    tokens,
+                    daily,
+                },
+            )
+            .await?;
+            limit_reply(response).map(|_| ())
+        }
+        super::raft::CounterHome::Unavailable => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "AI raft leader is not elected; rate counters are not split".into(),
+        )),
+    }
+}
+
 fn admit_scope(
     state: &AppState,
     scope: &str,
@@ -1410,6 +1640,41 @@ pub fn would_reject_quota(key: &InferenceApiKey) -> bool {
     key.request_quota.is_some_and(|q| key.requests_used >= q)
 }
 
+fn mtls_websocket_config(
+    cert_path: &str,
+    key_path: &str,
+    ca_path: &str,
+) -> Result<rustls::ClientConfig, String> {
+    let ca = std::fs::read(ca_path).map_err(|err| format!("backend CA: {err}"))?;
+    let mut roots = rustls::RootCertStore::empty();
+    let mut added = false;
+    for item in rustls_pemfile::certs(&mut std::io::Cursor::new(ca)) {
+        roots
+            .add(item.map_err(|err| format!("backend CA: {err}"))?)
+            .map_err(|err| format!("backend CA: {err}"))?;
+        added = true;
+    }
+    if !added {
+        return Err("backend CA: no certificates".into());
+    }
+    let cert_pem = std::fs::read(cert_path).map_err(|err| format!("backend client cert: {err}"))?;
+    let certs = rustls_pemfile::certs(&mut std::io::Cursor::new(cert_pem))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| format!("backend client cert: {err}"))?;
+    let key_pem = std::fs::read(key_path).map_err(|err| format!("backend client key: {err}"))?;
+    let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(key_pem))
+        .map_err(|err| format!("backend client key: {err}"))?
+        .ok_or_else(|| "backend client key: empty".to_string())?;
+    rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::aws_lc_rs::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .map_err(|err| err.to_string())?
+    .with_root_certificates(roots)
+    .with_client_auth_cert(certs, key)
+    .map_err(|err| format!("backend client identity: {err}"))
+}
+
 fn websocket_upgrade(headers: &HeaderMap) -> bool {
     headers
         .get(header::UPGRADE)
@@ -1432,15 +1697,39 @@ async fn proxy_websocket(
     ))?;
     let transport = super::upstream::backend_transport(
         std::env::var("FLUXVM_AI_BACKEND_TLS").ok().as_deref() == Some("1"),
-        std::env::var("FLUXVM_AI_BACKEND_CLIENT_CERT").ok().as_deref(),
-        std::env::var("FLUXVM_AI_BACKEND_CLIENT_KEY").ok().as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_CERT")
+            .ok()
+            .as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_KEY")
+            .ok()
+            .as_deref(),
         std::env::var("FLUXVM_AI_BACKEND_CA").ok().as_deref(),
     )
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
     let url = super::upstream::websocket_origin(&transport, &primary, upstream_path);
-    let (upstream, _) = tokio_tungstenite::connect_async(&url)
-        .await
-        .map_err(|err| (StatusCode::BAD_GATEWAY, format!("upstream websocket: {err}")))?;
+    let connected = match &transport {
+        super::upstream::BackendTransport::Mtls { cert, key, ca } => {
+            let config = mtls_websocket_config(cert, key, ca)
+                .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
+            tokio_tungstenite::connect_async_tls_with_config(
+                url.as_str(),
+                None,
+                false,
+                Some(tokio_tungstenite::Connector::Rustls(Arc::new(config))),
+            )
+            .await
+            .map(|(stream, _)| stream)
+        }
+        _ => tokio_tungstenite::connect_async(&url)
+            .await
+            .map(|(stream, _)| stream),
+    };
+    let upstream = connected.map_err(|err| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("upstream websocket: {err}"),
+        )
+    })?;
     let upgrade = axum::extract::ws::WebSocketUpgrade::from_request_parts(&mut parts, &())
         .await
         .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;

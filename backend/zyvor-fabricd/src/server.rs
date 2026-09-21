@@ -406,6 +406,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/ai/models/{name}/blobs/{digest}",
             put(api::ai::model_jobs::receive_blob),
         )
+        .route("/ai/raft/vote", post(api::ai::raft::vote))
+        .route("/ai/raft/append", post(api::ai::raft::append))
+        .route("/ai/raft/snapshot", post(api::ai::raft::snapshot))
+        .route("/ai/raft/limits", post(api::ai::raft::limit_write))
         .with_state(state.clone());
 
     // Protected API routes
