@@ -160,19 +160,19 @@ async fn gateway_inner(
     if let Some(daily) = daily_tokens() {
         admit_daily(state, tokens, daily).map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
     }
-    if let Some(rpm) = global_rpm() {
-        admit_scope(state, "global", "fabric", tokens, rpm)
+    if let Some((rpm, tpm)) = rate_window(global_rpm(), global_tpm()) {
+        admit_scope(state, "global", "fabric", tokens, rpm, tpm)
             .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
     }
-    if let Some(rpm) = tenant_rpm() {
+    if let Some((rpm, tpm)) = rate_window(tenant_rpm(), tenant_tpm()) {
         if let Some(tenant) = tenant_rate_name(key.tenant.as_deref())
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            admit_scope(state, "tenant", tenant, tokens, rpm)
+            admit_scope(state, "tenant", tenant, tokens, rpm, tpm)
                 .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
         }
     }
-    if let Some(rpm) = project_rpm() {
+    if let Some((rpm, tpm)) = rate_window(project_rpm(), project_tpm()) {
         if let Some(project) = project_id(
             parts
                 .headers
@@ -181,19 +181,19 @@ async fn gateway_inner(
         )
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            admit_scope(state, "project", project, tokens, rpm)
+            admit_scope(state, "project", project, tokens, rpm, tpm)
                 .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
         }
     }
-    if let Some(rpm) = gateway_rpm() {
-        admit_scope(state, "endpoint", endpoint_name, tokens, rpm)
+    if let Some((rpm, tpm)) = rate_window(gateway_rpm(), gateway_tpm()) {
+        admit_scope(state, "endpoint", endpoint_name, tokens, rpm, tpm)
             .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
     }
-    if let Some(rpm) = model_rpm() {
-        admit_scope(state, "model", &dep.model, tokens, rpm)
+    if let Some((rpm, tpm)) = rate_window(model_rpm(), model_tpm()) {
+        admit_scope(state, "model", &dep.model, tokens, rpm, tpm)
             .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
     }
-    if let Some(rpm) = user_rpm() {
+    if let Some((rpm, tpm)) = rate_window(user_rpm(), user_tpm()) {
         if let Some(user) = user_id(
             parts
                 .headers
@@ -202,7 +202,7 @@ async fn gateway_inner(
         )
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
-            admit_scope(state, "user", user, tokens, rpm)
+            admit_scope(state, "user", user, tokens, rpm, tpm)
                 .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
         }
     }
@@ -488,6 +488,41 @@ fn model_rpm() -> Option<u64> {
 
 fn user_rpm() -> Option<u64> {
     env_limit("FLUXVM_AI_USER_RPM")
+}
+
+fn global_tpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_GLOBAL_TPM")
+}
+
+fn tenant_tpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_TENANT_TPM")
+}
+
+fn project_tpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_PROJECT_TPM")
+}
+
+fn gateway_tpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_GATEWAY_TPM")
+}
+
+fn model_tpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_MODEL_TPM")
+}
+
+fn user_tpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_USER_TPM")
+}
+
+/// One stored window when either cap is set. Zero means that cap is off.
+pub fn rate_window(rpm: Option<u64>, tpm: Option<u64>) -> Option<(u64, u64)> {
+    let rpm = rpm.unwrap_or(0);
+    let tpm = tpm.unwrap_or(0);
+    if rpm == 0 && tpm == 0 {
+        None
+    } else {
+        Some((rpm, tpm))
+    }
 }
 
 fn env_limit(name: &str) -> Option<u64> {
@@ -787,6 +822,7 @@ fn admit_scope(
     name: &str,
     tokens: u64,
     rpm: u64,
+    tpm: u64,
 ) -> Result<(), String> {
     let id = super::limits::counter_id(scope, name);
     let current = state
@@ -820,7 +856,7 @@ fn admit_scope(
             super::STORE_RATE_COUNTERS,
             &id,
             |counter: super::limits::RateCounter| {
-                super::limits::admit(counter, Utc::now().timestamp(), tokens, rpm, 0)
+                super::limits::admit(counter, Utc::now().timestamp(), tokens, rpm, tpm)
             },
         )
         .map_err(|e| e.to_string())?;
@@ -1215,6 +1251,10 @@ mod tests {
         assert!(generation_allowed(3, 8, 0, 0).is_ok());
         assert!(generation_allowed(3, 8, 2, 0).is_err());
         assert!(generation_allowed(3, 8, 0, 7).is_err());
+        assert_eq!(rate_window(None, None), None);
+        assert_eq!(rate_window(Some(10), None), Some((10, 0)));
+        assert_eq!(rate_window(None, Some(40)), Some((0, 40)));
+        assert_eq!(rate_window(Some(10), Some(40)), Some((10, 40)));
     }
 
     #[test]

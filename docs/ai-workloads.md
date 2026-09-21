@@ -132,8 +132,10 @@ is `low`, `normal`, or `high`. Low sheds at half that queue and high at double.
 `FLUXVM_AI_MAX_PROMPT_TOKENS` and `FLUXVM_AI_MAX_GENERATED_TOKENS` refuse a call
 whose prompt estimate or `max_tokens` is above that cap. Unset or `0` leaves
 the cap off. `FLUXVM_AI_GLOBAL_RPM`, `FLUXVM_AI_TENANT_RPM`, `FLUXVM_AI_PROJECT_RPM`,
-`FLUXVM_AI_MODEL_RPM`, and `FLUXVM_AI_USER_RPM` use the same stored one-minute
-window as `FLUXVM_AI_GATEWAY_RPM`. The tenant window applies only when the API
+`FLUXVM_AI_MODEL_RPM`, and `FLUXVM_AI_USER_RPM` share one stored one-minute
+window with `FLUXVM_AI_GATEWAY_RPM`. The matching `*_TPM` variables count tokens
+in that same window. A scope is checked when either of its caps is set.
+The tenant window applies only when the API
 key has a tenant. The project window applies only when `x-project-id` is set.
 The user window applies only when `x-user-id` is set. `x-session-id`, or the first 64 characters of the prompt when that header is
 absent, selects one replica. That replica is placed immediately after the VIP,

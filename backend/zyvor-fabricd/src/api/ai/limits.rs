@@ -120,6 +120,22 @@ mod tests {
     }
 
     #[test]
+    fn one_call_counts_once_against_requests_and_tokens() {
+        let counter = RateCounter {
+            id: "model:qwen".into(),
+            window_started_unix: 10,
+            requests: 0,
+            tokens: 0,
+            day_started_unix: 0,
+            day_tokens: 0,
+        };
+        let next = admit(counter, 10, 4, 2, 6).unwrap();
+        assert_eq!(next.requests, 1);
+        assert_eq!(next.tokens, 4);
+        assert!(admit(next, 10, 4, 2, 6).is_err());
+    }
+
+    #[test]
     fn daily_bucket_resets_after_a_day_and_refuses_the_overflow() {
         let counter = RateCounter {
             id: "global:all".into(),
