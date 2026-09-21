@@ -3,6 +3,10 @@
 
 //! Tenant model policy. No policy record means the existing tenant filter stands.
 
+use axum::{extract::State, http::StatusCode, Json};
+use chrono::Timelike;
+use std::sync::Arc;
+
 use crate::server::AppState;
 
 use super::STORE_POLICIES;
@@ -159,6 +163,150 @@ pub fn enforce(
             has_signature: true,
             context_tokens: 0,
             hour: chrono::Timelike::hour(&chrono::Utc::now()) as u8,
+        },
+    )
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AdmitRequest {
+    #[serde(default)]
+    pub tenant: Option<String>,
+    pub model: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub site: String,
+    #[serde(default)]
+    pub gpus: u32,
+    #[serde(default)]
+    pub has_signature: bool,
+    #[serde(default)]
+    pub context_tokens: u32,
+}
+
+/// POST /api/ai/admit
+pub async fn admit(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    admit_body(&state, None, body).await
+}
+
+/// POST /api/ai/admit/{token}
+pub async fn admit_with_token(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(token): axum::extract::Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    admit_body(&state, Some(token.as_str()), body).await
+}
+
+async fn admit_body(
+    state: &AppState,
+    token: Option<&str>,
+    body: serde_json::Value,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    if let Err(message) = admit_token_ok(token) {
+        return Err(super::err(StatusCode::UNAUTHORIZED, message));
+    }
+    let review = body.get("kind").and_then(|kind| kind.as_str()) == Some("AdmissionReview");
+    let request = if review {
+        admit_from_review(&body)
+    } else {
+        serde_json::from_value(body.clone())
+            .map_err(|err| super::err(StatusCode::BAD_REQUEST, err.to_string()))?
+    };
+    let decision = admit_decision(state, &request);
+    if review {
+        let allowed = decision.is_ok();
+        let message = decision.err().unwrap_or_default();
+        return Ok(Json(serde_json::json!({
+            "apiVersion": "admission.k8s.io/v1",
+            "kind": "AdmissionReview",
+            "response": {
+                "uid": body.pointer("/request/uid").and_then(|v| v.as_str()).unwrap_or(""),
+                "allowed": allowed,
+                "status": { "message": message }
+            }
+        })));
+    }
+    decision.map_err(|message| super::err(StatusCode::FORBIDDEN, message))?;
+    Ok(Json(serde_json::json!({"allowed": true})))
+}
+
+fn admit_token_ok(token: Option<&str>) -> Result<(), &'static str> {
+    let expected = std::env::var("FLUXVM_AI_ADMIT_TOKEN").ok();
+    match (expected.as_deref(), token) {
+        (Some(expected), Some(token)) if expected == token && !expected.is_empty() => Ok(()),
+        (Some(_), _) => Err("admit token is required"),
+        (None, None) => Ok(()),
+        (None, Some(_)) => Err("admit token is not configured"),
+    }
+}
+
+fn admit_from_review(body: &serde_json::Value) -> AdmitRequest {
+    let spec = body.pointer("/request/object/spec");
+    AdmitRequest {
+        tenant: spec
+            .and_then(|spec| spec.get("tenant"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        model: spec
+            .and_then(|spec| spec.get("model"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        source: spec
+            .and_then(|spec| spec.get("source"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        site: spec
+            .and_then(|spec| spec.get("site"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        gpus: spec
+            .and_then(|spec| spec.get("gpus"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1) as u32,
+        has_signature: spec
+            .and_then(|spec| spec.get("has_signature"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        context_tokens: spec
+            .and_then(|spec| spec.get("context_tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32,
+    }
+}
+
+pub fn admit_decision(state: &AppState, request: &AdmitRequest) -> Result<(), String> {
+    let Some(tenant) = request
+        .tenant
+        .as_deref()
+        .filter(|tenant| !tenant.is_empty())
+    else {
+        return Ok(());
+    };
+    let Some(policy) = state
+        .store
+        .get_entity::<TenantAiPolicy>(STORE_POLICIES, tenant)
+        .ok()
+        .flatten()
+    else {
+        return Ok(());
+    };
+    evaluate(
+        &policy,
+        &DeployCheck {
+            model: &request.model,
+            source: &request.source,
+            site: &request.site,
+            gpus: request.gpus,
+            has_signature: request.has_signature,
+            context_tokens: request.context_tokens,
+            hour: Timelike::hour(&chrono::Utc::now()) as u8,
         },
     )
 }

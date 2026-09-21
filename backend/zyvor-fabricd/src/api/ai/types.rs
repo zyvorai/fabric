@@ -367,6 +367,15 @@ pub struct NodeGpu {
     pub parent_bdf: String,
     #[serde(default)]
     pub nvlink: bool,
+    /// Degrees Celsius reported by the node. `0` means unknown.
+    #[serde(default)]
+    pub temperature_c: u32,
+    /// Watts reported by the node. `0` means unknown.
+    #[serde(default)]
+    pub power_watts: u32,
+    /// ECC error count reported by the node. `0` means none reported.
+    #[serde(default)]
+    pub ecc_errors: u64,
 }
 
 fn default_nvidia() -> String {

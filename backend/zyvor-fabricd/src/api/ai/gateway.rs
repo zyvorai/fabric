@@ -76,6 +76,7 @@ async fn gateway_inner(
     if let Err(msg) = reject_control_plane_jwt(&secret) {
         return Err((StatusCode::UNAUTHORIZED, msg.into()));
     }
+    let inference_jwt = inference_audience(&secret);
 
     let upstream_hint = if path.is_empty() {
         "/v1/models".to_string()
@@ -91,10 +92,19 @@ async fn gateway_inner(
         ));
     }
 
-    let mut key = keys::verify_api_key(state, &secret)
-        .ok_or((StatusCode::UNAUTHORIZED, "invalid API key".into()))?;
-    keys::ensure_current(&key, Utc::now().timestamp())
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+    let mut key = if inference_jwt {
+        let (_sub, tenant) =
+            crate::api::external_auth::verify_inference_token(&state.http_client, state, &secret)
+                .await
+                .map_err(|err| (StatusCode::UNAUTHORIZED, err))?;
+        oidc_inference_key(endpoint_name, &tenant)
+    } else {
+        let key = keys::verify_api_key(state, &secret)
+            .ok_or((StatusCode::UNAUTHORIZED, "invalid API key".into()))?;
+        keys::ensure_current(&key, Utc::now().timestamp())
+            .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+        key
+    };
 
     if key.endpoint != endpoint_name {
         return Err((
@@ -120,6 +130,19 @@ async fn gateway_inner(
             StatusCode::BAD_GATEWAY,
             format!("deployment '{}' not found", ep.deployment),
         ))?;
+
+    if key.prefix == "oidc" {
+        match (&ep.tenant, &key.tenant) {
+            (Some(expected), Some(got)) if expected == got => {}
+            (Some(_), _) => {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    "inference token tenant does not match the endpoint".into(),
+                ));
+            }
+            (None, _) => {}
+        }
+    }
 
     if let Some(ref model_scope) = key.model {
         if &dep.model != model_scope {
@@ -270,17 +293,19 @@ async fn gateway_inner(
             "inference queue is shedding load".into(),
         ));
     }
-    key = keys::consume_request(state, &key.id, tokens)
-        .await
-        .map_err(|e| {
-            let status = if e.contains("quota") || e.contains("token") || e.contains("concurrency")
-            {
-                StatusCode::TOO_MANY_REQUESTS
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            };
-            (status, e)
-        })?;
+    if key.prefix != "oidc" {
+        key = keys::consume_request(state, &key.id, tokens)
+            .await
+            .map_err(|e| {
+                let status =
+                    if e.contains("quota") || e.contains("token") || e.contains("concurrency") {
+                        StatusCode::TOO_MANY_REQUESTS
+                    } else {
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    };
+                (status, e)
+            })?;
+    }
     let req = Request::from_parts(parts, Body::from(body_bytes.clone()));
 
     let resource = format!("ai/openai/{endpoint_name}/{path}");
@@ -304,7 +329,7 @@ async fn gateway_inner(
         format!("/{path}")
     };
 
-    if dry_run {
+    if dry_run && !janus_replica_ready(&dep) {
         audit(
             state,
             &format!("apikey:{}", key.prefix),
@@ -312,7 +337,9 @@ async fn gateway_inner(
             &resource,
             "SUCCESS",
         );
-        keys::release_concurrency(state, &key.id);
+        if key.prefix != "oidc" {
+            keys::release_concurrency(state, &key.id);
+        }
         return Ok(dry_run_response(
             &method,
             &upstream_path,
@@ -328,7 +355,11 @@ async fn gateway_inner(
         &upstream_path,
         req,
         state.store.clone(),
-        key.id.clone(),
+        if key.prefix == "oidc" {
+            String::new()
+        } else {
+            key.id.clone()
+        },
         streams,
     )
     .await;
@@ -377,8 +408,66 @@ struct ConcurrencyGuard {
 
 impl Drop for ConcurrencyGuard {
     fn drop(&mut self) {
-        keys::release_concurrency_store(&self.store, &self.key_id);
+        if !self.key_id.is_empty() {
+            keys::release_concurrency_store(&self.store, &self.key_id);
+        }
     }
+}
+
+fn inference_client(
+) -> Result<(reqwest::Client, super::upstream::BackendTransport), (StatusCode, String)> {
+    let transport = super::upstream::backend_transport(
+        std::env::var("FLUXVM_AI_BACKEND_TLS").ok().as_deref() == Some("1"),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_CERT")
+            .ok()
+            .as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_KEY")
+            .ok()
+            .as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CA").ok().as_deref(),
+    )
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut builder = reqwest::Client::builder().connect_timeout(Duration::from_secs(10));
+    if let super::upstream::BackendTransport::Mtls { cert, key, ca } = &transport {
+        let mut pem = std::fs::read(key).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("backend client key: {e}"),
+            )
+        })?;
+        if !pem.ends_with(b"\n") {
+            pem.push(b'\n');
+        }
+        pem.extend(std::fs::read(cert).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("backend client cert: {e}"),
+            )
+        })?);
+        let identity = reqwest::Identity::from_pem(&pem).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("backend client identity: {e}"),
+            )
+        })?;
+        let ca_pem = std::fs::read(ca).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("backend CA: {e}"),
+            )
+        })?;
+        let root = reqwest::Certificate::from_pem(&ca_pem).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("backend CA: {e}"),
+            )
+        })?;
+        builder = builder.identity(identity).add_root_certificate(root);
+    }
+    let client = builder
+        .build()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok((client, transport))
 }
 
 async fn proxy_upstream(
@@ -437,16 +526,13 @@ async fn proxy_upstream(
         vip_first,
         &affinity_key(session.as_deref(), &body_bytes),
     );
-    let client = reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let (client, transport) = inference_client()?;
 
     let primary = targets[0].clone();
     let mut result = post_upstream(
         &client,
         method,
-        &format!("http://{primary}{upstream_path}"),
+        &super::upstream::upstream_origin(&transport, &primary, upstream_path),
         &incoming_type,
         deadline,
         &body_bytes,
@@ -457,7 +543,7 @@ async fn proxy_upstream(
             result = post_upstream(
                 &client,
                 method,
-                &format!("http://{alt}{upstream_path}"),
+                &super::upstream::upstream_origin(&transport, &alt, upstream_path),
                 &incoming_type,
                 deadline,
                 &body_bytes,
@@ -886,10 +972,58 @@ pub fn reject_control_plane_jwt(secret: &str) -> Result<(), &'static str> {
     let accept = std::env::var("FLUXVM_AI_GATEWAY_ACCEPT_JWT")
         .map(|v| v == "1")
         .unwrap_or(false);
-    if jwt && !accept {
+    if jwt && !accept && !inference_audience(secret) {
         Err("inference gateway accepts scoped API keys")
     } else {
         Ok(())
+    }
+}
+
+/// Unverified audience peek. It only chooses the verification path.
+pub fn inference_audience(secret: &str) -> bool {
+    let Some(payload) = secret.split('.').nth(1) else {
+        return false;
+    };
+    let Ok(bytes) =
+        base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload).or_else(
+            |_| base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE, payload),
+        )
+    else {
+        return false;
+    };
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return false;
+    };
+    match value.get("aud") {
+        Some(serde_json::Value::String(aud)) => aud == "fabric-inference",
+        Some(serde_json::Value::Array(items)) => items
+            .iter()
+            .any(|item| item.as_str() == Some("fabric-inference")),
+        _ => false,
+    }
+}
+
+fn oidc_inference_key(endpoint: &str, tenant: &str) -> super::types::InferenceApiKey {
+    super::types::InferenceApiKey {
+        id: format!("oidc:{tenant}"),
+        name: "oidc".into(),
+        endpoint: endpoint.to_string(),
+        model: None,
+        tenant: Some(tenant.to_string()),
+        secret_hash: String::new(),
+        prefix: "oidc".into(),
+        request_quota: None,
+        tokens_per_minute: None,
+        max_concurrent: None,
+        requests_used: 0,
+        tokens_used_window: 0,
+        window_started_unix: 0,
+        inflight: 0,
+        not_before_unix: 0,
+        not_after_unix: 0,
+        successor_id: None,
+        created: Utc::now(),
+        last_used: None,
     }
 }
 
@@ -1049,7 +1183,11 @@ fn upstream_targets(ep: &InferenceEndpoint, dep: &InferenceDeployment) -> Vec<St
             continue;
         }
         if let Some(addr) = rep.address.as_deref().filter(|addr| !addr.is_empty()) {
-            let target = format!("{addr}:{}", ep.port);
+            let target = if addr.contains(':') {
+                addr.to_string()
+            } else {
+                format!("{addr}:{}", ep.port)
+            };
             if !targets.iter().any(|existing| existing == &target) {
                 targets.push(target);
             }
@@ -1098,9 +1236,21 @@ pub fn sticky_target(replicas: &[String], key: &str) -> Option<String> {
     Some(ordered[index].clone())
 }
 
+/// True when a ready replica already points at the configured Janus upstream.
+fn janus_replica_ready(dep: &InferenceDeployment) -> bool {
+    let Some(url) = super::janus::janus_url() else {
+        return false;
+    };
+    let hostport = super::janus::replica_hostport(&url);
+    dep.status
+        .replicas
+        .iter()
+        .any(|rep| rep.ready && rep.address.as_deref() == Some(hostport.as_str()))
+}
+
 /// Session id wins. Otherwise the first 64 characters of the prompt are the prefix.
 /// The key is used only to order backends and is not written to the audit log.
-pub fn affinity_key(session: Option<&str>, body: &[u8]) -> String {
+fn affinity_key(session: Option<&str>, body: &[u8]) -> String {
     if let Some(session) = session.map(str::trim).filter(|value| !value.is_empty()) {
         return session.to_string();
     }
@@ -1381,5 +1531,22 @@ mod tests {
         assert!(!inference_path_allowed("/v1/admin"));
         assert!(reject_control_plane_jwt("fvai_abc.def.ghi").is_ok());
         assert!(reject_control_plane_jwt("aaa.bbb.ccc").is_err());
+        let inference = format!(
+            "e30.{}.e30",
+            base64::Engine::encode(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                br#"{"aud":"fabric-inference"}"#
+            )
+        );
+        let control_plane = format!(
+            "e30.{}.e30",
+            base64::Engine::encode(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                br#"{"aud":"zyvor-fabricd"}"#
+            )
+        );
+        assert!(inference_audience(&inference));
+        assert!(reject_control_plane_jwt(&inference).is_ok());
+        assert!(reject_control_plane_jwt(&control_plane).is_err());
     }
 }

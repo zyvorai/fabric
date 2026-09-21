@@ -374,8 +374,26 @@ pub fn requested_tokens(body: &[u8]) -> u64 {
         .unwrap_or(1)
 }
 
+pub fn accept_hmac_secret(value: &str, require_non_default: bool) -> Result<String, String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err("HMAC secret is empty".into());
+    }
+    if require_non_default && value == "fabric-ai-preview-hmac" {
+        return Err("HMAC secret must not be the preview default".into());
+    }
+    Ok(value.to_string())
+}
+
 pub fn hmac_key() -> Result<String, String> {
     let require = std::env::var("FLUXVM_AI_REQUIRE_HMAC").ok().as_deref() == Some("1");
+    if let Ok(path) = std::env::var("FLUXVM_AI_KEY_HMAC_SECRET_FILE") {
+        if !path.is_empty() {
+            let text = std::fs::read_to_string(&path)
+                .map_err(|e| format!("cannot read HMAC secret file: {e}"))?;
+            return accept_hmac_secret(&text, require);
+        }
+    }
     match std::env::var("FLUXVM_AI_KEY_HMAC_SECRET") {
         Ok(value) if !value.is_empty() && value != "fabric-ai-preview-hmac" => Ok(value),
         Ok(value) if !value.is_empty() && !require => Ok(value),
@@ -448,6 +466,10 @@ mod tests {
     fn hash_is_stable() {
         assert_eq!(hash_secret("abc"), hash_secret("abc"));
         assert_ne!(hash_secret("abc"), hash_secret("abd"));
+        assert!(accept_hmac_secret("  real-secret  ", true).is_ok());
+        assert!(accept_hmac_secret("fabric-ai-preview-hmac", true).is_err());
+        assert!(accept_hmac_secret("fabric-ai-preview-hmac", false).is_ok());
+        assert!(accept_hmac_secret("   ", true).is_err());
     }
 
     #[test]

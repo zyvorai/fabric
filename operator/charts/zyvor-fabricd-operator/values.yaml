@@ -25,3 +25,9 @@ resources:
   requests:
     cpu: 100m
     memory: 64Mi
+
+admissionWebhook:
+  enabled: false
+  fabricdUrl: "https://zyvor-fabricd:9095"
+  token: ""
+  caBundle: ""

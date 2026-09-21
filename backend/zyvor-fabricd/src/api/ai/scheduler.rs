@@ -183,6 +183,7 @@ fn free_gpu<'a>(node: &'a InferenceNode, req: &ScheduleRequest) -> Option<&'a No
             && gpu.healthy
             && (!req.require_nvlink || gpu.nvlink)
             && (req.mig_profile.is_empty() || gpu.mig_profile == req.mig_profile)
+            && !node.gpus.iter().any(|other| other.parent_bdf == gpu.bdf)
             && !req
                 .allocated
                 .iter()
@@ -228,6 +229,9 @@ mod tests {
                 mig_profile: String::new(),
                 parent_bdf: String::new(),
                 nvlink: true,
+                temperature_c: 0,
+                power_watts: 0,
+                ecc_errors: 0,
             }],
             taints: vec![],
             cpu_free: 16,

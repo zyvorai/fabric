@@ -1337,6 +1337,13 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/ai/nodes/{id}/gpus/{bdf}/mig",
             post(api::ai::nodes::set_mig),
         )
+        .route("/ai/nodes/{id}/mig", post(api::ai::nodes::create_mig_slice))
+        .route(
+            "/ai/nodes/{id}/mig/{bdf}",
+            axum::routing::delete(api::ai::nodes::delete_mig_slice),
+        )
+        .route("/ai/admit", post(api::ai::policy::admit))
+        .route("/ai/admit/{token}", post(api::ai::policy::admit_with_token))
         .route(
             "/ai/sites",
             get(api::ai::sites::list_sites).post(api::ai::sites::put_site),
@@ -1344,6 +1351,20 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/ai/sites/{id}",
             get(api::ai::sites::get_site).delete(api::ai::sites::delete_site),
+        )
+        .route(
+            "/ai/batches",
+            get(api::ai::batch::list_batches).post(api::ai::batch::create_batch),
+        )
+        .route("/ai/batches/{id}", get(api::ai::batch::get_batch))
+        .route("/ai/batches/{id}/claim", post(api::ai::batch::claim_batch))
+        .route(
+            "/ai/batches/{id}/finish",
+            post(api::ai::batch::finish_batch),
+        )
+        .route(
+            "/ai/batches/{id}/cancel",
+            post(api::ai::batch::cancel_batch),
         )
         .route(
             "/ai/explain/placement/{deployment}",
@@ -1371,10 +1392,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/ai/keys",
             get(api::ai::keys::list_keys).post(api::ai::keys::create_key),
         )
-        .route(
-            "/ai/keys/{id}/rotate",
-            post(api::ai::keys::rotate_key),
-        )
+        .route("/ai/keys/{id}/rotate", post(api::ai::keys::rotate_key))
         .route(
             "/ai/keys/{id}",
             axum::routing::delete(api::ai::keys::delete_key),

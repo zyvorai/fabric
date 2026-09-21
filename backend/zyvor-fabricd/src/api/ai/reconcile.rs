@@ -663,6 +663,11 @@ async fn create_replica(
     };
 
     let inventory = client.list_host_gpus().await.unwrap_or_default();
+    if inventory.is_empty() {
+        if let Some(url) = super::janus::janus_url() {
+            super::janus::sync_nodes(state, &url).await?;
+        }
+    }
     let gpu_req = profile.gpu.clone();
     let scheduled = super::scheduler::decide(
         &registered_nodes(state),
@@ -677,6 +682,36 @@ async fn create_replica(
         super::scheduler::Placement::Legacy => None,
         super::scheduler::Placement::Chosen(choice) => Some(choice.bdf.clone()),
     };
+
+    if inventory.is_empty() {
+        if let Some(url) = super::janus::janus_url() {
+            let site = dep.preferred_site.clone().or_else(|| Some("janus".into()));
+            let ready = scheduled_bdf.is_some();
+            return Ok(InferenceReplica {
+                replica_id,
+                ordinal,
+                vm_name,
+                bdf: scheduled_bdf.unwrap_or_else(|| "janus:unplaced".into()),
+                ready,
+                address: Some(super::janus::replica_hostport(&url)),
+                metrics: None,
+                maglev_weight: None,
+                site,
+                cost_tier: Some(1),
+                draining: false,
+                unhealthy_streak: 0,
+                deployment: String::new(),
+                revision: 0,
+                model_digest: String::new(),
+                profile_digest: String::new(),
+                host: scheduled_host,
+                generation: 0,
+                lifecycle: String::new(),
+                health: String::new(),
+                created_at: None,
+            });
+        }
+    }
 
     if dry_run {
         let site = dep

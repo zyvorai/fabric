@@ -14,6 +14,7 @@
 
 pub mod autoscaling;
 pub mod backup;
+pub mod batch;
 pub mod capacity;
 pub mod circuit;
 pub mod deployments;
@@ -26,6 +27,7 @@ pub mod gateway;
 pub mod gpu_orch;
 pub mod gpus;
 pub mod ipam;
+pub mod janus;
 pub mod keys;
 pub mod lifecycle;
 pub mod limits;
@@ -46,6 +48,7 @@ pub mod scheduler;
 pub mod sites;
 pub mod supply;
 pub mod types;
+pub mod upstream;
 
 pub(crate) const STORE_CIRCUITS: &str = "ai_gateway_circuits";
 pub(crate) const STORE_RATE_COUNTERS: &str = "ai_rate_counters";

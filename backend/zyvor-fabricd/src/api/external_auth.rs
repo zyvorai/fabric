@@ -667,6 +667,109 @@ async fn verify_id_token_jwks(
     verify_id_token_with_key(id_token, issuer, client_id, expected_nonce, alg, &key)
 }
 
+const INFERENCE_AUDIENCE: &str = "fabric-inference";
+
+/// Verify an inference access token. The audience is `fabric-inference` and
+/// there is no OIDC nonce. The caller must already have matched `issuer` to
+/// an enabled provider.
+pub async fn verify_inference_token(
+    http_client: &reqwest::Client,
+    state: &AppState,
+    token: &str,
+) -> Result<(String, String), String> {
+    let issuer = unverified_string_claim(token, "iss")
+        .ok_or_else(|| "inference token has no issuer".to_string())?;
+    let providers = state
+        .store
+        .list_entities::<AuthProvider>("auth_providers")
+        .map_err(|err| err.to_string())?;
+    let provider = providers
+        .into_iter()
+        .find(|provider| {
+            provider.enabled
+                && matches!(provider.provider_type, AuthProviderType::Oidc)
+                && match &provider.config {
+                    AuthProviderConfig::Oidc(config) => issuers_match(&config.issuer_url, &issuer),
+                    AuthProviderConfig::Ldap(_) => false,
+                }
+        })
+        .ok_or_else(|| "no OIDC provider matches the inference token issuer".to_string())?;
+    let AuthProviderConfig::Oidc(config) = provider.config else {
+        return Err("no OIDC provider matches the inference token issuer".into());
+    };
+    let discovery = discover_oidc_endpoints(http_client, &config.issuer_url).await;
+    let jwks_uri = discovery
+        .jwks_uri
+        .ok_or_else(|| "OIDC provider has no jwks_uri".to_string())?;
+    let claims = verify_inference_jwks(http_client, token, &config.issuer_url, &jwks_uri).await?;
+    let sub = claims
+        .get("sub")
+        .and_then(|value| value.as_str())
+        .filter(|sub| !sub.is_empty())
+        .ok_or_else(|| "inference token has no sub".to_string())?;
+    let tenant = claims
+        .get("tenant")
+        .and_then(|value| value.as_str())
+        .filter(|tenant| !tenant.is_empty())
+        .unwrap_or(sub);
+    Ok((sub.to_string(), tenant.to_string()))
+}
+
+fn issuers_match(configured: &str, claimed: &str) -> bool {
+    configured.trim_end_matches('/') == claimed.trim_end_matches('/')
+}
+
+fn unverified_string_claim(token: &str, claim: &str) -> Option<String> {
+    let payload = token.split('.').nth(1)?;
+    let bytes = base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload)
+        .or_else(|_| base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE, payload))
+        .ok()?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    value
+        .get(claim)
+        .and_then(|item| item.as_str())
+        .map(str::to_string)
+}
+
+async fn verify_inference_jwks(
+    http_client: &reqwest::Client,
+    token: &str,
+    issuer: &str,
+    jwks_uri: &str,
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let header =
+        decode_header(token).map_err(|err| format!("Invalid inference token header: {err}"))?;
+    let alg = match header.alg {
+        Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => header.alg,
+        other => {
+            return Err(format!(
+                "Unsupported inference token algorithm {other:?}; only RS256/384/512 are supported"
+            ))
+        }
+    };
+    let mut keys = get_jwks(http_client, jwks_uri, false).await?;
+    let jwk = match select_jwk(&keys, header.kid.as_deref(), alg) {
+        Ok(jwk) => jwk.clone(),
+        Err(_) => {
+            keys = get_jwks(http_client, jwks_uri, true).await?;
+            select_jwk(&keys, header.kid.as_deref(), alg)?.clone()
+        }
+    };
+    let key = decoding_key_from_jwk(&jwk)?;
+    let mut validation = Validation::new(alg);
+    let issuer_trimmed = issuer.trim_end_matches('/');
+    let issuer_slash = format!("{issuer_trimmed}/");
+    validation.set_issuer(&[issuer_trimmed, issuer_slash.as_str()]);
+    validation.set_audience(&[INFERENCE_AUDIENCE]);
+    validation.validate_exp = true;
+    let data = decode::<serde_json::Value>(token, &key, &validation)
+        .map_err(|err| format!("inference token verification failed: {err}"))?;
+    data.claims
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "inference token payload is not a JSON object".to_string())
+}
+
 /// POST /api/auth/oidc/callback - Handle OIDC callback
 ///
 /// Completes the OIDC authorization code flow:

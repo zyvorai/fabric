@@ -202,3 +202,111 @@ pub async fn set_mig(
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(node))
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateMigSlice {
+    pub parent_bdf: String,
+    pub profile: String,
+}
+
+/// POST /api/ai/nodes/{id}/mig
+///
+/// Creates a Janus slice record. It does not call `nvidia-smi`.
+pub async fn create_mig_slice(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<CreateMigSlice>,
+) -> Result<Json<InferenceNode>, (StatusCode, Json<serde_json::Value>)> {
+    let profile = super::gpu_orch::janus_mig_profile(&body.profile)
+        .ok_or_else(|| err(StatusCode::BAD_REQUEST, "unknown Janus MIG profile"))?;
+    if !super::janus::is_janus_bdf(&body.parent_bdf) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "MIG create is only available for a Janus GPU",
+        ));
+    }
+    if !super::gpu_orch::mig_reconfigure_allowed(&body.parent_bdf, &allocated_bdfs(&state)) {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "MIG profile cannot change while the GPU is allocated",
+        ));
+    }
+    let mut node = state
+        .store
+        .get_entity::<InferenceNode>(STORE_NODES, &id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "inference node not found"))?;
+    let parent = node
+        .gpus
+        .iter()
+        .find(|gpu| gpu.bdf == body.parent_bdf && gpu.parent_bdf.is_empty())
+        .cloned()
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "Janus parent GPU not found"))?;
+    if !parent.model.starts_with("janus:") {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "MIG create is only available for a Janus GPU",
+        ));
+    }
+    let existing = node
+        .gpus
+        .iter()
+        .filter(|gpu| gpu.parent_bdf == body.parent_bdf && gpu.mig_profile == profile.name)
+        .count() as u32;
+    if !super::gpu_orch::slice_fits(parent.vram_gib, profile, existing) {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "MIG slice does not fit the parent GPU",
+        ));
+    }
+    node.gpus.push(super::types::NodeGpu {
+        bdf: super::gpu_orch::slice_bdf(&body.parent_bdf, profile.name, existing),
+        vendor: parent.vendor.clone(),
+        vram_gib: profile.memory_gib,
+        model: parent.model.clone(),
+        healthy: true,
+        mig_profile: profile.name.to_string(),
+        parent_bdf: body.parent_bdf,
+        nvlink: false,
+        temperature_c: 0,
+        power_watts: 0,
+        ecc_errors: 0,
+    });
+    state
+        .store
+        .save_entity(STORE_NODES, &node.id, &node)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(node))
+}
+
+/// DELETE /api/ai/nodes/{id}/mig/{bdf}
+pub async fn delete_mig_slice(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path((id, bdf)): Path<(String, String)>,
+) -> Result<Json<InferenceNode>, (StatusCode, Json<serde_json::Value>)> {
+    if allocated_bdfs(&state)
+        .iter()
+        .any(|(host, held)| host == &id && held.eq_ignore_ascii_case(&bdf))
+    {
+        return Err(err(StatusCode::CONFLICT, "MIG slice is still allocated"));
+    }
+    let mut node = state
+        .store
+        .get_entity::<InferenceNode>(STORE_NODES, &id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "inference node not found"))?;
+    let before = node.gpus.len();
+    node.gpus.retain(|gpu| {
+        !(gpu.bdf == bdf && !gpu.parent_bdf.is_empty() && super::janus::is_janus_bdf(&gpu.bdf))
+    });
+    if node.gpus.len() == before {
+        return Err(err(StatusCode::NOT_FOUND, "Janus MIG slice not found"));
+    }
+    state
+        .store
+        .save_entity(STORE_NODES, &node.id, &node)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(node))
+}
