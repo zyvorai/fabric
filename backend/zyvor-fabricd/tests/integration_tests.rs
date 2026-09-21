@@ -921,7 +921,7 @@ async fn test_host_discovery_unreachable() {
         .header("content-type", "application/json")
         .body(Body::from(
             json!({
-                "address": "192.0.2.1",
+                "address": "10.255.255.1",
                 "port": 9999
             })
             .to_string(),
