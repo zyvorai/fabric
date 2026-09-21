@@ -377,6 +377,12 @@ pub struct CreateInferenceProfileRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InferenceReplica {
+    /// Stable id. Empty on records written before ordinals existed.
+    #[serde(default)]
+    pub replica_id: String,
+    /// Allocation ordinal. Not the vector index. Missing on old records.
+    #[serde(default)]
+    pub ordinal: u32,
     pub vm_name: String,
     pub bdf: String,
     pub ready: bool,

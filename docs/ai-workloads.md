@@ -192,9 +192,9 @@ Endpoint VIPs are allocated from a pool that uses Rivora AddressPool syntax
 addresses whose last octet is 0 or 255. For a prefix of /30 or wider, the
 network and broadcast addresses are also skipped (`10.96.0.0/30` yields only
 `.1` and `.2`). Each address is inserted with `create_new`, so two fabricd
-processes cannot take the same VIP. The address is released only after the
-Maglev service delete is confirmed. If that delete fails, the endpoint stays
-`Deleting` and the VIP is kept. Prefixes larger than /16, and IPv6, stay on the
+processes cannot take the same VIP. The address is released when Maglev is
+absent, including a delete that returns 404. If Maglev is still present, or
+FluxVM cannot be reached, the endpoint stays `Deleting` and the VIP is kept. Prefixes larger than /16, and IPv6, stay on the
 Rivora controller.
 
 ## Autoscaling and rollouts (Phase 3)
@@ -228,17 +228,27 @@ zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
 
 `ai_reconcile_controller` runs every 15 seconds and reconciles up to four
 deployments at once. Create, scale, the autoscaler, and that loop take a
-per-deployment lock. A GPU reservation file is created with `create_new` before
-`bind_host_gpu`; if the file already exists, that BDF is skipped. The
-reservation is removed only after a successful `release_host_gpu` (or a bind
-that never happened). A disappeared VM is released the same way. Each tick
-probes `GET /health`, including replicas that are already ready. Three
-consecutive failures clear ready, release the GPU, delete the VM, and let
-scale-up replace it. FluxVM connection and timeout errors leave the deployment
-`Pending`. A missing profile or model is `Failed`. Startup is the first tick.
-The sweep removes reservations and Fabric-managed VMs whose deployment is gone,
-and Maglev services that Fabric recorded for an endpoint that no longer exists.
-It does not delete unrelated FluxVM services. Maturity stays **Preview**.
+per-deployment lock, then a file lease (owner, fencing token, expiry) on the
+state directory. That lease is not an etcd lock: two fabricd processes on
+different hosts still need a shared transactional store. Each replica stores
+`replica_id` and `ordinal`. A new replica takes the first unused ordinal, not
+`replicas.len()`, so replacing one replica cannot collide with another.
+Restart reloads that identity. A GPU or VIP file is
+created with `create_new` before use. An empty or partial file is kept until
+FluxVM shows the GPU or VIP is idle; if the device is still active the file is
+rewritten, not deleted. A reservation that is not yet attached expires; once the VM or
+endpoint exists it is pinned. The reservation is removed only after a
+successful `release_host_gpu` (or a bind that never happened). A disappeared
+VM is released the same way. Each tick probes `GET /health`, including replicas
+that are already ready. Three consecutive failures clear ready, release the
+GPU, delete the VM, and let scale-up replace it. Endpoint delete releases the
+VIP when Maglev is absent, including a DELETE that returns 404. FluxVM
+connection and timeout errors, and a lease held by another process, leave the
+deployment `Pending`. A missing profile or model is `Failed`. Startup is the
+first tick. The sweep removes reservations and Fabric-managed VMs whose
+deployment is gone, and Maglev services that Fabric recorded for an endpoint
+that no longer exists. It does not delete unrelated FluxVM services. Maturity
+stays **Preview**.
 
 ## Security (Phase 4)
 
@@ -339,7 +349,8 @@ show the `/api/ai/openai/{name}` gateway path.
 GitHub Actions workflow `.github/workflows/ai-workloads.yml` runs unit tests for
 routing, autoscaling, rollouts, API keys, gateway quota math, and capacity helpers
 on every PR that touches AI paths. The dry-run smoke job builds
-`zyvor-fabricd` from `backend/Cargo.toml`, restarts fabricd and checks the
+`zyvor-fabricd` from `backend/Cargo.toml`, restarts fabricd twice and checks that
+the deployment phase and replica ids are unchanged, and requires a streaming
 deployment phase is unchanged, and requires a streaming chat to return two SSE
 chunks (`data:` then `[DONE]`). On failure it uploads `fabricd.log`. Lab smoke
 is the same script: `scripts/smoke-ai-workloads-phases.sh`.

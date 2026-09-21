@@ -32,6 +32,8 @@ export interface InferenceProfile {
 }
 
 export interface InferenceReplica {
+  replica_id?: string
+  ordinal?: number
   vm_name: string
   bdf: string
   ready: boolean

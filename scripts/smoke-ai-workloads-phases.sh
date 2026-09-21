@@ -41,34 +41,51 @@ echo "== status =="
 PHASE1=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
 echo "phase=$PHASE1"
 if [[ -n "${FABRICD_BIN:-}" && -n "${FABRICD_PIDFILE:-}" ]]; then
-  echo "== restart fabricd =="
-  old="$(cat "$FABRICD_PIDFILE")"
-  kill "$old" || true
-  for _ in $(seq 1 50); do
-    if ! kill -0 "$old" 2>/dev/null; then
-      break
+  restart_fabricd() {
+    echo "== restart fabricd =="
+    old="$(cat "$FABRICD_PIDFILE")"
+    kill "$old" || true
+    for _ in $(seq 1 50); do
+      if ! kill -0 "$old" 2>/dev/null; then
+        break
+      fi
+      sleep 0.2
+    done
+    "$FABRICD_BIN" >> "${FABRICD_LOG:-/tmp/fabricd-smoke.log}" 2>&1 &
+    echo $! > "$FABRICD_PIDFILE"
+    for _ in $(seq 1 90); do
+      if curl -skf "$FABRIC_URL/health" >/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+    curl -skf "$FABRIC_URL/health" >/dev/null
+  }
+  IDS1=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -c '[.status.replicas[] | {replica_id,ordinal,vm_name}]')
+  for n in 1 2; do
+    restart_fabricd
+    PHASE=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
+    IDS=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -c '[.status.replicas[] | {replica_id,ordinal,vm_name}]')
+    if [[ -z "$PHASE1" || "$PHASE1" == "null" || "$PHASE1" != "$PHASE" ]]; then
+      echo "phase changed across restart $n: $PHASE1 -> $PHASE" >&2
+      exit 1
     fi
-    sleep 0.2
-  done
-  "$FABRICD_BIN" >> "${FABRICD_LOG:-/tmp/fabricd-smoke.log}" 2>&1 &
-  echo $! > "$FABRICD_PIDFILE"
-  for _ in $(seq 1 90); do
-    if curl -skf "$FABRIC_URL/health" >/dev/null; then
-      break
+    if [[ "$IDS" != "$IDS1" ]]; then
+      echo "replica identity changed across restart $n: $IDS1 -> $IDS" >&2
+      exit 1
     fi
-    sleep 1
+    echo "restart $n kept phase $PHASE and replicas $IDS"
   done
-  curl -skf "$FABRIC_URL/health" >/dev/null
 else
   echo "== reconcile again =="
   sleep 16
+  PHASE2=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
+  if [[ -z "$PHASE1" || "$PHASE1" == "null" || "$PHASE1" != "$PHASE2" ]]; then
+    echo "phase changed across reconcile: $PHASE1 -> $PHASE2" >&2
+    exit 1
+  fi
+  echo "phase stayed $PHASE2"
 fi
-PHASE2=$(curl_json "$FABRIC_URL/api/ai/deployments/$NAME" "${auth[@]}" | jq -r .status.phase)
-if [[ -z "$PHASE1" || "$PHASE1" == "null" || "$PHASE1" != "$PHASE2" ]]; then
-  echo "phase changed across reconcile: $PHASE1 -> $PHASE2" >&2
-  exit 1
-fi
-echo "phase stayed $PHASE2"
 
 echo "== endpoint =="
 curl_json -X POST "$FABRIC_URL/api/ai/endpoints" "${auth[@]}" \

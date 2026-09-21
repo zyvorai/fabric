@@ -390,6 +390,8 @@ mod tests {
 
     fn rep(name: &str, queue: u32, ttft: f64, cache: f64) -> InferenceReplica {
         InferenceReplica {
+            replica_id: name.into(),
+            ordinal: 0,
             vm_name: name.into(),
             bdf: "0000:01:00.0".into(),
             ready: true,

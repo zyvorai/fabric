@@ -21,13 +21,25 @@ use serde::{Deserialize, Serialize};
 
 use crate::server::AppState;
 
+use super::types::InferenceEndpoint;
+use super::STORE_ENDPOINTS;
+
 pub const STORE_VIPS: &str = "ai_vip_allocations";
+/// Unpinned reservations older than this can be reclaimed. Zero means held.
+pub const RESERVATION_TTL_SECS: i64 = 1800;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VipAllocation {
     pub vip: String,
     pub endpoint: String,
     pub pool: String,
+    #[serde(default)]
+    pub owner: String,
+    #[serde(default)]
+    pub created_unix: i64,
+    /// `0` once the endpoint record exists. Until then, expiry reclaims a crash.
+    #[serde(default)]
+    pub expires_unix: i64,
 }
 
 fn ipam_lock() -> &'static Mutex<()> {
@@ -79,17 +91,27 @@ pub fn next_free(
 /// A lost create-new race retries the next free address.
 pub fn reserve(state: &AppState, endpoint: &str) -> Result<String, String> {
     let _guard = ipam_lock().lock().unwrap_or_else(|e| e.into_inner());
+    let mut blocked = HashSet::new();
     for _ in 0..64 {
         let all: Vec<VipAllocation> = state.store.list_entities(STORE_VIPS).unwrap_or_default();
         if let Some(existing) = all.iter().find(|a| a.endpoint == endpoint) {
             return Ok(existing.vip.clone());
         }
-        let used: HashSet<String> = all.iter().map(|a| a.vip.clone()).collect();
+        let mut used: HashSet<String> = all.iter().map(|a| a.vip.clone()).collect();
+        if let Ok(unreadable) = state.store.list_unreadable_entities(STORE_VIPS) {
+            used.extend(unreadable);
+        }
+        used.extend(blocked.iter().cloned());
         let specs = pool_specs();
         let vip = next_free(&used, &specs, avoid_buggy_ips())?;
         match save_allocation(state, &vip, endpoint) {
             Ok(()) => return Ok(vip),
-            Err(e) if e.starts_with("conflict:") => continue,
+            Err(e) if e.starts_with("conflict:") => {
+                if !reclaim_stale_vip(state, &vip) {
+                    blocked.insert(vip);
+                }
+                continue;
+            }
             Err(e) => return Err(e),
         }
     }
@@ -127,11 +149,30 @@ pub fn release(state: &AppState, endpoint: &str) {
     }
 }
 
+/// Mark an allocation permanent once the endpoint record is stored.
+pub fn pin(state: &AppState, endpoint: &str) {
+    let _guard = ipam_lock().lock().unwrap_or_else(|e| e.into_inner());
+    let all: Vec<VipAllocation> = state.store.list_entities(STORE_VIPS).unwrap_or_default();
+    for mut rec in all.into_iter().filter(|a| a.endpoint == endpoint) {
+        rec.expires_unix = 0;
+        let _ = state.store.save_entity(STORE_VIPS, &rec.vip, &rec);
+    }
+}
+
+/// A reservation that nobody holds and whose lease has expired can be taken.
+pub fn reservation_reclaimable(expires_unix: i64, held: bool, now: i64) -> bool {
+    !held && expires_unix > 0 && now >= expires_unix
+}
+
 fn save_allocation(state: &AppState, vip: &str, endpoint: &str) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp();
     let rec = VipAllocation {
         vip: vip.to_string(),
         endpoint: endpoint.to_string(),
         pool: "default".into(),
+        owner: format!("fabricd-{}", std::process::id()),
+        created_unix: now,
+        expires_unix: now.saturating_add(RESERVATION_TTL_SECS),
     };
     match state.store.try_create_entity(STORE_VIPS, vip, &rec) {
         Ok(()) => Ok(()),
@@ -140,6 +181,22 @@ fn save_allocation(state: &AppState, vip: &str, endpoint: &str) -> Result<(), St
         }
         Err(e) => Err(e.to_string()),
     }
+}
+
+fn reclaim_stale_vip(state: &AppState, vip: &str) -> bool {
+    let Ok(Some(rec)) = state.store.get_entity::<VipAllocation>(STORE_VIPS, vip) else {
+        return false;
+    };
+    let held = state
+        .store
+        .get_entity::<InferenceEndpoint>(STORE_ENDPOINTS, &rec.endpoint)
+        .ok()
+        .flatten()
+        .is_some();
+    if reservation_reclaimable(rec.expires_unix, held, chrono::Utc::now().timestamp()) {
+        return state.store.delete_entity(STORE_VIPS, vip).is_ok();
+    }
+    false
 }
 
 fn address_in_pool(vip: &str, specs: &[String], avoid_buggy: bool) -> Result<bool, String> {
@@ -321,6 +378,14 @@ fn is_network_or_broadcast(addr: Ipv4Addr, network: Ipv4Addr, prefix: u32) -> bo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expired_unheld_reservation_can_be_reclaimed() {
+        assert!(!reservation_reclaimable(0, false, 100));
+        assert!(!reservation_reclaimable(200, true, 300));
+        assert!(!reservation_reclaimable(200, false, 100));
+        assert!(reservation_reclaimable(200, false, 200));
+    }
 
     #[test]
     fn does_not_reuse_and_release_frees() {

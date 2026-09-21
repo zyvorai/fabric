@@ -297,6 +297,8 @@ mod tests {
             status: crate::api::ai::types::InferenceDeploymentStatus {
                 phase: "Ready".into(),
                 replicas: vec![InferenceReplica {
+                    replica_id: "d-r000000".into(),
+                    ordinal: 0,
                     vm_name: "d-0".into(),
                     bdf: "x".into(),
                     ready: true,

@@ -13,12 +13,14 @@
 //! REST layer. Set `FLUXVM_AI_DRY_RUN=1` to skip bind/create and only update
 //! status bookkeeping.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 use vm_model::{BindMount, CloudInitFile, VMStartOptions, VM};
-use zyvor_fabric_fluxvm_client::{FluxVmClient, GpuBindRequest, GpuReleaseRequest};
+use zyvor_fabric_fluxvm_client::{
+    FluxVmClient, GpuBindRequest, GpuReleaseRequest, HostGpu, NetworkServiceSpec, VmRecord,
+};
 
 use crate::server::AppState;
 
@@ -36,12 +38,21 @@ const HEALTH_PATH: &str = "/health";
 const STORE_GPU_RESERVATIONS: &str = "ai_gpu_reservations";
 const STORE_MANAGED_VMS: &str = "ai_managed_vms";
 const STORE_MAGLEV: &str = "ai_maglev_services";
+const STORE_DEPLOYMENT_LEASES: &str = "ai_deployment_leases";
+const STORE_ENDPOINT_LEASES: &str = "ai_endpoint_leases";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct GpuReservation {
     bdf: String,
     deployment: String,
     vm_name: String,
+    #[serde(default)]
+    owner: String,
+    #[serde(default)]
+    created_unix: i64,
+    /// `0` after the VM is running. Until then the reservation expires.
+    #[serde(default)]
+    expires_unix: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,9 +80,17 @@ fn deployment_lock(name: &str) -> Arc<tokio::sync::Mutex<()>> {
 }
 
 /// Serialize create, scale, autoscaler, and the periodic loop for one deployment.
+/// The in-process mutex is the fast path. The file lease excludes another
+/// fabricd on the same state directory. It is not an etcd lease.
 pub async fn locked_reconcile(state: &AppState, name: &str) -> Result<(), String> {
     let lock = deployment_lock(name);
     let _guard = lock.lock().await;
+    let _lease = hold_reconcile_lease(
+        state,
+        STORE_DEPLOYMENT_LEASES,
+        name,
+        &format!("deployment/{name}"),
+    )?;
     reconcile_deployment(state, name).await
 }
 
@@ -81,6 +100,7 @@ pub async fn run_ai_reconcile_controller(state: Arc<AppState>) {
     let sem = Arc::new(tokio::sync::Semaphore::new(4));
     loop {
         interval.tick().await;
+        recover_reservations(&state).await;
         let names: Vec<String> = state
             .store
             .list_entities::<InferenceDeployment>(STORE_DEPLOYMENTS)
@@ -149,6 +169,7 @@ pub fn is_retryable_fluxvm(error: &str) -> bool {
         || lower.contains("connection")
         || lower.contains("connect")
         || lower.contains("temporarily")
+        || lower.contains("lease held")
 }
 
 pub fn is_hard_failure(error: &str) -> bool {
@@ -166,15 +187,84 @@ pub fn note_health(streak: u32, healthy: bool) -> (u32, bool) {
     }
 }
 
-/// Release the VIP only after Maglev deletion is confirmed.
-pub fn should_release_vip(deleted: bool, confirmed_absent: bool) -> Result<(), &'static str> {
-    if !deleted {
-        return Err("Maglev delete failed; VIP retained");
-    }
+/// Release the VIP when Maglev is confirmed absent. A successful delete is not
+/// required: DELETE 404 and a follow-up GET 404 both mean the service is gone.
+pub fn should_release_vip(confirmed_absent: bool) -> Result<(), &'static str> {
     if !confirmed_absent {
         return Err("Maglev service still present; VIP retained");
     }
     Ok(())
+}
+
+pub fn is_fluxvm_not_found(err: &str) -> bool {
+    let lower = err.to_ascii_lowercase();
+    lower.contains("404") || lower.contains("not found")
+}
+
+/// `get_ok` means the service was read and is still present.
+/// Absence is a not-found GET, a not-found DELETE, or a DELETE that succeeded
+/// when the GET does not show the service is still there.
+pub fn maglev_is_absent(delete_error: Option<&str>, get_ok: bool, get_error: Option<&str>) -> bool {
+    if get_ok {
+        return false;
+    }
+    if get_error.is_some_and(is_fluxvm_not_found) {
+        return true;
+    }
+    delete_error.is_none() || delete_error.is_some_and(is_fluxvm_not_found)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EndpointTeardownPlan {
+    pub release_vip: bool,
+    pub delete_endpoint: bool,
+}
+
+/// Already-absent Maglev (DELETE or GET 404) releases the VIP and drops the endpoint.
+pub fn plan_endpoint_teardown(
+    delete_error: Option<&str>,
+    get_ok: bool,
+    get_error: Option<&str>,
+) -> Result<EndpointTeardownPlan, &'static str> {
+    should_release_vip(maglev_is_absent(delete_error, get_ok, get_error))?;
+    Ok(EndpointTeardownPlan {
+        release_vip: true,
+        delete_endpoint: true,
+    })
+}
+
+/// First unused ordinal. Identity is this number, not `replicas.len()`.
+pub fn next_replica_ordinal(replicas: &[InferenceReplica]) -> u32 {
+    let used: HashSet<u32> = replicas.iter().map(|r| r.ordinal).collect();
+    (0..).find(|n| !used.contains(n)).unwrap()
+}
+
+pub fn replica_vm_name(deployment: &str, ordinal: u32) -> String {
+    format!("{deployment}-{ordinal}")
+}
+
+pub fn replica_id_for(deployment: &str, ordinal: u32) -> String {
+    format!("{deployment}-r{ordinal:06}")
+}
+
+/// Old records have no `replica_id`. Fill it from the VM name so restart
+/// keeps the same ordinal instead of treating every replica as 0.
+pub fn ensure_replica_identity(deployment: &str, rep: &mut InferenceReplica) {
+    if !rep.replica_id.is_empty() {
+        return;
+    }
+    if let Some(n) = ordinal_from_vm_name(deployment, &rep.vm_name) {
+        rep.ordinal = n;
+    }
+    rep.replica_id = replica_id_for(deployment, rep.ordinal);
+}
+
+fn ordinal_from_vm_name(deployment: &str, vm_name: &str) -> Option<u32> {
+    let rest = vm_name.strip_prefix(&format!("{deployment}-"))?;
+    if rest.is_empty() || !rest.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    rest.parse().ok()
 }
 
 /// Spawn a background Maglev upsert for an endpoint.
@@ -192,6 +282,9 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
         .get_entity(STORE_DEPLOYMENTS, name)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("deployment '{name}' not found"))?;
+    for rep in &mut dep.status.replicas {
+        ensure_replica_identity(&dep.name, rep);
+    }
 
     let profile: InferenceProfile = state
         .store
@@ -265,10 +358,10 @@ pub async fn reconcile_deployment(state: &AppState, name: &str) -> Result<(), St
         apply_health(state, &mut dep).await;
     }
 
-    // Scale up.
+    // Scale up. The ordinal is the first unused number, not `replicas.len()`.
     while dep.status.replicas.len() < dep.replicas as usize {
-        let idx = dep.status.replicas.len();
-        match create_replica(state, &dep, &profile, &model_host, idx, dry_run).await {
+        let ordinal = next_replica_ordinal(&dep.status.replicas);
+        match create_replica(state, &dep, &profile, &model_host, ordinal, dry_run).await {
             Ok(rep) => dep.status.replicas.push(rep),
             Err(e) => {
                 dep.status.phase = "Pending".into();
@@ -319,10 +412,11 @@ async fn create_replica(
     dep: &InferenceDeployment,
     profile: &InferenceProfile,
     model_host: &str,
-    idx: usize,
+    ordinal: u32,
     dry_run: bool,
 ) -> Result<InferenceReplica, String> {
-    let vm_name = format!("{}-{}", dep.name, idx);
+    let vm_name = replica_vm_name(&dep.name, ordinal);
+    let replica_id = replica_id_for(&dep.name, ordinal);
     crate::validation::validate_vm_name(&vm_name).map_err(|(_, m)| m)?;
 
     let client = match fluxvm_client(state) {
@@ -346,10 +440,12 @@ async fn create_replica(
             .clone()
             .or_else(|| std::env::var("FLUXVM_AI_SITE").ok());
         return Ok(InferenceReplica {
+            replica_id,
+            ordinal,
             vm_name,
-            bdf: format!("dry-run-{idx}"),
+            bdf: format!("dry-run-{ordinal}"),
             ready: true,
-            address: Some(format!("10.255.0.{}", idx + 1)),
+            address: Some(format!("10.255.0.{}", ordinal + 1)),
             metrics: None,
             maglev_weight: None,
             site,
@@ -372,10 +468,14 @@ async fn create_replica(
         let picked = place_gpus(&inventory, &gpu_req, &allocated)?;
         let gpu = &picked[0];
         let bdf = gpu.bdf.clone();
+        let now = Utc::now().timestamp();
         let reservation = GpuReservation {
             bdf: bdf.clone(),
             deployment: dep.name.clone(),
             vm_name: vm_name.clone(),
+            owner: fabricd_owner().to_string(),
+            created_unix: now,
+            expires_unix: now.saturating_add(ipam::RESERVATION_TTL_SECS),
         };
         match state
             .store
@@ -385,7 +485,10 @@ async fn create_replica(
                 reserved = Some((bdf, gpu.vram_gib));
                 break;
             }
-            Err(e) if state_store::is_entity_conflict(&e) => continue,
+            Err(e) if state_store::is_entity_conflict(&e) => {
+                let _ = release_stale_gpu_reservation(state, &bdf);
+                continue;
+            }
             Err(e) => return Err(e.to_string()),
         }
     }
@@ -504,6 +607,18 @@ async fn create_replica(
             deployment: dep.name.clone(),
         },
     );
+    let _ = state.store.save_entity(
+        STORE_GPU_RESERVATIONS,
+        &bdf,
+        &GpuReservation {
+            bdf: bdf.clone(),
+            deployment: dep.name.clone(),
+            vm_name: vm_name.clone(),
+            owner: fabricd_owner().to_string(),
+            created_unix: Utc::now().timestamp(),
+            expires_unix: 0,
+        },
+    );
 
     // Best-effort guest IP from FluxVM record.
     let address = match client.find_by_name(&vm_name).await {
@@ -512,6 +627,8 @@ async fn create_replica(
     };
 
     Ok(InferenceReplica {
+        replica_id,
+        ordinal,
         vm_name,
         bdf,
         ready: false,
@@ -586,6 +703,7 @@ pub async fn teardown_deployment(
 }
 
 pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), String> {
+    let _lease = acquire_endpoint_lease(state, name)?;
     let mut ep: InferenceEndpoint = state
         .store
         .get_entity(STORE_ENDPOINTS, name)
@@ -620,6 +738,7 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
             ep.vip = Some(vip);
             ep.updated = Utc::now();
             let _ = state.store.save_entity(STORE_ENDPOINTS, &ep.name, &ep);
+            ipam::pin(state, &ep.name);
             return Ok(());
         }
     };
@@ -641,6 +760,7 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
                 .store
                 .save_entity(STORE_ENDPOINTS, &ep.name, &ep)
                 .map_err(|e| e.to_string())?;
+            ipam::pin(state, &ep.name);
             Ok(())
         }
         Err(e) => {
@@ -648,12 +768,14 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
             ep.vip = Some(vip);
             ep.updated = Utc::now();
             let _ = state.store.save_entity(STORE_ENDPOINTS, &ep.name, &ep);
+            ipam::pin(state, &ep.name);
             Err(e.to_string())
         }
     }
 }
 
 pub async fn teardown_endpoint(state: &AppState, ep: &InferenceEndpoint) -> Result<(), String> {
+    let _lease = acquire_endpoint_lease(state, &ep.name)?;
     let mut ep = ep.clone();
     ep.phase = "Deleting".into();
     ep.updated = Utc::now();
@@ -675,20 +797,278 @@ pub async fn teardown_endpoint(state: &AppState, ep: &InferenceEndpoint) -> Resu
                 .unwrap_or("FluxVM unavailable; VIP retained")
                 .to_string()
         })?;
-        let deleted = client.delete_network_service(&ep.name).await.is_ok();
-        let confirmed_absent = match client.get_network_service(&ep.name).await {
-            Ok(_) => false,
-            Err(e) => {
-                let msg = e.to_string().to_ascii_lowercase();
-                msg.contains("404") || msg.contains("not found")
-            }
+        let delete_error = match client.delete_network_service(&ep.name).await {
+            Ok(_) => None,
+            Err(e) => Some(e.to_string()),
         };
-        should_release_vip(deleted, confirmed_absent).map_err(|e| e.to_string())?;
+        let (get_ok, get_error) = match client.get_network_service(&ep.name).await {
+            Ok(_) => (true, None),
+            Err(e) => (false, Some(e.to_string())),
+        };
+        plan_endpoint_teardown(delete_error.as_deref(), get_ok, get_error.as_deref())
+            .map_err(|e| e.to_string())?;
     }
 
     let _ = state.store.delete_entity(STORE_MAGLEV, &ep.name);
     ipam::release(state, &ep.name);
     Ok(())
+}
+
+/// Same-host reconcile lease. The flock excludes another fabricd on this
+/// state directory. Health replacement, scale, and autoscaling all enter
+/// through `locked_reconcile`. Multi-node HA still needs a transactional store.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReconcileLease {
+    pub resource: String,
+    pub owner: String,
+    pub fencing_token: u64,
+    pub acquired_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+struct HeldReconcileLease {
+    _guard: state_store::FileLease,
+}
+
+fn hold_reconcile_lease(
+    state: &AppState,
+    subdir: &str,
+    id: &str,
+    resource: &str,
+) -> Result<HeldReconcileLease, String> {
+    let guard = state
+        .store
+        .try_acquire_lease(subdir, id, fabricd_owner(), 120, resource)
+        .map_err(|e| {
+            if e.to_string().contains("lease held") {
+                format!("lease held: {e}")
+            } else {
+                e.to_string()
+            }
+        })?;
+    let record = ReconcileLease {
+        resource: guard.resource.clone(),
+        owner: guard.owner.clone(),
+        fencing_token: guard.fencing_token,
+        acquired_at: DateTime::from_timestamp(guard.acquired_unix, 0).unwrap_or_else(Utc::now),
+        expires_at: DateTime::from_timestamp(guard.expires_unix, 0).unwrap_or_else(Utc::now),
+    };
+    tracing::debug!(
+        resource = %record.resource,
+        token = record.fencing_token,
+        "reconcile lease"
+    );
+    Ok(HeldReconcileLease { _guard: guard })
+}
+
+fn fabricd_owner() -> &'static str {
+    static OWNER: OnceLock<String> = OnceLock::new();
+    OWNER.get_or_init(|| format!("fabricd-{}-{}", std::process::id(), Utc::now().timestamp()))
+}
+
+fn acquire_endpoint_lease(state: &AppState, name: &str) -> Result<HeldReconcileLease, String> {
+    hold_reconcile_lease(
+        state,
+        STORE_ENDPOINT_LEASES,
+        name,
+        &format!("endpoint/{name}"),
+    )
+}
+
+fn replica_bdfs(state: &AppState) -> HashSet<String> {
+    state
+        .store
+        .list_entities::<InferenceDeployment>(STORE_DEPLOYMENTS)
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|d| d.status.replicas.into_iter())
+        .map(|r| r.bdf.to_ascii_lowercase())
+        .filter(|b| !b.is_empty() && !b.starts_with("dry-run-"))
+        .collect()
+}
+
+fn release_stale_gpu_reservation(state: &AppState, bdf: &str) -> bool {
+    let rec = match state
+        .store
+        .get_entity::<GpuReservation>(STORE_GPU_RESERVATIONS, bdf)
+    {
+        Ok(Some(rec)) => rec,
+        Ok(None) => return true,
+        Err(_) => return false,
+    };
+    let held = replica_bdfs(state).contains(&rec.bdf.to_ascii_lowercase());
+    if ipam::reservation_reclaimable(rec.expires_unix, held, Utc::now().timestamp()) {
+        return state
+            .store
+            .delete_entity(STORE_GPU_RESERVATIONS, bdf)
+            .is_ok();
+    }
+    false
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiveCheck {
+    Unknown,
+    Active,
+    Idle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CorruptAction {
+    Keep,
+    Repair,
+    Reclaim,
+}
+
+/// Unreadable JSON is not deleted until FluxVM shows the device is idle.
+pub fn corrupt_reservation_action(check: LiveCheck) -> CorruptAction {
+    match check {
+        LiveCheck::Unknown => CorruptAction::Keep,
+        LiveCheck::Active => CorruptAction::Repair,
+        LiveCheck::Idle => CorruptAction::Reclaim,
+    }
+}
+
+fn gpu_live_check(bdf: &str, gpus: &[HostGpu], vms: &[VmRecord]) -> LiveCheck {
+    let active = gpus
+        .iter()
+        .any(|g| g.bdf.eq_ignore_ascii_case(bdf) && (g.group_bound_to_vfio || g.group_held))
+        || vms.iter().any(|vm| {
+            vm.request
+                .vfio_devices
+                .iter()
+                .any(|d| d.eq_ignore_ascii_case(bdf))
+        });
+    if active {
+        LiveCheck::Active
+    } else {
+        LiveCheck::Idle
+    }
+}
+
+fn vip_live_check(vip: &str, services: &[NetworkServiceSpec]) -> LiveCheck {
+    if services.iter().any(|s| s.vip == vip) {
+        LiveCheck::Active
+    } else {
+        LiveCheck::Idle
+    }
+}
+
+async fn recover_reservations(state: &AppState) {
+    let gpu_ids = state
+        .store
+        .list_unreadable_entities(STORE_GPU_RESERVATIONS)
+        .unwrap_or_default();
+    let vip_ids = state
+        .store
+        .list_unreadable_entities(ipam::STORE_VIPS)
+        .unwrap_or_default();
+    let client = fluxvm_client(state).ok();
+    let gpus = match &client {
+        Some(c) => c.list_host_gpus().await.ok(),
+        None => None,
+    };
+    let vms = match &client {
+        Some(c) => c.list_vms().await.ok(),
+        None => None,
+    };
+    let services = match &client {
+        Some(c) => c.list_network_services().await.ok(),
+        None => None,
+    };
+    for id in gpu_ids {
+        let check = match (&gpus, &vms) {
+            (Some(gpus), Some(vms)) => gpu_live_check(&id, gpus, vms),
+            _ => LiveCheck::Unknown,
+        };
+        apply_corrupt_gpu(state, &id, check);
+    }
+    for id in vip_ids {
+        let check = match &services {
+            Some(services) => vip_live_check(&id, services),
+            None => LiveCheck::Unknown,
+        };
+        apply_corrupt_vip(state, &id, check);
+    }
+    let now = Utc::now().timestamp();
+    let held = replica_bdfs(state);
+    let reservations: Vec<GpuReservation> = state
+        .store
+        .list_entities(STORE_GPU_RESERVATIONS)
+        .unwrap_or_default();
+    for rec in reservations {
+        if ipam::reservation_reclaimable(
+            rec.expires_unix,
+            held.contains(&rec.bdf.to_ascii_lowercase()),
+            now,
+        ) {
+            let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, &rec.bdf);
+        }
+    }
+    let endpoints: HashSet<String> = state
+        .store
+        .list_entities::<InferenceEndpoint>(STORE_ENDPOINTS)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|e| e.name)
+        .collect();
+    let vips: Vec<ipam::VipAllocation> = state
+        .store
+        .list_entities(ipam::STORE_VIPS)
+        .unwrap_or_default();
+    for rec in vips {
+        if ipam::reservation_reclaimable(rec.expires_unix, endpoints.contains(&rec.endpoint), now) {
+            let _ = state.store.delete_entity(ipam::STORE_VIPS, &rec.vip);
+        }
+    }
+}
+
+fn apply_corrupt_gpu(state: &AppState, id: &str, check: LiveCheck) {
+    match corrupt_reservation_action(check) {
+        CorruptAction::Keep => {}
+        CorruptAction::Reclaim => {
+            let _ = state.store.delete_entity(STORE_GPU_RESERVATIONS, id);
+        }
+        CorruptAction::Repair => {
+            let now = Utc::now().timestamp();
+            let _ = state.store.save_entity(
+                STORE_GPU_RESERVATIONS,
+                id,
+                &GpuReservation {
+                    bdf: id.to_string(),
+                    deployment: String::new(),
+                    vm_name: String::new(),
+                    owner: fabricd_owner().to_string(),
+                    created_unix: now,
+                    expires_unix: 0,
+                },
+            );
+        }
+    }
+}
+
+fn apply_corrupt_vip(state: &AppState, id: &str, check: LiveCheck) {
+    match corrupt_reservation_action(check) {
+        CorruptAction::Keep => {}
+        CorruptAction::Reclaim => {
+            let _ = state.store.delete_entity(ipam::STORE_VIPS, id);
+        }
+        CorruptAction::Repair => {
+            let now = Utc::now().timestamp();
+            let _ = state.store.save_entity(
+                ipam::STORE_VIPS,
+                id,
+                &ipam::VipAllocation {
+                    vip: id.to_string(),
+                    endpoint: String::new(),
+                    pool: "recovered".into(),
+                    owner: fabricd_owner().to_string(),
+                    created_unix: now,
+                    expires_unix: 0,
+                },
+            );
+        }
+    }
 }
 
 fn allocated_bdfs(state: &AppState) -> HashSet<String> {
@@ -709,6 +1089,11 @@ fn allocated_bdfs(state: &AppState) -> HashSet<String> {
     for rec in reserved {
         if !rec.bdf.is_empty() && !rec.bdf.starts_with("dry-run-") {
             set.insert(rec.bdf.to_ascii_lowercase());
+        }
+    }
+    if let Ok(unreadable) = state.store.list_unreadable_entities(STORE_GPU_RESERVATIONS) {
+        for id in unreadable {
+            set.insert(id.to_ascii_lowercase());
         }
     }
     set
@@ -735,7 +1120,7 @@ async fn sweep_orphans(state: &AppState) {
         .list_entities(STORE_GPU_RESERVATIONS)
         .unwrap_or_default();
     for rec in reservations {
-        if dep_names.contains(&rec.deployment) {
+        if rec.deployment.is_empty() || dep_names.contains(&rec.deployment) {
             continue;
         }
         let Ok(client) = fluxvm_client(state) else {
@@ -893,15 +1278,106 @@ mod tests {
 
     #[test]
     fn failed_maglev_delete_keeps_vip() {
-        assert!(should_release_vip(false, false).is_err());
-        assert!(should_release_vip(true, false).is_err());
-        assert!(should_release_vip(true, true).is_ok());
+        assert!(!maglev_is_absent(
+            Some("connection refused"),
+            false,
+            Some("connection refused")
+        ));
+        assert!(!maglev_is_absent(None, true, None));
+        assert!(should_release_vip(false).is_err());
+    }
+
+    #[test]
+    fn already_absent_maglev_releases_vip() {
+        let plan = plan_endpoint_teardown(Some("404 not found"), false, Some("not found")).unwrap();
+        assert!(plan.release_vip);
+        assert!(plan.delete_endpoint);
+        assert!(maglev_is_absent(None, false, Some("404 not found")));
+        assert!(plan_endpoint_teardown(
+            Some("connection refused"),
+            false,
+            Some("connection refused")
+        )
+        .is_err());
+        assert!(plan_endpoint_teardown(None, true, None).is_err());
+    }
+
+    fn sample_replica(ordinal: u32) -> InferenceReplica {
+        InferenceReplica {
+            replica_id: replica_id_for("dep", ordinal),
+            ordinal,
+            vm_name: replica_vm_name("dep", ordinal),
+            bdf: format!("dry-run-{ordinal}"),
+            ready: false,
+            address: None,
+            metrics: None,
+            maglev_weight: None,
+            site: None,
+            cost_tier: None,
+            draining: false,
+            unhealthy_streak: 3,
+        }
+    }
+
+    #[test]
+    fn replacement_reclaims_freed_ordinal() {
+        let live = vec![sample_replica(1)];
+        let ordinal = next_replica_ordinal(&live);
+        assert_eq!(ordinal, 0);
+        assert_eq!(replica_vm_name("dep", ordinal), "dep-0");
+        assert_ne!(replica_vm_name("dep", ordinal), live[0].vm_name);
+    }
+
+    #[test]
+    fn restart_preserves_replica_identity() {
+        let rep = sample_replica(1);
+        let json = serde_json::to_string(&rep).unwrap();
+        let back: InferenceReplica = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.replica_id, "dep-r000001");
+        assert_eq!(back.ordinal, 1);
+        assert_eq!(back.vm_name, "dep-1");
+        let old = r#"{"vm_name":"dep-1","bdf":"x","ready":true}"#;
+        let mut loaded: InferenceReplica = serde_json::from_str(old).unwrap();
+        ensure_replica_identity("dep", &mut loaded);
+        assert_eq!(loaded.ordinal, 1);
+        assert_eq!(loaded.replica_id, "dep-r000001");
+        assert_eq!(loaded.vm_name, "dep-1");
+    }
+
+    #[test]
+    fn multiple_replacements_get_distinct_names() {
+        let mut live = Vec::new();
+        let first = next_replica_ordinal(&live);
+        live.push(sample_replica(first));
+        let second = next_replica_ordinal(&live);
+        live.push(sample_replica(second));
+        assert_eq!(first, 0);
+        assert_eq!(second, 1);
+        assert_ne!(live[0].vm_name, live[1].vm_name);
+        assert_ne!(live[0].replica_id, live[1].replica_id);
+    }
+
+    #[test]
+    fn unreadable_reservation_stays_until_hardware_is_idle() {
+        assert_eq!(
+            corrupt_reservation_action(LiveCheck::Unknown),
+            CorruptAction::Keep
+        );
+        assert_eq!(
+            corrupt_reservation_action(LiveCheck::Active),
+            CorruptAction::Repair
+        );
+        assert_eq!(
+            corrupt_reservation_action(LiveCheck::Idle),
+            CorruptAction::Reclaim
+        );
     }
 
     #[test]
     fn transient_fluxvm_errors_stay_pending() {
         assert!(is_retryable_fluxvm("connection refused"));
         assert!(is_retryable_fluxvm("request timed out"));
+        assert!(is_retryable_fluxvm("deployment lease held"));
         assert!(!is_retryable_fluxvm("profile 'edge' not found"));
         assert!(is_hard_failure("model 'qwen' not found"));
     }

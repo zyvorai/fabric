@@ -964,14 +964,20 @@ enum AiProfileCmd {
         #[arg(long, default_value_t = 32)]
         memory: u32,
     },
-    Info { name: String },
-    Delete { name: String },
+    Info {
+        name: String,
+    },
+    Delete {
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
 enum AiDeploymentCmd {
     List,
-    Info { name: String },
+    Info {
+        name: String,
+    },
     Scale {
         name: String,
         #[arg(long)]
@@ -1016,8 +1022,12 @@ enum AiDeploymentCmd {
         canary_percent: u8,
     },
     /// Show last scraped AI metrics + Maglev weights
-    Metrics { name: String },
-    Delete { name: String },
+    Metrics {
+        name: String,
+    },
+    Delete {
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1043,8 +1053,12 @@ enum AiEndpointCmd {
         #[arg(long)]
         residency: Option<String>,
     },
-    Info { name: String },
-    Delete { name: String },
+    Info {
+        name: String,
+    },
+    Delete {
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1059,7 +1073,9 @@ enum AiKeyCmd {
         #[arg(long)]
         request_quota: Option<u64>,
     },
-    Delete { id: String },
+    Delete {
+        id: String,
+    },
 }
 
 // ─── Table row types ─────────────────────────────────────────────────────────

@@ -136,6 +136,9 @@ impl StateStore {
                 Ok(mut file) => {
                     file.write_all(content.as_bytes())?;
                     file.sync_all()?;
+                    if let Some((dir, _)) = file_path.rsplit_once('/') {
+                        fsync_dir(dir)?;
+                    }
                     Ok(())
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
@@ -143,6 +146,173 @@ impl StateStore {
                 }
                 Err(e) => Err(e.into()),
             }
+        })
+    }
+
+    /// Delete one entity file when it is missing, empty, or not JSON.
+    ///
+    /// `try_create_entity` creates the file before the write finishes. A crash
+    /// in that window leaves a name that `list_entities` skips and that a
+    /// later create can never take.
+    pub fn reclaim_unreadable_entity(&self, subdir: &str, id: &str) -> Result<bool> {
+        let subdir = Self::entity_subdir(subdir)?;
+        let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
+        Self::validate_entity_id(id)?;
+        let root = self.path.to_string_lossy();
+        let file_path = format!("{root}/{subdir}/{id}.json");
+        input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
+            let content = match fs::read_to_string(&file_path) {
+                Ok(content) => content,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+                Err(e) => return Err(e.into()),
+            };
+            if !content.trim().is_empty()
+                && serde_json::from_str::<serde_json::Value>(&content).is_ok()
+            {
+                return Ok(false);
+            }
+            fs::remove_file(&file_path)?;
+            if let Some((dir, _)) = file_path.rsplit_once('/') {
+                fsync_dir(dir)?;
+            }
+            Ok(true)
+        })
+    }
+
+    /// Delete every empty or non-JSON entity file in `subdir`.
+    pub fn reclaim_unreadable_entities(&self, subdir: &str) -> Result<Vec<String>> {
+        let subdir = Self::entity_subdir(subdir)?;
+        let root = self.path.to_string_lossy();
+        let dir = format!("{root}/{subdir}");
+        input_guard::fs_checked!(dir, anyhow::anyhow!("rejected path"), |dir| {
+            if !Path::new(&dir).exists() {
+                return Ok(Vec::new());
+            }
+            let mut removed = Vec::new();
+            for entry in fs::read_dir(&dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                    continue;
+                }
+                let content = fs::read_to_string(&path).unwrap_or_default();
+                if !content.trim().is_empty()
+                    && serde_json::from_str::<serde_json::Value>(&content).is_ok()
+                {
+                    continue;
+                }
+                let id = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or_default()
+                    .to_string();
+                fs::remove_file(&path)?;
+                removed.push(id);
+            }
+            if !removed.is_empty() {
+                fsync_dir(&dir)?;
+            }
+            Ok(removed)
+        })
+    }
+
+    /// Ids whose files are empty or not JSON. Does not delete them.
+    pub fn list_unreadable_entities(&self, subdir: &str) -> Result<Vec<String>> {
+        let subdir = Self::entity_subdir(subdir)?;
+        let root = self.path.to_string_lossy();
+        let dir = format!("{root}/{subdir}");
+        input_guard::fs_checked!(dir, anyhow::anyhow!("rejected path"), |dir| {
+            if !Path::new(&dir).exists() {
+                return Ok(Vec::new());
+            }
+            let mut ids = Vec::new();
+            for entry in fs::read_dir(&dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                    continue;
+                }
+                let content = fs::read_to_string(&path).unwrap_or_default();
+                if !content.trim().is_empty()
+                    && serde_json::from_str::<serde_json::Value>(&content).is_ok()
+                {
+                    continue;
+                }
+                let id = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or_default()
+                    .to_string();
+                if !id.is_empty() {
+                    ids.push(id);
+                }
+            }
+            Ok(ids)
+        })
+    }
+
+    /// Exclusive same-host lease. The flock is the lock; the file records the
+    /// owner, a fencing token, and an expiry. A dead holder drops the flock.
+    /// Two nodes that do not share this filesystem need a transactional store.
+    pub fn try_acquire_lease(
+        &self,
+        subdir: &str,
+        id: &str,
+        owner: &str,
+        ttl_secs: i64,
+        resource: &str,
+    ) -> Result<FileLease> {
+        let subdir = Self::entity_subdir(subdir)?;
+        let id = input_guard::vet_component!(id, anyhow::anyhow!("Invalid entity ID"));
+        Self::validate_entity_id(id)?;
+        let root = self.path.to_string_lossy();
+        let file_path = format!("{root}/{subdir}/{id}.json");
+        input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
+            if let Some((dir, _)) = file_path.rsplit_once('/') {
+                fs::create_dir_all(dir)?;
+            }
+            let mut file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&file_path)?;
+            let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+            if rc != 0 {
+                let err = std::io::Error::last_os_error();
+                if err.kind() == std::io::ErrorKind::WouldBlock {
+                    anyhow::bail!("lease held");
+                }
+                anyhow::bail!("flock failed: {err}");
+            }
+            let content = fs::read_to_string(&file_path).unwrap_or_default();
+            let previous: u64 = serde_json::from_str::<LeaseBody>(&content)
+                .map(|b| b.fencing_token)
+                .unwrap_or(0);
+            let now = unix_now();
+            let body = LeaseBody {
+                resource: resource.to_string(),
+                owner: owner.to_string(),
+                fencing_token: previous.saturating_add(1),
+                acquired_unix: now,
+                expires_unix: now.saturating_add(ttl_secs.max(1)),
+            };
+            let encoded = serde_json::to_string_pretty(&body)?;
+            file.seek(SeekFrom::Start(0))?;
+            file.set_len(0)?;
+            file.write_all(encoded.as_bytes())?;
+            file.sync_all()?;
+            if let Some((dir, _)) = file_path.rsplit_once('/') {
+                fsync_dir(dir)?;
+            }
+            Ok(FileLease {
+                file,
+                resource: body.resource,
+                owner: body.owner,
+                fencing_token: body.fencing_token,
+                acquired_unix: body.acquired_unix,
+                expires_unix: body.expires_unix,
+            })
         })
     }
 
@@ -298,11 +468,57 @@ impl StateStore {
         let file_path = format!("{root}/{subdir}/{id}.json");
         input_guard::fs_checked!(file_path, anyhow::anyhow!("rejected path"), |file_path| {
             match fs::remove_file(&file_path) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    if let Some((dir, _)) = file_path.rsplit_once('/') {
+                        fsync_dir(dir)?;
+                    }
+                    Ok(())
+                }
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
                 Err(e) => Err(e.into()),
             }
         })
+    }
+}
+
+fn fsync_dir(dir: &str) -> Result<()> {
+    let file = File::open(dir)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LeaseBody {
+    resource: String,
+    owner: String,
+    fencing_token: u64,
+    acquired_unix: i64,
+    expires_unix: i64,
+}
+
+/// Held exclusive lease. Dropping it unlocks the file.
+#[derive(Debug)]
+pub struct FileLease {
+    file: File,
+    pub resource: String,
+    pub owner: String,
+    pub fencing_token: u64,
+    pub acquired_unix: i64,
+    pub expires_unix: i64,
+}
+
+impl Drop for FileLease {
+    fn drop(&mut self) {
+        unsafe {
+            libc::flock(self.file.as_raw_fd(), libc::LOCK_UN);
+        }
     }
 }
 
@@ -688,5 +904,69 @@ mod tests {
         }
         let n: u64 = store.get_entity("counters", "quota").unwrap().unwrap();
         assert_eq!(n, 8);
+    }
+
+    #[test]
+    fn unreadable_reservation_is_reclaimed() {
+        let (store, dir) = test_store();
+        let path = dir.path().join("ai_gpu_reservations");
+        fs::create_dir_all(&path).unwrap();
+        fs::write(path.join("0000-01.json"), "").unwrap();
+        assert!(store
+            .reclaim_unreadable_entity("ai_gpu_reservations", "0000-01")
+            .unwrap());
+        store
+            .try_create_entity(
+                "ai_gpu_reservations",
+                "0000-01",
+                &serde_json::json!({"bdf": "0000:01:00.0"}),
+            )
+            .unwrap();
+        fs::write(path.join("partial.json"), "{").unwrap();
+        let removed = store
+            .reclaim_unreadable_entities("ai_gpu_reservations")
+            .unwrap();
+        assert_eq!(removed, vec!["partial".to_string()]);
+        let kept: Option<serde_json::Value> =
+            store.get_entity("ai_gpu_reservations", "0000-01").unwrap();
+        assert!(kept.is_some());
+    }
+
+    #[test]
+    fn lease_excludes_a_second_acquire_and_bumps_fencing_token() {
+        let (store, _dir) = test_store();
+        let first = store
+            .try_acquire_lease(
+                "ai_deployment_leases",
+                "qwen",
+                "owner-a",
+                120,
+                "deployment/qwen",
+            )
+            .unwrap();
+        assert_eq!(first.fencing_token, 1);
+        assert_eq!(first.resource, "deployment/qwen");
+        let err = store
+            .try_acquire_lease(
+                "ai_deployment_leases",
+                "qwen",
+                "owner-b",
+                120,
+                "deployment/qwen",
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("lease held"));
+        drop(first);
+        let second = store
+            .try_acquire_lease(
+                "ai_deployment_leases",
+                "qwen",
+                "owner-b",
+                120,
+                "deployment/qwen",
+            )
+            .unwrap();
+        assert_eq!(second.fencing_token, 2);
+        assert_eq!(second.owner, "owner-b");
     }
 }
