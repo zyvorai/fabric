@@ -1,29 +1,34 @@
-# Fabric AI Workloads (Preview 2)
+# Fabric AI Workloads (Beta on a single cluster)
 
 OpenAI-compatible inference on dedicated NVIDIA GPU VMs, operated through
 Fabric’s API, CLI, and console. Maglev load-balances backends with
 control-plane weight updates. Phases 0–6 cover inventory, routing, autoscaling,
-API keys, sites, and Agent Runtime. Preview 2 adds revisioned rollouts, model
+API keys, sites, and Agent Runtime. Preview 2 / Beta adds revisioned rollouts, model
 supply-chain jobs, gateway limits, a per-process Raft lease, live `nvidia-smi`
-readings, site-to-site model copy, a WebSocket inference proxy, and optional
-OTLP export. Maturity for a single cluster stays Preview 2.
+readings, site-to-site model copy, a WebSocket inference proxy, optional
+OTLP export, PCI MIG behind `FLUXVM_AI_PCI_MIG`, and known runtimes enabled by
+default. **Single-cluster AI Workloads are Beta.** Multi-site HA store stays Preview.
+Do not treat this as GA.
 
 ## Maturity
 
 | Capability | Status |
 |---|---|
 | Service Fabric Maglev | GA |
-| Fabric AI Workloads Phases 0–6 | **Preview** |
-| Revisioned rollouts, model jobs, gateway limits | **Preview 2** |
-| Multi-node GPU scheduler | **Preview** |
-| Multi-site federation, explain, policy, backup, vLLM-only runtime | **Preview** |
+| Fabric AI Workloads (single cluster) | **Beta** |
+| Revisioned rollouts, model jobs, gateway limits, Raft lease | **Beta** |
+| Multi-node GPU scheduler | **Beta** |
+| Multi-site federation HA store, explain/policy cross-site | **Preview** |
 | In-tree `flux-vm` multi-vCPU | Experimental until `scripts/test-kvm-smp-boot.sh` is green on lab hardware |
 | Machina local LLM | Separate roadmap product — not Fabric |
 
 ## First release shape
 
 - One to eight NVIDIA GPUs per QEMU VM, reserved together and passed as VFIO devices. `gpu.count` of 1 keeps the previous single-device path.
-- Runtime: **vLLM** launches by default. TensorRT-LLM, Triton, llama.cpp, and text-embeddings-inference launch only when named in `FLUXVM_AI_ALLOW_RUNTIMES`.
+- Runtime: **vLLM**, TensorRT-LLM, Triton, llama.cpp, and text-embeddings-inference
+  (`tei`) are known and launch by default. Set `FLUXVM_AI_DENY_RUNTIMES` to block a
+  name. When `FLUXVM_AI_ALLOW_RUNTIMES` is set, it is a strict allowlist. The guest
+  image must still contain the binary.
 - Model source: `hf://org/name` or a pre-staged host path. A model job passes the stored Hugging Face `revision` to the downloader and keeps bytes under `{state}/ai-models` by digest. Checksums for a directory are a sorted manifest (relative path, size, SHA-256), not the first file. When `signature` is set, the job checks an HMAC-SHA256 of that digest with `FLUXVM_AI_MODEL_SIGNING_KEY`.
 - Endpoint: Maglev VIP → guest `:8000` (`/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`, `/v1/rerank`, `/v1/batches`)
 - Readiness: Fabric HTTP `GET /health` before Maglev `Ready`
@@ -287,11 +292,11 @@ Canary uses a separate replica set and the steps 5% / 300s, 20% / 600s, 50% / 90
 
 Blue/green builds the full new replica set, then switches weights in one save. The old set stays until the rollback window ends.
 
-Maturity stays **Preview 2** for a single cluster. The control plane records revisioned rollouts, content-addressed model jobs (including format scanning and derived optimization artifacts), gateway limits, optional backend TLS, batch job records, reported GPU temperature and ECC filters, multi-GPU reservation, site policy, chargeback, and chaos recovery classes. Additional runtimes stay fail-closed until listed in `FLUXVM_AI_ALLOW_RUNTIMES`. `FLUXVM_AI_CONSENSUS=external` is only a label.
+Maturity for a **single cluster** is **Beta**. The control plane records revisioned rollouts, content-addressed model jobs (including format scanning and derived optimization artifacts), gateway limits, optional backend TLS, batch job records, reported GPU temperature and ECC filters, multi-GPU reservation, site policy, chargeback, and chaos recovery classes. Known runtimes launch by default; `FLUXVM_AI_DENY_RUNTIMES` blocks a name and `FLUXVM_AI_ALLOW_RUNTIMES` is an optional strict allowlist. `FLUXVM_AI_CONSENSUS=external` is only a label. Multi-site HA store stays **Preview**. This is not GA.
 
 Each `zyvor-fabricd` process is one Raft voter when `FLUXVM_AI_RAFT_ID`, `FLUXVM_AI_RAFT_PEERS` (at least three `id@host:port` entries, including this process), and `FLUXVM_AI_RAFT_TOKEN` are set. The log is `{state}/ai-raft/`. RequestVote and AppendEntries use `POST /api/ai/raft/{vote,append,snapshot}` with `x-raft-token`. The replicated record is the current leader id. AI placement runs only while this process is the committed leader of that membership. With those variables unset, placement stays as it is on a single process. This process never starts the other voters. A missing membership, or fewer than three committed voters, leaves leader-loss recovery degraded.
 
-On Linux, a node heartbeat runs `nvidia-smi` when that binary is on `PATH` and writes `temperature.gpu`, `power.draw`, and `ecc.errors.uncorrected.volatile` onto a matching PCI BDF. A missing binary, a failed command, or a `janus:` id leaves the stored fields unchanged. `POST /api/ai/nodes/{id}/mig` still creates Janus slice records only. A real PCI BDF returns 400. There is no `nvidia-smi mig` and no NVML mode change.
+On Linux, a node heartbeat runs `nvidia-smi` when that binary is on `PATH` and writes `temperature.gpu`, `power.draw`, and `ecc.errors.uncorrected.volatile` onto a matching PCI BDF. A missing binary, a failed command, or a `janus:` id leaves the stored fields unchanged. `POST /api/ai/nodes/{id}/mig` creates Janus slice records without the driver. A PCI parent BDF requires `FLUXVM_AI_PCI_MIG=1` and runs `nvidia-smi mig` (or inventory-only when `FLUXVM_AI_PCI_MIG_RECORD_ONLY=1`). Without that flag, a PCI MIG create returns 400.
 
 `AiSite.peer_url` is optional. `POST /api/ai/models/{name}/replicate` stays `pending` unless a node at the site already cached the model, or the peer returns 201 from `PUT /api/ai/models/{name}/blobs/{digest}` after the SHA-256 matches. The receiver writes only under its model directory. A missing `peer_url`, a missing file, a hash mismatch, or a wrong `FLUXVM_AI_REPLICATE_TOKEN` does not mark the record `ready`.
 
@@ -309,7 +314,7 @@ Placement is filter then score: ready state, no taints, residency, free NVIDIA V
 
 When `FLUXVM_AI_JANUS_URL` is set and FluxVM reports no NVIDIA GPU, Fabric reads `GET /api/cluster?config=single_gpu` and stores the device as `janus:node-0:gpu-0` with `source` carried in the model name `janus:…`. A Matrox or other non-NVIDIA display adapter does not count as an inference GPU. The replica address is the Janus host and port. No VFIO bind and no VM are created. The gateway proxies a ready replica at that address even when `FLUXVM_AI_DRY_RUN=1`. Set `FLUXVM_AI_JANUS_API_KEY` to the Janus shim bearer so that hop authenticates. That device is the Janus scheduler simulator, not a PCI NVIDIA GPU. The Janus node’s site is `janus`; leave `preferred_site` unset (or set it to `janus`) so placement can select that node — a preferred site of `lab` alone rejects it as “no free matching GPU” when the only free device is under the Janus site.
 
-`POST /api/ai/nodes/{id}/mig` creates a slice record for a Janus parent when the body includes `parent_bdf` (for example `janus:node-0:gpu-0`) and the profile is in the H100 catalog (`1g.10gb`, `1g`, `2g.20gb`, `2g`, `3g.40gb`, `3g`, `7g.80gb`, `7g`) and the memory still fits. `DELETE /api/ai/nodes/{id}/mig/{bdf}` removes that slice when no replica holds it. Placement uses the slice and leaves the parent unschedulable while slices exist. MIG create does not call `nvidia-smi`. A heartbeat on Linux does, when `nvidia-smi` is on `PATH`, and fills `temperature_c`, `power_watts`, and `ecc_errors` for a matching PCI BDF. `0` still means unknown. A missing binary, a failed command, or a `janus:` id does not invent those readings and does not clear a value the node already reported. `FLUXVM_AI_MAX_GPU_TEMP_C` skips a GPU hotter than that value. `FLUXVM_AI_REJECT_ECC=1` skips a GPU whose ECC count is above zero.
+`POST /api/ai/nodes/{id}/mig` creates a slice record for a Janus parent when the body includes `parent_bdf` (for example `janus:node-0:gpu-0`) and the profile is in the H100 catalog (`1g.10gb`, `1g`, `2g.20gb`, `2g`, `3g.40gb`, `3g`, `7g.80gb`, `7g`) and the memory still fits. The same catalog applies to a PCI parent when `FLUXVM_AI_PCI_MIG=1`; Fabric then runs `nvidia-smi mig -cgi … -C` unless `FLUXVM_AI_PCI_MIG_RECORD_ONLY=1`. `DELETE /api/ai/nodes/{id}/mig/{bdf}` removes that slice when no replica holds it (and destroys PCI instances when PCI MIG is enabled). Placement uses the slice and leaves the parent unschedulable while slices exist. A heartbeat on Linux fills `temperature_c`, `power_watts`, and `ecc_errors` for a matching PCI BDF when `nvidia-smi` is on `PATH`. `0` still means unknown. A missing binary, a failed command, or a `janus:` id does not invent those readings and does not clear a value the node already reported. `FLUXVM_AI_MAX_GPU_TEMP_C` skips a GPU hotter than that value. `FLUXVM_AI_REJECT_ECC=1` skips a GPU whose ECC count is above zero.
 
 When a ready replica address is an IP hostport such as `127.0.0.1:30818`, Maglev stores the IP and that port. A hostname upstream is omitted from Maglev; the OpenAI gateway still proxies it. An endpoint whose replicas have no IP backends, or whose ready replicas are all Janus or `dry-run-*` devices, reserves a VIP and skips the Maglev upsert so the reconciler does not log a FluxVM error every tick.
 
@@ -323,7 +328,7 @@ The inference gateway still accepts scoped API keys. It also accepts an OIDC JWT
 
 `GET /api/ai/explain/placement/{deployment}` returns the chosen node and why the others were rejected. `GET /api/ai/explain/scaling/{deployment}` reports the instantaneous scale-out, scale-in, or hold signal; the autoscaler still waits its configured seconds before changing the replica count. `GET /api/ai/explain/routing/{endpoint}` says why each replica is included or excluded. `GET /api/ai/explain/failure/{replica}` lists recorded reasons for one replica id or VM name. `POST /api/ai/policies` is a tenant allow-list for model name and source prefix. Optional `deploy_hour_start` and `deploy_hour_end` are UTC hours; both absent means deploys are always allowed, and a start after the end wraps past midnight. No policy means the existing tenant filter still applies. `POST /api/ai/backup` and `POST /api/ai/restore` copy desired-state JSON, not model bytes.
 
-Chargeback is `GET /api/ai/finops`: GPU-seconds, reserved versus ready GPUs, and the current token window. `alert` is true when those tokens exceed `FLUXVM_AI_TOKEN_BUDGET`; unset or `0` does not alert. Each AI audit row extends a SHA-256 chain in the state store. The only runtime that launches by default is vLLM. TensorRT-LLM, Triton, llama.cpp, and text-embeddings-inference launch when named in `FLUXVM_AI_ALLOW_RUNTIMES`. There is no quorum inside one process. Set `FLUXVM_AI_RAFT_ID`, `FLUXVM_AI_RAFT_PEERS`, and `FLUXVM_AI_RAFT_TOKEN` on each voter when a three-process lease is required. `FLUXVM_AI_CONSENSUS=external` does not create that lease. OIDC remains the control-plane login. The inference gateway accepts scoped API keys and an OIDC JWT whose audience is `fabric-inference`. Any other JWT audience is rejected unless `FLUXVM_AI_GATEWAY_ACCEPT_JWT=1`.
+Chargeback is `GET /api/ai/finops`: GPU-seconds, reserved versus ready GPUs, and the current token window. `alert` is true when those tokens exceed `FLUXVM_AI_TOKEN_BUDGET`; unset or `0` does not alert. Each AI audit row extends a SHA-256 chain in the state store; when Raft peers are set, the tip also replicates as `LeaseCommand::AuditLink` on the leader. Known runtimes launch by default. Set `FLUXVM_AI_DENY_RUNTIMES` to block a name, or set `FLUXVM_AI_ALLOW_RUNTIMES` for a strict allowlist. There is no quorum inside one process. Set `FLUXVM_AI_RAFT_ID`, `FLUXVM_AI_RAFT_PEERS`, and `FLUXVM_AI_RAFT_TOKEN` on each voter when a three-process lease is required; rate counters and the audit tip then live on the leader. `FLUXVM_AI_CONSENSUS=external` does not create that lease. OIDC remains the control-plane login. The inference gateway accepts scoped API keys and an OIDC JWT whose audience is `fabric-inference`. Any other JWT audience is rejected unless `FLUXVM_AI_GATEWAY_ACCEPT_JWT=1`. Single-cluster maturity is **Beta**; multi-site HA store stays **Preview**.
 
 ```text
 Scale out when:

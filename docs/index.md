@@ -126,7 +126,7 @@ Detailed documentation for each major feature area.
 | [Networking Overview](networking.md) | Network architecture, SDN stack, and VM edge dataplane |
 | [VM edge dataplane (Network Fabric schema v4)](guides/vm-drivers/fluxvm-dataplane.md) | Fabric proxy of FluxVM TC/eBPF — API, Web, CLI, lab UX |
 | [Service Fabric v6 (Maglev VIP LB)](ebpf-service-fabric.md) | FluxVM Maglev/NAT/DSR/EDT/flows/policy + Fabric leases, HA, FRR/BIRD |
-| [AI Workloads (Preview 2)](ai-workloads.md) | vLLM GPU VMs, Janus lab upstream, admit webhook, fabric-inference JWT, revisioned rollouts, gateway limits, Maglev, Terraform, operator CRDs |
+| [AI Workloads (Beta)](ai-workloads.md) | GPU VMs, Janus lab upstream, PCI MIG flag, admit webhook, fabric-inference JWT, revisioned rollouts, gateway limits, Maglev, Terraform, operator CRDs |
 | [User: VM Dataplane](user/pages/infrastructure/dataplane.md) | Console walkthrough for Status / Policy / Effective / Stats / Flows |
 | [User: Edge Dataplane](user/pages/infrastructure/edge-dataplane.md) | Cluster groups / CNP / Maglev Services / health / observe console |
 | [Tutorial 09: Edge Dataplane](tutorials/09-edge-dataplane.md) | End-to-end lab (API + CLI + UX) |
@@ -478,7 +478,7 @@ The REST API is organized into the following endpoint groups:
 
 ---
 
-## AI Workloads (Preview 2)
+## AI Workloads (Beta)
 
 OpenAI-compatible inference on dedicated NVIDIA GPU VMs: ModelArtifact /
 InferenceProfile / InferenceDeployment / InferenceEndpoint, revisioned
@@ -489,7 +489,7 @@ Still a single-cluster preview.
 
 | Document | Description |
 |----------|-------------|
-| [ai-workloads.md](ai-workloads.md) | REST, CLI, Janus lab GPU, admit webhook, phases 0–6 plus Preview 2 gates, golden image, dry-run / CI smoke |
+| [ai-workloads.md](ai-workloads.md) | REST, CLI, Janus lab GPU, PCI MIG flag, admit webhook, phases 0–6 plus Beta gates, golden image, dry-run / CI smoke |
 | [scripts/bake-ai-vllm-image.sh](../scripts/bake-ai-vllm-image.sh) | Bake CUDA + vLLM qcow2 |
 | [terraform-provider/examples/ai-workloads](../terraform-provider/examples/ai-workloads/) | Terraform model/profile/deployment/endpoint |
 | [operator/examples/ai-inference-deployment.yaml](../operator/examples/ai-inference-deployment.yaml) | ModelArtifact + InferenceDeployment CRs |

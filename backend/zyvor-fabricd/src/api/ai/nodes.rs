@@ -215,7 +215,9 @@ pub struct CreateMigSlice {
 
 /// POST /api/ai/nodes/{id}/mig
 ///
-/// Creates a Janus slice record. It does not call `nvidia-smi`.
+/// Janus BDFs create inventory records only. PCI BDFs require
+/// `FLUXVM_AI_PCI_MIG=1` and run `nvidia-smi mig` unless
+/// `FLUXVM_AI_PCI_MIG_RECORD_ONLY=1`.
 pub async fn create_mig_slice(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
@@ -223,11 +225,19 @@ pub async fn create_mig_slice(
     Json(body): Json<CreateMigSlice>,
 ) -> Result<Json<InferenceNode>, (StatusCode, Json<serde_json::Value>)> {
     let profile = super::gpu_orch::janus_mig_profile(&body.profile)
-        .ok_or_else(|| err(StatusCode::BAD_REQUEST, "unknown Janus MIG profile"))?;
-    if !super::janus::is_janus_bdf(&body.parent_bdf) {
+        .ok_or_else(|| err(StatusCode::BAD_REQUEST, "unknown MIG profile"))?;
+    let janus = super::janus::is_janus_bdf(&body.parent_bdf);
+    let pci = super::pci_mig::is_pci_bdf(&body.parent_bdf);
+    if !janus && !pci {
         return Err(err(
             StatusCode::BAD_REQUEST,
-            "MIG create is only available for a Janus GPU",
+            "parent_bdf must be a Janus id or a PCI BDF",
+        ));
+    }
+    if pci && !super::pci_mig::pci_mig_enabled() {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "PCI MIG create requires FLUXVM_AI_PCI_MIG=1",
         ));
     }
     if !super::gpu_orch::mig_reconfigure_allowed(&body.parent_bdf, &allocated_bdfs(&state)) {
@@ -246,8 +256,8 @@ pub async fn create_mig_slice(
         .iter()
         .find(|gpu| gpu.bdf == body.parent_bdf && gpu.parent_bdf.is_empty())
         .cloned()
-        .ok_or_else(|| err(StatusCode::NOT_FOUND, "Janus parent GPU not found"))?;
-    if !parent.model.starts_with("janus:") {
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "parent GPU not found"))?;
+    if janus && !parent.model.starts_with("janus:") {
         return Err(err(
             StatusCode::BAD_REQUEST,
             "MIG create is only available for a Janus GPU",
@@ -263,6 +273,10 @@ pub async fn create_mig_slice(
             StatusCode::CONFLICT,
             "MIG slice does not fit the parent GPU",
         ));
+    }
+    if pci {
+        super::pci_mig::apply_create(&body.parent_bdf, profile)
+            .map_err(|e| err(StatusCode::BAD_GATEWAY, e))?;
     }
     node.gpus.push(super::types::NodeGpu {
         bdf: super::gpu_orch::slice_bdf(&body.parent_bdf, profile.name, existing),
@@ -301,13 +315,28 @@ pub async fn delete_mig_slice(
         .get_entity::<InferenceNode>(STORE_NODES, &id)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "inference node not found"))?;
-    let before = node.gpus.len();
-    node.gpus.retain(|gpu| {
-        !(gpu.bdf == bdf && !gpu.parent_bdf.is_empty() && super::janus::is_janus_bdf(&gpu.bdf))
-    });
-    if node.gpus.len() == before {
-        return Err(err(StatusCode::NOT_FOUND, "Janus MIG slice not found"));
+    let slice = node
+        .gpus
+        .iter()
+        .find(|gpu| gpu.bdf == bdf && !gpu.parent_bdf.is_empty())
+        .cloned()
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "MIG slice not found"))?;
+    let janus = super::janus::is_janus_bdf(&slice.bdf);
+    let pci = super::pci_mig::is_pci_bdf(&slice.parent_bdf);
+    if !janus && pci && !super::pci_mig::pci_mig_enabled() {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "PCI MIG delete requires FLUXVM_AI_PCI_MIG=1",
+        ));
     }
+    if pci && super::pci_mig::pci_mig_enabled() {
+        super::pci_mig::apply_destroy(&slice.bdf)
+            .map_err(|e| err(StatusCode::BAD_GATEWAY, e))?;
+    }
+    if !janus && !pci {
+        return Err(err(StatusCode::NOT_FOUND, "MIG slice not found"));
+    }
+    node.gpus.retain(|gpu| gpu.bdf != bdf);
     state
         .store
         .save_entity(STORE_NODES, &node.id, &node)

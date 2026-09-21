@@ -68,6 +68,10 @@ pub enum LeaseCommand {
         tokens: u64,
         daily: u64,
     },
+    /// Append one audit chain tip on the leader (replicated).
+    AuditLink {
+        line: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -77,6 +81,7 @@ pub enum LeaseResponse {
     Admitted { stream_id: Option<String> },
     Rejected { message: String },
     Released,
+    AuditLinked { tip: String },
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +128,7 @@ fn peer_spec() -> Option<PeerSpec> {
 static MEMBER: OnceLock<Arc<RaftNode>> = OnceLock::new();
 static START_GATE: OnceLock<Mutex<()>> = OnceLock::new();
 static RECORDED_LEADER: AtomicU64 = AtomicU64::new(u64::MAX);
+static AUDIT_TIP: OnceLock<std::sync::Mutex<String>> = OnceLock::new();
 
 pub fn may_place() -> bool {
     if peer_spec().is_none() {
@@ -172,6 +178,27 @@ pub fn counter_home() -> CounterHome {
         .unwrap_or(CounterHome::Unavailable)
 }
 
+pub async fn write_audit_link(line: String) -> Result<String, String> {
+    let response = write_counter(LeaseCommand::AuditLink { line }).await?;
+    match response {
+        LeaseResponse::AuditLinked { tip } => Ok(tip),
+        other => Err(format!("unexpected audit reply: {other:?}")),
+    }
+}
+
+pub fn replicated_audit_tip() -> Option<String> {
+    AUDIT_TIP.get().and_then(|tip| {
+        tip.lock()
+            .ok()
+            .map(|guard| tip_from_guard(&guard))
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn tip_from_guard(guard: &std::sync::MutexGuard<'_, String>) -> String {
+    (**guard).clone()
+}
+
 pub async fn write_counter(mut command: LeaseCommand) -> Result<LeaseResponse, String> {
     let Some(raft) = MEMBER.get() else {
         return Err("AI raft member is not running".into());
@@ -186,7 +213,7 @@ pub async fn write_counter(mut command: LeaseCommand) -> Result<LeaseResponse, S
         LeaseCommand::Leader { .. } => {
             return Err("leader records are not written through the limit path".into());
         }
-        LeaseCommand::Release { .. } => {}
+        LeaseCommand::Release { .. } | LeaseCommand::AuditLink { .. } => {}
     }
     raft.client_write(command)
         .await
@@ -647,6 +674,15 @@ fn apply_command(data: &mut MachineData, command: LeaseCommand) -> LeaseResponse
                 Err(message) => LeaseResponse::Rejected { message },
             }
         }
+        LeaseCommand::AuditLink { line } => {
+            let tip = super::chain_hash(&data.audit_tip, &line);
+            data.audit_tip = tip.clone();
+            let cell = AUDIT_TIP.get_or_init(|| std::sync::Mutex::new(String::new()));
+            if let Ok(mut guard) = cell.lock() {
+                *guard = tip.clone();
+            }
+            LeaseResponse::AuditLinked { tip }
+        }
     }
 }
 
@@ -657,6 +693,8 @@ struct MachineData {
     leader: Option<NodeId>,
     #[serde(default)]
     counters: BTreeMap<String, super::limits::RateCounter>,
+    #[serde(default)]
+    audit_tip: String,
 }
 
 #[derive(Debug, Default)]
@@ -990,6 +1028,38 @@ mod tests {
                 .count()
                 >= 3
         }));
+        let leader_raft = created
+            .iter()
+            .find(|raft| raft.metrics().borrow().current_leader == Some(leader))
+            .expect("leader handle")
+            .clone();
+        let admitted = leader_raft
+            .client_write(LeaseCommand::Admit {
+                id: "endpoint:shared".into(),
+                now: 1_700_000_000,
+                tokens: 1,
+                rpm: 10,
+                tpm: 100,
+                streams: 0,
+            })
+            .await
+            .unwrap()
+            .data;
+        assert_eq!(
+            admitted,
+            LeaseResponse::Admitted { stream_id: None }
+        );
+        let linked = leader_raft
+            .client_write(LeaseCommand::AuditLink {
+                line: "admin|create|model|ok".into(),
+            })
+            .await
+            .unwrap()
+            .data;
+        match linked {
+            LeaseResponse::AuditLinked { tip } => assert!(!tip.is_empty()),
+            other => panic!("expected AuditLinked, got {other:?}"),
+        }
     }
 
     #[test]

@@ -85,7 +85,7 @@ pub struct JanusMigProfile {
     pub max_per_gpu: u32,
 }
 
-/// H100 profiles from the Janus catalog. These are records, not `nvidia-smi` instances.
+/// H100 profiles from the Janus / PCI MIG catalog.
 const JANUS_MIG: &[JanusMigProfile] = &[
     JanusMigProfile {
         name: "1g.10gb",

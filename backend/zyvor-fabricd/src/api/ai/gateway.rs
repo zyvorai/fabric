@@ -1197,7 +1197,8 @@ fn limit_reply(
             Err((StatusCode::TOO_MANY_REQUESTS, message))
         }
         super::raft::LeaseResponse::Released => Ok(None),
-        super::raft::LeaseResponse::Leader { .. } => Err((
+        super::raft::LeaseResponse::Leader { .. }
+        | super::raft::LeaseResponse::AuditLinked { .. } => Err((
             StatusCode::SERVICE_UNAVAILABLE,
             "unexpected raft limit reply".into(),
         )),

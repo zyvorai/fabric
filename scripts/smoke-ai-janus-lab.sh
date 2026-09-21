@@ -100,7 +100,7 @@ echo "== MIG catalog =="
 curl_json -o /tmp/janus-mig-bad.json -w 'bad=%{http_code}\n' -X POST "${auth[@]}" \
   "$FABRIC_URL/api/ai/nodes/$NODE_ID/mig" \
   -d "{\"parent_bdf\":\"$PARENT\",\"profile\":\"9g.bogus\"}"
-[[ "$(jq -r .error /tmp/janus-mig-bad.json)" == "unknown Janus MIG profile" ]]
+[[ "$(jq -r .error /tmp/janus-mig-bad.json)" == "unknown MIG profile" ]]
 
 # Free the Janus parent: delete this smoke endpoint/deployment first.
 curl_json -X DELETE "${auth[@]}" "$FABRIC_URL/api/ai/endpoints/$NAME-ep" >/dev/null

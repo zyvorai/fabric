@@ -3,9 +3,10 @@
 
 //! Inference runtime drivers.
 //!
-//! vLLM launches without extra configuration. TensorRT-LLM, Triton,
-//! llama.cpp, and text-embeddings-inference launch only when named in
-//! `FLUXVM_AI_ALLOW_RUNTIMES`. Anything else fails closed.
+//! Known runtimes launch by default. `FLUXVM_AI_DENY_RUNTIMES` blocks a name.
+//! When `FLUXVM_AI_ALLOW_RUNTIMES` is set, it is a strict allowlist (air-gapped
+//! sites). Guest images must still contain the binary; a missing binary fails
+//! at VM ready, not at profile create.
 
 pub struct RuntimeSpec {
     pub runtime: String,
@@ -15,16 +16,21 @@ pub struct RuntimeSpec {
 }
 
 pub fn require_supported(runtime: &str) -> Result<(), String> {
-    launch_allowed(runtime, &allowlist())
+    launch_allowed(runtime, &allowlist(), &denylist())
 }
 
-pub fn launch_allowed(runtime: &str, allow: &[String]) -> Result<(), String> {
+pub fn launch_allowed(runtime: &str, allow: &[String], deny: &[String]) -> Result<(), String> {
     let name = normalize(runtime);
-    if name == "vllm" {
-        return Ok(());
-    }
-    if !known(name) {
+    if name.is_empty() || !known(name) {
         return Err(format!("runtime '{runtime}' is not supported"));
+    }
+    if deny.iter().any(|item| item.eq_ignore_ascii_case(name)) {
+        return Err(format!(
+            "runtime '{name}' is blocked by FLUXVM_AI_DENY_RUNTIMES"
+        ));
+    }
+    if allow.is_empty() {
+        return Ok(());
     }
     if allow.iter().any(|item| item.eq_ignore_ascii_case(name)) {
         Ok(())
@@ -101,7 +107,15 @@ fn known(name: &str) -> bool {
 }
 
 fn allowlist() -> Vec<String> {
-    std::env::var("FLUXVM_AI_ALLOW_RUNTIMES")
+    split_env("FLUXVM_AI_ALLOW_RUNTIMES")
+}
+
+fn denylist() -> Vec<String> {
+    split_env("FLUXVM_AI_DENY_RUNTIMES")
+}
+
+fn split_env(key: &str) -> Vec<String> {
+    std::env::var(key)
         .unwrap_or_default()
         .split(',')
         .map(str::trim)
@@ -115,13 +129,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_vllm_launches_unless_allowlisted() {
-        assert!(launch_allowed("vllm", &[]).is_ok());
-        assert!(launch_allowed("VLLM", &[]).is_ok());
-        assert!(launch_allowed("triton", &[]).is_err());
-        assert!(launch_allowed("tensorrt-llm", &[]).is_err());
-        assert!(launch_allowed("triton", &["triton".into()]).is_ok());
-        assert!(launch_allowed("mystery", &["mystery".into()]).is_err());
+    fn known_runtimes_launch_unless_denied_or_allowlisted() {
+        assert!(launch_allowed("vllm", &[], &[]).is_ok());
+        assert!(launch_allowed("triton", &[], &[]).is_ok());
+        assert!(launch_allowed("tensorrt-llm", &[], &[]).is_ok());
+        assert!(launch_allowed("llama.cpp", &[], &[]).is_ok());
+        assert!(launch_allowed("tei", &[], &[]).is_ok());
+        assert!(launch_allowed("triton", &[], &["triton".into()]).is_err());
+        assert!(launch_allowed("triton", &["vllm".into()], &[]).is_err());
+        assert!(launch_allowed("triton", &["triton".into()], &[]).is_ok());
+        assert!(launch_allowed("mystery", &[], &[]).is_err());
     }
 
     #[test]

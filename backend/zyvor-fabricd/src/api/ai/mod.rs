@@ -1,11 +1,11 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! Fabric AI Workloads — Inference plane (preview).
+//! Fabric AI Workloads — Inference plane (Beta on a single cluster).
 //!
 //! REST resources for model artifacts, inference profiles, deployments, and
-//! OpenAI-compatible endpoints backed by QEMU GPU VMs via FluxVM. Marked
-//! preview: APIs and reconciler behaviour may change before GA.
+//! OpenAI-compatible endpoints backed by QEMU GPU VMs via FluxVM. Multi-site
+//! HA store remains Preview; APIs may still change before GA.
 //!
 //! Golden image: bake CUDA + vLLM into a qcow2; cloud-init only writes the
 //! systemd unit that points vLLM at the mounted model path. Set
@@ -38,6 +38,7 @@ pub mod model_jobs;
 pub mod models;
 pub mod nodes;
 pub mod otel;
+pub mod pci_mig;
 pub mod placement;
 pub mod policy;
 pub mod profiles;
@@ -116,6 +117,21 @@ pub fn chain_hash(prev: &str, line: &str) -> String {
 }
 
 fn record_audit_chain(state: &AppState, line: &str) {
+    if raft::peers_configured() {
+        let line = line.to_string();
+        tokio::spawn(async move {
+            match raft::counter_home() {
+                raft::CounterHome::Local => {
+                    let _ = raft::write_audit_link(line).await;
+                }
+                raft::CounterHome::Leader(addr) => {
+                    let _ = remote_audit_link(&addr, line).await;
+                }
+                raft::CounterHome::Unavailable => {}
+            }
+        });
+        return;
+    }
     const STORE: &str = "ai_audit_chain";
     const ID: &str = "ai";
     if state
@@ -140,6 +156,23 @@ fn record_audit_chain(state: &AppState, line: &str) {
             link.prev = chain_hash(&link.prev, &line);
             Ok::<_, String>(link)
         });
+}
+
+async fn remote_audit_link(addr: &str, line: String) -> Result<(), String> {
+    let token = std::env::var("FLUXVM_AI_RAFT_TOKEN").unwrap_or_default();
+    let url = format!("http://{addr}/api/ai/raft/limits");
+    let client = reqwest::Client::new();
+    let response = client
+        .post(url)
+        .header("x-raft-token", token)
+        .json(&raft::LeaseCommand::AuditLink { line })
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("raft audit returned {}", response.status()));
+    }
+    Ok(())
 }
 
 pub(crate) fn err(

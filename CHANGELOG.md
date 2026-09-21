@@ -3,7 +3,8 @@
 ## 0.3.0
 
 ### Added
-- **AI Workloads stay Preview 2** on a single cluster. The control plane now
+- **AI Workloads are Beta on a single cluster** (multi-site HA store stays
+  Preview; this is not GA). The control plane now
   records revisioned rolling, canary, and blue/green rollouts; content-addressed
   model jobs with format scanning and derived artifacts; hierarchical gateway
   request and token windows, plus in-flight stream caps; optional HTTPS or mTLS to
@@ -14,18 +15,22 @@
   an admission webhook that stays off until enabled; key rotation with an overlap; deploy-hour policy;
   a token-budget alert; and a SHA-256 audit chain. `highest_throughput` and
   `lowest_failure` are Maglev strategies. Terraform can manage an AI site.
-  Extra runtimes stay fail-closed until `FLUXVM_AI_ALLOW_RUNTIMES` names them.
-  One process is one Raft voter when `FLUXVM_AI_RAFT_ID`, `FLUXVM_AI_RAFT_PEERS`,
-  and `FLUXVM_AI_RAFT_TOKEN` are set; unset peers leave placement unchanged, and
-  `FLUXVM_AI_CONSENSUS=external` is only a label. A Linux heartbeat reads
-  `nvidia-smi` temperature, power, and ECC when the binary is on `PATH`, and
-  leaves those fields unchanged when it is not. Real PCI MIG create still
-  returns 400. `AiSite.peer_url` streams a verified model digest and stays
-  pending until the peer returns 201. Inference `Upgrade: websocket` is bridged
-  to the selected upstream. `FLUXVM_AI_OTEL_ENDPOINT` exports one gateway span.
-  The operator watches an AI CRD only when that CRD is installed. Rate counters
-  stay in the local file until Raft peers are set; then the leader applies them
-  and a follower forwards instead of keeping a second count.
+  Known runtimes (vLLM, TensorRT-LLM, Triton, llama.cpp, TEI) launch by default;
+  `FLUXVM_AI_DENY_RUNTIMES` blocks a name and `FLUXVM_AI_ALLOW_RUNTIMES` is an
+  optional strict allowlist. One process is one Raft voter when `FLUXVM_AI_RAFT_ID`,
+  `FLUXVM_AI_RAFT_PEERS`, and `FLUXVM_AI_RAFT_TOKEN` are set; unset peers leave
+  placement unchanged, and `FLUXVM_AI_CONSENSUS=external` is only a label. A Linux
+  heartbeat reads `nvidia-smi` temperature, power, and ECC when the binary is on
+  `PATH`, and leaves those fields unchanged when it is not. PCI MIG create runs
+  `nvidia-smi mig` when `FLUXVM_AI_PCI_MIG=1` (inventory-only with
+  `FLUXVM_AI_PCI_MIG_RECORD_ONLY=1`); without the flag a PCI parent still returns
+  400. Janus MIG records stay driver-free. `AiSite.peer_url` streams a verified
+  model digest and stays pending until the peer returns 201. Inference
+  `Upgrade: websocket` is bridged to the selected upstream. `FLUXVM_AI_OTEL_ENDPOINT`
+  exports one gateway span. The operator watches an AI CRD only when that CRD is
+  installed. Rate counters and the audit tip stay in the local file until Raft
+  peers are set; then the leader applies them and a follower forwards instead of
+  keeping a second count.
   GitHub Actions `ai-workloads.yml` covers unit tests, dry-run smoke, the
   admit webhook Helm templates, and Agent Runtime credential tests.
   Maglev accepts an IP hostport from a Janus replica and skips the upsert
