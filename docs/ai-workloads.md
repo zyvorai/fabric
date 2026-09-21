@@ -325,7 +325,7 @@ stays **Preview**.
 ## Security (Phase 4)
 
 - Per-tenant model / endpoint scoping (existing RBAC + tenant filters)
-- `POST /api/ai/keys` — HMAC-SHA256 with `FLUXVM_AI_KEY_HMAC_SECRET` (a preview default is used when unset). Plaintext is returned once. `GET /api/ai/keys` does not include `secret_hash`
+- `POST /api/ai/keys` — HMAC-SHA256 with `FLUXVM_AI_KEY_HMAC_SECRET` (a preview default is used when unset). Plaintext is returned once. `GET /api/ai/keys` does not include `secret_hash`. `ttl_secs` sets `not_after_unix`; absent or `0` does not expire. `POST /api/ai/keys/{id}/rotate` issues a second secret and keeps the current one valid for `overlap_secs` (default 3600). This is not a certificate authority.
 - Lifetime `request_quota`, plus optional per-key `tokens_per_minute` and `max_concurrent`. The gateway updates the key file under the same exclusive lock as the lifetime quota. In-flight count drops when the client cancels or the upstream stream ends. If the upstream usage object is missing, the request's `max_tokens` is the token count (or 1). Distributed counters across nodes are not in this slice
 - `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file. `POST /api/ai/models/{name}/verify` repeats that check and refuses `.pkl`, `.pickle`, `.pt`, and `.pth` files. A `.safetensors` file is counted and preferred; a `.bin` file is not treated as a pickle. Signatures are not verified.
 - Model paths are canonicalized and must stay under `FLUXVM_AI_MODEL_DIR` or `{state}/ai-models`

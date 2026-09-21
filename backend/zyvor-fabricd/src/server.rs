@@ -1372,6 +1372,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::ai::keys::list_keys).post(api::ai::keys::create_key),
         )
         .route(
+            "/ai/keys/{id}/rotate",
+            post(api::ai::keys::rotate_key),
+        )
+        .route(
             "/ai/keys/{id}",
             axum::routing::delete(api::ai::keys::delete_key),
         )

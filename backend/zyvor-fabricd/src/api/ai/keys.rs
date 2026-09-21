@@ -97,6 +97,9 @@ pub async fn create_key(
         tokens_used_window: 0,
         window_started_unix: 0,
         inflight: 0,
+        not_before_unix: 0,
+        not_after_unix: expiry_unix(now.timestamp(), req.ttl_secs),
+        successor_id: None,
         created: now,
         last_used: None,
     };
@@ -156,6 +159,130 @@ pub async fn delete_key(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+pub struct RotateApiKeyRequest {
+    /// Seconds the current secret remains valid after the replacement is issued.
+    /// Absent means 3600. `0` retires the current secret immediately.
+    #[serde(default)]
+    pub overlap_secs: Option<i64>,
+    /// Lifetime of the replacement key. Absent or `0` means it does not expire.
+    #[serde(default)]
+    pub ttl_secs: Option<i64>,
+}
+
+/// POST /api/ai/keys/{id}/rotate
+pub async fn rotate_key(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    body: Option<Json<RotateApiKeyRequest>>,
+) -> Result<(StatusCode, Json<CreateApiKeyResponse>), (StatusCode, Json<serde_json::Value>)> {
+    let req = body.map(|Json(req)| req).unwrap_or_default();
+    let overlap = req.overlap_secs.unwrap_or(3600);
+    if !(0..=7 * 86_400).contains(&overlap) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "overlap_secs must be between 0 and 604800",
+        ));
+    }
+    let now = Utc::now().timestamp();
+    let current = state
+        .store
+        .get_entity::<InferenceApiKey>(STORE_API_KEYS, &id)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "API key not found"))?;
+    if let Some(ref claim_tenant) = claims.tenant {
+        if current.tenant.as_deref() != Some(claim_tenant.as_str()) {
+            return Err(err(StatusCode::NOT_FOUND, "API key not found"));
+        }
+    }
+    ensure_current(&current, now).map_err(|e| err(StatusCode::CONFLICT, e))?;
+
+    let secret = generate_secret();
+    let new_id = format!("aik_{}", &uuid_simple()[..12]);
+    let mut name = format!("{}-{}", current.name, &new_id[4..8]);
+    if name.len() > 128 {
+        name.truncate(120);
+        name.push_str(&new_id[4..12]);
+    }
+    let replacement = InferenceApiKey {
+        id: new_id.clone(),
+        name,
+        endpoint: current.endpoint.clone(),
+        model: current.model.clone(),
+        tenant: current.tenant.clone(),
+        secret_hash: hash_secret(&secret),
+        prefix: secret.chars().take(8).collect(),
+        request_quota: current.request_quota,
+        tokens_per_minute: current.tokens_per_minute,
+        max_concurrent: current.max_concurrent,
+        requests_used: 0,
+        tokens_used_window: 0,
+        window_started_unix: 0,
+        inflight: 0,
+        not_before_unix: 0,
+        not_after_unix: expiry_unix(now, req.ttl_secs),
+        successor_id: None,
+        created: Utc::now(),
+        last_used: None,
+    };
+    state
+        .store
+        .save_entity(STORE_API_KEYS, &replacement.id, &replacement)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let successor = replacement.id.clone();
+    state
+        .store
+        .update_entity_exclusive(STORE_API_KEYS, &id, |mut key: InferenceApiKey| {
+            key.not_after_unix = rotated_not_after(key.not_after_unix, now, overlap);
+            key.successor_id = Some(successor.clone());
+            Ok::<_, String>(key)
+        })
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    audit(
+        &state,
+        &claims.sub,
+        "ROTATE",
+        &format!("ai/keys/{id}"),
+        "SUCCESS",
+    );
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateApiKeyResponse {
+            key: InferenceApiKeyView::from(&replacement),
+            secret,
+        }),
+    ))
+}
+
+/// `0` on either bound means that side is open.
+pub fn ensure_current(key: &InferenceApiKey, now_unix: i64) -> Result<(), &'static str> {
+    if key.not_before_unix > 0 && now_unix < key.not_before_unix {
+        return Err("API key is not yet valid");
+    }
+    if key.not_after_unix > 0 && now_unix >= key.not_after_unix {
+        return Err("API key has expired");
+    }
+    Ok(())
+}
+
+pub fn expiry_unix(now_unix: i64, ttl_secs: Option<i64>) -> i64 {
+    match ttl_secs {
+        Some(ttl) if ttl > 0 => now_unix.saturating_add(ttl.min(366 * 86_400)),
+        _ => 0,
+    }
+}
+
+/// The earlier of the existing expiry and the overlap window. `0` means no expiry yet.
+pub fn rotated_not_after(existing: i64, now_unix: i64, overlap_secs: i64) -> i64 {
+    let overlap_end = now_unix.saturating_add(overlap_secs.max(0));
+    if existing > 0 {
+        existing.min(overlap_end)
+    } else {
+        overlap_end
+    }
+}
+
 fn key_locks() -> &'static Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>> {
     static LOCKS: OnceLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = OnceLock::new();
     LOCKS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -213,6 +340,7 @@ pub fn admit_limits(
     now_unix: i64,
     requested_tokens: u64,
 ) -> Result<InferenceApiKey, String> {
+    ensure_current(&key, now_unix).map_err(|e| e.to_string())?;
     if now_unix.saturating_sub(key.window_started_unix) >= 60 {
         key.window_started_unix = now_unix;
         key.tokens_used_window = 0;
@@ -262,8 +390,12 @@ pub fn verify_api_key(state: &AppState, secret: &str) -> Option<InferenceApiKey>
     let prefix: String = secret.chars().take(8).collect();
     let hash = hash_secret(secret);
     let keys: Vec<InferenceApiKey> = state.store.list_entities(STORE_API_KEYS).ok()?;
-    keys.into_iter()
-        .find(|k| k.prefix == prefix && bool::from(k.secret_hash.as_bytes().ct_eq(hash.as_bytes())))
+    let now = Utc::now().timestamp();
+    keys.into_iter().find(|k| {
+        k.prefix == prefix
+            && ensure_current(k, now).is_ok()
+            && bool::from(k.secret_hash.as_bytes().ct_eq(hash.as_bytes()))
+    })
 }
 
 pub fn hash_secret(secret: &str) -> String {
@@ -335,6 +467,9 @@ mod tests {
             tokens_used_window: 0,
             window_started_unix: 0,
             inflight: 0,
+            not_before_unix: 0,
+            not_after_unix: 0,
+            successor_id: None,
             created: Utc::now(),
             last_used: None,
         };
@@ -368,6 +503,9 @@ mod tests {
             tokens_used_window: 0,
             window_started_unix: 1_000,
             inflight: 0,
+            not_before_unix: 0,
+            not_after_unix: 0,
+            successor_id: None,
             created: Utc::now(),
             last_used: None,
         };
@@ -376,5 +514,38 @@ mod tests {
         assert_eq!(key.inflight, 1);
         assert!(admit_limits(key, 1_020, 1).is_err());
         assert_eq!(requested_tokens(br#"{"max_tokens":16}"#), 16);
+    }
+
+    #[test]
+    fn expiry_and_rotation_overlap() {
+        let mut key = InferenceApiKey {
+            id: "aik_1".into(),
+            name: "n".into(),
+            endpoint: "e".into(),
+            model: None,
+            tenant: None,
+            secret_hash: "h".into(),
+            prefix: "fvai_abc".into(),
+            request_quota: None,
+            tokens_per_minute: None,
+            max_concurrent: None,
+            requests_used: 0,
+            tokens_used_window: 0,
+            window_started_unix: 0,
+            inflight: 0,
+            not_before_unix: 0,
+            not_after_unix: 0,
+            successor_id: None,
+            created: Utc::now(),
+            last_used: None,
+        };
+        assert!(ensure_current(&key, 1_000).is_ok());
+        key.not_after_unix = rotated_not_after(0, 1_000, 60);
+        assert_eq!(key.not_after_unix, 1_060);
+        assert!(ensure_current(&key, 1_059).is_ok());
+        assert!(ensure_current(&key, 1_060).is_err());
+        assert_eq!(rotated_not_after(1_030, 1_000, 60), 1_030);
+        assert_eq!(expiry_unix(1_000, Some(0)), 0);
+        assert_eq!(expiry_unix(1_000, Some(30)), 1_030);
     }
 }

@@ -449,6 +449,15 @@ pub struct InferenceApiKey {
     pub window_started_unix: i64,
     #[serde(default)]
     pub inflight: u32,
+    /// Unix time the key becomes valid. `0` means immediately.
+    #[serde(default)]
+    pub not_before_unix: i64,
+    /// Unix time the key stops being valid. `0` means it does not expire.
+    #[serde(default)]
+    pub not_after_unix: i64,
+    /// Replacement key issued by rotate. Both keys work until `not_after_unix`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub successor_id: Option<String>,
     pub created: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_used: Option<DateTime<Utc>>,
@@ -468,6 +477,9 @@ pub struct CreateApiKeyRequest {
     pub tokens_per_minute: Option<u64>,
     #[serde(default)]
     pub max_concurrent: Option<u32>,
+    /// Lifetime in seconds from creation. Absent or `0` means the key does not expire.
+    #[serde(default)]
+    pub ttl_secs: Option<i64>,
 }
 
 /// API view of an inference key. `secret_hash` is never serialized.
@@ -491,6 +503,16 @@ pub struct InferenceApiKeyView {
     pub created: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_used: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "is_zero_i64")]
+    pub not_before_unix: i64,
+    #[serde(skip_serializing_if = "is_zero_i64")]
+    pub not_after_unix: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub successor_id: Option<String>,
+}
+
+fn is_zero_i64(value: &i64) -> bool {
+    *value == 0
 }
 
 impl From<&InferenceApiKey> for InferenceApiKeyView {
@@ -508,6 +530,9 @@ impl From<&InferenceApiKey> for InferenceApiKeyView {
             requests_used: key.requests_used,
             created: key.created,
             last_used: key.last_used,
+            not_before_unix: key.not_before_unix,
+            not_after_unix: key.not_after_unix,
+            successor_id: key.successor_id.clone(),
         }
     }
 }

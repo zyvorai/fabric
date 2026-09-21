@@ -93,6 +93,8 @@ async fn gateway_inner(
 
     let mut key = keys::verify_api_key(state, &secret)
         .ok_or((StatusCode::UNAUTHORIZED, "invalid API key".into()))?;
+    keys::ensure_current(&key, Utc::now().timestamp())
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     if key.endpoint != endpoint_name {
         return Err((
@@ -1161,6 +1163,9 @@ mod tests {
             tokens_used_window: 0,
             window_started_unix: 0,
             inflight: 0,
+            not_before_unix: 0,
+            not_after_unix: 0,
+            successor_id: None,
             created: Utc::now(),
             last_used: None,
         };
