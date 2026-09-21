@@ -1,9 +1,11 @@
-# Fabric AI Workloads (preview)
+# Fabric AI Workloads (Preview 2)
 
 OpenAI-compatible inference on dedicated NVIDIA GPU VMs, operated through
 Fabric’s API, CLI, and console. Maglev load-balances backends with
-control-plane weight updates. Autoscaling, API keys, multi-site preference,
-and Agent Runtime fabric providers are included through Phase 6.
+control-plane weight updates. Phases 0–6 cover inventory, routing, autoscaling,
+API keys, sites, and Agent Runtime. Preview 2 adds revisioned rollouts, model
+supply-chain jobs, and gateway limits. Maturity for a single cluster stays
+Preview 2.
 
 ## Maturity
 
@@ -19,10 +21,10 @@ and Agent Runtime fabric providers are included through Phase 6.
 
 ## First release shape
 
-- One NVIDIA GPU per QEMU VM (dedicated VFIO passthrough)
-- Runtime: **vLLM** only
-- Model source: `hf://org/name` or a pre-staged host path. A model job passes the stored Hugging Face `revision` to the downloader and keeps bytes under `{state}/ai-models` by digest. Checksums for a directory are a sorted manifest (relative path, size, SHA-256), not the first file.
-- Endpoint: Maglev VIP → guest `:8000` (`/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`)
+- One to eight NVIDIA GPUs per QEMU VM, reserved together and passed as VFIO devices. `gpu.count` of 1 keeps the previous single-device path.
+- Runtime: **vLLM** launches by default. TensorRT-LLM, Triton, llama.cpp, and text-embeddings-inference launch only when named in `FLUXVM_AI_ALLOW_RUNTIMES`.
+- Model source: `hf://org/name` or a pre-staged host path. A model job passes the stored Hugging Face `revision` to the downloader and keeps bytes under `{state}/ai-models` by digest. Checksums for a directory are a sorted manifest (relative path, size, SHA-256), not the first file. When `signature` is set, the job checks an HMAC-SHA256 of that digest with `FLUXVM_AI_MODEL_SIGNING_KEY`.
+- Endpoint: Maglev VIP → guest `:8000` (`/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`, `/v1/rerank`, `/v1/batches`)
 - Readiness: Fabric HTTP `GET /health` before Maglev `Ready`
 - Manual + automatic replica scaling; drain on delete / maintenance
 - Bridged tap NICs (Maglev does not attach to bridge-less direct taps)
@@ -164,7 +166,7 @@ chunks instead of one buffered completion.
 | 5 | `site_local` / `cost_optimized` / `energy_optimized` routing, preferred/allowed sites |
 | 6 | Agent Runtime `kind: fabric` credentials + `ZYVOR_FABRIC_INFERENCE_BASE` shim |
 | Harden | OpenAI API-key gateway, `/ai/capacity` + `/ai/events`, console keys/autoscale, golden-image bake script |
-| GitOps | Terraform `zyvor-fabricd_{model_artifact,inference_profile,inference_deployment,inference_endpoint}` + operator `ModelArtifact` / `InferenceDeployment` CRDs |
+| GitOps | Terraform `zyvor-fabricd_{model_artifact,inference_profile,inference_deployment,inference_endpoint,ai_site}` plus operator CRDs. The operator reconciles `ModelArtifact` and `InferenceDeployment`. The other AI kinds are registered so a missing CRD does not stop the process. |
 | Correctness | Exclusive GPU/VIP create, health replacement after three failures, Maglev-before-VIP delete, CIDR network/broadcast skipped, bounded reconcile retry. Still **Preview** |
 
 ## Terraform
@@ -194,6 +196,11 @@ resource "zyvor-fabricd_inference_endpoint" "qwen" {
   name       = "qwen3-8b-openai"
   deployment = zyvor-fabricd_inference_deployment.qwen.name
 }
+
+resource "zyvor-fabricd_ai_site" "pune" {
+  id        = "pune-1"
+  residency = "india"
+}
 ```
 
 See `terraform-provider/examples/ai-workloads/`.
@@ -202,8 +209,10 @@ See `terraform-provider/examples/ai-workloads/`.
 
 ```bash
 kubectl apply -f operator/examples/ai-inference-deployment.yaml
-# CRDs: ModelArtifact, InferenceDeployment (zyvor-fabricd.io/v1alpha1)
-# Create InferenceProfile via zyvorctl or Terraform before the Deployment CR.
+# The operator reconciles ModelArtifact and InferenceDeployment.
+# It also lists InferenceProfile, InferenceEndpoint, InferenceRollout,
+# GpuNode, AiSite, InferenceApiKeyPolicy, and InferenceAutoscaler.
+# Those extra kinds are not watched.
 ```
 
 ## AI-aware Maglev routing (Phase 2+)
@@ -327,12 +336,12 @@ stays **Preview**.
 - Per-tenant model / endpoint scoping (existing RBAC + tenant filters)
 - `POST /api/ai/keys` — HMAC-SHA256 with `FLUXVM_AI_KEY_HMAC_SECRET` (a preview default is used when unset). Plaintext is returned once. `GET /api/ai/keys` does not include `secret_hash`. `ttl_secs` sets `not_after_unix`; absent or `0` does not expire. `POST /api/ai/keys/{id}/rotate` issues a second secret and keeps the current one valid for `overlap_secs` (default 3600). This is not a certificate authority.
 - Lifetime `request_quota`, plus optional per-key `tokens_per_minute` and `max_concurrent`. The gateway updates the key file under the same exclusive lock as the lifetime quota. In-flight count drops when the client cancels or the upstream stream ends. If the upstream usage object is missing, the request's `max_tokens` is the token count (or 1). Distributed counters across nodes are not in this slice
-- `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file. `POST /api/ai/models/{name}/verify` repeats that check and refuses `.pkl`, `.pickle`, `.pt`, and `.pth` files. A `.safetensors` file is counted and preferred; a `.bin` file is not treated as a pickle. Signatures are not verified.
+- `require_checksum` on ModelArtifact rejects unverified materialization. A directory checksum is the SHA-256 of a sorted manifest (`relative-path size sha256`), not the first file. `POST /api/ai/models/{name}/verify` repeats that check and refuses `.pkl`, `.pickle`, `.pt`, and `.pth` files. A `.safetensors` file is counted and preferred; a `.bin` file is not treated as a pickle. A set `signature` must be the HMAC-SHA256 hex of the digest under `FLUXVM_AI_MODEL_SIGNING_KEY`. An artifact with no signature is not signed.
 - Model paths are canonicalized and must stay under `FLUXVM_AI_MODEL_DIR` or `{state}/ai-models`
 - `license` + `residency` metadata on models; residency copied to deployments. When an endpoint sets `residency`, replicas with no `site` are excluded
-- `InferenceProfile.gpu.count` must be 1
+- `InferenceProfile.gpu.count` is 1 to 8. The reconciler reserves that whole group on one node.
 - Deployment revision 1 is written at create. Later revisions and replica sets are the rollout record described above
-- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images. Model jobs run outside the HTTP request: `Registered`, `Resolving`, `Downloading`, `Verifying`, `Ready`, or `Failed` with a durable message and retry count. A second job for the same digest joins the first. A partial file is resumed. The job is refused when free disk is below the declared size. `GET /api/ai/model-jobs` and `GET /api/ai/models/{name}/status` report that state. `POST /api/ai/models/{name}/materialize` only records a job
+- HF tokens stay on the host (`HF_TOKEN`); never baked into guest images. Model jobs run outside the HTTP request: `Registered`, `Resolving`, `Downloading`, `Verifying`, `Scanning`, `Optimizing`, `Ready`, or `Failed` with a durable message and retry count. Scanning counts files (`FLUXVM_AI_MODEL_MAX_FILES`, default 10000) and checks the signature. Optimizing writes a derived artifact and does not replace the source digest. A second job for the same digest joins the first. A partial file is resumed. The job is refused when free disk is below the declared size. `GET /api/ai/model-jobs` and `GET /api/ai/models/{name}/status` report that state. `POST /api/ai/models/{name}/materialize` only records a job. `POST /api/ai/models/{name}/replicate` marks a model ready at a site when a node there already lists it; it does not copy bytes across the WAN.
 
 ## Multi-site (Phase 5)
 
