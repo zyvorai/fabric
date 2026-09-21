@@ -28,6 +28,8 @@
   and a follower forwards instead of keeping a second count.
   GitHub Actions `ai-workloads.yml` covers unit tests, dry-run smoke, the
   admit webhook Helm templates, and Agent Runtime credential tests.
+  Maglev accepts an IP hostport from a Janus replica and skips the upsert
+  when every ready replica is a Janus device so the gateway can proxy alone.
   See [docs/ai-workloads.md](docs/ai-workloads.md).
 - **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
   Networking / Meta, with emoji section markers), `--color auto|always|never`,

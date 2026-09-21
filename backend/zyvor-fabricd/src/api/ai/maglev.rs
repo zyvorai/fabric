@@ -3,6 +3,8 @@
 
 //! Maglev ServiceSpec builder for AI inference endpoints (preview).
 
+use std::net::IpAddr;
+
 use zyvor_fabric_fluxvm_client::{
     NetworkServiceAlgorithm, NetworkServiceBackend, NetworkServiceExposure, NetworkServiceMode,
     NetworkServiceProtocol, NetworkServiceSpec,
@@ -10,6 +12,31 @@ use zyvor_fabric_fluxvm_client::{
 
 use super::eligibility::replica_serving;
 use super::types::InferenceReplica;
+
+/// Split a replica address into an IP Maglev can load-balance and a TCP port.
+///
+/// FluxVM rejects `host:port` in `backends[].address`. Janus replicas store
+/// `127.0.0.1:30818`; real VMs usually store a bare guest IP and use the
+/// endpoint port. Non-IP hosts are omitted so the gateway can still proxy
+/// them without a Maglev upsert.
+pub fn backend_hostport(raw: &str, default_port: u16) -> Option<(String, u16)> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if let Ok(ip) = raw.parse::<IpAddr>() {
+        return Some((ip.to_string(), default_port));
+    }
+    let (host, port_text) = raw.rsplit_once(':')?;
+    if host.parse::<IpAddr>().is_err() {
+        return None;
+    }
+    let port: u16 = port_text.parse().ok()?;
+    if port == 0 {
+        return None;
+    }
+    Some((host.to_string(), port))
+}
 
 /// Build an equal-weight Maglev service from ready replicas.
 pub fn build_maglev_service_spec(
@@ -34,11 +61,12 @@ pub fn build_maglev_service_spec_weighted(
         .iter()
         .filter(|r| replica_serving(r))
         .filter_map(|r| {
-            let address = r.address.as_ref()?;
+            let raw = r.address.as_ref()?;
+            let (address, backend_port) = backend_hostport(raw, port)?;
             let weight = r.maglev_weight.unwrap_or(1).clamp(1, 32);
             Some(NetworkServiceBackend {
-                address: address.clone(),
-                port,
+                address,
+                port: backend_port,
                 weight,
                 enabled: true,
                 state: Default::default(),
@@ -46,7 +74,6 @@ pub fn build_maglev_service_spec_weighted(
             })
         })
         .collect();
-
     NetworkServiceSpec {
         name: name.to_string(),
         vip: vip.to_string(),
@@ -72,8 +99,11 @@ pub fn drain_backend(spec: &mut NetworkServiceSpec, address: &str) {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
+    let target = backend_hostport(address, 0)
+        .map(|(ip, _)| ip)
+        .unwrap_or_else(|| address.to_string());
     for b in &mut spec.backends {
-        if b.address == address {
+        if b.address == target || b.address == address {
             b.enabled = false;
             b.state = zyvor_fabric_fluxvm_client::NetworkBackendState::Draining;
             b.drain_until_unix_ms = Some(now_ms.saturating_add(30_000));
@@ -196,5 +226,35 @@ mod tests {
             spec.backends[0].state,
             zyvor_fabric_fluxvm_client::NetworkBackendState::Draining
         ));
+    }
+
+    #[test]
+    fn janus_hostport_becomes_ip_and_port() {
+        let replicas = vec![replica(
+            "j",
+            true,
+            Some("127.0.0.1:30818"),
+            false,
+            Some(1),
+            fresh(),
+        )];
+        let spec = build_maglev_service_spec("janus-ep", "10.96.0.50", 8000, &replicas, None);
+        assert_eq!(spec.backends.len(), 1);
+        assert_eq!(spec.backends[0].address, "127.0.0.1");
+        assert_eq!(spec.backends[0].port, 30818);
+    }
+
+    #[test]
+    fn hostname_upstream_is_omitted_from_maglev() {
+        let replicas = vec![replica(
+            "j",
+            true,
+            Some("janus.lab:30818"),
+            false,
+            Some(1),
+            fresh(),
+        )];
+        let spec = build_maglev_service_spec("janus-ep", "10.96.0.50", 8000, &replicas, None);
+        assert!(spec.backends.is_empty());
     }
 }

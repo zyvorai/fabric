@@ -238,7 +238,8 @@ fn admit_token_ok(token: Option<&str>) -> Result<(), &'static str> {
     let expected = std::env::var("FLUXVM_AI_ADMIT_TOKEN").ok();
     match (expected.as_deref(), token) {
         (Some(expected), Some(token)) if expected == token && !expected.is_empty() => Ok(()),
-        (Some(_), _) => Err("admit token is required"),
+        (Some(_), None) => Err("admit token is required"),
+        (Some(_), Some(_)) => Err("admit token mismatch"),
         (None, None) => Ok(()),
         (None, Some(_)) => Err("admit token is not configured"),
     }

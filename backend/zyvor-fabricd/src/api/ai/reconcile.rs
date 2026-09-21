@@ -1079,6 +1079,27 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
 
     let spec = build_maglev_service_spec(&ep.name, &vip, ep.port, &dep.status.replicas, max_egress);
 
+    // Janus (and any non-IP upstream) is proxied by the OpenAI gateway. Maglev
+    // only accepts IP backends, so an empty table means leave VIP reserved and
+    // skip the FluxVM upsert instead of logging a 422 every tick. Janus BDFs
+    // also skip Maglev even when the hostport parses as 127.0.0.1:port — the
+    // lab FluxVM dataplane is not the path for that simulator.
+    let serving: Vec<_> = dep
+        .status
+        .replicas
+        .iter()
+        .filter(|r| super::eligibility::replica_serving(r))
+        .collect();
+    let janus_only =
+        !serving.is_empty() && serving.iter().all(|r| super::janus::is_janus_bdf(&r.bdf));
+    if spec.backends.is_empty() || janus_only {
+        ep.vip = Some(vip);
+        ep.updated = Utc::now();
+        let _ = state.store.save_entity(STORE_ENDPOINTS, &ep.name, &ep);
+        ipam::pin(state, &ep.name);
+        return Ok(());
+    }
+
     let client = match fluxvm_client(state) {
         Ok(c) => c,
         Err(_) => {
