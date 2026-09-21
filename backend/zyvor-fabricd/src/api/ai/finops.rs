@@ -23,6 +23,7 @@ pub struct UsageReport {
     pub egress_bytes: u64,
     pub reserved_gpus: u32,
     pub utilized_gpus: u32,
+    pub alert: bool,
 }
 
 pub struct UsageInput {
@@ -51,6 +52,7 @@ pub fn summarize(input: &UsageInput) -> UsageReport {
         egress_bytes: input.egress_bytes,
         reserved_gpus: input.reserved_gpus,
         utilized_gpus: input.utilized_gpus,
+        alert: false,
     }
 }
 
@@ -80,7 +82,7 @@ pub async fn report(
         .list_entities(super::keys::STORE_API_KEYS)
         .unwrap_or_default();
     let tokens = keys.iter().map(|key| key.tokens_used_window).sum();
-    Ok(axum::Json(summarize(&UsageInput {
+    let mut report = summarize(&UsageInput {
         reserved_gpus: reserved,
         utilized_gpus: utilized,
         seconds: 3600,
@@ -90,7 +92,19 @@ pub async fn report(
         storage_bytes: 0,
         transfer_bytes: 0,
         egress_bytes: 0,
-    })))
+    });
+    let spent = report
+        .prompt_tokens
+        .saturating_add(report.completion_tokens);
+    report.alert = over_budget(spent, token_budget());
+    Ok(axum::Json(report))
+}
+
+fn token_budget() -> u64 {
+    std::env::var("FLUXVM_AI_TOKEN_BUDGET")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0)
 }
 
 pub fn token_charge(
@@ -126,6 +140,7 @@ mod tests {
         assert_eq!(report.gpu_seconds, 7200);
         assert_eq!(report.gpu_memory_gib_hours, 80);
         assert_eq!(report.reserved_gpus, 4);
+        assert!(!report.alert);
         assert!(over_budget(11, 10));
         assert!(!over_budget(10, 0));
     }

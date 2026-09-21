@@ -95,6 +95,45 @@ pub(crate) fn audit(state: &AppState, user: &str, action: &str, resource: &str, 
     if let Err(e) = state.store.save_entity("audit_logs", &entry.id, &entry) {
         tracing::warn!("Failed to persist audit log: {}", e);
     }
+    record_audit_chain(state, &format!("{user}|{action}|{resource}|{status}"));
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+struct AuditChain {
+    prev: String,
+}
+
+pub fn chain_hash(prev: &str, line: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(format!("{prev}\n{line}").as_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn record_audit_chain(state: &AppState, line: &str) {
+    const STORE: &str = "ai_audit_chain";
+    const ID: &str = "ai";
+    if state
+        .store
+        .get_entity::<AuditChain>(STORE, ID)
+        .ok()
+        .flatten()
+        .is_none()
+    {
+        let _ = state.store.save_entity(
+            STORE,
+            ID,
+            &AuditChain {
+                prev: String::new(),
+            },
+        );
+    }
+    let line = line.to_string();
+    let _ = state
+        .store
+        .update_entity_exclusive(STORE, ID, |mut link: AuditChain| {
+            link.prev = chain_hash(&link.prev, &line);
+            Ok::<_, String>(link)
+        });
 }
 
 pub(crate) fn err(
@@ -105,4 +144,17 @@ pub(crate) fn err(
         status,
         axum::Json(serde_json::json!({ "error": msg.into() })),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::chain_hash;
+
+    #[test]
+    fn audit_chain_depends_on_the_previous_hash() {
+        let first = chain_hash("", "create|model");
+        let second = chain_hash(&first, "create|model");
+        assert_ne!(first, second);
+        assert_eq!(first, chain_hash("", "create|model"));
+    }
 }

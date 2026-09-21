@@ -404,3 +404,30 @@ func (c *Client) CreateInferenceEndpoint(ctx context.Context, req createInferenc
 func (c *Client) DeleteInferenceEndpoint(ctx context.Context, name string) error {
 	return c.do(ctx, http.MethodDelete, "/api/ai/endpoints/"+name, nil, nil)
 }
+
+type aiSiteRecord struct {
+	ID        string `json:"id"`
+	Residency string `json:"residency"`
+	LatencyMs int64  `json:"latency_ms"`
+	CostClass int64  `json:"cost_class"`
+}
+
+func (c *Client) GetAiSite(ctx context.Context, id string) (*aiSiteRecord, error) {
+	var site aiSiteRecord
+	if err := c.do(ctx, http.MethodGet, "/api/ai/sites/"+id, nil, &site); err != nil {
+		return nil, err
+	}
+	return &site, nil
+}
+
+func (c *Client) PutAiSite(ctx context.Context, site aiSiteRecord) (*aiSiteRecord, error) {
+	var saved aiSiteRecord
+	if err := c.do(ctx, http.MethodPost, "/api/ai/sites", site, &saved); err != nil {
+		return nil, err
+	}
+	return &saved, nil
+}
+
+func (c *Client) DeleteAiSite(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/api/ai/sites/"+id, nil, nil)
+}

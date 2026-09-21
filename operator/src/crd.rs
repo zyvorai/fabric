@@ -225,6 +225,36 @@ pub struct AiSiteSpec {
     pub residency: String,
 }
 
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "InferenceApiKeyPolicy",
+    plural = "inferenceapikeypolicies",
+    namespaced
+)]
+pub struct InferenceApiKeyPolicySpec {
+    pub endpoint: String,
+    #[serde(default)]
+    pub max_ttl_secs: i64,
+}
+
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
+#[kube(
+    group = "zyvor-fabricd.io",
+    version = "v1alpha1",
+    kind = "InferenceAutoscaler",
+    plural = "inferenceautoscalers",
+    namespaced
+)]
+pub struct InferenceAutoscalerSpec {
+    pub deployment: String,
+    #[serde(default)]
+    pub min_replicas: u32,
+    #[serde(default)]
+    pub max_replicas: u32,
+}
+
 fn default_vllm_runtime() -> String {
     "vllm".into()
 }
@@ -244,6 +274,8 @@ pub fn production_ai_kinds() -> &'static [&'static str] {
         std::any::type_name::<InferenceRollout>(),
         std::any::type_name::<GpuNode>(),
         std::any::type_name::<AiSite>(),
+        std::any::type_name::<InferenceApiKeyPolicy>(),
+        std::any::type_name::<InferenceAutoscaler>(),
     );
     &[
         "ModelArtifact",
@@ -253,6 +285,8 @@ pub fn production_ai_kinds() -> &'static [&'static str] {
         "InferenceRollout",
         "GpuNode",
         "AiSite",
+        "InferenceApiKeyPolicy",
+        "InferenceAutoscaler",
     ]
 }
 

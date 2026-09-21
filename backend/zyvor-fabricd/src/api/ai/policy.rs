@@ -27,6 +27,12 @@ pub struct TenantAiPolicy {
     /// Prompts are not stored. This flag must stay false.
     #[serde(default)]
     pub prompt_logging: bool,
+    /// Inclusive UTC hour. Unset together with `deploy_hour_end` means no window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deploy_hour_start: Option<u8>,
+    /// Exclusive UTC hour, except when it equals the start, which allows that hour only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deploy_hour_end: Option<u8>,
 }
 
 pub struct DeployCheck<'a> {
@@ -36,6 +42,7 @@ pub struct DeployCheck<'a> {
     pub gpus: u32,
     pub has_signature: bool,
     pub context_tokens: u32,
+    pub hour: u8,
 }
 
 pub fn evaluate(policy: &TenantAiPolicy, check: &DeployCheck<'_>) -> Result<(), String> {
@@ -66,7 +73,31 @@ pub fn evaluate(policy: &TenantAiPolicy, check: &DeployCheck<'_>) -> Result<(), 
     if policy.max_context_tokens > 0 && check.context_tokens > policy.max_context_tokens {
         return Err("context length exceeds tenant policy".into());
     }
+    deploy_window(policy.deploy_hour_start, policy.deploy_hour_end, check.hour)
+        .map_err(|msg| msg.to_string())?;
     Ok(())
+}
+
+/// Both bounds absent means always open. A start after the end wraps past midnight.
+pub fn deploy_window(start: Option<u8>, end: Option<u8>, hour: u8) -> Result<(), &'static str> {
+    match (start, end) {
+        (None, None) => Ok(()),
+        (Some(start), Some(end)) if start <= 23 && end <= 23 && hour <= 23 => {
+            let open = if start == end {
+                hour == start
+            } else if start < end {
+                hour >= start && hour < end
+            } else {
+                hour >= start || hour < end
+            };
+            if open {
+                Ok(())
+            } else {
+                Err("deployment is outside the tenant time window")
+            }
+        }
+        _ => Err("tenant deploy window hours must be 0 to 23"),
+    }
 }
 
 pub fn rbac_allows(granted: &[&str], action: &str) -> bool {
@@ -118,7 +149,7 @@ pub fn enforce(
     else {
         return Ok(());
     };
-    if evaluate(
+    evaluate(
         &policy,
         &DeployCheck {
             model,
@@ -127,16 +158,9 @@ pub fn enforce(
             gpus: 0,
             has_signature: true,
             context_tokens: 0,
+            hour: chrono::Timelike::hour(&chrono::Utc::now()) as u8,
         },
     )
-    .is_ok()
-    {
-        Ok(())
-    } else {
-        Err(format!(
-            "tenant '{tenant}' is not allowed to deploy model '{model}'"
-        ))
-    }
 }
 
 #[cfg(test)]
@@ -154,6 +178,8 @@ mod tests {
             require_signature: true,
             max_context_tokens: 8192,
             prompt_logging: false,
+            deploy_hour_start: Some(9),
+            deploy_hour_end: Some(17),
         };
         assert!(allows(&policy, "qwen", "hf://Qwen/Qwen3-8B"));
         assert!(!allows(&policy, "other", "hf://Qwen/Qwen3-8B"));
@@ -167,6 +193,7 @@ mod tests {
                 gpus: 2,
                 has_signature: true,
                 context_tokens: 1024,
+                hour: 10,
             }
         )
         .is_ok());
@@ -179,12 +206,19 @@ mod tests {
                 gpus: 4,
                 has_signature: false,
                 context_tokens: 1024,
+                hour: 10,
             }
         )
         .is_err());
         assert!(rbac_allows(&["scale"], "scale"));
         assert!(!rbac_allows(&["read"], "rollback"));
         assert!(rbac_allows(&["administer"], "promote"));
+        assert!(deploy_window(None, None, 3).is_ok());
+        assert!(deploy_window(Some(9), Some(17), 9).is_ok());
+        assert!(deploy_window(Some(9), Some(17), 17).is_err());
+        assert!(deploy_window(Some(22), Some(6), 23).is_ok());
+        assert!(deploy_window(Some(22), Some(6), 12).is_err());
+        assert!(deploy_window(Some(4), Some(4), 4).is_ok());
     }
 }
 

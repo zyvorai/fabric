@@ -79,6 +79,7 @@ func (p *fabricdProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewInferenceProfileResource,
 		NewInferenceDeploymentResource,
 		NewInferenceEndpointResource,
+		NewAiSiteResource,
 	}
 }
 
