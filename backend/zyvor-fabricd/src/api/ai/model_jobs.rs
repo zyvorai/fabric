@@ -363,7 +363,7 @@ pub async fn list_jobs(
         .store
         .list_entities(STORE_MODEL_JOBS)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    jobs.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    jobs.sort_by_key(|job| job.created_at);
     Ok(Json(jobs))
 }
 
@@ -378,7 +378,7 @@ pub async fn model_status(
         .list_entities(STORE_MODEL_JOBS)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     jobs.retain(|j| j.model == name);
-    jobs.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    jobs.sort_by_key(|job| job.created_at);
     jobs.pop()
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "no model job for this artifact"))
         .map(Json)

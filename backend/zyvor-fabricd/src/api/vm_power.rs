@@ -332,7 +332,7 @@ pub async fn migrate_storage(
     // Update VM image path — fail explicitly if VM not found
     let mut vm = state
         .store
-        .get_vm(&vm_name)
+        .get_vm(vm_name)
         .map_err(|e| {
             crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
         })?

@@ -170,9 +170,9 @@ pub fn key_lock(id: &str) -> Arc<tokio::sync::Mutex<()>> {
 
 /// Sequential quota step. The per-key mutex in `consume_request` is what
 /// serializes callers; this helper is the decision itself.
-pub fn try_reserve_quota(used: u64, quota: Option<u64>) -> Result<u64, ()> {
+pub fn try_reserve_quota(used: u64, quota: Option<u64>) -> Result<u64, &'static str> {
     if quota.is_some_and(|q| used >= q) {
-        return Err(());
+        return Err("quota exceeded");
     }
     Ok(used.saturating_add(1))
 }
@@ -283,7 +283,7 @@ fn hmac_sha256(key: &[u8], msg: &[u8]) -> [u8; 32] {
     let inner_hash = inner.finalize();
     let mut outer = Sha256::new();
     outer.update(opad);
-    outer.update(&inner_hash);
+    outer.update(inner_hash);
     let out = outer.finalize();
     let mut arr = [0u8; 32];
     arr.copy_from_slice(&out);

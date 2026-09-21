@@ -204,7 +204,9 @@ pub fn compute_weights(strategy: RoutingStrategy, ready: &[&InferenceReplica]) -
             let v_w = compute_weights(RoutingStrategy::MostFreeVram, ready);
             q_w.into_iter()
                 .zip(v_w)
-                .map(|(a, b)| clamp_weight(((u32::from(a) + u32::from(b) + 1) / 2) as u16))
+                .map(|(a, b)| {
+                    clamp_weight(u32::from(a).saturating_add(u32::from(b)).div_ceil(2) as u16)
+                })
                 .collect()
         }
         RoutingStrategy::SiteLocal => {
@@ -245,10 +247,7 @@ pub fn filter_replicas_for_endpoint<'a>(
         .filter(|r| replica_serving(r))
         .filter(|r| {
             if let Some(res) = ep.residency.as_deref() {
-                match r.site.as_deref() {
-                    Some(s) if s == res => true,
-                    _ => false,
-                }
+                matches!(r.site.as_deref(), Some(s) if s == res)
             } else {
                 true
             }
@@ -370,11 +369,9 @@ pub fn parse_vllm_prometheus(text: &str) -> ReplicaMetrics {
 
 fn split_prom_line(line: &str) -> Option<(&str, &str)> {
     // name{labels} value   OR   name value
-    let (left, right) = if let Some(idx) = line.rfind(' ') {
-        (&line[..idx], &line[idx + 1..])
-    } else {
-        return None;
-    };
+    let (left, right) = line
+        .rfind(' ')
+        .map(|idx| (&line[..idx], &line[idx + 1..]))?;
     let name = if let Some(brace) = left.find('{') {
         &left[..brace]
     } else {

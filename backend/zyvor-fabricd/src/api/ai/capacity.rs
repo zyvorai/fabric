@@ -18,10 +18,7 @@ pub async fn capacity(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let client = fluxvm_client(&state)?;
-    let inventory = match client.list_host_gpus().await {
-        Ok(g) => g,
-        Err(_) => Vec::new(),
-    };
+    let inventory = client.list_host_gpus().await.unwrap_or_default();
 
     let deployments: Vec<InferenceDeployment> = state
         .store
@@ -93,7 +90,7 @@ pub async fn events(
 
     let mut rows: Vec<AuditRow> = state.store.list_entities("audit_logs").unwrap_or_default();
     rows.retain(|r| r.resource.starts_with("ai/") || r.action == "INFER");
-    rows.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    rows.sort_by_key(|r| std::cmp::Reverse(r.timestamp));
     rows.truncate(50);
 
     let items: Vec<serde_json::Value> = rows

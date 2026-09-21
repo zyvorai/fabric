@@ -64,10 +64,10 @@ pub fn pool_specs() -> Vec<String> {
 }
 
 pub fn avoid_buggy_ips() -> bool {
-    match std::env::var("FLUXVM_AI_AVOID_BUGGY_IPS") {
-        Ok(v) if v == "0" || v.eq_ignore_ascii_case("false") => false,
-        _ => true,
-    }
+    !matches!(
+        std::env::var("FLUXVM_AI_AVOID_BUGGY_IPS").as_deref(),
+        Ok(v) if v == "0" || v.eq_ignore_ascii_case("false")
+    )
 }
 
 /// First free address in `specs` that is not in `used`.

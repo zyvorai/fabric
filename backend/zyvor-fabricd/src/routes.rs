@@ -858,6 +858,7 @@ pub async fn clear_direct_uplink(
     (StatusCode::OK, Json(vm)).into_response()
 }
 
+#[allow(clippy::result_large_err)]
 async fn clear_fluxvm_record(
     state: &AppState,
     claims: &security::Claims,
