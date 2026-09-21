@@ -110,7 +110,9 @@ zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
 zyvorctl ai key create edge-key --endpoint qwen3-8b-openai
 zyvorctl ai capacity
 zyvorctl ai gpus
-zyvorctl ai nodes
+zyvorctl ai node list
+zyvorctl ai node mig-create node-0 --parent-bdf janus:node-0:gpu-0 --profile 1g.10gb
+zyvorctl ai node mig-delete node-0 janus:node-0:gpu-0--1g.10gb--0
 ```
 
 ## OpenAI gateway
@@ -305,7 +307,7 @@ Register hosts with `POST /api/ai/nodes`. Each node reports site, failure domain
 
 Placement is filter then score: ready state, no taints, residency, free NVIDIA VRAM, then cache hit, preferred site, and failure-domain spread. The same inputs pick the same node. When no nodes are registered, replicas still land on the local FluxVM inventory. A chosen GPU that this FluxVM process does not have is not started here. A replica on an offline node is replaced only when another ready node exists, so the last healthy replica is kept when nothing else can take it.
 
-When `FLUXVM_AI_JANUS_URL` is set and FluxVM reports no NVIDIA GPU, Fabric reads `GET /api/cluster?config=single_gpu` and stores the device as `janus:node-0:gpu-0` with `source` carried in the model name `janus:…`. A Matrox or other non-NVIDIA display adapter does not count as an inference GPU. The replica address is the Janus host and port. No VFIO bind and no VM are created. The gateway proxies a ready replica at that address even when `FLUXVM_AI_DRY_RUN=1`. Set `FLUXVM_AI_JANUS_API_KEY` to the Janus shim bearer so that hop authenticates. That device is the Janus scheduler simulator, not a PCI NVIDIA GPU.
+When `FLUXVM_AI_JANUS_URL` is set and FluxVM reports no NVIDIA GPU, Fabric reads `GET /api/cluster?config=single_gpu` and stores the device as `janus:node-0:gpu-0` with `source` carried in the model name `janus:…`. A Matrox or other non-NVIDIA display adapter does not count as an inference GPU. The replica address is the Janus host and port. No VFIO bind and no VM are created. The gateway proxies a ready replica at that address even when `FLUXVM_AI_DRY_RUN=1`. Set `FLUXVM_AI_JANUS_API_KEY` to the Janus shim bearer so that hop authenticates. That device is the Janus scheduler simulator, not a PCI NVIDIA GPU. The Janus node’s site is `janus`; leave `preferred_site` unset (or set it to `janus`) so placement can select that node — a preferred site of `lab` alone rejects it as “no free matching GPU” when the only free device is under the Janus site.
 
 `POST /api/ai/nodes/{id}/mig` creates a slice record for a Janus parent when the body includes `parent_bdf` (for example `janus:node-0:gpu-0`) and the profile is in the H100 catalog (`1g.10gb`, `1g`, `2g.20gb`, `2g`, `3g.40gb`, `3g`, `7g.80gb`, `7g`) and the memory still fits. `DELETE /api/ai/nodes/{id}/mig/{bdf}` removes that slice when no replica holds it. Placement uses the slice and leaves the parent unschedulable while slices exist. MIG create does not call `nvidia-smi`. A heartbeat on Linux does, when `nvidia-smi` is on `PATH`, and fills `temperature_c`, `power_watts`, and `ecc_errors` for a matching PCI BDF. `0` still means unknown. A missing binary, a failed command, or a `janus:` id does not invent those readings and does not clear a value the node already reported. `FLUXVM_AI_MAX_GPU_TEMP_C` skips a GPU hotter than that value. `FLUXVM_AI_REJECT_ECC=1` skips a GPU whose ECC count is above zero.
 

@@ -32,8 +32,11 @@
   when every ready replica is a Janus or `dry-run-*` device so the gateway
   can proxy alone. Lab k3s can enable the InferenceDeployment admit webhook
   against host fabricd with the chart `admissionWebhook` values. The console
-  Nodes tab and `zyvorctl ai nodes` list Janus inventory; `scripts/smoke-ai-janus-lab.sh`
-  covers health, chat, MIG, and admit on a Janus-enabled lab.
+  Nodes tab and `zyvorctl ai node list` list Janus inventory; MIG slice create
+  and delete are `zyvorctl ai node mig-create|mig-delete`.
+  `scripts/smoke-ai-janus-lab.sh` covers health, chat, MIG, and admit on a
+  Janus-enabled lab. Remote deploy also refreshes `/usr/local/bin/zyvorctl` so
+  lab PATH does not keep a stale binary.
   See [docs/ai-workloads.md](docs/ai-workloads.md).
 - **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
   Networking / Meta, with emoji section markers), `--color auto|always|never`,

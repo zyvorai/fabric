@@ -563,9 +563,17 @@ for bin in zyvor-fabricd zyvorctl; do
     if [ -f \"backend/target/release/\$bin\" ]; then
         \$SUDO install -m 755 \"backend/target/release/\$bin\" \"/usr/bin/\$bin\"
         echo \"  ✅ \$bin -> /usr/bin/\$bin\"
+        # Lab shells often prefer /usr/local/bin; keep that copy fresh too.
+        if [ -d /usr/local/bin ]; then
+            \$SUDO install -m 755 \"backend/target/release/\$bin\" \"/usr/local/bin/\$bin\"
+            echo \"  ✅ \$bin -> /usr/local/bin/\$bin\"
+        fi
     fi
 done
 [ -f zyvorctl ] && \$SUDO install -m 755 zyvorctl /usr/bin/zyvorctl && echo '  ✅ zyvorctl -> /usr/bin/zyvorctl'
+if [ -f zyvorctl ] && [ -d /usr/local/bin ]; then
+  \$SUDO install -m 755 zyvorctl /usr/local/bin/zyvorctl && echo '  ✅ zyvorctl -> /usr/local/bin/zyvorctl'
+fi
 
 \$SUDO install -d /etc/zyvor-fabricd /var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/state /var/log/zyvor-fabricd /run/zyvor-fabricd
 

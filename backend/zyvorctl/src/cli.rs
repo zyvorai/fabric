@@ -920,8 +920,9 @@ enum AiCmd {
     Key(AiKeyCmd),
     /// List host GPUs (FluxVM inventory + Fabric allocation)
     Gpus,
-    /// List inference nodes (Janus lab inventory or registered hosts)
-    Nodes,
+    /// Inference nodes (Janus lab inventory or registered hosts)
+    #[command(subcommand, visible_alias = "nodes")]
+    Node(AiNodeCmd),
     /// Aggregate GPU / replica capacity
     Capacity,
     /// Recent AI audit events
@@ -1077,6 +1078,28 @@ enum AiKeyCmd {
     },
     Delete {
         id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum AiNodeCmd {
+    /// List registered inference nodes and their GPUs
+    List,
+    /// Create a Janus MIG slice record (no nvidia-smi)
+    MigCreate {
+        /// Inference node id (for example node-0)
+        node: String,
+        #[arg(long)]
+        parent_bdf: String,
+        #[arg(long)]
+        profile: String,
+    },
+    /// Delete a Janus MIG slice record
+    MigDelete {
+        /// Inference node id
+        node: String,
+        /// Slice BDF (for example janus:node-0:gpu-0--1g.10gb--0)
+        bdf: String,
     },
 }
 
@@ -3089,10 +3112,35 @@ impl Cli {
                     let val = api_get(&client, "/ai/gpus").await?;
                     print_value(&val, fmt);
                 }
-                AiCmd::Nodes => {
-                    let val = api_get(&client, "/ai/nodes").await?;
-                    print_value(&val, fmt);
-                }
+                AiCmd::Node(sub) => match sub {
+                    AiNodeCmd::List => {
+                        let val = api_get(&client, "/ai/nodes").await?;
+                        print_value(&val, fmt);
+                    }
+                    AiNodeCmd::MigCreate {
+                        node,
+                        parent_bdf,
+                        profile,
+                    } => {
+                        let body = serde_json::json!({
+                            "parent_bdf": parent_bdf,
+                            "profile": profile,
+                        });
+                        let val = api_post(
+                            &client,
+                            &format!("/ai/nodes/{node}/mig"),
+                            &body,
+                        )
+                        .await?;
+                        print_value(&val, fmt);
+                    }
+                    AiNodeCmd::MigDelete { node, bdf } => {
+                        // Janus BDFs contain ':' — percent-encode for the path segment.
+                        let encoded = bdf.replace(':', "%3A");
+                        api_delete(&client, &format!("/ai/nodes/{node}/mig/{encoded}")).await?;
+                        println!("Deleted MIG slice '{bdf}' on node '{node}'");
+                    }
+                },
                 AiCmd::Capacity => {
                     let val = api_get(&client, "/ai/capacity").await?;
                     print_value(&val, fmt);
