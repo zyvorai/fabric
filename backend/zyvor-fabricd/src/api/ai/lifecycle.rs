@@ -75,8 +75,6 @@ pub fn recovery(event: ChaosEvent, consensus: bool) -> Recovery {
     }
 }
 
-/// True only after this process has committed a three-voter membership.
-/// `FLUXVM_AI_CONSENSUS=external` is a label and does not create that membership.
 pub fn consensus_configured() -> bool {
     std::env::var("FLUXVM_AI_CONSENSUS")
         .map(|v| v == "external")
@@ -103,5 +101,6 @@ mod tests {
             Recovery::FailClosed
         );
         assert_eq!(objectives().rpo_secs, 0);
+        assert!(!consensus_configured());
     }
 }

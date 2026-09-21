@@ -46,13 +46,37 @@ openraft::declare_raft_types!(
 pub type RaftNode = openraft::Raft<TypeConfig>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct LeaseCommand {
-    pub leader: NodeId,
+#[serde(tag = "op")]
+pub enum LeaseCommand {
+    Leader {
+        leader: NodeId,
+    },
+    Admit {
+        id: String,
+        now: i64,
+        tokens: u64,
+        rpm: u64,
+        tpm: u64,
+        streams: u32,
+    },
+    Release {
+        id: String,
+    },
+    AdmitDay {
+        id: String,
+        now: i64,
+        tokens: u64,
+        daily: u64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct LeaseResponse {
-    pub leader: NodeId,
+#[serde(tag = "op")]
+pub enum LeaseResponse {
+    Leader { leader: NodeId },
+    Admitted { stream_id: Option<String> },
+    Rejected { message: String },
+    Released,
 }
 
 #[derive(Debug, Clone)]
@@ -115,6 +139,61 @@ pub fn is_leader() -> bool {
     metrics.state == ServerState::Leader && metrics.current_leader == Some(metrics.id)
 }
 
+pub fn peers_configured() -> bool {
+    peer_spec().is_some()
+}
+
+/// Where a rate counter is stored. Unset peers stay on the local file.
+/// A follower forwards to the elected leader. No elected leader fails closed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CounterHome {
+    Local,
+    Leader(String),
+    Unavailable,
+}
+
+pub fn counter_home() -> CounterHome {
+    let Some(spec) = peer_spec() else {
+        return CounterHome::Local;
+    };
+    if is_leader() {
+        return CounterHome::Local;
+    }
+    let Some(raft) = MEMBER.get() else {
+        return CounterHome::Unavailable;
+    };
+    let metrics = raft.metrics().borrow().clone();
+    let Some(leader) = metrics.current_leader else {
+        return CounterHome::Unavailable;
+    };
+    spec.peers
+        .get(&leader)
+        .map(|node| CounterHome::Leader(node.addr.clone()))
+        .unwrap_or(CounterHome::Unavailable)
+}
+
+pub async fn write_counter(mut command: LeaseCommand) -> Result<LeaseResponse, String> {
+    let Some(raft) = MEMBER.get() else {
+        return Err("AI raft member is not running".into());
+    };
+    if !is_leader() {
+        return Err("this process is not the AI raft leader".into());
+    }
+    match &mut command {
+        LeaseCommand::Admit { now, .. } | LeaseCommand::AdmitDay { now, .. } => {
+            *now = chrono::Utc::now().timestamp();
+        }
+        LeaseCommand::Leader { .. } => {
+            return Err("leader records are not written through the limit path".into());
+        }
+        LeaseCommand::Release { .. } => {}
+    }
+    raft.client_write(command)
+        .await
+        .map(|written| written.data)
+        .map_err(|err| err.to_string())
+}
+
 pub fn quorum_committed() -> bool {
     let Some(raft) = MEMBER.get() else {
         return false;
@@ -136,7 +215,7 @@ pub async fn record_leader() -> Result<(), String> {
     if RECORDED_LEADER.load(Ordering::Relaxed) == id {
         return Ok(());
     }
-    raft.client_write(LeaseCommand { leader: id })
+    raft.client_write(LeaseCommand::Leader { leader: id })
         .await
         .map(|_| ())
         .map_err(|err| err.to_string())?;
@@ -228,6 +307,29 @@ pub async fn snapshot(
 > {
     let raft = member(&headers)?;
     Ok(Json(raft.install_snapshot(req).await))
+}
+
+/// POST /api/ai/raft/limits
+///
+/// The leader appends one counter command. A follower returns 503 so the
+/// caller can retry the elected leader instead of keeping a second count.
+pub async fn limit_write(
+    headers: HeaderMap,
+    Json(command): Json<LeaseCommand>,
+) -> Result<Json<LeaseResponse>, (StatusCode, String)> {
+    if !token_ok(&headers) {
+        return Err((StatusCode::UNAUTHORIZED, "raft token is required".into()));
+    }
+    if matches!(command, LeaseCommand::Leader { .. }) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "leader records are not written through the limit path".into(),
+        ));
+    }
+    write_counter(command)
+        .await
+        .map(Json)
+        .map_err(|err| (StatusCode::SERVICE_UNAVAILABLE, err))
 }
 
 #[derive(Clone, Debug)]
@@ -479,11 +581,82 @@ impl RaftLogStorage<TypeConfig> for LogStore {
     }
 }
 
+fn empty_counter(id: String) -> super::limits::RateCounter {
+    super::limits::RateCounter {
+        id,
+        window_started_unix: 0,
+        requests: 0,
+        tokens: 0,
+        day_started_unix: 0,
+        day_tokens: 0,
+        inflight: 0,
+    }
+}
+
+fn apply_command(data: &mut MachineData, command: LeaseCommand) -> LeaseResponse {
+    match command {
+        LeaseCommand::Leader { leader } => {
+            data.leader = Some(leader);
+            LeaseResponse::Leader { leader }
+        }
+        LeaseCommand::Admit {
+            id,
+            now,
+            tokens,
+            rpm,
+            tpm,
+            streams,
+        } => {
+            let current = data
+                .counters
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| empty_counter(id.clone()));
+            match super::limits::admit(current, now, tokens, rpm, tpm, streams) {
+                Ok(next) => {
+                    let stream_id = if streams > 0 { Some(id.clone()) } else { None };
+                    data.counters.insert(id, next);
+                    LeaseResponse::Admitted { stream_id }
+                }
+                Err(message) => LeaseResponse::Rejected { message },
+            }
+        }
+        LeaseCommand::Release { id } => {
+            if let Some(counter) = data.counters.get(&id).cloned() {
+                data.counters
+                    .insert(id, super::limits::release_inflight(counter));
+            }
+            LeaseResponse::Released
+        }
+        LeaseCommand::AdmitDay {
+            id,
+            now,
+            tokens,
+            daily,
+        } => {
+            let current = data
+                .counters
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| empty_counter(id.clone()));
+            match super::limits::admit_day(current, now, tokens, daily) {
+                Ok(next) => {
+                    data.counters.insert(id, next);
+                    LeaseResponse::Admitted { stream_id: None }
+                }
+                Err(message) => LeaseResponse::Rejected { message },
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct MachineData {
     last_applied_log: Option<LogId<NodeId>>,
     last_membership: StoredMembership<NodeId, BasicNode>,
     leader: Option<NodeId>,
+    #[serde(default)]
+    counters: BTreeMap<String, super::limits::RateCounter>,
 }
 
 #[derive(Debug, Default)]
@@ -589,21 +762,20 @@ impl RaftStateMachine<TypeConfig> for Arc<StateMachineStore> {
         let mut state_machine = self.state_machine.write().await;
         for entry in entries {
             state_machine.last_applied_log = Some(entry.log_id);
-            let leader = match entry.payload {
-                EntryPayload::Blank => state_machine.leader,
-                EntryPayload::Normal(command) => {
-                    state_machine.leader = Some(command.leader);
-                    Some(command.leader)
-                }
+            let response = match entry.payload {
+                EntryPayload::Blank => LeaseResponse::Leader {
+                    leader: state_machine.leader.unwrap_or(0),
+                },
+                EntryPayload::Normal(command) => apply_command(&mut state_machine, command),
                 EntryPayload::Membership(membership) => {
                     state_machine.last_membership =
                         StoredMembership::new(Some(entry.log_id), membership);
-                    state_machine.leader
+                    LeaseResponse::Leader {
+                        leader: state_machine.leader.unwrap_or(0),
+                    }
                 }
             };
-            responses.push(LeaseResponse {
-                leader: leader.unwrap_or(0),
-            });
+            responses.push(response);
         }
         self.flush(&state_machine)?;
         Ok(responses)
@@ -818,5 +990,60 @@ mod tests {
                 .count()
                 >= 3
         }));
+    }
+
+    #[test]
+    fn a_second_admit_is_rejected_and_release_drops_the_inflight_slot() {
+        let mut data = MachineData::default();
+        let first = apply_command(
+            &mut data,
+            LeaseCommand::Admit {
+                id: "endpoint:qwen".into(),
+                now: 1_000,
+                tokens: 4,
+                rpm: 1,
+                tpm: 10,
+                streams: 1,
+            },
+        );
+        assert_eq!(
+            first,
+            LeaseResponse::Admitted {
+                stream_id: Some("endpoint:qwen".into())
+            }
+        );
+        let second = apply_command(
+            &mut data,
+            LeaseCommand::Admit {
+                id: "endpoint:qwen".into(),
+                now: 1_001,
+                tokens: 4,
+                rpm: 1,
+                tpm: 10,
+                streams: 1,
+            },
+        );
+        assert!(matches!(second, LeaseResponse::Rejected { .. }));
+        assert_eq!(
+            data.counters
+                .get("endpoint:qwen")
+                .map(|counter| counter.inflight),
+            Some(1)
+        );
+        assert_eq!(
+            apply_command(
+                &mut data,
+                LeaseCommand::Release {
+                    id: "endpoint:qwen".into()
+                }
+            ),
+            LeaseResponse::Released
+        );
+        assert_eq!(
+            data.counters
+                .get("endpoint:qwen")
+                .map(|counter| counter.inflight),
+            Some(0)
+        );
     }
 }

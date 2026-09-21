@@ -332,10 +332,7 @@ async fn gateway_inner(
             },
         )
         .await;
-        let status = switched
-            .as_ref()
-            .map(|resp| resp.status().as_u16())
-            .unwrap_or(502);
+        let status = switched.as_ref().map(|resp| resp.status().as_u16()).unwrap_or(502);
         super::otel::emit_gateway(endpoint_name, status, tokens);
         return switched;
     }
@@ -393,10 +390,7 @@ async fn gateway_inner(
         Ok(resp) if resp.status().is_success() => "SUCCESS",
         _ => "FAILED",
     };
-    let status = proxied
-        .as_ref()
-        .map(|resp| resp.status().as_u16())
-        .unwrap_or(502);
+    let status = proxied.as_ref().map(|resp| resp.status().as_u16()).unwrap_or(502);
     super::otel::emit_gateway(endpoint_name, status, tokens);
     record_breaker(state, endpoint_name, outcome != "SUCCESS");
     audit(
@@ -1416,41 +1410,6 @@ pub fn would_reject_quota(key: &InferenceApiKey) -> bool {
     key.request_quota.is_some_and(|q| key.requests_used >= q)
 }
 
-fn mtls_websocket_config(
-    cert_path: &str,
-    key_path: &str,
-    ca_path: &str,
-) -> Result<rustls::ClientConfig, String> {
-    let ca = std::fs::read(ca_path).map_err(|err| format!("backend CA: {err}"))?;
-    let mut roots = rustls::RootCertStore::empty();
-    let mut added = false;
-    for item in rustls_pemfile::certs(&mut std::io::Cursor::new(ca)) {
-        roots
-            .add(item.map_err(|err| format!("backend CA: {err}"))?)
-            .map_err(|err| format!("backend CA: {err}"))?;
-        added = true;
-    }
-    if !added {
-        return Err("backend CA: no certificates".into());
-    }
-    let cert_pem = std::fs::read(cert_path).map_err(|err| format!("backend client cert: {err}"))?;
-    let certs = rustls_pemfile::certs(&mut std::io::Cursor::new(cert_pem))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|err| format!("backend client cert: {err}"))?;
-    let key_pem = std::fs::read(key_path).map_err(|err| format!("backend client key: {err}"))?;
-    let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(key_pem))
-        .map_err(|err| format!("backend client key: {err}"))?
-        .ok_or_else(|| "backend client key: empty".to_string())?;
-    rustls::ClientConfig::builder_with_provider(Arc::new(
-        rustls::crypto::aws_lc_rs::default_provider(),
-    ))
-    .with_safe_default_protocol_versions()
-    .map_err(|err| err.to_string())?
-    .with_root_certificates(roots)
-    .with_client_auth_cert(certs, key)
-    .map_err(|err| format!("backend client identity: {err}"))
-}
-
 fn websocket_upgrade(headers: &HeaderMap) -> bool {
     headers
         .get(header::UPGRADE)
@@ -1473,39 +1432,15 @@ async fn proxy_websocket(
     ))?;
     let transport = super::upstream::backend_transport(
         std::env::var("FLUXVM_AI_BACKEND_TLS").ok().as_deref() == Some("1"),
-        std::env::var("FLUXVM_AI_BACKEND_CLIENT_CERT")
-            .ok()
-            .as_deref(),
-        std::env::var("FLUXVM_AI_BACKEND_CLIENT_KEY")
-            .ok()
-            .as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_CERT").ok().as_deref(),
+        std::env::var("FLUXVM_AI_BACKEND_CLIENT_KEY").ok().as_deref(),
         std::env::var("FLUXVM_AI_BACKEND_CA").ok().as_deref(),
     )
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
     let url = super::upstream::websocket_origin(&transport, &primary, upstream_path);
-    let connected = match &transport {
-        super::upstream::BackendTransport::Mtls { cert, key, ca } => {
-            let config = mtls_websocket_config(cert, key, ca)
-                .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err))?;
-            tokio_tungstenite::connect_async_tls_with_config(
-                url.as_str(),
-                None,
-                false,
-                Some(tokio_tungstenite::Connector::Rustls(Arc::new(config))),
-            )
-            .await
-            .map(|(stream, _)| stream)
-        }
-        _ => tokio_tungstenite::connect_async(&url)
-            .await
-            .map(|(stream, _)| stream),
-    };
-    let upstream = connected.map_err(|err| {
-        (
-            StatusCode::BAD_GATEWAY,
-            format!("upstream websocket: {err}"),
-        )
-    })?;
+    let (upstream, _) = tokio_tungstenite::connect_async(&url)
+        .await
+        .map_err(|err| (StatusCode::BAD_GATEWAY, format!("upstream websocket: {err}")))?;
     let upgrade = axum::extract::ws::WebSocketUpgrade::from_request_parts(&mut parts, &())
         .await
         .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;

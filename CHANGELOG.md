@@ -22,7 +22,9 @@
   returns 400. `AiSite.peer_url` streams a verified model digest and stays
   pending until the peer returns 201. Inference `Upgrade: websocket` is bridged
   to the selected upstream. `FLUXVM_AI_OTEL_ENDPOINT` exports one gateway span.
-  The operator watches an AI CRD only when that CRD is installed.
+  The operator watches an AI CRD only when that CRD is installed. Rate counters
+  stay in the local file until Raft peers are set; then the leader applies them
+  and a follower forwards instead of keeping a second count.
   See [docs/ai-workloads.md](docs/ai-workloads.md).
 - **zyvorctl Cilium-style CLI UX** — grouped colorful `--help` (Basic / Dataplane /
   Networking / Meta, with emoji section markers), `--color auto|always|never`,
