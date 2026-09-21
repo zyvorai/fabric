@@ -148,6 +148,41 @@ async fn gateway_inner(
             format!("context of {context} tokens exceeds {cap}"),
         ));
     }
+    if let Some(rpm) = global_rpm() {
+        admit_scope(state, "global", "all", tokens, rpm)
+            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    }
+    if let Some(rpm) = tenant_rpm() {
+        if let Some(tenant) = key.tenant.as_deref().filter(|tenant| !tenant.is_empty()) {
+            admit_scope(state, "tenant", tenant, tokens, rpm)
+                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+        }
+    }
+    if let Some(rpm) = project_rpm() {
+        if let Some(project) = project_id(
+            parts
+                .headers
+                .get("x-project-id")
+                .and_then(|value| value.to_str().ok()),
+        )
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+        {
+            admit_scope(state, "project", project, tokens, rpm)
+                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+        }
+    }
+    if let Some(rpm) = global_rpm() {
+        admit_scope(state, "global", "fabric", tokens, rpm)
+            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    }
+    if let Some(rpm) = tenant_rpm() {
+        if let Some(tenant) = tenant_rate_name(key.tenant.as_deref())
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+        {
+            admit_scope(state, "tenant", tenant, tokens, rpm)
+                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+        }
+    }
     if let Some(rpm) = gateway_rpm() {
         admit_scope(state, "endpoint", endpoint_name, tokens, rpm)
             .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
@@ -429,8 +464,28 @@ fn body_limit() -> usize {
         .unwrap_or(1024 * 1024)
 }
 
+fn global_rpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_GLOBAL_RPM")
+}
+
+fn tenant_rpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_TENANT_RPM")
+}
+
 fn gateway_rpm() -> Option<u64> {
     env_limit("FLUXVM_AI_GATEWAY_RPM")
+}
+
+fn global_rpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_GLOBAL_RPM")
+}
+
+fn tenant_rpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_TENANT_RPM")
+}
+
+fn project_rpm() -> Option<u64> {
+    env_limit("FLUXVM_AI_PROJECT_RPM")
 }
 
 fn model_rpm() -> Option<u64> {
@@ -448,8 +503,31 @@ fn env_limit(name: &str) -> Option<u64> {
         .filter(|n| *n > 0)
 }
 
+/// A key with no tenant skips the tenant window. A tenant id is a counter name.
+pub fn tenant_rate_name(tenant: Option<&str>) -> Result<Option<&str>, &'static str> {
+    let Some(raw) = tenant.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if raw.len() > 128 || raw.contains('/') || raw.contains("..") {
+        return Err("tenant id cannot be used as a rate-limit scope");
+    }
+    Ok(Some(raw))
+}
+
 /// `x-user-id` is optional. When present it must be a short stable identifier.
 pub fn user_id(header: Option<&str>) -> Result<Option<&str>, &'static str> {
+    labeled_id(header, "x-user-id must be 1 to 128 letters, digits, or . _ @ -")
+}
+
+/// `x-project-id` uses the same shape as `x-user-id`.
+pub fn project_id(header: Option<&str>) -> Result<Option<&str>, &'static str> {
+    labeled_id(
+        header,
+        "x-project-id must be 1 to 128 letters, digits, or . _ @ -",
+    )
+}
+
+fn labeled_id(header: Option<&str>, bad: &'static str) -> Result<Option<&str>, &'static str> {
     let Some(raw) = header.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(None);
     };
@@ -461,7 +539,7 @@ pub fn user_id(header: Option<&str>) -> Result<Option<&str>, &'static str> {
     if ok {
         Ok(Some(raw))
     } else {
-        Err("x-user-id must be 1 to 128 letters, digits, or . _ @ -")
+        Err(bad)
     }
 }
 
@@ -998,6 +1076,11 @@ mod tests {
         assert_eq!(user_id(None).unwrap(), None);
         assert_eq!(user_id(Some("ada@lab")).unwrap(), Some("ada@lab"));
         assert!(user_id(Some("../root")).is_err());
+        assert_eq!(tenant_rate_name(None).unwrap(), None);
+        assert_eq!(tenant_rate_name(Some("acme")).unwrap(), Some("acme"));
+        assert!(tenant_rate_name(Some("../acme")).is_err());
+        assert_eq!(project_id(Some("lab-1")).unwrap(), Some("lab-1"));
+        assert!(project_id(Some("a/b")).is_err());
     }
 
     #[test]
