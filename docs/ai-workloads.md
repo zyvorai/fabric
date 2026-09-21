@@ -128,11 +128,14 @@ defaults to 60 seconds (`FLUXVM_AI_GATEWAY_IDLE_SECS`). Set
 `FLUXVM_AI_SHED_QUEUE` to refuse a request when any ready replica's queue
 depth is above that value; unset or `0` does not shed. `x-request-priority`
 is `low`, `normal`, or `high`. Low sheds at half that queue and high at double.
-`FLUXVM_AI_GLOBAL_RPM` applies to every call. `FLUXVM_AI_TENANT_RPM` applies when the API key has a tenant. `FLUXVM_AI_PROJECT_RPM` applies when `x-project-id` is set. `FLUXVM_AI_GLOBAL_RPM`, `FLUXVM_AI_TENANT_RPM`, `FLUXVM_AI_MODEL_RPM`, and
-`FLUXVM_AI_USER_RPM` use the same stored one-minute window as
-`FLUXVM_AI_GATEWAY_RPM`. The tenant window applies only when the API key has
-a tenant. The user window applies only when `x-user-id` is set. There is no
-project scope. `x-session-id`, or the first 64 characters of the prompt when that header is
+`FLUXVM_AI_DAILY_TOKENS` is a separate 24-hour token bucket for the whole gateway.
+`FLUXVM_AI_MAX_PROMPT_TOKENS` and `FLUXVM_AI_MAX_GENERATED_TOKENS` refuse a call
+whose prompt estimate or `max_tokens` is above that cap. Unset or `0` leaves
+the cap off. `FLUXVM_AI_GLOBAL_RPM`, `FLUXVM_AI_TENANT_RPM`, `FLUXVM_AI_PROJECT_RPM`,
+`FLUXVM_AI_MODEL_RPM`, and `FLUXVM_AI_USER_RPM` use the same stored one-minute
+window as `FLUXVM_AI_GATEWAY_RPM`. The tenant window applies only when the API
+key has a tenant. The project window applies only when `x-project-id` is set.
+The user window applies only when `x-user-id` is set. `x-session-id`, or the first 64 characters of the prompt when that header is
 absent, selects one replica. That replica is placed immediately after the VIP,
 or first when there is no VIP. The prefix is not written to the audit log. A connect failure is
 tried once on another ready replica, and only when the request is not streaming

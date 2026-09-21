@@ -148,12 +148,26 @@ async fn gateway_inner(
             format!("context of {context} tokens exceeds {cap}"),
         ));
     }
+    let (prompt_tokens, generated_tokens) = token_parts(&body_bytes);
+    if let Err(msg) = generation_allowed(
+        prompt_tokens,
+        generated_tokens,
+        max_prompt_tokens(),
+        max_generated_tokens(),
+    ) {
+        return Err((StatusCode::PAYLOAD_TOO_LARGE, msg.into()));
+    }
+    if let Some(daily) = daily_tokens() {
+        admit_daily(state, tokens, daily).map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
+    }
     if let Some(rpm) = global_rpm() {
-        admit_scope(state, "global", "all", tokens, rpm)
+        admit_scope(state, "global", "fabric", tokens, rpm)
             .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
     }
     if let Some(rpm) = tenant_rpm() {
-        if let Some(tenant) = key.tenant.as_deref().filter(|tenant| !tenant.is_empty()) {
+        if let Some(tenant) = tenant_rate_name(key.tenant.as_deref())
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+        {
             admit_scope(state, "tenant", tenant, tokens, rpm)
                 .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
         }
@@ -168,18 +182,6 @@ async fn gateway_inner(
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         {
             admit_scope(state, "project", project, tokens, rpm)
-                .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
-        }
-    }
-    if let Some(rpm) = global_rpm() {
-        admit_scope(state, "global", "fabric", tokens, rpm)
-            .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
-    }
-    if let Some(rpm) = tenant_rpm() {
-        if let Some(tenant) = tenant_rate_name(key.tenant.as_deref())
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
-        {
-            admit_scope(state, "tenant", tenant, tokens, rpm)
                 .map_err(|e| (StatusCode::TOO_MANY_REQUESTS, e))?;
         }
     }
@@ -476,14 +478,6 @@ fn gateway_rpm() -> Option<u64> {
     env_limit("FLUXVM_AI_GATEWAY_RPM")
 }
 
-fn global_rpm() -> Option<u64> {
-    env_limit("FLUXVM_AI_GLOBAL_RPM")
-}
-
-fn tenant_rpm() -> Option<u64> {
-    env_limit("FLUXVM_AI_TENANT_RPM")
-}
-
 fn project_rpm() -> Option<u64> {
     env_limit("FLUXVM_AI_PROJECT_RPM")
 }
@@ -516,7 +510,10 @@ pub fn tenant_rate_name(tenant: Option<&str>) -> Result<Option<&str>, &'static s
 
 /// `x-user-id` is optional. When present it must be a short stable identifier.
 pub fn user_id(header: Option<&str>) -> Result<Option<&str>, &'static str> {
-    labeled_id(header, "x-user-id must be 1 to 128 letters, digits, or . _ @ -")
+    labeled_id(
+        header,
+        "x-user-id must be 1 to 128 letters, digits, or . _ @ -",
+    )
 }
 
 /// `x-project-id` uses the same shape as `x-user-id`.
@@ -527,7 +524,10 @@ pub fn project_id(header: Option<&str>) -> Result<Option<&str>, &'static str> {
     )
 }
 
-fn labeled_id(header: Option<&str>, bad: &'static str) -> Result<Option<&str>, &'static str> {
+fn labeled_id<'a>(
+    header: Option<&'a str>,
+    bad: &'static str,
+) -> Result<Option<&'a str>, &'static str> {
     let Some(raw) = header.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(None);
     };
@@ -604,15 +604,55 @@ fn shed_limit() -> u32 {
 
 /// Prompt characters divided by 4, plus `max_tokens`. The prompt text is not kept.
 pub fn context_tokens(body: &[u8]) -> u32 {
+    let (prompt, generated) = token_parts(body);
+    u32::saturating_add(prompt, generated)
+}
+
+pub fn token_parts(body: &[u8]) -> (u32, u32) {
     let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
-        return 0;
+        return (0, 0);
     };
     let generated = value
         .get("max_tokens")
         .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    let prompt = prompt_chars(&value) as u64 / 4;
-    generated.saturating_add(prompt).min(u64::from(u32::MAX)) as u32
+        .unwrap_or(0)
+        .min(u64::from(u32::MAX)) as u32;
+    let prompt = ((prompt_chars(&value) as u64) / 4).min(u64::from(u32::MAX)) as u32;
+    (prompt, generated)
+}
+
+pub fn generation_allowed(
+    prompt: u32,
+    generated: u32,
+    max_prompt: u32,
+    max_generated: u32,
+) -> Result<(), &'static str> {
+    if max_prompt > 0 && prompt > max_prompt {
+        return Err("prompt exceeds the maximum prompt tokens");
+    }
+    if max_generated > 0 && generated > max_generated {
+        return Err("max_tokens exceeds the maximum generated tokens");
+    }
+    Ok(())
+}
+
+fn max_prompt_tokens() -> u32 {
+    env_u32("FLUXVM_AI_MAX_PROMPT_TOKENS")
+}
+
+fn max_generated_tokens() -> u32 {
+    env_u32("FLUXVM_AI_MAX_GENERATED_TOKENS")
+}
+
+fn daily_tokens() -> Option<u64> {
+    env_limit("FLUXVM_AI_DAILY_TOKENS")
+}
+
+fn env_u32(name: &str) -> u32 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0)
 }
 
 fn prompt_chars(value: &serde_json::Value) -> usize {
@@ -759,6 +799,8 @@ fn admit_scope(
             window_started_unix: 0,
             requests: 0,
             tokens: 0,
+            day_started_unix: 0,
+            day_tokens: 0,
         });
     if state
         .store
@@ -784,6 +826,41 @@ fn admit_scope(
         .map_err(|e| e.to_string())?;
     let _ = updated;
     Ok(())
+}
+
+fn admit_daily(state: &AppState, tokens: u64, daily: u64) -> Result<(), String> {
+    let id = super::limits::counter_id("global", "day");
+    let current = super::limits::RateCounter {
+        id: id.clone(),
+        window_started_unix: 0,
+        requests: 0,
+        tokens: 0,
+        day_started_unix: 0,
+        day_tokens: 0,
+    };
+    if state
+        .store
+        .get_entity::<super::limits::RateCounter>(super::STORE_RATE_COUNTERS, &id)
+        .ok()
+        .flatten()
+        .is_none()
+    {
+        state
+            .store
+            .save_entity(super::STORE_RATE_COUNTERS, &id, &current)
+            .map_err(|e| e.to_string())?;
+    }
+    state
+        .store
+        .update_entity_exclusive(
+            super::STORE_RATE_COUNTERS,
+            &id,
+            |counter: super::limits::RateCounter| {
+                super::limits::admit_day(counter, Utc::now().timestamp(), tokens, daily)
+            },
+        )
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 fn copy_response_headers(from: &HeaderMap, to: &mut HeaderMap) {
@@ -1134,6 +1211,10 @@ mod tests {
         assert!(context_allowed(100, 0));
         assert_eq!(tighter_context_limit(32_768, 1024), 1024);
         assert_eq!(tighter_context_limit(0, 0), 0);
+        assert_eq!(token_parts(body), (3, 8));
+        assert!(generation_allowed(3, 8, 0, 0).is_ok());
+        assert!(generation_allowed(3, 8, 2, 0).is_err());
+        assert!(generation_allowed(3, 8, 0, 7).is_err());
     }
 
     #[test]

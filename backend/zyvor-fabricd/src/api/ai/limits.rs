@@ -15,6 +15,11 @@ pub struct RateCounter {
     pub requests: u64,
     #[serde(default)]
     pub tokens: u64,
+    /// Unix time when the daily token bucket started. `0` means unused.
+    #[serde(default)]
+    pub day_started_unix: i64,
+    #[serde(default)]
+    pub day_tokens: u64,
 }
 
 pub fn admit(
@@ -47,6 +52,35 @@ pub fn admit(
     Ok(counter)
 }
 
+const DAY_SECS: i64 = 86_400;
+
+/// A separate 24-hour token bucket. A zero allowance does not change the counter.
+pub fn admit_day(
+    mut counter: RateCounter,
+    now_unix: i64,
+    requested_tokens: u64,
+    daily_tokens: u64,
+) -> Result<RateCounter, String> {
+    if daily_tokens == 0 {
+        return Ok(counter);
+    }
+    if counter.day_started_unix == 0
+        || now_unix.saturating_sub(counter.day_started_unix) >= DAY_SECS
+    {
+        counter.day_started_unix = now_unix;
+        counter.day_tokens = 0;
+    }
+    let tokens = requested_tokens.max(1);
+    if counter.day_tokens.saturating_add(tokens) > daily_tokens {
+        return Err(format!(
+            "daily token allowance exceeded for {} ({daily_tokens} tokens)",
+            counter.id
+        ));
+    }
+    counter.day_tokens = counter.day_tokens.saturating_add(tokens);
+    Ok(counter)
+}
+
 pub fn counter_id(scope: &str, name: &str) -> String {
     let name = name.replace('/', "_");
     format!("{scope}:{name}")
@@ -63,6 +97,8 @@ mod tests {
             window_started_unix: 0,
             requests: 2,
             tokens: 0,
+            day_started_unix: 0,
+            day_tokens: 0,
         };
         let admitted = admit(counter, 61, 1, 2, 0).unwrap();
         assert_eq!(admitted.requests, 1);
@@ -77,7 +113,25 @@ mod tests {
             window_started_unix: 10,
             requests: 0,
             tokens: 8,
+            day_started_unix: 0,
+            day_tokens: 0,
         };
         assert!(admit(counter, 10, 4, 0, 10).is_err());
+    }
+
+    #[test]
+    fn daily_bucket_resets_after_a_day_and_refuses_the_overflow() {
+        let counter = RateCounter {
+            id: "global:all".into(),
+            window_started_unix: 0,
+            requests: 0,
+            tokens: 0,
+            day_started_unix: 1_000,
+            day_tokens: 9,
+        };
+        assert!(admit_day(counter.clone(), 1_000, 2, 10).is_err());
+        let next = admit_day(counter, 1_000 + 86_400, 2, 10).unwrap();
+        assert_eq!(next.day_tokens, 2);
+        assert_eq!(next.requests, 0);
     }
 }
