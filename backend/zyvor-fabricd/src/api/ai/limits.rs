@@ -33,7 +33,9 @@ pub fn admit(
     tokens_per_minute: u64,
     streams: u32,
 ) -> Result<RateCounter, String> {
-    if now_unix.saturating_sub(counter.window_started_unix) >= 60 {
+    if (requests_per_minute > 0 || tokens_per_minute > 0)
+        && now_unix.saturating_sub(counter.window_started_unix) >= 60
+    {
         counter.window_started_unix = now_unix;
         counter.requests = 0;
         counter.tokens = 0;
