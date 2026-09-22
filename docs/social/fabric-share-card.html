@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fabric share card</title>
+<!--
+  1200x630 card: README hero and website Open Graph (website/static/img/social-card.png).
+  Build:  ./docs/social/build-social-card.sh
+-->
+<style>
+  :root {
+    --bg: #07090f;
+    --ink: #f4f7fb;
+    --ink-soft: #aab4c3;
+    --ink-dim: #6b7686;
+    --accent: #3b82f6;
+    --accent-soft: #93c5fd;
+    --line: rgba(59, 130, 246, 0.55);
+    --sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --mono: 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; background: var(--bg); overflow: hidden; }
+  .card {
+    position: relative; width: 1200px; height: 630px;
+    background:
+      radial-gradient(circle at 900px 315px, rgba(59, 130, 246, 0.18), transparent 340px),
+      radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1.4px) 0 0 / 22px 22px,
+      var(--bg);
+    color: var(--ink); font-family: var(--sans);
+  }
+  .edge { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: var(--accent); }
+  .left { position: absolute; left: 64px; top: 0; width: 580px; height: 100%; }
+  .eyebrow {
+    position: absolute; top: 92px;
+    font-family: var(--mono); font-weight: 500; font-size: 15px;
+    letter-spacing: 0.22em; color: var(--accent-soft); text-transform: uppercase;
+  }
+  h1 {
+    position: absolute; top: 124px;
+    font-size: 112px; line-height: 1; font-weight: 700; letter-spacing: -0.035em;
+  }
+  .tag {
+    position: absolute; top: 268px; width: 540px;
+    font-size: 24px; line-height: 1.4; font-weight: 500; color: var(--ink-soft);
+  }
+  .pills { position: absolute; top: 410px; display: flex; flex-wrap: wrap; gap: 9px; width: 560px; }
+  .pill {
+    font-family: var(--mono); font-weight: 500; font-size: 12px;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-soft); white-space: nowrap;
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px;
+    background: rgba(59, 130, 246, 0.08);
+  }
+  .foot {
+    position: absolute; top: 556px;
+    font-family: var(--mono); font-size: 14px; color: var(--ink-dim); letter-spacing: 0.02em;
+  }
+  .foot b { color: var(--ink-soft); font-weight: 500; }
+  svg.art { position: absolute; left: 600px; top: 0; }
+  svg.art text {
+    font-family: var(--mono); font-weight: 500; font-size: 14px;
+    letter-spacing: 0.12em; fill: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="edge"></div>
+  <div class="left">
+    <div class="eyebrow">Private cloud control plane</div>
+    <h1>Fabric</h1>
+    <p class="tag">VMs, networking, storage, security, and AI inference from one daemon — CLI, Web, Kubernetes, and Terraform.</p>
+    <div class="pills">
+      <span class="pill">Single daemon</span>
+      <span class="pill">Kubernetes-ready</span>
+      <span class="pill">FluxVM + GuestKit</span>
+      <span class="pill">Apache-2.0</span>
+    </div>
+    <div class="foot">github.com/zyvorai/fabric &nbsp;·&nbsp; <b>v0.3.0</b></div>
+  </div>
+
+  <svg class="art" width="600" height="630" viewBox="0 0 600 630" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <g id="spokes" stroke="#3b82f6" stroke-opacity=".5" stroke-width="1.6"></g>
+    <circle cx="300" cy="315" r="72" fill="#0a101c" stroke="#3b82f6" stroke-opacity=".35" stroke-width="3"/>
+    <circle cx="300" cy="315" r="48" fill="none" stroke="#3b82f6" stroke-opacity=".55" stroke-width="2" filter="url(#glow)"/>
+    <!-- stylized control-plane hex -->
+    <polygon points="300,278 332,296 332,334 300,352 268,334 268,296"
+      fill="none" stroke="#93c5fd" stroke-width="2.2" stroke-linejoin="round" filter="url(#glow)"/>
+    <circle cx="300" cy="315" r="10" fill="#3b82f6"/>
+    <g id="dots" fill="#60a5fa"></g>
+    <g id="labels"></g>
+  </svg>
+</div>
+<script>
+  const NS = 'http://www.w3.org/2000/svg';
+  const cx = 300, cy = 315;
+  const el = (tag, attrs, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    parent.appendChild(e);
+    return e;
+  };
+  const pt = (deg, r) => [cx + r * Math.cos(deg * Math.PI / 180), cy + r * Math.sin(deg * Math.PI / 180)];
+
+  const nodes = [
+    { label: 'VM', deg: -90 },
+    { label: 'NET', deg: -30 },
+    { label: 'STORAGE', deg: 30 },
+    { label: 'SECURITY', deg: 90 },
+    { label: 'AI', deg: 150 },
+    { label: 'K8S', deg: 210 },
+  ];
+  const spokes = document.getElementById('spokes');
+  const dots = document.getElementById('dots');
+  const labels = document.getElementById('labels');
+  for (const n of nodes) {
+    const [x1, y1] = pt(n.deg, 78);
+    const [x2, y2] = pt(n.deg, 168);
+    el('line', { x1, y1, x2, y2 }, spokes);
+    el('circle', { cx: x2, cy: y2, r: 7 }, dots);
+    const [tx, ty] = pt(n.deg, 198);
+    const t = el('text', { x: tx, y: ty, 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, labels);
+    t.textContent = n.label;
+  }
+</script>
+</body>
+</html>

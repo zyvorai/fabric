@@ -1,11 +1,4 @@
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="web/public/zyvor-logo-on-dark.png">
-  <img src="web/public/zyvor-logo.png" alt="Zyvor Fabric" width="360">
-</picture>
-
-### Private cloud control plane for Linux — VMs, networking, storage, security, and AI inference from one daemon.
+# Zyvor Fabric
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/zyvorai/fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ci.yml)
@@ -16,9 +9,11 @@
 [![Built on FluxVM](https://img.shields.io/badge/VM%20engine-FluxVM-8a2be2)](https://github.com/zyvorai/fluxvm)
 [![Built on GuestKit](https://img.shields.io/badge/guest%20tooling-GuestKit-2ea44f)](https://github.com/zyvorai/guestkit)
 
-**[Quick start](#quick-start)** · **[AI Workloads](#ai-workloads-beta)** · **[Is this for you?](#is-this-for-you)** · **[Compare](docs/guides/decision-support/comparison-matrix.md)** · **[FAQ](docs/quick-reference/faq.md)** · **[Deploy](#deploy)** · **[Docs](#documentation)**
+![Zyvor Fabric — private cloud control plane for Linux](docs/social/fabric-share-card.png)
 
-</div>
+**Private cloud control plane for Linux — VMs, networking, storage, security, and AI inference from one daemon.**
+
+**[Quick start](#quick-start)** · **[AI Workloads](#ai-workloads-beta)** · **[Is this for you?](#is-this-for-you)** · **[Compare](docs/guides/decision-support/comparison-matrix.md)** · **[FAQ](docs/quick-reference/faq.md)** · **[Deploy](#deploy)** · **[Docs](#documentation)**
 
 ---
 
