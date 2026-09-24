@@ -8,6 +8,7 @@
 #   keepctl create -f agent.json --signature agent.json.sig
 #                                   # deploy with signed full manifest in Keep mode
 #   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
+#   keepctl unwrap-token|unwrap|vault-status  # software vault ceremony (host-env)
 #   keepctl pack   <path>            # workspace hint + policy + manifest pin
 #   keepctl unpack <path>            # restore policy onto an agent
 #   keepctl export-token …           # scoped trajectory export (default: none)
@@ -191,6 +192,27 @@ PY
     [[ -n "$scope" ]] || { echo "usage: keepctl export-token <scope> [ttl_seconds]" >&2; exit 1; }
     api POST /v1/export-tokens -H 'Content-Type: application/json' \
       -d "{\"scope\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$scope"),\"ttl_seconds\":$ttl}"
+    echo
+    ;;
+
+  unwrap-token)
+    scope="${1:-vault}"
+    ttl="${2:-3600}"
+    api POST /v1/vault/unwrap-tokens -H 'Content-Type: application/json' \
+      -d "{\"scope\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$scope"),\"ttl_seconds\":$ttl}"
+    echo
+    ;;
+
+  unwrap)
+    tok="${1:-${KEEP_UNWRAP_TOKEN:-}}"
+    [[ -n "$tok" ]] || { echo "usage: keepctl unwrap <token>  (or KEEP_UNWRAP_TOKEN)" >&2; exit 1; }
+    api POST /v1/vault/unwrap -H 'Content-Type: application/json' \
+      -d "{\"token\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$tok")}"
+    echo
+    ;;
+
+  vault-status)
+    api GET /v1/vault/status
     echo
     ;;
 

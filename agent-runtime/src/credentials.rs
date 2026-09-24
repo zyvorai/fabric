@@ -108,6 +108,13 @@ impl CredentialVault {
         self.descriptors.get(name)
     }
 
+    /// Descriptor names only (never secret values).
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<_> = self.descriptors.keys().cloned().collect();
+        names.sort();
+        names
+    }
+
     pub fn is_injection_header(&self, header: &str) -> bool {
         self.descriptors
             .values()
