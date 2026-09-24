@@ -72,10 +72,7 @@ pub struct PolicyTrust {
 
 impl PolicyTrust {
     pub fn from_env() -> Result<Self> {
-        let keep_mode = std::env::var("ZYVOR_AGENT_KEEP_MODE")
-            .ok()
-            .as_deref()
-            == Some("1");
+        let keep_mode = std::env::var("ZYVOR_AGENT_KEEP_MODE").ok().as_deref() == Some("1");
         let raw = std::env::var("ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS").unwrap_or_default();
         let mut trusted_signers = Vec::new();
         for part in raw.split(',').map(str::trim).filter(|s| !s.is_empty()) {

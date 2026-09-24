@@ -77,7 +77,9 @@ pub fn run_nvidia_smi(argv: &[String]) -> Result<(), String> {
         return Ok(());
     }
     if !cfg!(target_os = "linux") {
-        return Err("PCI MIG requires Linux nvidia-smi (or FLUXVM_AI_PCI_MIG_RECORD_ONLY=1)".into());
+        return Err(
+            "PCI MIG requires Linux nvidia-smi (or FLUXVM_AI_PCI_MIG_RECORD_ONLY=1)".into(),
+        );
     }
     let output = std::process::Command::new("nvidia-smi")
         .args(argv)
@@ -88,13 +90,11 @@ pub fn run_nvidia_smi(argv: &[String]) -> Result<(), String> {
     }
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Err(format!(
-        "nvidia-smi mig failed: {} {}",
-        stderr.trim(),
-        stdout.trim()
+    Err(
+        format!("nvidia-smi mig failed: {} {}", stderr.trim(), stdout.trim())
+            .trim()
+            .to_string(),
     )
-    .trim()
-    .to_string())
 }
 
 pub fn apply_create(parent_bdf: &str, profile: &JanusMigProfile) -> Result<(), String> {
@@ -120,10 +120,7 @@ mod tests {
         assert!(!is_pci_bdf("0000:01:00.0--1g.10gb--0"));
         let profile = janus_mig_profile("1g.10gb").unwrap();
         let argv = create_argv("0000:01:00.0", profile).unwrap();
-        assert_eq!(
-            argv,
-            vec!["mig", "-i", "0000:01:00.0", "-cgi", "19", "-C"]
-        );
+        assert_eq!(argv, vec!["mig", "-i", "0000:01:00.0", "-cgi", "19", "-C"]);
         assert_eq!(
             destroy_argv("0000:01:00.0--1g.10gb--0"),
             vec!["mig", "-i", "0000:01:00.0", "-dci", "-dgi"]

@@ -1474,7 +1474,10 @@ fn read_skill_dir(root: &std::path::Path) -> Result<Vec<serde_json::Value>> {
             let path = entry.path();
             let kind = entry.file_type()?;
             if kind.is_symlink() {
-                anyhow::bail!("{} is a symlink; skills may not contain symlinks", path.display());
+                anyhow::bail!(
+                    "{} is a symlink; skills may not contain symlinks",
+                    path.display()
+                );
             }
             if kind.is_dir() {
                 walk(root, &path, out)?;
@@ -3331,12 +3334,8 @@ impl Cli {
                             "parent_bdf": parent_bdf,
                             "profile": profile,
                         });
-                        let val = api_post(
-                            &client,
-                            &format!("/ai/nodes/{node}/mig"),
-                            &body,
-                        )
-                        .await?;
+                        let val =
+                            api_post(&client, &format!("/ai/nodes/{node}/mig"), &body).await?;
                         print_value(&val, fmt);
                     }
                     AiNodeCmd::MigDelete { node, bdf } => {

@@ -177,6 +177,21 @@ impl FluxVm {
         self.parse(response).await
     }
 
+    /// Light vsock health-check (no exec). Prefer this over `process` while waiting
+    /// for a cold guest boot — exec can hang longer than ping on some images.
+    pub async fn agent_ping(&self, id: Uuid) -> Result<()> {
+        let response = self
+            .auth(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/agent/ping"))?),
+            )
+            .json(&json!({}))
+            .send()
+            .await?;
+        let _: Value = self.parse(response).await?;
+        Ok(())
+    }
+
     pub async fn guest_request(
         &self,
         id: Uuid,

@@ -1235,10 +1235,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/approvals",
             get(api::agent_runtime::list_approvals).post(api::agent_runtime::create_approval),
         )
-        .route(
-            "/approvals/{id}",
-            post(api::agent_runtime::decide_approval),
-        )
+        .route("/approvals/{id}", post(api::agent_runtime::decide_approval))
         .route("/audit/agent-actions", get(api::agent_runtime::list_audit))
         .route(
             "/skills",

@@ -305,10 +305,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/goals/{id}",
             get(crate::goals::get_goal).patch(crate::goals::patch_goal),
         )
-        .route(
-            "/v1/goals/{id}/advance",
-            post(crate::goals::advance_step),
-        )
+        .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
         .route(
             "/v1/artifacts",
             get(crate::goals::list_artifacts).post(crate::goals::create_artifact),
@@ -378,8 +375,8 @@ async fn deploy_agent(
         .policy_trust
         .verify_deployment(&body, signature)
         .map_err(ApiError::forbidden)?;
-    let mut req: DeployAgentRequest = serde_json::from_slice(&body)
-        .map_err(ApiError::bad_request)?;
+    let mut req: DeployAgentRequest =
+        serde_json::from_slice(&body).map_err(ApiError::bad_request)?;
     if req.manifest.template.trim().is_empty() {
         return Err(ApiError::bad_request("manifest.template is required"));
     }
@@ -847,15 +844,12 @@ async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Resul
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
     loop {
-        // See HEALTH_CHECK_ATTEMPT_TIMEOUT's doc comment: a single call here
-        // has to be bounded independently of the retry loop's own deadline,
-        // or a stuck call blocks the loop from ever reaching that deadline
-        // check at all.
+        // Prefer agent/ping over process/exec: ping is cheap and reliable once
+        // vsock is up; mkdir-via-exec has been observed to hang past the
+        // attempt timeout on cold boots even when ping already returns 200.
         let attempt = with_timeout(
             HEALTH_CHECK_ATTEMPT_TIMEOUT,
-            state
-                .fluxvm
-                .process(sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10)),
+            state.fluxvm.agent_ping(sandbox_id),
         )
         .await;
         match attempt {
@@ -1978,7 +1972,9 @@ async fn list_audit(
         .verify()
         .await
         .map_err(ApiError::internal)?;
-    Ok(Json(json!({"items": items, "chain": chain, "export": false})))
+    Ok(Json(
+        json!({"items": items, "chain": chain, "export": false}),
+    ))
 }
 
 /// Full audit/trajectory export — requires X-Keep-Export-Token (training default off).
@@ -2022,7 +2018,9 @@ async fn export_audit(
             json!({"limit": limit}),
         )
         .await;
-    Ok(Json(json!({"items": items, "chain": chain, "export": true})))
+    Ok(Json(
+        json!({"items": items, "chain": chain, "export": true}),
+    ))
 }
 
 /// Keep: readable Sentinel policy as `keep.policy.yaml`.

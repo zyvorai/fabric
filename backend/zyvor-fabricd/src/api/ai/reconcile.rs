@@ -1092,9 +1092,9 @@ pub async fn reconcile_endpoint(state: &AppState, name: &str) -> Result<(), Stri
         .filter(|r| super::eligibility::replica_serving(r))
         .collect();
     let skip_maglev = !serving.is_empty()
-        && serving.iter().all(|r| {
-            super::janus::is_janus_bdf(&r.bdf) || r.bdf.starts_with("dry-run-")
-        });
+        && serving
+            .iter()
+            .all(|r| super::janus::is_janus_bdf(&r.bdf) || r.bdf.starts_with("dry-run-"));
     if spec.backends.is_empty() || skip_maglev {
         ep.vip = Some(vip);
         ep.updated = Utc::now();

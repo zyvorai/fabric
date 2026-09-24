@@ -108,16 +108,16 @@ pub(crate) async fn browser_view(
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|tab| {
+        .map(|tab| {
             let title = tab.get("title").and_then(|v| v.as_str()).unwrap_or("");
             let url = tab.get("url").and_then(|v| v.as_str()).unwrap_or("");
             let id = tab.get("id").and_then(|v| v.as_str()).unwrap_or("");
-            Some(json!({
+            json!({
                 "id": id,
                 "title": title,
                 "url": url,
                 "type": tab.get("type").and_then(|v| v.as_str()).unwrap_or("page"),
-            }))
+            })
         })
         .collect();
     Ok(Json(json!({
