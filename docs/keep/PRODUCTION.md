@@ -19,11 +19,12 @@ KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-pilot-gate.sh
 | Console Keep view | `/app/keep/:sessionId` — goal, task, evidence, approval, outcome |
 | infra-ops pack | `./scripts/keep-pack-demo.sh infra-ops` |
 
-Latest archived run: [pilot-runs/20260924T172304Z](pilot-runs/20260924T172304Z/)
-(also [20260924T154950Z](pilot-runs/20260924T154950Z/)). QEMU guest agent is
-musl-static + link-local net. Firecracker cell: bake a flat rootfs with
-[`scripts/keep-bake-fc-rootfs.sh`](../../scripts/keep-bake-fc-rootfs.sh) and use
-`KEEP_E2E_TEMPLATE=node22-fc` (pilot gate prefers FC when registered).
+Latest archived run: [pilot-runs/20260924T182930Z](pilot-runs/20260924T182930Z/)
+(**Firecracker** `node22-fc` / `flux-vm`, `guest_worker=ok`). Prior QEMU:
+[20260924T172304Z](pilot-runs/20260924T172304Z/),
+[20260924T154950Z](pilot-runs/20260924T154950Z/). Bake FC with
+[`scripts/keep-bake-fc-rootfs.sh`](../../scripts/keep-bake-fc-rootfs.sh);
+pilot gate prefers `node22-fc` when registered.
 
 ## Keep 0.1 — live proof (lab release gate)
 

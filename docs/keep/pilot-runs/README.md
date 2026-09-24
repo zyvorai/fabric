@@ -27,6 +27,9 @@ Firecracker appends `root=/dev/vda`, which panics on a partitioned disk. Bake wi
 
 The pilot gate prefers `node22-fc` when that template exists.
 
+Latest FC archive: [20260924T182930Z](20260924T182930Z/) (`template=node22-fc`,
+`cell_backend=flux-vm`, happy+deny PASS, `guest_worker=ok`).
+
 ## Honesty
 
 Measured profile remains **software-test**. Keep 0.2 + hardware for unread-by-operator claims.
