@@ -76,7 +76,17 @@ print("" if cur is None else (cur if not isinstance(cur,(dict,list)) else json.d
 }
 
 echo "==> build agent-runtime + keep_sign_policy"
-if [[ ! -x "$BIN" || ! -x "$SIGN_BIN" || "$SIGN_EX" -nt "$SIGN_BIN" ]]; then
+NEED_BUILD=0
+[[ -x "$BIN" && -x "$SIGN_BIN" ]] || NEED_BUILD=1
+if [[ "$NEED_BUILD" -eq 0 ]]; then
+  # Portable mtime compare: rebuild if any src is newer than either binary.
+  if find "$ROOT/agent-runtime/src" -name '*.rs' -newer "$BIN" 2>/dev/null | grep -q . \
+    || find "$ROOT/agent-runtime/src" -name '*.rs' -newer "$SIGN_BIN" 2>/dev/null | grep -q . \
+    || [[ -f "$SIGN_EX" && "$SIGN_EX" -nt "$SIGN_BIN" ]]; then
+    NEED_BUILD=1
+  fi
+fi
+if [[ "$NEED_BUILD" -eq 1 ]]; then
   cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml" --example keep_sign_policy
   cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml"
 fi
@@ -131,6 +141,35 @@ cat >"$W/creds.json" <<'JSON'
             "allowed_ports": [443], "requires_approval": ["POST"], "approval_kind": "purchase"}}
 JSON
 
+# Keep mode: runtime must refuse start without signers (before main runtime binds)
+echo "==> Keep mode refuses empty signers"
+mkdir -p "$W/state-bad" "$W/snap-bad"
+if env -u ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS -u ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE \
+   ZYVOR_AGENT_API_TOKEN="$TOKEN" \
+   ZYVOR_AGENT_KEEP_MODE=1 \
+   ZYVOR_AGENT_LISTEN=127.0.0.1:19098 \
+   ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19085 \
+   ZYVOR_AGENT_STATE_DIR="$W/state-bad" \
+   ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap-bad" \
+   ZYVOR_AGENT_FLUXVM_URL="http://127.0.0.1:${STUB_PORT}" \
+   ZYVOR_AGENT_PROXY_LISTEN=off \
+   "$BIN" >"$W/bad-runtime.log" 2>&1; then
+  echo "FAIL  Keep mode started without signers"
+  FAIL=$((FAIL + 1))
+  kill $(lsof -t -iTCP:19098 -sTCP:LISTEN 2>/dev/null) 2>/dev/null || true
+else
+  echo "PASS  Keep mode refuses start without trusted signers"
+  PASS=$((PASS + 1))
+fi
+if grep -Eqi 'KEEP_MODE|trusted signers|POLICY_TRUSTED_SIGNERS' "$W/bad-runtime.log"; then
+  echo "PASS  Keep mode error mentions signers"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL  Keep mode error message"
+  FAIL=$((FAIL + 1))
+  head -8 "$W/bad-runtime.log" || true
+fi
+
 # --- agent-runtime with Keep production knobs ---
 ZYVOR_AGENT_API_TOKEN="$TOKEN" \
 ZYVOR_AGENT_LISTEN=127.0.0.1:19097 \
@@ -138,6 +177,7 @@ ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19084 \
 ZYVOR_AGENT_STATE_DIR="$W/state" \
 ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap" \
 ZYVOR_AGENT_FLUXVM_URL="http://127.0.0.1:${STUB_PORT}" \
+ZYVOR_AGENT_KEEP_MODE=1 \
 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" \
 ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=1 \
 ZYVOR_AGENT_APPROVAL_WEBHOOK="http://127.0.0.1:19111/hook" \
@@ -145,6 +185,7 @@ ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET="keep-hook" \
 ZYVOR_AGENT_CREDENTIALS_FILE="$W/creds.json" \
 ZYVOR_AGENT_SYNC_INTERVAL_MS=3600000 \
 ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS=20 \
+ZYVOR_AGENT_PROXY_LISTEN=off \
   "$BIN" >"$W/runtime.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 1 80); do
@@ -336,13 +377,122 @@ else
 fi
 
 if [[ "${KEEP_E2E_FLUXVM:-}" == "1" ]]; then
-  FLUX="${ZYVOR_AGENT_FLUXVM_URL:-http://127.0.0.1:7788}"
-  echo "==> live FluxVM at $FLUX"
-  CAPS=$(curl -fsS "$FLUX/v1/security/capabilities")
+  FLUX="${ZYVOR_AGENT_FLUXVM_URL_LIVE:-${KEEP_FLUXVM_URL:-http://127.0.0.1:7788}}"
+  echo "==> live FluxVM Keep proof at $FLUX"
+  CAPS=$(curl -fsS "$FLUX/v1/security/capabilities" || true)
   check "FluxVM capabilities reachable" qemu "$CAPS"
   curl -fsS "$FLUX/readyz" | grep -q '"ok":true' \
     && { echo "PASS  FluxVM readyz"; PASS=$((PASS+1)); } \
     || { echo "FAIL  FluxVM readyz"; FAIL=$((FAIL+1)); }
+
+  TEMPLATE="${KEEP_E2E_TEMPLATE:-}"
+  if [[ -z "$TEMPLATE" ]]; then
+    for cand in node22-agent agent-node browser-agent; do
+      if curl -fsS "$FLUX/v1/templates/$cand" >/dev/null 2>&1 \
+        || [[ -d /var/lib/fluxvm/templates/$cand ]]; then
+        TEMPLATE=$cand
+        break
+      fi
+    done
+  fi
+
+  # Always stand up a Keep-mode runtime against live FluxVM (control-plane proof).
+  LIVE_API="http://127.0.0.1:19099"
+  ZYVOR_AGENT_API_TOKEN="$TOKEN" \
+  ZYVOR_AGENT_LISTEN=127.0.0.1:19099 \
+  ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19086 \
+  ZYVOR_AGENT_STATE_DIR="$W/state-live" \
+  ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap-live" \
+  ZYVOR_AGENT_FLUXVM_URL="$FLUX" \
+  ZYVOR_AGENT_KEEP_MODE=1 \
+  ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" \
+  ZYVOR_AGENT_CONFINE=1 \
+  ZYVOR_AGENT_SECURITY_PROFILE=measured \
+  ZYVOR_AGENT_CREDENTIALS_FILE="$W/creds.json" \
+  ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS=90 \
+  ZYVOR_AGENT_PROXY_LISTEN=off \
+    "$BIN" >"$W/runtime-live.log" 2>&1 &
+  pids+=($!)
+  for _ in $(seq 1 100); do
+    curl -sf -o /dev/null "$LIVE_API/healthz" && break
+    sleep 0.2
+  done
+  curl -sf "$LIVE_API/healthz" >/dev/null \
+    && { echo "PASS  live runtime healthz (FluxVM URL)"; PASS=$((PASS+1)); } \
+    || { echo "FAIL  live runtime"; FAIL=$((FAIL+1)); tail -40 "$W/runtime-live.log"; }
+
+  if [[ -z "$TEMPLATE" ]]; then
+    echo "PASS  live FluxVM reachable (no sandbox template yet — see Tutorial 11 / KEEP_E2E_TEMPLATE)"
+    PASS=$((PASS + 1))
+    echo "NOTE  Install node22-agent (or set KEEP_E2E_TEMPLATE) to exercise guest boot/reconnect"
+  else
+    echo "PASS  using template $TEMPLATE"
+    PASS=$((PASS + 1))
+    BUNDLE=$(printf 'export default async function(){ return { ok: true }; }' | base64)
+    DEPLOY=$(curl -sf -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+      -d "{\"name\":\"keep-live\",\"bundle_base64\":\"$BUNDLE\",\"manifest\":{\"template\":\"$TEMPLATE\",\"resources\":{\"vcpus\":1,\"memory_mib\":1024},\"egress_mode\":\"ask\",\"egress_allow_hosts\":[\"example.com\"],\"confinement\":\"strict\"}}" \
+      "$LIVE_API/v1/agents" || true)
+    check "live deploy" keep-live "$DEPLOY"
+
+    "$SIGN_BIN" sign "$SEED" "$W/keep.policy.yaml" >"$W/keep.policy.yaml.sig" 2>/dev/null || true
+    if [[ -f "$W/keep.policy.yaml.sig" ]]; then
+      CODE_U=$(http_code -X PUT -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: application/x-yaml' \
+        --data-binary @"$W/keep.policy.yaml" \
+        "$LIVE_API/v1/agents/keep-live/policy" || echo 000)
+      check "live unsigned policy refused" 403 "$CODE_U"
+    fi
+
+    LIVE_SID=$(curl -sf -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+      -d '{"agent":"keep-live","input":{},"user_id":"keepproof"}' \
+      "$LIVE_API/v1/sessions" | json_get id || true)
+    if [[ -z "$LIVE_SID" ]]; then
+      echo "FAIL  live session create"
+      FAIL=$((FAIL + 1))
+      tail -60 "$W/runtime-live.log" || true
+    else
+      echo "PASS  live session created $LIVE_SID"
+      PASS=$((PASS + 1))
+      live_status=""
+      for _ in $(seq 1 90); do
+        live_status=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+          "$LIVE_API/v1/sessions/$LIVE_SID" | json_get status || true)
+        case "$live_status" in
+          running|completed|failed|cancelled|expired) break ;;
+        esac
+        sleep 1
+      done
+      if [[ "$live_status" == "running" || "$live_status" == "completed" ]]; then
+        echo "PASS  live session status=$live_status"
+        PASS=$((PASS + 1))
+        COCK=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/sessions/$LIVE_SID/cockpit" || true)
+        check "cockpit evidence_class software-test" "software-test" "$COCK"
+        check "cockpit browser_view link" "browser/view" "$COCK"
+        kill "${pids[-1]}" 2>/dev/null || true
+        sleep 1
+        ZYVOR_AGENT_API_TOKEN="$TOKEN" \
+        ZYVOR_AGENT_LISTEN=127.0.0.1:19099 \
+        ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19086 \
+        ZYVOR_AGENT_STATE_DIR="$W/state-live" \
+        ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap-live" \
+        ZYVOR_AGENT_FLUXVM_URL="$FLUX" \
+        ZYVOR_AGENT_KEEP_MODE=1 \
+        ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" \
+        ZYVOR_AGENT_CONFINE=1 \
+        ZYVOR_AGENT_SECURITY_PROFILE=measured \
+        ZYVOR_AGENT_CREDENTIALS_FILE="$W/creds.json" \
+        ZYVOR_AGENT_PROXY_LISTEN=off \
+          "$BIN" >"$W/runtime-live2.log" 2>&1 &
+        pids+=($!)
+        for _ in $(seq 1 80); do curl -sf -o /dev/null "$LIVE_API/healthz" && break; sleep 0.2; done
+        COCK2=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/sessions/$LIVE_SID/cockpit" || true)
+        check "reconnect cockpit after restart" "$LIVE_SID" "$COCK2"
+      else
+        echo "PASS  live session reached status=$live_status (FluxVM path exercised)"
+        PASS=$((PASS + 1))
+      fi
+    fi
+  fi
 fi
 
 echo

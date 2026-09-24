@@ -3,7 +3,7 @@
 
 use crate::{
     audit::AuditPhase,
-    credentials::{credential_allows_request, host_matches, CredentialVault},
+    credentials::{host_matches, CredentialVault, ResolveContext},
     model::{
         AgentManifest, ApprovalKind, ApprovalRecord, ApprovalStatus, EgressMode, EgressRequest,
         SessionRecord, DEFAULT_EGRESS_APPROVAL_SECONDS,
@@ -276,29 +276,22 @@ pub(crate) async fn proxy_inner(
                 "fabric credentials require http or https".into(),
             ));
         }
-        let (descriptor, secret) = state
-            .credentials
-            .resolve(name)
-            .map_err(|e| (StatusCode::BAD_GATEWAY, e.to_string()))?;
-        if !host_matches(&descriptor.host, host) {
-            return Err((
-                StatusCode::FORBIDDEN,
-                format!("credential '{name}' cannot be used for host {host}"),
-            ));
-        }
         let port = url
             .port_or_known_default()
             .unwrap_or(if is_fabric { 80 } else { 443 });
-        if !credential_allows_request(descriptor, &method, url.path(), port) {
-            return Err((
-                StatusCode::FORBIDDEN,
-                format!(
-                    "credential '{name}' policy denies {} {} on port {port}",
-                    method.as_str(),
-                    url.path()
-                ),
-            ));
-        }
+        let (descriptor, secret) = state
+            .credentials
+            .authorize_resolve(
+                name,
+                &ResolveContext {
+                    host,
+                    method: &method,
+                    path: url.path(),
+                    port,
+                    user_id: session.user_id.as_deref(),
+                },
+            )
+            .map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?;
         if let Some(kind) = descriptor.approval_kind_for(&method) {
             needs_approval = Some((kind, name.to_string()));
         }
@@ -914,6 +907,7 @@ pub(crate) mod ask_tests {
             mitm_ca_dir: None,
             extra_ca_files: vec![],
             confine_all: false,
+            security_profile: None,
             max_vcpus: None,
             max_memory_mib: None,
             egress_advertise_host: None,

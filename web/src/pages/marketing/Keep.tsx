@@ -105,7 +105,8 @@ export default function Keep() {
         <h2>Deploy a Keep from the console</h2>
         <p>
           Build a bundle, deploy under your tenant, and start a session — multi-user home disks and
-          JWT-scoped agents are already wired in Fabric.
+          JWT-scoped agents are already wired in Fabric. Lab live proof:{' '}
+          <code className="font-mono text-[13px]">./scripts/keep-live-lab.sh</code>.
         </p>
         <div className="flex flex-wrap gap-3 mt-6">
           {isAuthenticated ? (

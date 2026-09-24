@@ -102,6 +102,7 @@ async fn create_cold_sandbox(
             volumes: &volumes,
             resources: agent.manifest.resources,
             confidential: agent.manifest.confidential,
+            security_profile: state.config.security_profile.as_deref(),
         },
     ))
     .await
@@ -250,6 +251,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
         .route("/v1/sessions/{id}/untaint", post(untaint_session))
         .route(
+            "/v1/sessions/{id}/browser/view",
+            get(crate::browser::browser_view),
+        )
+        .route(
             "/v1/sessions/{id}/browser/{*path}",
             get(crate::browser::devtools),
         )
@@ -311,6 +316,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/healthz", get(|| async { Json(json!({"ok": true})) }))
         .route("/v1/hooks/{id}", post(crate::schedules::webhook_ingress))
         .route("/keep/cockpit", get(cockpit_page))
+        .route("/keep/browser", get(crate::browser::browser_page))
         .merge(protected)
         .with_state(state)
 }
@@ -2113,7 +2119,11 @@ async fn session_cockpit(
         "upcoming_cron": upcoming,
         "model_socket": state.store.get_agent(&session.agent).await.map(|a| a.manifest.model_socket),
         "browser_port": state.store.get_agent(&session.agent).await.and_then(|a| a.manifest.browser_port),
-        "honesty": "If FluxVM evidence class is software-test, the host can still see this VM.",
+        "browser_view": format!("/v1/sessions/{id}/browser/view"),
+        "browser_page": format!("/keep/browser?session={id}"),
+        "security_profile": state.config.security_profile,
+        "evidence_class": "software-test",
+        "honesty": "Evidence class software-test: the host can still see this VM. Keep 0.2 + attested hardware is required before claiming otherwise.",
     })))
 }
 

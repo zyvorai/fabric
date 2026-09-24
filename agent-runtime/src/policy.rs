@@ -3,8 +3,13 @@
 
 //! Keep Sentinel policy: export/import `keep.policy.yaml` from an agent manifest.
 //!
-//! When `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS` is set, PUT policy requires a valid
-//! Ed25519 signature over the exact YAML bytes (`X-Keep-Policy-Signature: <hex>`).
+//! **Keep mode** (`ZYVOR_AGENT_KEEP_MODE=1`): trusted signers are required at
+//! startup, and every PUT policy must carry a valid Ed25519 signature
+//! (`X-Keep-Policy-Signature: <hex>`). `ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=0`
+//! is ignored in Keep mode (fail-closed).
+//!
+//! Without Keep mode, when `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS` is set, PUT
+//! policy requires a signature unless `ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=0`.
 
 use crate::model::{AgentManifest, EgressMode, EgressRule, TaintPolicy};
 use anyhow::{bail, Context, Result};
@@ -55,14 +60,20 @@ pub struct KeepTaint {
 
 #[derive(Debug, Clone, Default)]
 pub struct PolicyTrust {
-    /// Hex-encoded 32-byte Ed25519 public keys. Empty = signatures not required.
+    /// Hex-encoded 32-byte Ed25519 public keys.
     pub trusted_signers: Vec<[u8; 32]>,
-    /// When true and signers are configured, unsigned policy is refused.
+    /// When true, unsigned policy is refused (requires non-empty signers).
     pub require_signature: bool,
+    /// Keep mode: fail-closed; signers mandatory; REQUIRE_SIGNATURE=0 ignored.
+    pub keep_mode: bool,
 }
 
 impl PolicyTrust {
     pub fn from_env() -> Result<Self> {
+        let keep_mode = std::env::var("ZYVOR_AGENT_KEEP_MODE")
+            .ok()
+            .as_deref()
+            == Some("1");
         let raw = std::env::var("ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS").unwrap_or_default();
         let mut trusted_signers = Vec::new();
         for part in raw.split(',').map(str::trim).filter(|s| !s.is_empty()) {
@@ -72,30 +83,51 @@ impl PolicyTrust {
                 .map_err(|_| anyhow::anyhow!("POLICY_TRUSTED_SIGNERS entry must be 32 bytes"))?;
             trusted_signers.push(arr);
         }
-        let require_signature = match std::env::var("ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE")
-            .ok()
-            .as_deref()
-        {
-            Some("1") => true,
-            Some("0") => false,
-            _ => !trusted_signers.is_empty(),
+        if keep_mode && trusted_signers.is_empty() {
+            bail!(
+                "ZYVOR_AGENT_KEEP_MODE=1 requires ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS \
+                 (comma-separated hex Ed25519 public keys)"
+            );
+        }
+        let require_signature = if keep_mode {
+            true
+        } else {
+            match std::env::var("ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE")
+                .ok()
+                .as_deref()
+            {
+                Some("1") => true,
+                Some("0") => false,
+                _ => !trusted_signers.is_empty(),
+            }
         };
         Ok(Self {
             trusted_signers,
             require_signature,
+            keep_mode,
         })
     }
 
     pub fn verify_yaml(&self, yaml: &[u8], signature_hex: Option<&str>) -> Result<()> {
+        if self.keep_mode || self.require_signature {
+            if self.trusted_signers.is_empty() {
+                bail!("policy signature required but no trusted signers configured");
+            }
+            let Some(sig_hex) = signature_hex.filter(|s| !s.trim().is_empty()) else {
+                bail!("policy signature required (X-Keep-Policy-Signature)");
+            };
+            return self.verify_signature(yaml, sig_hex);
+        }
         if self.trusted_signers.is_empty() {
             return Ok(());
         }
         let Some(sig_hex) = signature_hex.filter(|s| !s.trim().is_empty()) else {
-            if self.require_signature {
-                bail!("policy signature required (X-Keep-Policy-Signature)");
-            }
             return Ok(());
         };
+        self.verify_signature(yaml, sig_hex)
+    }
+
+    fn verify_signature(&self, yaml: &[u8], sig_hex: &str) -> Result<()> {
         let sig_bytes = hex::decode(sig_hex.trim()).context("invalid policy signature hex")?;
         let signature = Signature::from_slice(&sig_bytes).context("malformed Ed25519 signature")?;
         for pk in &self.trusted_signers {
@@ -257,9 +289,49 @@ mod tests {
         let trust = PolicyTrust {
             trusted_signers: vec![pk],
             require_signature: true,
+            keep_mode: false,
         };
         trust.verify_yaml(yaml, Some(&sig)).unwrap();
         assert!(trust.verify_yaml(yaml, Some("00")).is_err());
         assert!(trust.verify_yaml(yaml, None).is_err());
+    }
+
+    #[test]
+    fn keep_mode_refuses_unsigned_even_if_require_flag_would_be_off() {
+        let seed = [9u8; 32];
+        let yaml = b"version: 1\ndefault_egress: deny\n";
+        let sig = sign_policy_yaml(yaml, &seed);
+        let pk = SigningKey::from_bytes(&seed).verifying_key().to_bytes();
+        let trust = PolicyTrust {
+            trusted_signers: vec![pk],
+            require_signature: false, // would allow unsigned without keep_mode
+            keep_mode: true,
+        };
+        assert!(trust.verify_yaml(yaml, None).is_err());
+        trust.verify_yaml(yaml, Some(&sig)).unwrap();
+    }
+
+    #[test]
+    fn keep_mode_refuses_when_no_signers() {
+        let trust = PolicyTrust {
+            trusted_signers: vec![],
+            require_signature: true,
+            keep_mode: true,
+        };
+        assert!(trust
+            .verify_yaml(b"version: 1\n", Some("abcd"))
+            .unwrap_err()
+            .to_string()
+            .contains("no trusted signers"));
+    }
+
+    #[test]
+    fn without_keep_mode_empty_signers_accept_unsigned() {
+        let trust = PolicyTrust {
+            trusted_signers: vec![],
+            require_signature: false,
+            keep_mode: false,
+        };
+        trust.verify_yaml(b"version: 1\n", None).unwrap();
     }
 }

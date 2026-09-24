@@ -44,6 +44,9 @@ struct SandboxCreate<'a> {
     memory_mib: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     confidential: Option<&'static str>,
+    /// FluxVM Phase 6 profile (`measured`, …). Older FluxVM ignores unknown fields.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    security_profile: Option<&'a str>,
 }
 
 /// A FluxVM sandbox volume (`POST /v1/sandboxes` `volumes`).
@@ -59,6 +62,9 @@ pub struct SandboxOptions<'a> {
     pub volumes: &'a [SandboxVolume],
     pub resources: Option<Resources>,
     pub confidential: crate::model::Confidential,
+    /// Phase 6 security profile name (e.g. `measured`). Evidence class stays
+    /// `software-test` until Keep 0.2 + attested hardware.
+    pub security_profile: Option<&'a str>,
 }
 
 impl FluxVm {
@@ -130,6 +136,7 @@ impl FluxVm {
                 memory_mib: options.resources.map(|r| r.memory_mib),
                 confidential: (!options.confidential.is_off())
                     .then_some(options.confidential.as_str()),
+                security_profile: options.security_profile,
             })
             .send()
             .await?;
@@ -342,6 +349,7 @@ mod tests {
             vcpus: None,
             memory_mib: None,
             confidential: None,
+            security_profile: None,
         })
         .unwrap();
         assert!(none.get("volumes").is_none());
@@ -361,6 +369,7 @@ mod tests {
             vcpus: Some(2),
             memory_mib: Some(7900),
             confidential: Some("auto"),
+            security_profile: Some("measured"),
         })
         .unwrap();
         assert_eq!(some["volumes"][0]["name"], "home");
@@ -369,5 +378,6 @@ mod tests {
             (some["vcpus"].as_u64(), some["memory_mib"].as_u64()),
             (Some(2), Some(7900))
         );
+        assert_eq!(some["security_profile"], "measured");
     }
 }

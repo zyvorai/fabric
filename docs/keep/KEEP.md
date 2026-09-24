@@ -22,6 +22,9 @@ cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
 # Full Keep end-to-end (live runtime + FluxVM stub + keepctl)
 ./scripts/keep-e2e.sh
 
+# Lab live FluxVM proof (Keep 0.1 release gate)
+./scripts/keep-live-lab.sh
+
 # Runtime control-plane e2e (proxy / Sentinel / DLP / phone approvals)
 cargo build --manifest-path agent-runtime/Cargo.toml --release
 BIN=agent-runtime/target/release/zyvor-fabric-agent-runtime \
