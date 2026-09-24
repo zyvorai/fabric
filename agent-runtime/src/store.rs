@@ -933,6 +933,8 @@ mod tests {
                 skills: vec![],
                 skill_scope: None,
                 egress_approval_timeout_seconds: None,
+                model_socket: None,
+                cell_backend: None,
             },
         };
         let record = store.deploy_agent(request).await.unwrap();
@@ -981,6 +983,8 @@ mod tests {
                     skills: vec![],
                     skill_scope: None,
                     egress_approval_timeout_seconds: None,
+                    model_socket: None,
+                    cell_backend: None,
                 },
             })
             .await
@@ -1014,6 +1018,8 @@ mod tests {
                     skills: vec![],
                     skill_scope: None,
                     egress_approval_timeout_seconds: None,
+                    model_socket: None,
+                    cell_backend: None,
                 },
             })
             .await

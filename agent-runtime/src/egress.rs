@@ -112,7 +112,7 @@ impl AuditTarget {
     }
 }
 
-async fn proxy_inner(
+pub(crate) async fn proxy_inner(
     state: &AppState,
     headers: &HeaderMap,
     request: EgressRequest,
@@ -217,17 +217,19 @@ async fn proxy_inner(
         .method
         .parse::<reqwest::Method>()
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid HTTP method".into()))?;
-    let request_client = reqwest::Client::builder()
+    let mut client_builder = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(120))
-        .resolve(host, pinned)
-        .build()
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("failed to construct pinned egress client: {e}"),
-            )
-        })?;
+        .resolve(host, pinned);
+    for root in &state.extra_roots {
+        client_builder = client_builder.add_root_certificate(root.clone());
+    }
+    let request_client = client_builder.build().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to construct pinned egress client: {e}"),
+        )
+    })?;
     let mut upstream = request_client.request(method.clone(), url.clone());
     for (name, value) in request.headers {
         if is_hop_or_secret_header(&name) || state.credentials.is_injection_header(&name) {
@@ -369,10 +371,14 @@ async fn proxy_inner(
     let status = response.status().as_u16();
     taint_on_read(state, &session, &agent.manifest, host).await;
     let mut out_headers = BTreeMap::new();
+    // `headers` collapses repeats (fine for a JSON caller); `header_list` keeps
+    // every one, which the TLS-intercepting proxy needs for multiple Set-Cookie.
+    let mut header_list: Vec<(String, String)> = Vec::new();
     for (name, value) in response.headers() {
         if let Ok(value) = value.to_str() {
             if !is_hop_or_secret_header(name.as_str()) {
                 out_headers.insert(name.to_string(), value.to_string());
+                header_list.push((name.to_string(), value.to_string()));
             }
         }
     }
@@ -393,6 +399,7 @@ async fn proxy_inner(
     Ok(json!({
         "status": status,
         "headers": out_headers,
+        "header_list": header_list,
         "body_base64": base64::engine::general_purpose::STANDARD.encode(body),
     }))
 }
@@ -904,6 +911,8 @@ pub(crate) mod ask_tests {
             approval_webhook: None,
             proxy_listen: None,
             proxy_connect_ports: vec![443],
+            mitm_ca_dir: None,
+            extra_ca_files: vec![],
             confine_all: false,
             max_vcpus: None,
             max_memory_mib: None,
@@ -973,6 +982,8 @@ pub(crate) mod ask_tests {
             skills: vec![],
             skill_scope: None,
             egress_approval_timeout_seconds: timeout,
+            model_socket: None,
+            cell_backend: None,
         }
     }
 
@@ -981,7 +992,7 @@ pub(crate) mod ask_tests {
     }
 
     /// Wait until an egress approval for the session is pending, then return it.
-    async fn wait_pending(state: &AppState, session: uuid::Uuid) -> ApprovalRecord {
+    pub(crate) async fn wait_pending(state: &AppState, session: uuid::Uuid) -> ApprovalRecord {
         for _ in 0..200 {
             if let Some(found) = state
                 .store

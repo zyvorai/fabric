@@ -94,6 +94,38 @@ pub struct AgentManifest {
     /// new version.
     #[serde(default)]
     pub runtime: AgentRuntimeKind,
+    /// Bring-your-own model socket (Keep). The cell does not care which brain
+    /// answers; only this endpoint config changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_socket: Option<ModelSocket>,
+    /// Prefer Firecracker/FluxVM microVM for the agent cell when the template
+    /// supports it. Documented Keep 0.1 target; bubblewrap remains interim.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cell_backend: Option<CellBackend>,
+}
+
+/// Where the agent talks to an LLM. Swap Grok / local GGUF / vLLM / Muse-class
+/// APIs without rebuilding the cell.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModelSocket {
+    /// OpenAI-compatible base URL, e.g. `https://api.x.ai/v1` or `http://127.0.0.1:8080/v1`.
+    pub base_url: String,
+    /// Model id the provider expects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Vault credential name that holds the API key (surrogate at egress).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential: Option<String>,
+}
+
+/// Preferred isolation for the untrusted agent cell.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum CellBackend {
+    #[default]
+    Template,
+    Firecracker,
+    Qemu,
 }
 
 /// A named FluxVM volume mounted into the agent's sandbox. The volume outlives
@@ -1068,6 +1100,8 @@ mod home_volume_tests {
             skills: vec![],
             skill_scope: None,
             egress_approval_timeout_seconds: None,
+            model_socket: None,
+            cell_backend: None,
         }
     }
 

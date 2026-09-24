@@ -18,6 +18,8 @@ use crate::{
     audit::AuditPhase,
     credentials::host_matches,
     egress::{authorize_unlisted_host, constant_time_eq, resolve_and_validate_destination},
+    mitm::Mitm,
+    model::{AgentRecord, SessionRecord},
     AppState,
 };
 use axum::http::StatusCode;
@@ -105,14 +107,30 @@ async fn handle(state: Arc<AppState>, mut client: TcpStream) {
     }
 }
 
-struct Tunnel {
+/// A blind byte-for-byte tunnel to the destination.
+struct DirectTunnel {
     upstream: TcpStream,
     session_id: uuid::Uuid,
     host: String,
     port: u16,
 }
 
-async fn open_tunnel(state: &AppState, head: &str) -> Result<Tunnel, Refusal> {
+/// A tunnel whose TLS the runtime terminates, so each request goes through the
+/// broker. Only for hosts a credential descriptor asks to intercept.
+struct Interception {
+    session: SessionRecord,
+    agent: AgentRecord,
+    mitm: Arc<Mitm>,
+    host: String,
+    port: u16,
+}
+
+enum Tunnel {
+    Direct(DirectTunnel),
+    Intercept(Box<Interception>),
+}
+
+async fn open_tunnel(state: &Arc<AppState>, head: &str) -> Result<Tunnel, Refusal> {
     let mut lines = head.split("\r\n");
     let request_line = lines.next().unwrap_or_default();
     let mut parts = request_line.split_whitespace();
@@ -167,6 +185,32 @@ async fn open_tunnel(state: &AppState, head: &str) -> Result<Tunnel, Refusal> {
         )
         .await;
     }
+    // A host a credential wants intercepted is not tunnelled at all: the broker
+    // judges every request inside it (allowlist, approvals, rules, DLP, taint), so
+    // none of the checks below apply to the tunnel itself.
+    if let Some(mitm) = &state.mitm {
+        if !state
+            .credentials
+            .intercepted_for(&agent.manifest.credentials, &host)
+            .is_empty()
+        {
+            record(
+                state,
+                session.id,
+                AuditPhase::Approved,
+                &host,
+                json!({"port": port, "intercepted": true}),
+            )
+            .await;
+            return Ok(Tunnel::Intercept(Box::new(Interception {
+                session: session.clone(),
+                agent: agent.clone(),
+                mitm: mitm.clone(),
+                host: host.clone(),
+                port,
+            })));
+        }
+    }
     // Per-host rules constrain methods and paths, which a TLS tunnel hides.
     if crate::l7::host_has_rules(&agent.manifest.egress_rules, &host) {
         return refuse(
@@ -213,12 +257,12 @@ async fn open_tunnel(state: &AppState, head: &str) -> Result<Tunnel, Refusal> {
     .await;
     // The browser is about to read from this host.
     crate::egress::taint_on_read(state, &session, &agent.manifest, &host).await;
-    Ok(Tunnel {
+    Ok(Tunnel::Direct(DirectTunnel {
         upstream,
         session_id: session.id,
         host,
         port,
-    })
+    }))
 }
 
 async fn record(
@@ -264,13 +308,44 @@ async fn refuse<T>(
     Err(Refusal::new(status, message))
 }
 
-async fn run_tunnel(state: &AppState, mut client: TcpStream, leftover: Vec<u8>, tunnel: Tunnel) {
-    let Tunnel {
+async fn run_tunnel(
+    state: &Arc<AppState>,
+    mut client: TcpStream,
+    leftover: Vec<u8>,
+    tunnel: Tunnel,
+) {
+    let DirectTunnel {
         mut upstream,
         session_id,
         host,
         port,
-    } = tunnel;
+    } = match tunnel {
+        Tunnel::Direct(direct) => direct,
+        Tunnel::Intercept(interception) => {
+            let Interception {
+                session,
+                agent,
+                mitm,
+                host,
+                port,
+            } = *interception;
+            if client
+                .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                .await
+                .is_err()
+            {
+                return;
+            }
+            let target = crate::mitm::Target {
+                session,
+                agent,
+                host,
+                port,
+            };
+            crate::mitm::intercept(state.clone(), mitm, target, client, leftover).await;
+            return;
+        }
+    };
     if client
         .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
         .await

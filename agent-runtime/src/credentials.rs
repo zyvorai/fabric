@@ -36,9 +36,22 @@ pub struct CredentialDescriptor {
     /// is used, e.g. `["POST"]` for a mail-sending or checkout credential.
     #[serde(default)]
     pub requires_approval: Vec<String>,
+    /// Let the CONNECT proxy terminate TLS for this credential's host so a
+    /// per-session surrogate token the agent holds can be swapped for the real
+    /// secret in flight. Needs `ZYVOR_AGENT_MITM_CA_DIR`; see `mitm`.
+    #[serde(default)]
+    pub intercept: bool,
     /// What such an approval is called to the operator: `send` (default) or `purchase`.
     #[serde(default)]
     pub approval_kind: Option<String>,
+}
+
+/// The stand-in for credential `name` that a session's agent holds. It is derived
+/// from the session's capability, so it is stable for the session, different for
+/// every session, and worthless anywhere but through this runtime.
+pub fn surrogate(capability: &str, name: &str) -> String {
+    let mac = crate::schedules::hmac_sha256(capability.as_bytes(), name.as_bytes());
+    format!("zy_sur_{}", &hex::encode(mac)[..32])
 }
 
 impl CredentialDescriptor {
@@ -83,6 +96,11 @@ impl CredentialVault {
         Ok(Self { descriptors })
     }
 
+    /// A vault of the given descriptors (used by tests and embedders).
+    pub fn from_descriptors(descriptors: HashMap<String, CredentialDescriptor>) -> Self {
+        Self { descriptors }
+    }
+
     pub fn descriptor(&self, name: &str) -> Option<&CredentialDescriptor> {
         self.descriptors.get(name)
     }
@@ -91,6 +109,19 @@ impl CredentialVault {
         self.descriptors
             .values()
             .any(|d| d.header.eq_ignore_ascii_case(header))
+    }
+
+    /// Names, among `granted`, of credentials whose host is `host` and that ask to
+    /// be intercepted.
+    pub fn intercepted_for<'a>(&self, granted: &'a [String], host: &str) -> Vec<&'a str> {
+        granted
+            .iter()
+            .filter(|name| {
+                self.descriptor(name)
+                    .is_some_and(|d| d.intercept && host_matches(&d.host, host))
+            })
+            .map(String::as_str)
+            .collect()
     }
 
     pub fn resolve(&self, name: &str) -> Result<(&CredentialDescriptor, String)> {
@@ -211,6 +242,7 @@ mod tests {
             kind: "provider".into(),
             requires_approval: vec![],
             approval_kind: None,
+            intercept: false,
         };
         assert!(credential_allows_request(
             &d,

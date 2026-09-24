@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: Apache-2.0
+#
+# keepctl — Keep product CLI (Fabric). Talks to agent-runtime REST; FluxVM is
+# the cell backend. Same verbs as the API. Not a separate repo.
+#
+#   keepctl create …          # deploy agent (Keep) via agent-runtime
+#   keepctl policy show|set   # signed keep.policy.yaml
+#   keepctl pack   <path>     # workspace hint + policy + manifest pin
+#   keepctl unpack <path>     # restore policy onto an agent
+#   keepctl export-token …    # scoped trajectory export (default: none)
+#
+set -euo pipefail
+
+BASE="${KEEP_API:-${ZYVOR_AGENT_URL:-http://127.0.0.1:9096}}"
+TOKEN="FAKESECRET_m2n3o4p5q6r7s8t9u0v1"
+AUTH=()
+if [[ -n "$TOKEN" ]]; then
+  AUTH=(-H "Authorization: Bearer $TOKEN")
+fi
+
+usage() {
+  sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+  exit "${1:-0}"
+}
+
+api() {
+  local method=$1 path=$2; shift 2
+  curl -fsS -X "$method" "${AUTH[@]}" "$BASE$path" "$@"
+}
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  ""|-h|--help) usage 0 ;;
+
+  create)
+    # Body: DeployAgentRequest JSON on stdin or -f file
+    file=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        -f|--file) file=$2; shift 2 ;;
+        *) echo "unknown arg: $1" >&2; usage 1 ;;
+      esac
+    done
+    if [[ -n "$file" ]]; then
+      api POST /v1/agents -H 'Content-Type: application/json' --data-binary @"$file"
+    else
+      api POST /v1/agents -H 'Content-Type: application/json' --data-binary @-
+    fi
+    echo
+    ;;
+
+  policy)
+    sub="${1:-}"; shift || true
+    name="${1:-}"; shift || true
+    [[ -n "$name" ]] || { echo "usage: keepctl policy show|set <agent> [file]" >&2; exit 1; }
+    case "$sub" in
+      show)
+        api GET "/v1/agents/${name}/policy"
+        echo
+        ;;
+      set)
+        file="${1:-}"
+        [[ -n "$file" ]] || { echo "usage: keepctl policy set <agent> <policy.yaml>" >&2; exit 1; }
+        api PUT "/v1/agents/${name}/policy" -H 'Content-Type: application/x-yaml' --data-binary @"$file"
+        echo
+        ;;
+      *) echo "usage: keepctl policy show|set <agent>" >&2; exit 1 ;;
+    esac
+    ;;
+
+  pack)
+    out="${1:-}"
+    name="${2:-}"
+    [[ -n "$out" && -n "$name" ]] || { echo "usage: keepctl pack <dir> <agent>" >&2; exit 1; }
+    mkdir -p "$out"
+    api GET "/v1/agents/${name}/policy" >"$out/keep.policy.yaml"
+    api GET "/v1/agents/${name}" >"$out/agent.json"
+    cat >"$out/KEEP_PACK.md" <<EOF
+# Keep pack
+
+Agent: ${name}
+Packed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+Contains:
+- keep.policy.yaml — Sentinel policy (sign before production use)
+- agent.json — manifest pin (includes model_socket, cell_backend)
+
+Workspace disk / sealed vault: copy the FluxVM qcow2 / vault export beside this
+directory, then \`keepctl unpack\` on the destination node.
+
+Honesty: measured evidence is software-test until confidential hardware + user-held key.
+EOF
+    echo "packed $name → $out"
+    ;;
+
+  unpack)
+    dir="${1:-}"
+    name="${2:-}"
+    [[ -n "$dir" && -n "$name" ]] || { echo "usage: keepctl unpack <dir> <agent>" >&2; exit 1; }
+    [[ -f "$dir/keep.policy.yaml" ]] || { echo "missing $dir/keep.policy.yaml" >&2; exit 1; }
+    api PUT "/v1/agents/${name}/policy" -H 'Content-Type: application/x-yaml' --data-binary @"$dir/keep.policy.yaml"
+    echo
+    echo "unpacked policy onto $name (new agent version). Restore qcow2/vault separately on FluxVM."
+    ;;
+
+  export-token)
+    scope="${1:-}"
+    ttl="${2:-3600}"
+    [[ -n "$scope" ]] || { echo "usage: keepctl export-token <scope> [ttl_seconds]" >&2; exit 1; }
+    api POST /v1/export-tokens -H 'Content-Type: application/json' \
+      -d "{\"scope\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$scope"),\"ttl_seconds\":$ttl}"
+    echo
+    ;;
+
+  cockpit)
+    id="${1:-}"
+    [[ -n "$id" ]] || { echo "usage: keepctl cockpit <session-id>" >&2; exit 1; }
+    api GET "/v1/sessions/${id}/cockpit"
+    echo
+    ;;
+
+  *)
+    echo "unknown command: $cmd" >&2
+    usage 1
+    ;;
+esac

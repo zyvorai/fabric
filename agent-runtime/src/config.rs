@@ -13,6 +13,11 @@ pub struct Config {
     pub proxy_listen: Option<SocketAddr>,
     /// Ports a CONNECT tunnel may target.
     pub proxy_connect_ports: Vec<u16>,
+    /// Directory holding the interception CA (`ca.pem`, `ca.key`), created on first
+    /// use. Absent turns TLS interception off. See `mitm`.
+    pub mitm_ca_dir: Option<PathBuf>,
+    /// Extra PEM root certificates the broker trusts for upstream TLS (private CAs).
+    pub extra_ca_files: Vec<PathBuf>,
     pub state_dir: PathBuf,
     pub snapshot_dir: PathBuf,
     pub fluxvm_url: String,
@@ -52,6 +57,10 @@ impl Config {
             listen: env_parse("ZYVOR_AGENT_LISTEN", "127.0.0.1:9096")?,
             egress_listen: env_parse("ZYVOR_AGENT_EGRESS_LISTEN", "0.0.0.0:18082")?,
             proxy_listen: proxy_listen_from_env()?,
+            mitm_ca_dir: env_opt("ZYVOR_AGENT_MITM_CA_DIR").map(PathBuf::from),
+            extra_ca_files: env_opt("ZYVOR_AGENT_EXTRA_CA_FILE")
+                .map(|v| v.split(',').map(|p| PathBuf::from(p.trim())).collect())
+                .unwrap_or_default(),
             proxy_connect_ports: env_or("ZYVOR_AGENT_PROXY_CONNECT_PORTS", "443")
                 .split(',')
                 .map(|p| {

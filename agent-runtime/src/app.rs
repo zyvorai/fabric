@@ -288,6 +288,12 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/approvals", get(list_approvals).post(create_approval))
         .route("/v1/approvals/{id}", post(decide_approval))
         .route("/v1/audit", get(list_audit))
+        .route(
+            "/v1/agents/{name}/policy",
+            get(get_agent_policy).put(put_agent_policy),
+        )
+        .route("/v1/sessions/{id}/cockpit", get(session_cockpit))
+        .route("/v1/export-tokens", post(mint_export_token))
         .route("/v1/skills", get(list_skills).post(publish_skill))
         .route("/v1/skills/{name}", get(get_skill).delete(delete_skill))
         .route("/mcp", post(crate::mcp::handle))
@@ -987,8 +993,53 @@ async fn provision_guest(
     let credentials =
         serde_json::to_string(&agent.manifest.credentials).unwrap_or_else(|_| "[]".into());
     let launcher = crate::contain::launcher_prefix(agent.manifest.inner_container);
+    // With interception on, an agent that holds intercepted credentials gets the
+    // CA in its trust stores and a surrogate for each: never the real secret.
+    let surrogates = match &state.mitm {
+        Some(_) => crate::mitm::surrogates(
+            &state.credentials,
+            &agent.manifest.credentials,
+            &session.capability_token,
+        ),
+        None => Default::default(),
+    };
+    let mut mitm_env = String::new();
+    if let (Some(mitm), false) = (&state.mitm, surrogates.is_empty()) {
+        let installed = with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                crate::mitm::GUEST_CA_PATH,
+                mitm.ca_pem().as_bytes(),
+                0o644,
+            ),
+        )
+        .await;
+        match installed {
+            Ok(()) => {
+                if let Err(error) = with_timeout(
+                    HEALTH_CHECK_ATTEMPT_TIMEOUT,
+                    state
+                        .fluxvm
+                        .process(session.sandbox_id, crate::mitm::GUEST_INSTALL, Some(10)),
+                )
+                .await
+                {
+                    tracing::warn!(%error, "could not install the interception CA in the guest");
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, "could not write the interception CA to the guest")
+            }
+        }
+        mitm_env = format!(
+            "NODE_EXTRA_CA_CERTS={} ZYVOR_SURROGATES={} ",
+            crate::mitm::GUEST_CA_PATH,
+            shell_quote(&serde_json::to_string(&surrogates).unwrap_or_else(|_| "{}".into())),
+        );
+    }
     let command = format!(
-        "mkdir -p /opt/zyvor/agent; {proxy_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
+        "mkdir -p /opt/zyvor/agent; {proxy_env}{mitm_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()),
         shell_quote(&session.capability_token),
         shell_quote(&broker),
@@ -1878,6 +1929,197 @@ async fn list_audit(
         .await
         .map_err(ApiError::internal)?;
     Ok(Json(json!({"items": items, "chain": chain})))
+}
+
+/// Keep: readable Sentinel policy as `keep.policy.yaml`.
+async fn get_agent_policy(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Response> {
+    let agent = state
+        .store
+        .get_agent(&name)
+        .await
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
+    let yaml = crate::policy::KeepPolicy::from_manifest(&agent.manifest)
+        .to_yaml()
+        .map_err(ApiError::internal)?;
+    Ok((
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/x-yaml; charset=utf-8",
+        )],
+        yaml,
+    )
+        .into_response())
+}
+
+/// Keep: replace policy from YAML; redeploys a new agent version (sessions keep old contract).
+async fn put_agent_policy(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    body: String,
+) -> ApiResult<Json<Value>> {
+    let agent = state
+        .store
+        .get_agent(&name)
+        .await
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
+    let policy = crate::policy::KeepPolicy::from_yaml(&body).map_err(ApiError::bad_request)?;
+    let mut manifest = agent.manifest.clone();
+    policy.apply_to_manifest(&mut manifest);
+    let bundle_path = state
+        .config
+        .state_dir
+        .join("agents")
+        .join(&name)
+        .join(&agent.version)
+        .join("bundle.mjs");
+    let bundle = tokio::fs::read(&bundle_path)
+        .await
+        .map_err(ApiError::internal)?;
+    let record = state
+        .store
+        .deploy_agent(crate::model::DeployAgentRequest {
+            name: name.clone(),
+            bundle_base64: base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                bundle,
+            ),
+            manifest,
+        })
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.policy.set",
+            Some(name),
+            json!({"version": record.version}),
+        )
+        .await;
+    Ok(Json(json!({
+        "name": record.name,
+        "version": record.version,
+        "policy": crate::policy::KeepPolicy::from_manifest(&record.manifest),
+    })))
+}
+
+/// Keep cockpit: taint paint + last Sentinel/audit decisions for a session.
+async fn session_cockpit(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<Value>> {
+    let session = state
+        .store
+        .get_session(id)
+        .await
+        .ok_or_else(|| ApiError::not_found("session not found"))?;
+    let decisions = state
+        .store
+        .audit
+        .list(Some(id), 20)
+        .await
+        .map_err(ApiError::internal)?;
+    let pending: Vec<_> = state
+        .store
+        .list_approvals()
+        .await
+        .into_iter()
+        .filter(|a| a.session_id == id && a.status == crate::model::ApprovalStatus::Pending)
+        .collect();
+    let schedules = state.store.list_schedules().await;
+    let upcoming: Vec<_> = schedules
+        .into_iter()
+        .filter(|s| s.agent == session.agent)
+        .take(10)
+        .collect();
+    Ok(Json(json!({
+        "session_id": id,
+        "agent": session.agent,
+        "status": session.status,
+        "tainted_by": session.tainted_by,
+        "taint_visible": !session.tainted_by.is_empty(),
+        "pending_approvals": pending,
+        "last_decisions": decisions,
+        "upcoming_cron": upcoming,
+        "model_socket": state.store.get_agent(&session.agent).await.map(|a| a.manifest.model_socket),
+        "browser_port": state.store.get_agent(&session.agent).await.and_then(|a| a.manifest.browser_port),
+        "honesty": "If FluxVM evidence class is software-test, the host can still see this VM.",
+    })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MintExportTokenRequest {
+    /// What may leave the box (e.g. `trajectory:read:7d`). Empty is refused.
+    scope: String,
+    /// Lifetime in seconds (max 86400).
+    #[serde(default = "default_export_ttl")]
+    ttl_seconds: u64,
+}
+
+fn default_export_ttl() -> u64 {
+    3600
+}
+
+/// Keep: training default off — mint an explicit scoped export token or nothing leaves.
+async fn mint_export_token(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<MintExportTokenRequest>,
+) -> ApiResult<Json<Value>> {
+    if req.scope.trim().is_empty() {
+        return Err(ApiError::bad_request(
+            "scope is required; training/trajectory export is off by default",
+        ));
+    }
+    let ttl = req.ttl_seconds.clamp(60, 86_400);
+    let token = format!("keep_export_{}", Uuid::new_v4().simple());
+    let path = state.config.state_dir.join("export-tokens.jsonl");
+    let line = json!({
+        "token_sha256": {
+            // store hash only
+        },
+        "scope": req.scope,
+        "ttl_seconds": ttl,
+        "created_at": Utc::now(),
+    });
+    // Persist a hash of the token, never the raw token on disk in plaintext beyond this response.
+    let hash = {
+        use sha2::{Digest, Sha256};
+        hex::encode(Sha256::digest(token.as_bytes()))
+    };
+    let mut entry = line;
+    entry["token_sha256"] = json!(hash);
+    let mut file = tokio::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .await
+        .map_err(ApiError::internal)?;
+    use tokio::io::AsyncWriteExt;
+    file.write_all(format!("{entry}\n").as_bytes())
+        .await
+        .map_err(ApiError::internal)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.export_token.minted",
+            None,
+            json!({"scope": req.scope, "ttl_seconds": ttl}),
+        )
+        .await;
+    Ok(Json(json!({
+        "token": token,
+        "scope": req.scope,
+        "ttl_seconds": ttl,
+        "note": "Present this token to export trajectories. Without it, nothing leaves the box.",
+    })))
 }
 
 async fn list_skills(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
