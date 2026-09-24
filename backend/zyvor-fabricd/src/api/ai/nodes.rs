@@ -330,8 +330,7 @@ pub async fn delete_mig_slice(
         ));
     }
     if pci && super::pci_mig::pci_mig_enabled() {
-        super::pci_mig::apply_destroy(&slice.bdf)
-            .map_err(|e| err(StatusCode::BAD_GATEWAY, e))?;
+        super::pci_mig::apply_destroy(&slice.bdf).map_err(|e| err(StatusCode::BAD_GATEWAY, e))?;
     }
     if !janus && !pci {
         return Err(err(StatusCode::NOT_FOUND, "MIG slice not found"));

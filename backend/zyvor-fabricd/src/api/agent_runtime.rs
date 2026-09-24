@@ -164,9 +164,7 @@ pub(crate) fn scope_agent_name(claims: &Claims, name: &str) -> String {
     match claims.tenant.as_deref() {
         Some(t) if !t.is_empty() => {
             let prefix = tenant_agent_prefix(t);
-            let bare = name
-                .strip_prefix(&format!("{prefix}."))
-                .unwrap_or(name);
+            let bare = name.strip_prefix(&format!("{prefix}.")).unwrap_or(name);
             let bare = sanitize_name_component(bare, 40);
             format!("{prefix}.{bare}")
         }
@@ -217,9 +215,8 @@ async fn proxy_json(
     let value = if bytes.is_empty() {
         Value::Null
     } else {
-        serde_json::from_slice(&bytes).unwrap_or_else(|_| {
-            json!({ "raw": String::from_utf8_lossy(&bytes) })
-        })
+        serde_json::from_slice(&bytes)
+            .unwrap_or_else(|_| json!({ "raw": String::from_utf8_lossy(&bytes) }))
     };
     Ok((status, value))
 }
@@ -256,10 +253,7 @@ pub async fn deploy_agent(
     if claims.role != Role::Admin {
         if let Some(manifest) = body.get_mut("manifest").and_then(|m| m.as_object_mut()) {
             if !manifest.contains_key("home_volume") {
-                manifest.insert(
-                    "home_volume".into(),
-                    json!({ "per_user": true }),
-                );
+                manifest.insert("home_volume".into(), json!({ "per_user": true }));
             }
         }
     }
@@ -342,11 +336,7 @@ pub async fn create_session(
     }
 }
 
-async fn session_owned(
-    state: &AppState,
-    claims: &Claims,
-    id: &str,
-) -> Result<Value, Response> {
+async fn session_owned(state: &AppState, claims: &Claims, id: &str) -> Result<Value, Response> {
     let (status, value) = proxy_json(
         state,
         Method::GET,

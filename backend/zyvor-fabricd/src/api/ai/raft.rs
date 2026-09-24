@@ -1045,10 +1045,7 @@ mod tests {
             .await
             .unwrap()
             .data;
-        assert_eq!(
-            admitted,
-            LeaseResponse::Admitted { stream_id: None }
-        );
+        assert_eq!(admitted, LeaseResponse::Admitted { stream_id: None });
         let linked = leader_raft
             .client_write(LeaseCommand::AuditLink {
                 line: "admin|create|model|ok".into(),
