@@ -296,6 +296,23 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/loops/{id}",
             axum::routing::delete(crate::schedules::delete_loop),
         )
+        .route(
+            "/v1/goals",
+            get(crate::goals::list_goals).post(crate::goals::create_goal),
+        )
+        .route(
+            "/v1/goals/{id}",
+            get(crate::goals::get_goal).patch(crate::goals::patch_goal),
+        )
+        .route(
+            "/v1/goals/{id}/advance",
+            post(crate::goals::advance_step),
+        )
+        .route(
+            "/v1/artifacts",
+            get(crate::goals::list_artifacts).post(crate::goals::create_artifact),
+        )
+        .route("/v1/artifacts/{id}", get(crate::goals::get_artifact))
         .route("/v1/approvals", get(list_approvals).post(create_approval))
         .route("/v1/approvals/{id}", post(decide_approval))
         .route("/v1/audit", get(list_audit))
@@ -2108,6 +2125,53 @@ async fn session_cockpit(
         .filter(|s| s.agent == session.agent)
         .take(10)
         .collect();
+    let goals = state.store.list_goals().await;
+    let active_goal = goals
+        .iter()
+        .find(|g| {
+            g.session_id == Some(id)
+                && matches!(
+                    g.status,
+                    crate::goals::GoalStatus::Open | crate::goals::GoalStatus::Blocked
+                )
+        })
+        .cloned()
+        .or_else(|| {
+            goals
+                .iter()
+                .find(|g| {
+                    g.agent == session.agent
+                        && matches!(
+                            g.status,
+                            crate::goals::GoalStatus::Open | crate::goals::GoalStatus::Blocked
+                        )
+                })
+                .cloned()
+        });
+    let recent_artifacts: Vec<_> = state
+        .store
+        .list_artifacts()
+        .await
+        .into_iter()
+        .filter(|a| {
+            a.session_id == Some(id)
+                || active_goal
+                    .as_ref()
+                    .map(|g| a.goal_id == Some(g.id))
+                    .unwrap_or(false)
+                || a.agent.as_deref() == Some(session.agent.as_str())
+        })
+        .take(10)
+        .map(|a| {
+            json!({
+                "id": a.id,
+                "kind": a.kind,
+                "title": a.title,
+                "href": format!("/v1/artifacts/{}", a.id),
+                "created_at": a.created_at,
+            })
+        })
+        .collect();
     Ok(Json(json!({
         "session_id": id,
         "agent": session.agent,
@@ -2117,6 +2181,14 @@ async fn session_cockpit(
         "pending_approvals": pending,
         "last_decisions": decisions,
         "upcoming_cron": upcoming,
+        "active_goal": active_goal.as_ref().map(|g| json!({
+            "id": g.id,
+            "title": g.title,
+            "status": g.status,
+            "href": format!("/v1/goals/{}", g.id),
+            "plan": g.plan,
+        })),
+        "recent_artifacts": recent_artifacts,
         "model_socket": state.store.get_agent(&session.agent).await.map(|a| a.manifest.model_socket),
         "browser_port": state.store.get_agent(&session.agent).await.and_then(|a| a.manifest.browser_port),
         "browser_view": format!("/v1/sessions/{id}/browser/view"),
@@ -2423,7 +2495,8 @@ async fn decide_approval(
         return Err(ApiError::conflict("approval is already decided"));
     }
     let session = require_session(&state, record.session_id).await?;
-    if session.status != SessionStatus::Running {
+    let session_running = session.status == SessionStatus::Running;
+    if !session_running && (record.broker_held || record.kind == ApprovalKind::Egress) {
         return Err(ApiError::conflict("session is not running"));
     }
     let scope = (record.kind == ApprovalKind::Egress).then(|| req.scope.unwrap_or_default());
@@ -2463,7 +2536,7 @@ async fn decide_approval(
     // An approval the broker is holding (egress, or a send/purchase/DLP/taint hold)
     // unblocks a request already in flight; the agent is not waiting for steering,
     // so there is nothing to send it.
-    if record.kind != ApprovalKind::Egress && !record.broker_held {
+    if session_running && record.kind != ApprovalKind::Egress && !record.broker_held {
         let _ = steer_session(
             State(state),
             Path(record.session_id),

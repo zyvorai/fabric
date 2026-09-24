@@ -77,6 +77,11 @@ export default function Keep() {
             Linux cell — opening a browser, filling forms, and coming back when it needs your approval.
             Sessions keep running after you close the console.
           </p>
+          <p className="mt-4 text-[14px] text-[var(--zf-muted)]">
+            First packs talk to Fabric APIs you already own — infrastructure ops, migrations, and
+            deploy readiness — via signed policy and ask-before-mutate. See{' '}
+            <code className="font-mono text-[13px]">examples/keep-agents/</code> and Tutorial 16.
+          </p>
         </div>
         <div>
           <h2>A secure computer for the agent</h2>

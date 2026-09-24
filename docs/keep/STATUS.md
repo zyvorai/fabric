@@ -3,25 +3,39 @@
 | Phase | Status | Where |
 |---|---|---|
 | FluxVM Phase 6 | Merged (`security_profile` / measured) | [zyvorai/fluxvm](https://github.com/zyvorai/fluxvm) |
+| **Keep 0.1 pilot** | Live gate twice (happy + deny) on FluxVM host | [`pilot-runs/`](pilot-runs/) · `./scripts/keep-pilot-gate.sh` |
 | Keep 0.1 live proof | Keep mode + live e2e path + browser view + credential authority | this tree |
 | Keep docs | In Fabric | `docs/keep/` |
 | keepctl | Script | `scripts/keepctl` |
-| Agent runtime | Policy YAML, model_socket, cell_backend, cockpit, export-token | `agent-runtime/` |
+| Agent runtime | Policy YAML, goals/artifacts, cockpit, export-token | `agent-runtime/` |
+| Packaged agents | `infra-ops`, `migration-op`, `deploy-op` + `_fabric` | [`examples/keep-agents/`](../../examples/keep-agents/) |
+| Keep console view | Goal → task → evidence → approval → outcome | `/app/keep/:sessionId` |
 | Keep 0.2 | Documented gate only | `docs/keep/KEEP-0.2.md` |
 | CI | Keep workflow (stub e2e) | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
-| Tutorial | Hands-on | [Tutorial 16](../tutorials/16-keep-workstation.md) |
+| Tutorial | Hands-on + pack appendix | [Tutorial 16](../tutorials/16-keep-workstation.md) |
+
+## Packaged agents
+
+| Pack | Fabric surface |
+|---|---|
+| infra-ops | alerts, VMs, lifecycle; restart/remediation behind ask |
+| migration-op | `/api/migrations` + GuestKit inspect/rescue (no Transiva in-repo) |
+| deploy-op | `/readyz` + `/health` → readiness artifact |
 
 ## How to test
 
 ```bash
 cargo test --manifest-path agent-runtime/Cargo.toml --lib
-cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+cargo test --manifest-path agent-runtime/Cargo.toml goals -- --nocapture
 ./scripts/keep-e2e.sh
-# Lab live FluxVM gate:
-./scripts/keep-live-lab.sh
-./scripts/keepctl --help
+# Lab FluxVM host (template required — soft-pass removed):
+KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-live-lab.sh
+# Full pilot (happy + deny, archived logs):
+./scripts/keep-pilot-gate.sh
+./scripts/keep-pack-demo.sh infra-ops
 ```
 
 ## Honesty
 
 Measured = `software-test`. Host can still see the VM until Keep 0.2 + hardware.
+Guest vsock worker may still be pending on some lab images — see [pilot-runs/README.md](pilot-runs/README.md).

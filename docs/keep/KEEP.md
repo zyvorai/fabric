@@ -101,14 +101,16 @@ Security profiles (FluxVM Phase 6):
 | `measured` | `software-test` | **never** |
 | `confidential-snp` / `confidential-tdx` | `sev-snp` / `tdx` only after verified hardware run | gated |
 
-## Keep 0.1 — six-pack (ship this)
+## Keep 0.1 — six-pack (shipped)
 
 1. **BYO model socket** — Grok / local GGUF / vLLM / Muse-class API; cell unchanged.
-2. **Signed YAML Sentinel** — `sentinel/keep.policy.yaml`.
-3. **Firecracker cell** — agent kernel ≠ host kernel.
-4. **Phone-only high-risk approvals** — buy / send / delete never in chat.
+2. **Signed YAML Sentinel** — Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) fail-closed; `sentinel/keep.policy.yaml`.
+3. **Firecracker / measured cell** — agent kernel ≠ host kernel intent; `security_profile: measured` → evidence `software-test`.
+4. **Phone-only high-risk approvals** — buy / send / delete via webhook / `/v1/approvals`, never in chat.
 5. **Pack / unpack** — `keepctl pack` → USB or S3 → `keepctl unpack` on another FluxVM node.
-6. **Cockpit with visible taint** — browser / terminal / files / cron / last 20 Sentinel decisions; red paint on untrusted tabs.
+6. **Cockpit + browser live view** — visible taint, last decisions, tab listing (`/keep/browser`); no screencast/takeover yet.
+
+Lab gate: `./scripts/keep-live-lab.sh`. Guest boot needs a FluxVM template (Tutorial 11).
 
 ## Keep 0.2 — Muse’s “later,” without the wait-as-product
 

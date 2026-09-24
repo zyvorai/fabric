@@ -67,6 +67,61 @@ export async function getSession(id: string): Promise<SessionView> {
   return apiGet(`/api/sessions/${encodeURIComponent(id)}`)
 }
 
+export interface KeepCockpit {
+  session_id: string
+  agent: string
+  status: string
+  tainted_by?: string[]
+  taint_visible?: boolean
+  pending_approvals?: Array<{
+    id: string
+    prompt: string
+    status: string
+    kind?: string
+    subject?: string | null
+  }>
+  last_decisions?: Array<{
+    action?: string
+    phase?: string
+    at?: string
+    detail?: unknown
+  }>
+  active_goal?: {
+    id: string
+    title: string
+    status: string
+    href?: string
+    plan?: Array<{
+      id: string
+      title: string
+      status: string
+      requires_approval?: boolean
+    }>
+  } | null
+  recent_artifacts?: Array<{
+    id: string
+    kind: string
+    title: string
+    href?: string
+    created_at?: string
+  }>
+  evidence_class?: string
+  honesty?: string
+  security_profile?: string | null
+  browser_page?: string
+}
+
+export async function getSessionCockpit(id: string): Promise<KeepCockpit> {
+  return apiGet(`/api/sessions/${encodeURIComponent(id)}/cockpit`)
+}
+
+export async function decideApproval(
+  id: string,
+  body: { decision: 'approved' | 'denied'; comment?: string },
+): Promise<unknown> {
+  return apiPost(`/api/approvals/${encodeURIComponent(id)}`, body)
+}
+
 export async function createSession(body: {
   agent: string
   input?: unknown

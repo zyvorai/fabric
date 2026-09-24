@@ -3,11 +3,34 @@
 ## 0.3.0
 
 ### Added
+- **Keep 0.1 pilot gate.** Live FluxVM e2e requires a registered agent template
+  (no soft-pass); `./scripts/keep-pilot-gate.sh` runs happy + deny paths and
+  archives logs under `docs/keep/pilot-runs/`; console Keep view at
+  `/app/keep/:sessionId` (goal → evidence → approval → outcome); fabricd proxies
+  `GET /api/sessions/{id}/cockpit`. Non-broker approvals can be decided after a
+  session ends. Docs: [docs/keep/PRODUCTION.md](docs/keep/PRODUCTION.md),
+  [docs/keep/STATUS.md](docs/keep/STATUS.md).
+- **Keep packaged agents (infra, migration, deploy).** Goals/plans/artifacts API
+  (`/v1/goals`, `/v1/artifacts`, advance → `/v1/approvals`); cockpit `active_goal` /
+  `recent_artifacts`; shared `_fabric` client + `fabric-api` credential/policy
+  recipes; packs `infra-ops`, `migration-op`, `deploy-op` under
+  `examples/keep-agents/`; demo `./scripts/keep-pack-demo.sh`. Docs:
+  [docs/keep/goals](docs/keep/goals/README.md), Tutorial 16 appendix, STATUS.
+- **Keep 0.1 live proof.** Fail-closed Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) requires
+  trusted policy signers at startup and refuses unsigned `keep.policy.yaml` updates;
+  `CredentialVault::authorize_resolve` allowlists host/method/path/user before
+  host-env secret injection; operator browser live view
+  (`GET /v1/sessions/{id}/browser/view`, `/keep/browser`); cockpit reports
+  `evidence_class: software-test` and measured `security_profile`; lab gate
+  `./scripts/keep-live-lab.sh` / `KEEP_E2E_FLUXVM=1 ./scripts/keep-e2e.sh`.
+  Product page at console `/keep`. Docs: [docs/keep/PRODUCTION.md](docs/keep/PRODUCTION.md),
+  [Tutorial 16](docs/tutorials/16-keep-workstation.md).
 - **Inner containment, always-on workstations and a browser tab view.**
   `inner_container: strict` runs the worker unprivileged in a bubblewrap container
   (fails closed); `persistent: true` plus `PUT /v1/workstations/{agent}/{user_id}`
-  keeps a user's session running with backoff restarts; `browser_port` lets an
-  operator list the agent's open tabs (read-only; no live view yet).
+  keeps a user's session running with backoff restarts; `browser_port` plus
+  `/browser/view` give operators a read-only live tab listing (screencast/takeover
+  still not implemented).
 - **Confidential VMs when the host has them.** `confidential: auto|required` asks
   FluxVM (`feat/sandbox-resources`, `GET /v1/host/confidential`) for a
   hardware-encrypted sandbox and falls back to a normal VM (`auto`) or refuses

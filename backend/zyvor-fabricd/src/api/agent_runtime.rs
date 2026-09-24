@@ -460,6 +460,26 @@ pub async fn session_events(
     .await
 }
 
+/// Keep cockpit: goal, artifacts, pending approvals, last decisions.
+pub async fn session_cockpit(
+    RequireRead(claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Response {
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
+    }
+    proxy(
+        &state,
+        Method::GET,
+        &format!("/v1/sessions/{id}/cockpit"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
 pub async fn list_approvals(
     RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,

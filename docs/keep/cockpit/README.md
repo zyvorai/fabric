@@ -1,15 +1,20 @@
 # Live cockpit
 
-Split view people open every day:
+Operator surfaces shipped in Keep 0.1:
 
-- Browser (what the agent sees)
-- Terminal
-- Files (`~/Keep/workspace`)
-- Upcoming cron
-- Last 20 Sentinel decisions
+| Surface | What you get |
+|---|---|
+| `GET /v1/sessions/{id}/cockpit` | Taint paint, pending approvals, last decisions, `evidence_class`, browser links |
+| `GET /keep/cockpit?session=` | Minimal HTML for phone/laptop (token in query or form) |
+| `GET /v1/sessions/{id}/browser/view` | Sanitized open-tab titles/URLs |
+| `GET /keep/browser?session=` | HTML that polls the live tab listing |
 
-**Visible taint:** untrusted tab → process painted red; list which egress rules
-just went to `ask`. Hidden eBPF is not a feature.
+**Visible taint:** untrusted brokered reads paint `tainted_by`; list which egress
+rules just went to `ask`. Hidden eBPF alone is not the product.
 
-**Attestation receipt (0.1 honest / 0.2 full):** image hash, profile achieved,
-evidence class. If class is `software-test`, UI must not claim operator cannot read.
+**Not yet a full Muse-style split desktop:** terminal pane, file browser, and
+input takeover are still product goals — see [browser/README.md](../browser/README.md).
+
+**Attestation receipt (0.1 honest / 0.2 full):** cockpit returns
+`security_profile` + `evidence_class`. If class is `software-test`, UI must not
+claim the operator cannot read the VM.
