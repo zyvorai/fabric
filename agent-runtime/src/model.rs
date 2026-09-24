@@ -150,6 +150,9 @@ pub enum EgressMode {
     #[default]
     Deny,
     Ask,
+    /// Like `ask`, but a reviewer model screens the request first and may
+    /// deny it (or, if the operator allows, let it through once).
+    Sentinel,
 }
 
 impl EgressMode {

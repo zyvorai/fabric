@@ -11,6 +11,7 @@ pub mod mcp;
 pub mod model;
 pub mod pool;
 pub mod schedules;
+pub mod sentinel;
 pub mod skills;
 pub mod store;
 

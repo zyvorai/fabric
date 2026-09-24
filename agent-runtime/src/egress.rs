@@ -8,6 +8,7 @@ use crate::{
         AgentManifest, ApprovalKind, ApprovalRecord, ApprovalStatus, EgressMode, EgressRequest,
         SessionRecord, DEFAULT_EGRESS_APPROVAL_SECONDS,
     },
+    sentinel::{self, ReviewRequest, Verdict},
     AppState,
 };
 use axum::{
@@ -404,6 +405,75 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 #[allow(dead_code)]
 fn _assert_send_sync(_: &CredentialVault) {}
 
+enum SentinelOutcome {
+    /// One request may proceed; nothing is remembered for later requests.
+    Allow,
+    Deny(String),
+    /// Ask an operator, passing along what the reviewer said (if anything).
+    Escalate(Option<String>),
+}
+
+/// Screen a request with the reviewer model. Every failure path escalates to
+/// the operator rather than allowing.
+async fn sentinel_screen(
+    state: &AppState,
+    session: &SessionRecord,
+    manifest: &AgentManifest,
+    url: &Url,
+    method: &str,
+    host: &str,
+) -> SentinelOutcome {
+    let Some(config) = state.config.sentinel.as_ref() else {
+        return SentinelOutcome::Escalate(Some("sentinel is not configured".into()));
+    };
+    let request = ReviewRequest {
+        agent: &session.agent,
+        allowed_hosts: &manifest.egress_allow_hosts,
+        method,
+        host,
+        path: url.path(),
+    };
+    let audit = |phase: AuditPhase, detail: Value| async move {
+        if let Err(error) = state
+            .store
+            .audit
+            .append(
+                Some(session.id),
+                phase,
+                "sentinel.egress",
+                Some(host.to_string()),
+                detail,
+            )
+            .await
+        {
+            tracing::error!(%error, "failed to write audit entry");
+        }
+    };
+    match sentinel::review(&state.egress_http, config, &request).await {
+        Ok(review) => {
+            let detail = json!({"verdict": format!("{:?}", review.verdict).to_lowercase(), "reason": review.reason, "method": method});
+            match review.verdict {
+                Verdict::Allow => {
+                    audit(AuditPhase::Approved, detail).await;
+                    SentinelOutcome::Allow
+                }
+                Verdict::Deny => {
+                    audit(AuditPhase::Denied, detail).await;
+                    SentinelOutcome::Deny(format!(
+                        "egress to {host} was denied by sentinel: {}",
+                        review.reason
+                    ))
+                }
+                Verdict::Escalate => SentinelOutcome::Escalate(Some(review.reason)),
+            }
+        }
+        Err(error) => {
+            tracing::warn!(%error, host, "sentinel review failed; asking an operator");
+            SentinelOutcome::Escalate(Some(format!("sentinel unavailable: {error}")))
+        }
+    }
+}
+
 /// Poll interval while a request waits for an operator decision.
 const APPROVAL_POLL: std::time::Duration = std::time::Duration::from_millis(250);
 
@@ -439,6 +509,15 @@ async fn authorize_unlisted_host(
     }
 
     let method = method.to_ascii_uppercase();
+    let sentinel_note = if manifest.egress_mode == EgressMode::Sentinel {
+        match sentinel_screen(state, session, manifest, url, &method, &host).await {
+            SentinelOutcome::Allow => return Ok(()),
+            SentinelOutcome::Deny(message) => return refuse(message),
+            SentinelOutcome::Escalate(note) => note,
+        }
+    } else {
+        None
+    };
     let mut target = url.clone();
     target.set_query(None);
     target.set_fragment(None);
@@ -453,6 +532,7 @@ async fn authorize_unlisted_host(
             "method": method,
             "url": target.as_str(),
             "scopes": ["once", "session"],
+            "sentinel": sentinel_note,
         })),
         prompt: format!("Agent wants to {method} {target}, which is not on its egress allowlist"),
         status: ApprovalStatus::Pending,
@@ -552,6 +632,12 @@ mod ask_tests {
     use std::sync::Arc;
 
     async fn state_and_session() -> (Arc<AppState>, SessionRecord) {
+        state_and_session_with(None).await
+    }
+
+    async fn state_and_session_with(
+        sentinel: Option<crate::sentinel::SentinelConfig>,
+    ) -> (Arc<AppState>, SessionRecord) {
         let root = std::env::temp_dir().join(format!("zyvor-egress-ask-{}", uuid::Uuid::new_v4()));
         let config = Config {
             listen: "127.0.0.1:0".parse().unwrap(),
@@ -563,6 +649,7 @@ mod ask_tests {
             api_token: None,
             credentials_file: None,
             skill_scopes_file: None,
+            sentinel,
             egress_advertise_host: None,
             sync_interval_ms: 300,
             guest_start_timeout_secs: 30,
@@ -815,5 +902,124 @@ mod ask_tests {
             .iter()
             .any(|e| e.phase == AuditPhase::Denied && e.detail["reason"] == "expired"));
         assert!(state.store.audit.verify().await.unwrap().chain_ok);
+    }
+
+    async fn reviewer(answer: &'static str) -> crate::sentinel::SentinelConfig {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(move || async move {
+                Json(json!({"choices": [{"message": {"content": answer}}]}))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        crate::sentinel::SentinelConfig {
+            url: format!("http://{addr}/v1"),
+            model: "m".into(),
+            api_key: None,
+            timeout: std::time::Duration::from_secs(5),
+            can_allow: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn sentinel_deny_refuses_without_a_human_and_is_journaled() {
+        let cfg = reviewer(r#"{"verdict":"deny","reason":"paste site"}"#).await;
+        let (state, session) = state_and_session_with(Some(cfg)).await;
+        let m = manifest(EgressMode::Sentinel, Some(30));
+        let err = authorize_unlisted_host(&state, &session, &m, &url(), "GET")
+            .await
+            .unwrap_err();
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+        assert!(err.1.contains("sentinel") && err.1.contains("paste site"));
+        assert!(state.store.list_approvals().await.is_empty());
+        let entries = state.store.audit.list(Some(session.id), 50).await.unwrap();
+        assert!(entries
+            .iter()
+            .any(|e| e.action == "sentinel.egress" && e.phase == AuditPhase::Denied));
+    }
+
+    #[tokio::test]
+    async fn sentinel_escalate_asks_an_operator_and_passes_the_note() {
+        let cfg = reviewer(r#"{"verdict":"escalate","reason":"unfamiliar host"}"#).await;
+        let (state, session) = state_and_session_with(Some(cfg)).await;
+        let m = manifest(EgressMode::Sentinel, Some(30));
+        let waiter = {
+            let (state, session, m) = (state.clone(), session.clone(), m.clone());
+            tokio::spawn(async move {
+                authorize_unlisted_host(&state, &session, &m, &url(), "GET").await
+            })
+        };
+        let pending = wait_pending(&state, session.id).await;
+        assert_eq!(
+            pending.planned_action.as_ref().unwrap()["sentinel"],
+            "unfamiliar host"
+        );
+        state
+            .store
+            .transition_approval(
+                pending.id,
+                ApprovalStatus::Approved,
+                None,
+                Some(GrantScope::Once),
+            )
+            .await
+            .unwrap();
+        assert!(waiter.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn sentinel_allow_needs_operator_opt_in_and_never_persists() {
+        let mut cfg = reviewer(r#"{"verdict":"allow","reason":"docs site"}"#).await;
+        cfg.can_allow = true;
+        let (state, session) = state_and_session_with(Some(cfg)).await;
+        let m = manifest(EgressMode::Sentinel, Some(30));
+        authorize_unlisted_host(&state, &session, &m, &url(), "GET")
+            .await
+            .unwrap();
+        assert!(state.store.list_approvals().await.is_empty());
+        assert!(
+            !state
+                .store
+                .has_session_egress_grant(session.id, "example.com")
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn sentinel_unconfigured_or_unreachable_falls_back_to_asking() {
+        for cfg in [
+            None,
+            Some(crate::sentinel::SentinelConfig {
+                url: "http://127.0.0.1:1/v1".into(),
+                model: "m".into(),
+                api_key: None,
+                timeout: std::time::Duration::from_secs(1),
+                can_allow: true,
+            }),
+        ] {
+            let (state, session) = state_and_session_with(cfg).await;
+            let m = manifest(EgressMode::Sentinel, Some(5));
+            let waiter = {
+                let (state, session, m) = (state.clone(), session.clone(), m.clone());
+                tokio::spawn(async move {
+                    authorize_unlisted_host(&state, &session, &m, &url(), "GET").await
+                })
+            };
+            let pending = wait_pending(&state, session.id).await;
+            state
+                .store
+                .transition_approval(pending.id, ApprovalStatus::Denied, None, None)
+                .await
+                .unwrap();
+            assert!(waiter.await.unwrap().is_err());
+        }
+    }
+
+    #[test]
+    fn sentinel_mode_serializes_as_sentinel() {
+        let value = serde_json::to_value(manifest(EgressMode::Sentinel, None)).unwrap();
+        assert_eq!(value["egress_mode"], "sentinel");
     }
 }

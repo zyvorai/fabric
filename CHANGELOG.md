@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **Sentinel egress review.** `egress_mode: "sentinel"` has an operator-configured
+  reviewer model (`ZYVOR_AGENT_SENTINEL_URL`, `_MODEL`) screen requests to unlisted
+  hosts before an operator is asked. It can deny, or escalate to the existing
+  approval flow (which is also what happens on any error or when unconfigured); it
+  can release a single request only with `ZYVOR_AGENT_SENTINEL_CAN_ALLOW=1`, and
+  never grants a session-wide approval. Verdicts are journaled.
 - **Agent skills with scoped mounts.** Immutable, content-addressed skill bundles
   (`/v1/skills`, `zyvorctl skill`) that agents pin at deploy time via manifest
   `skills` and mount per session: base skills at `/opt/zyvor/skills`, scoped skills

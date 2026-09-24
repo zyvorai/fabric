@@ -1,8 +1,9 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::sentinel::SentinelConfig;
 use anyhow::{Context, Result};
-use std::{net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -16,6 +17,9 @@ pub struct Config {
     pub credentials_file: Option<PathBuf>,
     /// JSON policy mapping an agent `skill_scope` to the skill scopes it may mount.
     pub skill_scopes_file: Option<PathBuf>,
+    /// Reviewer model for `egress_mode: "sentinel"`. Absent means sentinel
+    /// agents fall back to asking an operator.
+    pub sentinel: Option<SentinelConfig>,
     pub egress_advertise_host: Option<String>,
     pub sync_interval_ms: u64,
     pub guest_start_timeout_secs: u64,
@@ -49,6 +53,7 @@ impl Config {
             api_token,
             credentials_file: env_opt("ZYVOR_AGENT_CREDENTIALS_FILE").map(PathBuf::from),
             skill_scopes_file: env_opt("ZYVOR_AGENT_SKILL_SCOPES_FILE").map(PathBuf::from),
+            sentinel: sentinel_from_env()?,
             egress_advertise_host: env_opt("ZYVOR_AGENT_EGRESS_ADVERTISE_HOST"),
             sync_interval_ms: env_parse("ZYVOR_AGENT_SYNC_INTERVAL_MS", "300")?,
             guest_start_timeout_secs: env_parse("ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS", "30")?,
@@ -80,6 +85,21 @@ fn validate_auth(api_token: Option<&str>, allow_no_auth: Option<&str>) -> Result
         );
     }
     Ok(())
+}
+
+fn sentinel_from_env() -> Result<Option<SentinelConfig>> {
+    let Some(url) = env_opt("ZYVOR_AGENT_SENTINEL_URL") else {
+        return Ok(None);
+    };
+    let model = env_opt("ZYVOR_AGENT_SENTINEL_MODEL")
+        .context("ZYVOR_AGENT_SENTINEL_MODEL is required when ZYVOR_AGENT_SENTINEL_URL is set")?;
+    Ok(Some(SentinelConfig {
+        url,
+        model,
+        api_key: env_opt("ZYVOR_AGENT_SENTINEL_API_KEY"),
+        timeout: Duration::from_secs(env_parse("ZYVOR_AGENT_SENTINEL_TIMEOUT_SECS", "15")?),
+        can_allow: env_opt("ZYVOR_AGENT_SENTINEL_CAN_ALLOW").is_some_and(|v| v == "1"),
+    }))
 }
 
 fn env_or(name: &str, default: &str) -> String {

@@ -143,6 +143,20 @@ Decide it with `POST /v1/approvals/{id}` and `{"decision":"approved","scope":"on
 
 Approval only lifts the allowlist check. DNS pinning, the private-network gate, and credential host scoping still run afterwards, so approving a host never allows a request into loopback, private, or link-local ranges unless `allow_private_networks` is set. The agent only sees the 403 or the response: approving does not steer the session.
 
+### Sentinel review
+
+`"egress_mode": "sentinel"` puts a reviewer model in front of the operator. For a request to an unlisted host the broker asks an OpenAI-compatible chat endpoint for a verdict, and the reviewer sees only the agent name, its allowlist, and the request's method, host and path (never headers, bodies, query strings, or credentials). Configure it on the runtime:
+
+| Variable | Meaning |
+|---|---|
+| `ZYVOR_AGENT_SENTINEL_URL` | Base URL; `/chat/completions` is appended. Point it at the Fabric inference gateway or any compatible server. |
+| `ZYVOR_AGENT_SENTINEL_MODEL` | Model name. Required when the URL is set. |
+| `ZYVOR_AGENT_SENTINEL_API_KEY` | Optional bearer token. |
+| `ZYVOR_AGENT_SENTINEL_TIMEOUT_SECS` | Per-review timeout, default 15. |
+| `ZYVOR_AGENT_SENTINEL_CAN_ALLOW` | `1` lets an `allow` verdict release a single request. |
+
+The reviewer's authority is deliberately narrow, because the request it reads is written by a possibly injected agent. `deny` refuses the request with 403 and no human is asked. `escalate`, and any error, timeout, unparseable answer, or missing configuration, opens the normal `egress` approval with the reviewer's note in `planned_action.sentinel`. `allow` is treated as `escalate` unless `ZYVOR_AGENT_SENTINEL_CAN_ALLOW=1`, and even then it releases one request and never creates a session grant. Allow and deny verdicts are journaled as `sentinel.egress`. The private-network gate and DNS pinning still apply afterwards.
+
 Changing `egress_mode` or the timeout changes the agent's version, like any manifest change; manifests that leave both at their defaults keep their existing version ids.
 
 ## Persistent home volume
