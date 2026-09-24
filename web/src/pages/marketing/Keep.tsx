@@ -25,8 +25,8 @@ export default function Keep() {
         </p>
         <div className="mkt-cta-row mkt-reveal-delay-2">
           {isAuthenticated ? (
-            <Link to="/app/agents" className="zf-btn zf-btn-primary">
-              Open Agents
+            <Link to="/app/keep" className="zf-btn zf-btn-primary">
+              Open Keep
             </Link>
           ) : (
             <Link to="/sign-in" className="zf-btn zf-btn-primary">
@@ -115,8 +115,8 @@ export default function Keep() {
         </p>
         <div className="flex flex-wrap gap-3 mt-6">
           {isAuthenticated ? (
-            <Link to="/app/agents" className="zf-btn mkt-band-cta">
-              Open Agents
+            <Link to="/app/keep" className="zf-btn mkt-band-cta">
+              Open Keep
             </Link>
           ) : (
             <Link to="/sign-in" className="zf-btn mkt-band-cta">

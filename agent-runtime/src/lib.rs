@@ -10,6 +10,7 @@ pub mod config;
 pub mod confine;
 pub mod contain;
 pub mod credentials;
+pub mod demos;
 pub mod egress;
 pub mod export_tokens;
 pub mod fluxvm;

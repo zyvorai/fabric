@@ -571,6 +571,9 @@ pub struct VmNetworkPolicy {
     pub entities: Vec<String>,
     #[serde(default)]
     pub audit_mode: bool,
+    /// Keep / strict: drop UDP and SCTP (except DHCP) at the host TC program.
+    #[serde(default)]
+    pub deny_udp: bool,
 }
 
 impl Default for VmNetworkPolicy {
@@ -589,6 +592,7 @@ impl Default for VmNetworkPolicy {
             allow_fqdns: Vec::new(),
             entities: Vec::new(),
             audit_mode: false,
+            deny_udp: false,
         }
     }
 }

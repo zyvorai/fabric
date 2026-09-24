@@ -1,7 +1,9 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-import { apiDelete, apiGet, apiPost } from './client'
+import { apiDelete, apiFetch, apiGet, apiPost } from './client'
+import { formatHttpErrorBody } from '../utils/apiError'
+import { parseJsonResponse } from '../utils/parseJsonResponse'
 
 export interface AgentManifest {
   template: string
@@ -73,6 +75,9 @@ export interface KeepCockpit {
   status: string
   tainted_by?: string[]
   taint_visible?: boolean
+  /** Count of egress.connect / ebpf.* audit rows for this session. */
+  egress_connects?: number
+  drop_reasons?: unknown
   pending_approvals?: Array<{
     id: string
     prompt: string
@@ -166,6 +171,36 @@ export interface KeepCockpit {
     unlocked?: boolean
     honesty?: string
   }
+}
+
+export interface PdfBriefDemoResult {
+  session_id: string
+  agent?: string
+  goal_id?: string
+  artifact_id?: string
+  artifact_title?: string
+  egress_connects?: number
+  honesty?: string
+  filename?: string
+  extract_chars?: number
+  error?: string
+}
+
+/** One-click PDF → brief.md (multipart). Omit file to use the lab sample. */
+export async function demoPdfBrief(file?: File | null): Promise<PdfBriefDemoResult> {
+  const fd = new FormData()
+  if (file) {
+    fd.append('pdf', file, file.name || 'input.pdf')
+  }
+  const res = await apiFetch('/api/demos/pdf-brief', {
+    method: 'POST',
+    body: fd,
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+  }
+  return parseJsonResponse<PdfBriefDemoResult>(res)
 }
 
 export interface BrowserView {

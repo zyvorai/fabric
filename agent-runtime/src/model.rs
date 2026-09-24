@@ -619,6 +619,8 @@ pub enum AgentPausedReason {
     VaultFill,
     OperatorWatch,
     Taint,
+    /// FluxVM host eBPF dropped a private-net / budget / deny_udp trip.
+    EbpfDeny,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

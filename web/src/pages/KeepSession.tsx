@@ -232,6 +232,18 @@ export default function KeepSession() {
         </Card>
 
         <Card className="p-4 space-y-2 text-sm">
+          <h2 className="text-base font-semibold text-[var(--zf-ink)]">Egress proof</h2>
+          <div className="font-medium">
+            CONNECT: {cockpit?.egress_connects ?? '—'}
+            {cockpit?.agent_paused_reason ? ` · paused=${cockpit.agent_paused_reason}` : ''}
+          </div>
+          <p className="text-[12px] text-[var(--zf-muted)]">
+            Count from Keep audit (`egress.connect` / `ebpf.*`). FluxVM `drop_reasons` when dataplane
+            is attached — no PacketWolf required.
+          </p>
+        </Card>
+
+        <Card className="p-4 space-y-2 text-sm">
           <h2 className="text-base font-semibold text-[var(--zf-ink)]">Honesty badge</h2>
           {(() => {
             const badge = cockpit?.badge ?? cockpit?.browser?.badge

@@ -313,6 +313,7 @@ impl AgentPausedReason {
             Self::VaultFill => "vault_fill",
             Self::OperatorWatch => "operator_watch",
             Self::Taint => "taint",
+            Self::EbpfDeny => "ebpf_deny",
         }
     }
 
@@ -321,6 +322,7 @@ impl AgentPausedReason {
             "vault_fill" => Some(Self::VaultFill),
             "operator_watch" => Some(Self::OperatorWatch),
             "taint" => Some(Self::Taint),
+            "ebpf_deny" => Some(Self::EbpfDeny),
             _ => None,
         }
     }

@@ -365,6 +365,43 @@ impl FluxVm {
         Ok(())
     }
 
+    /// Host cgroup freeze (FluxVM) — used after eBPF deny trips.
+    pub async fn freeze(&self, id: Uuid) -> Result<()> {
+        let response = self
+            .auth(self.http.post(self.url(&format!("/v1/vms/{id}/freeze"))?))
+            .send()
+            .await?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(());
+        }
+        let body = response.text().await.unwrap_or_default();
+        bail!("FluxVM freeze failed: {status} — {body}")
+    }
+
+    pub async fn thaw(&self, id: Uuid) -> Result<()> {
+        let response = self
+            .auth(self.http.post(self.url(&format!("/v1/vms/{id}/thaw"))?))
+            .send()
+            .await?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(());
+        }
+        let body = response.text().await.unwrap_or_default();
+        bail!("FluxVM thaw failed: {status} — {body}")
+    }
+
+    /// FluxVM drop-reason histogram for the sandbox VM.
+    pub async fn drop_reasons(&self, id: Uuid, limit: Option<usize>) -> Result<Value> {
+        let mut url = self.url(&format!("/v1/vms/{id}/network/drop-reasons"))?;
+        if let Some(n) = limit {
+            url.query_pairs_mut().append_pair("limit", &n.to_string());
+        }
+        let response = self.auth(self.http.get(url)).send().await?;
+        self.parse(response).await
+    }
+
     pub async fn default_gateway(&self, id: Uuid) -> Result<String> {
         let value = self
             .process(
@@ -418,7 +455,14 @@ mod tests {
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         let client = FluxVm::new(&format!("http://{addr}"), None).unwrap();
         let id = Uuid::new_v4();
-        let policy = crate::confine::strict_policy("10.0.2.1".parse().unwrap(), 18082, None);
+        let policy = crate::confine::strict_policy(
+            "10.0.2.1".parse().unwrap(),
+            18082,
+            None,
+            &[],
+            None,
+            None,
+        );
         client.set_network_policy(id, &policy).await.unwrap();
         let (seen_id, seen_body) = seen.lock().unwrap().clone().unwrap();
         assert_eq!(seen_id, id.to_string());

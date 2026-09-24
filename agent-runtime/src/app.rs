@@ -349,6 +349,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
         .route("/v1/goals/{id}/browse", post(crate::goals::goal_browse))
         .route(
+            "/v1/demos/pdf-brief",
+            post(crate::demos::demo_pdf_brief),
+        )
+        .route(
             "/v1/artifacts",
             get(crate::goals::list_artifacts).post(crate::goals::create_artifact),
         )
@@ -1040,10 +1044,19 @@ async fn provision_guest(
     // the session rather than run it unconfined.
     if state.config.confine_all || agent.manifest.confinement == crate::model::Confinement::Strict {
         let gateway = crate::confine::parse_gateway(&host)?;
+        let mut fqdns = agent.manifest.egress_allow_hosts.clone();
+        if let Some(b) = &agent.manifest.browser {
+            fqdns.extend(b.allow_hosts.iter().cloned());
+        }
+        fqdns.sort();
+        fqdns.dedup();
         let policy = crate::confine::strict_policy(
             gateway,
             state.config.egress_listen.port(),
             state.config.proxy_listen.map(|addr| addr.port()),
+            &fqdns,
+            Some(&session.id.to_string()),
+            Some(&agent.name),
         );
         with_timeout(
             HEALTH_CHECK_ATTEMPT_TIMEOUT,
@@ -2257,12 +2270,20 @@ async fn session_cockpit(
     );
     let browser_cap = crate::browser::browser_capability(&state, id).await;
     let badge = browser_cap.get("badge").cloned();
+    let egress_connects = crate::demos::session_egress_connects(&state, id).await;
+    let drop_reasons = state
+        .fluxvm
+        .drop_reasons(session.sandbox_id, Some(20))
+        .await
+        .unwrap_or_else(|_| json!({ "items": [] }));
     Ok(Json(json!({
         "session_id": id,
         "agent": session.agent,
         "status": session.status,
         "tainted_by": session.tainted_by,
         "taint_visible": !session.tainted_by.is_empty(),
+        "egress_connects": egress_connects,
+        "drop_reasons": drop_reasons,
         "pending_approvals": pending,
         "last_decisions": decisions,
         "upcoming_cron": upcoming,
