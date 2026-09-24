@@ -216,6 +216,20 @@ impl FluxVm {
         bail!("FluxVM delete failed: {status}")
     }
 
+    /// Replace the sandbox's L4 network policy (`POST /v1/vms/{id}/network/policy`).
+    pub async fn set_network_policy(&self, id: Uuid, policy: &Value) -> Result<()> {
+        let response = self
+            .auth(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/network/policy"))?),
+            )
+            .json(policy)
+            .send()
+            .await?;
+        let _: Value = self.parse(response).await?;
+        Ok(())
+    }
+
     pub async fn default_gateway(&self, id: Uuid) -> Result<String> {
         let value = self
             .process(
@@ -246,6 +260,61 @@ impl FluxVm {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn set_network_policy_posts_the_policy_to_the_vm() {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let sink = seen.clone();
+        let app = axum::Router::new().route(
+            "/v1/vms/{id}/network/policy",
+            axum::routing::post(
+                move |axum::extract::Path(id): axum::extract::Path<String>,
+                      axum::Json(body): axum::Json<Value>| {
+                    let sink = sink.clone();
+                    async move {
+                        *sink.lock().unwrap() = Some((id, body.clone()));
+                        axum::Json(body)
+                    }
+                },
+            ),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = FluxVm::new(&format!("http://{addr}"), None).unwrap();
+        let id = Uuid::new_v4();
+        let policy = crate::confine::strict_policy("10.0.2.1".parse().unwrap(), 18082, None);
+        client.set_network_policy(id, &policy).await.unwrap();
+        let (seen_id, seen_body) = seen.lock().unwrap().clone().unwrap();
+        assert_eq!(seen_id, id.to_string());
+        assert_eq!(seen_body, policy);
+    }
+
+    #[tokio::test]
+    async fn set_network_policy_surfaces_a_fluxvm_error() {
+        let app = axum::Router::new().route(
+            "/v1/vms/{id}/network/policy",
+            axum::routing::post(|| async {
+                (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "invalid eBPF allow CIDR",
+                )
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = FluxVm::new(&format!("http://{addr}"), None).unwrap();
+        let error = client
+            .set_network_policy(Uuid::new_v4(), &json!({}))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("400") && error.contains("invalid eBPF allow CIDR"),
+            "{error}"
+        );
+    }
 
     #[test]
     fn sandbox_create_omits_volumes_unless_present() {

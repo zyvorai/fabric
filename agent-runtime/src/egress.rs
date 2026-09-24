@@ -20,7 +20,18 @@ use axum::{
 use base64::Engine;
 use reqwest::Url;
 use serde_json::{json, Value};
+use sha2::Digest;
 use std::{collections::BTreeMap, sync::Arc};
+
+/// The router the sandbox can reach: the JSON egress broker and nothing else.
+/// Approvals, the journal and every other operator route live only on the
+/// public router, behind the operator token, so an agent cannot decide its own
+/// approvals through the port it is allowed to talk to.
+pub fn broker_router(state: Arc<AppState>) -> axum::Router {
+    axum::Router::new()
+        .route("/v1/egress", axum::routing::post(proxy))
+        .with_state(state)
+}
 
 pub async fn proxy(
     State(state): State<Arc<AppState>>,
@@ -144,6 +155,45 @@ async fn proxy_inner(
     let host = url
         .host_str()
         .ok_or((StatusCode::BAD_REQUEST, "egress URL has no host".into()))?;
+    let body = match request.body_base64 {
+        Some(encoded) => {
+            let body = base64::engine::general_purpose::STANDARD
+                .decode(encoded.as_bytes())
+                .map_err(|_| (StatusCode::BAD_REQUEST, "body_base64 is invalid".into()))?;
+            if body.len() > 16 * 1024 * 1024 {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "egress body exceeds 16 MiB".into(),
+                ));
+            }
+            Some(body)
+        }
+        None => None,
+    };
+    // Layer 7 policy runs first, so a request the agent may never send is refused
+    // before an operator is asked about it.
+    crate::l7::check_rules(
+        &agent.manifest.egress_rules,
+        host,
+        &request.method,
+        url.path(),
+        body.as_ref().map_or(0, Vec::len),
+    )
+    .map_err(|message| (StatusCode::FORBIDDEN, message))?;
+    let dlp_hits = if agent.manifest.dlp {
+        let mut text = url.as_str().to_string();
+        for value in request.headers.values() {
+            text.push('\n');
+            text.push_str(value);
+        }
+        if let Some(bytes) = &body {
+            text.push('\n');
+            text.push_str(&String::from_utf8_lossy(bytes));
+        }
+        crate::l7::scan(&text)
+    } else {
+        Vec::new()
+    };
     if !agent
         .manifest
         .egress_allow_hosts
@@ -199,6 +249,7 @@ async fn proxy_inner(
         upstream = upstream.header(header_name, header_value);
     }
 
+    let mut needs_approval: Option<(ApprovalKind, String)> = None;
     if let Some(name) = request.credential.as_deref() {
         if !agent.manifest.credentials.iter().any(|c| c == name) {
             return Err((
@@ -246,6 +297,9 @@ async fn proxy_inner(
                 ),
             ));
         }
+        if let Some(kind) = descriptor.approval_kind_for(&method) {
+            needs_approval = Some((kind, name.to_string()));
+        }
         if !secret.is_empty() {
             let header_name = reqwest::header::HeaderName::from_bytes(descriptor.header.as_bytes())
                 .map_err(|_| {
@@ -264,16 +318,45 @@ async fn proxy_inner(
         }
     }
 
-    if let Some(encoded) = request.body_base64 {
-        let body = base64::engine::general_purpose::STANDARD
-            .decode(encoded.as_bytes())
-            .map_err(|_| (StatusCode::BAD_REQUEST, "body_base64 is invalid".into()))?;
-        if body.len() > 16 * 1024 * 1024 {
-            return Err((
-                StatusCode::PAYLOAD_TOO_LARGE,
-                "egress body exceeds 16 MiB".into(),
-            ));
+    // Reasons a person must decide this request, gathered into one approval: a
+    // credential that needs it, a secret-shaped string in the request, or a write
+    // from a tainted session. This runs after every policy check and before
+    // anything leaves the host.
+    let mut reasons: Vec<String> = Vec::new();
+    if !dlp_hits.is_empty() {
+        reasons.push(format!("request contains: {}", dlp_hits.join(", ")));
+    }
+    if agent.manifest.taint.is_some()
+        && !matches!(method, reqwest::Method::GET | reqwest::Method::HEAD)
+    {
+        if let Some(current) = state.store.get_session(session.id).await {
+            if !current.tainted_by.is_empty() {
+                reasons.push(format!(
+                    "session is tainted by {}",
+                    current.tainted_by.join(", ")
+                ));
+            }
         }
+    }
+    if needs_approval.is_some() || !reasons.is_empty() {
+        let (kind, credential) = match needs_approval {
+            Some((kind, name)) => (kind, Some(name)),
+            None => (ApprovalKind::Send, None),
+        };
+        hold_for_approval(
+            state,
+            &session,
+            &agent.manifest,
+            kind,
+            &url,
+            method.as_str(),
+            credential.as_deref(),
+            &reasons,
+            body.as_deref(),
+        )
+        .await?;
+    }
+    if let Some(body) = body {
         upstream = upstream.body(body);
     }
 
@@ -284,6 +367,7 @@ async fn proxy_inner(
         )
     })?;
     let status = response.status().as_u16();
+    taint_on_read(state, &session, &agent.manifest, host).await;
     let mut out_headers = BTreeMap::new();
     for (name, value) in response.headers() {
         if let Ok(value) = value.to_str() {
@@ -405,6 +489,52 @@ pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 #[allow(dead_code)]
 fn _assert_send_sync(_: &CredentialVault) {}
 
+/// Taint the session when it has read content from a host the agent's taint
+/// policy does not trust. Journaled once per host.
+pub(crate) async fn taint_on_read(
+    state: &AppState,
+    session: &SessionRecord,
+    manifest: &AgentManifest,
+    host: &str,
+) {
+    let Some(policy) = &manifest.taint else {
+        return;
+    };
+    if policy.trusted_hosts.iter().any(|h| host_matches(h, host)) {
+        return;
+    }
+    match state.store.taint_session(session.id, host).await {
+        Ok(true) => {
+            if let Err(error) = state
+                .store
+                .audit
+                .append(
+                    Some(session.id),
+                    AuditPhase::Performed,
+                    "session.tainted",
+                    Some(host.to_string()),
+                    json!({"reason": "read from an untrusted host"}),
+                )
+                .await
+            {
+                tracing::error!(%error, "failed to write audit entry");
+            }
+        }
+        Ok(false) => {}
+        Err(error) => tracing::error!(%error, "failed to taint session"),
+    }
+}
+
+/// True when the agent tracks taint and this session is currently tainted.
+async fn is_tainted(state: &AppState, session: &SessionRecord, manifest: &AgentManifest) -> bool {
+    manifest.taint.is_some()
+        && state
+            .store
+            .get_session(session.id)
+            .await
+            .is_some_and(|s| !s.tainted_by.is_empty())
+}
+
 enum SentinelOutcome {
     /// One request may proceed; nothing is remembered for later requests.
     Allow,
@@ -453,6 +583,13 @@ async fn sentinel_screen(
         Ok(review) => {
             let detail = json!({"verdict": format!("{:?}", review.verdict).to_lowercase(), "reason": review.reason, "method": method});
             match review.verdict {
+                // A tainted session may have read attacker-written content, so the
+                // reviewer's say-so is not enough: a person decides.
+                Verdict::Allow if is_tainted(state, session, manifest).await => {
+                    SentinelOutcome::Escalate(Some(
+                        "session is tainted; a person must decide".into(),
+                    ))
+                }
                 Verdict::Allow => {
                     audit(AuditPhase::Approved, detail).await;
                     SentinelOutcome::Allow
@@ -556,22 +693,47 @@ pub(crate) async fn authorize_unlisted_host(
         crate::app::audit_approval_planned(state, &approval).await;
     }
 
-    let timeout = std::time::Duration::from_secs(
+    wait_for_decision(
+        state,
+        session,
+        &approval,
+        approval_timeout(manifest),
+        &host,
+        &format!("egress to {host} was denied by an operator"),
+        &format!("egress approval for {host} expired"),
+    )
+    .await
+}
+
+fn approval_timeout(manifest: &AgentManifest) -> std::time::Duration {
+    std::time::Duration::from_secs(
         manifest
             .egress_approval_timeout_seconds
             .unwrap_or(DEFAULT_EGRESS_APPROVAL_SECONDS),
-    );
+    )
+}
+
+/// Hold the current request until an operator decides `approval`. Approved
+/// returns `Ok`; a denial, timeout, or the session ending refuses with 403.
+/// A decision and a timeout can land at the same instant: whichever transition
+/// reaches the store first wins, and the loser re-reads the result.
+async fn wait_for_decision(
+    state: &AppState,
+    session: &SessionRecord,
+    approval: &ApprovalRecord,
+    timeout: std::time::Duration,
+    subject: &str,
+    denied_message: &str,
+    expired_message: &str,
+) -> Result<(), (StatusCode, String)> {
+    let refuse = |message: &str| Err((StatusCode::FORBIDDEN, message.to_string()));
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
         let current = state.store.get_approval(approval.id).await;
         match current.as_ref().map(|r| r.status) {
             Some(ApprovalStatus::Approved) => return Ok(()),
-            Some(ApprovalStatus::Denied) => {
-                return refuse(format!("egress to {host} was denied by an operator"));
-            }
-            Some(ApprovalStatus::Expired) | None => {
-                return refuse(format!("egress approval for {host} expired"));
-            }
+            Some(ApprovalStatus::Denied) => return refuse(denied_message),
+            Some(ApprovalStatus::Expired) | None => return refuse(expired_message),
             Some(ApprovalStatus::Pending) => {}
         }
         let session_over = state
@@ -581,8 +743,6 @@ pub(crate) async fn authorize_unlisted_host(
             .is_none_or(|s| s.status.is_terminal());
         let timed_out = tokio::time::Instant::now() >= deadline;
         if session_over || timed_out {
-            // A decision may land at the same instant; whichever transition
-            // reaches the store first wins, and the loser re-reads the result.
             let expired = state
                 .store
                 .transition_approval(
@@ -605,20 +765,103 @@ pub(crate) async fn authorize_unlisted_host(
                     .append(
                         Some(session.id),
                         AuditPhase::Denied,
-                        "approval.egress",
-                        Some(host.clone()),
+                        &format!("approval.{}", approval.kind.as_str()),
+                        Some(subject.to_string()),
                         json!({"approval_id": approval.id, "reason": "expired"}),
                     )
                     .await
                 {
                     tracing::error!(%error, "failed to write audit entry");
                 }
-                return refuse(format!("egress approval for {host} expired"));
+                return refuse(expired_message);
             }
             continue;
         }
         tokio::time::sleep(APPROVAL_POLL).await;
     }
+}
+
+/// Open a fresh approval for one credentialed request and hold it until an
+/// operator decides. Unlike unlisted-host approvals these are never shared or
+/// remembered: each request needs its own decision, because what is being
+/// approved (a send, a purchase) is specific to that request. The record shows
+/// the method, URL without its query string, the credential name, and a digest
+/// and length of the body, never the body or any header.
+#[allow(clippy::too_many_arguments)]
+async fn hold_for_approval(
+    state: &AppState,
+    session: &SessionRecord,
+    manifest: &AgentManifest,
+    kind: ApprovalKind,
+    url: &Url,
+    method: &str,
+    credential: Option<&str>,
+    reasons: &[String],
+    body: Option<&[u8]>,
+) -> Result<(), (StatusCode, String)> {
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    let mut target = url.clone();
+    target.set_query(None);
+    target.set_fragment(None);
+    let _ = target.set_username("");
+    let _ = target.set_password(None);
+    let (body_len, body_sha256) = match body {
+        Some(bytes) => (bytes.len(), hex::encode(sha2::Sha256::digest(bytes))),
+        None => (0, String::new()),
+    };
+    let approval = ApprovalRecord {
+        id: uuid::Uuid::new_v4(),
+        session_id: session.id,
+        kind,
+        subject: Some(host.clone()),
+        planned_action: Some(json!({
+            "method": method,
+            "url": target.as_str(),
+            "credential": credential,
+            "reasons": reasons,
+            "body_bytes": body_len,
+            "body_sha256": body_sha256,
+            "scopes": ["once"],
+        })),
+        prompt: {
+            let mut prompt = format!("Agent wants to {method} {target}");
+            if let Some(name) = credential {
+                prompt.push_str(&format!(" using credential '{name}'"));
+            }
+            if !reasons.is_empty() {
+                prompt.push_str(&format!(" ({})", reasons.join("; ")));
+            }
+            prompt
+        },
+        status: ApprovalStatus::Pending,
+        comment: None,
+        created_at: chrono::Utc::now(),
+        decided_at: None,
+        source_seq: None,
+        grant_scope: None,
+    };
+    state
+        .store
+        .save_approval(approval.clone())
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to open approval: {e}"),
+            )
+        })?;
+    crate::app::audit_approval_planned(state, &approval).await;
+    let what = kind.as_str();
+    wait_for_decision(
+        state,
+        session,
+        &approval,
+        approval_timeout(manifest),
+        &host,
+        &format!("{what} to {host} was denied by an operator"),
+        &format!("{what} approval for {host} expired"),
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -656,8 +899,10 @@ pub(crate) mod ask_tests {
             credentials_file: None,
             skill_scopes_file: None,
             sentinel: None,
+            approval_webhook: None,
             proxy_listen: None,
             proxy_connect_ports: vec![443],
+            confine_all: false,
             max_vcpus: None,
             max_memory_mib: None,
             egress_advertise_host: None,
@@ -693,6 +938,7 @@ pub(crate) mod ask_tests {
             error: None,
             parent_session_id: None,
             user_id: None,
+            tainted_by: vec![],
         };
         state.store.save_session(session.clone()).await.unwrap();
         (state, session)
@@ -700,6 +946,10 @@ pub(crate) mod ask_tests {
 
     pub(crate) fn manifest(mode: EgressMode, timeout: Option<u64>) -> AgentManifest {
         AgentManifest {
+            egress_rules: vec![],
+            dlp: false,
+            taint: None,
+            confinement: Default::default(),
             resources: None,
             template: "t".into(),
             credentials: vec![],
@@ -1034,5 +1284,525 @@ pub(crate) mod ask_tests {
     fn sentinel_mode_serializes_as_sentinel() {
         let value = serde_json::to_value(manifest(EgressMode::Sentinel, None)).unwrap();
         assert_eq!(value["egress_mode"], "sentinel");
+    }
+
+    // ---- credentialed requests that need a human (send / purchase) ----
+
+    async fn upstream_counter() -> (u16, Arc<std::sync::atomic::AtomicUsize>) {
+        let hits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = hits.clone();
+        let app = axum::Router::new().route(
+            "/send",
+            axum::routing::any(move || {
+                let counter = counter.clone();
+                async move {
+                    counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    "ok"
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (port, hits)
+    }
+
+    /// A state whose agent holds a `mail` credential that needs approval for POST.
+    async fn approval_gated_agent(port: u16) -> (Arc<AppState>, SessionRecord) {
+        let file = std::env::temp_dir().join(format!("zyvor-cred-{}.json", uuid::Uuid::new_v4()));
+        std::fs::write(
+            &file,
+            json!({"mail": {
+                "host": "127.0.0.1", "header": "authorization", "kind": "fabric",
+                "allowed_ports": [port], "requires_approval": ["POST"], "approval_kind": "send"
+            }})
+            .to_string(),
+        )
+        .unwrap();
+        let (state, session) =
+            state_and_session_cfg(|config| config.credentials_file = Some(file)).await;
+        let mut m = manifest(EgressMode::Deny, Some(30));
+        m.credentials = vec!["mail".into()];
+        m.egress_allow_hosts = vec!["127.0.0.1".into()];
+        m.allow_private_networks = true;
+        let deployed = state
+            .store
+            .deploy_agent(crate::model::DeployAgentRequest {
+                name: session.agent.clone(),
+                bundle_base64: base64::engine::general_purpose::STANDARD.encode("export default 1"),
+                manifest: m,
+            })
+            .await
+            .unwrap();
+        let session = state
+            .store
+            .update_session(session.id, |s| s.agent_version = deployed.version.clone())
+            .await
+            .unwrap();
+        (state, session)
+    }
+
+    async fn call(
+        state: &AppState,
+        session: &SessionRecord,
+        port: u16,
+        method: &str,
+        body: Option<&str>,
+    ) -> Result<Value, (StatusCode, String)> {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-zyvor-session-id",
+            session.id.to_string().parse().unwrap(),
+        );
+        headers.insert("x-zyvor-egress-capability", "cap".parse().unwrap());
+        proxy_inner(
+            state,
+            &headers,
+            EgressRequest {
+                url: format!("http://127.0.0.1:{port}/send?token=hunter2"),
+                method: method.into(),
+                headers: Default::default(),
+                body_base64: body.map(|b| base64::engine::general_purpose::STANDARD.encode(b)),
+                credential: Some("mail".into()),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn send_credential_holds_the_request_until_approved_and_never_records_the_body() {
+        let (port, hits) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        let waiter = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(async move {
+                call(&state, &session, port, "POST", Some("hello secret body")).await
+            })
+        };
+        let pending = wait_pending(&state, session.id).await;
+        assert_eq!(pending.kind, ApprovalKind::Send);
+        let planned = pending.planned_action.clone().unwrap();
+        assert_eq!(planned["method"], "POST");
+        assert_eq!(planned["credential"], "mail");
+        assert_eq!(planned["body_bytes"], 17);
+        let expected = hex::encode(sha2::Sha256::digest(b"hello secret body"));
+        assert_eq!(planned["body_sha256"], expected);
+        let stored = format!("{planned} {}", pending.prompt);
+        assert!(
+            !stored.contains("hello secret body"),
+            "body leaked: {stored}"
+        );
+        assert!(!stored.contains("hunter2"), "query leaked: {stored}");
+        // Nothing left the host while the decision was pending.
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(!waiter.is_finished());
+
+        state
+            .store
+            .transition_approval(
+                pending.id,
+                ApprovalStatus::Approved,
+                None,
+                Some(GrantScope::Once),
+            )
+            .await
+            .unwrap();
+        let reply = waiter.await.unwrap().unwrap();
+        assert_eq!(reply["status"], 200);
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn approving_one_send_does_not_cover_the_next_and_denial_stops_it() {
+        let (port, hits) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        for decision in [ApprovalStatus::Approved, ApprovalStatus::Denied] {
+            let waiter = {
+                let (state, session) = (state.clone(), session.clone());
+                tokio::spawn(async move { call(&state, &session, port, "POST", Some("x")).await })
+            };
+            // Each request opens its own approval, even after an earlier approval.
+            let pending = wait_pending(&state, session.id).await;
+            state
+                .store
+                .transition_approval(pending.id, decision, None, Some(GrantScope::Session))
+                .await
+                .unwrap();
+            let result = waiter.await.unwrap();
+            if decision == ApprovalStatus::Denied {
+                assert!(result.unwrap_err().1.contains("denied by an operator"));
+            } else {
+                assert!(result.is_ok());
+            }
+        }
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn methods_not_listed_skip_the_approval() {
+        let (port, hits) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        let reply = call(&state, &session, port, "GET", None).await.unwrap();
+        assert_eq!(reply["status"], 200);
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert!(state.store.list_approvals().await.is_empty());
+    }
+
+    // ---- the agent cannot reach the approval API ----
+
+    async fn status(
+        router: axum::Router,
+        method: &str,
+        uri: &str,
+        bearer: Option<&str>,
+    ) -> StatusCode {
+        use tower::ServiceExt;
+        let mut request = axum::http::Request::builder().method(method).uri(uri);
+        if let Some(token) = bearer {
+            request = request.header("authorization", format!("Bearer {token}"));
+        }
+        let request = request
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from("{\"decision\":\"approved\"}"))
+            .unwrap();
+        router.oneshot(request).await.unwrap().status()
+    }
+
+    #[tokio::test]
+    async fn the_egress_broker_does_not_serve_operator_routes() {
+        let (state, session) = state_and_session().await;
+        let id = uuid::Uuid::new_v4();
+        for (method, uri) in [
+            ("GET", "/v1/approvals".to_string()),
+            ("POST", format!("/v1/approvals/{id}")),
+            ("GET", "/v1/audit".to_string()),
+            ("POST", "/v1/agents".to_string()),
+            ("GET", format!("/v1/sessions/{}", session.id)),
+        ] {
+            let code = status(broker_router(state.clone()), method, &uri, Some("cap")).await;
+            assert_eq!(code, StatusCode::NOT_FOUND, "{method} {uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_session_capability_is_not_an_operator_token() {
+        let (state, session) =
+            state_and_session_cfg(|c| c.api_token = Some("operator".into())).await;
+        let public = || crate::app::public_router(state.clone());
+        let id = uuid::Uuid::new_v4();
+        let uri = format!("/v1/approvals/{id}");
+        // The agent's own credential is refused outright.
+        for token in ["cap", &session.id.to_string()] {
+            assert_eq!(
+                status(public(), "GET", "/v1/approvals", Some(token)).await,
+                StatusCode::UNAUTHORIZED
+            );
+            assert_eq!(
+                status(public(), "POST", &uri, Some(token)).await,
+                StatusCode::UNAUTHORIZED
+            );
+        }
+        assert_eq!(
+            status(public(), "GET", "/v1/approvals", None).await,
+            StatusCode::UNAUTHORIZED
+        );
+        // The operator token gets through to the handler (404: no such approval).
+        assert_eq!(
+            status(public(), "POST", &uri, Some("operator")).await,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status(public(), "GET", "/v1/approvals", Some("operator")).await,
+            StatusCode::OK
+        );
+    }
+
+    // ---- layer 7 rules, DLP, and taint ----
+
+    /// Deploy an agent that may reach 127.0.0.1 and adjust its manifest, and
+    /// point the session at that version.
+    async fn deploy_local_agent(
+        state: &AppState,
+        session: &SessionRecord,
+        tweak: impl FnOnce(&mut AgentManifest),
+    ) -> SessionRecord {
+        let mut m = manifest(EgressMode::Deny, Some(30));
+        m.egress_allow_hosts = vec!["127.0.0.1".into()];
+        m.allow_private_networks = true;
+        tweak(&mut m);
+        let deployed = state
+            .store
+            .deploy_agent(crate::model::DeployAgentRequest {
+                name: session.agent.clone(),
+                bundle_base64: base64::engine::general_purpose::STANDARD.encode("export default 1"),
+                manifest: m,
+            })
+            .await
+            .unwrap();
+        state
+            .store
+            .update_session(session.id, |s| s.agent_version = deployed.version.clone())
+            .await
+            .unwrap()
+    }
+
+    async fn plain_call(
+        state: &AppState,
+        session: &SessionRecord,
+        port: u16,
+        method: &str,
+        body: Option<&str>,
+    ) -> Result<Value, (StatusCode, String)> {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-zyvor-session-id",
+            session.id.to_string().parse().unwrap(),
+        );
+        headers.insert("x-zyvor-egress-capability", "cap".parse().unwrap());
+        proxy_inner(
+            state,
+            &headers,
+            EgressRequest {
+                url: format!("http://127.0.0.1:{port}/send"),
+                method: method.into(),
+                headers: Default::default(),
+                body_base64: body.map(|b| base64::engine::general_purpose::STANDARD.encode(b)),
+                credential: None,
+            },
+        )
+        .await
+    }
+
+    fn hits(counter: &Arc<std::sync::atomic::AtomicUsize>) -> usize {
+        counter.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    #[tokio::test]
+    async fn egress_rules_refuse_before_anything_is_asked_or_sent() {
+        let (port, counter) = upstream_counter().await;
+        let (state, session) = state_and_session().await;
+        let session = deploy_local_agent(&state, &session, |m| {
+            m.egress_rules = vec![crate::model::EgressRule {
+                host: "127.0.0.1".into(),
+                methods: vec!["GET".into()],
+                path_prefixes: vec![],
+                max_body_bytes: None,
+            }];
+        })
+        .await;
+        assert!(plain_call(&state, &session, port, "GET", None)
+            .await
+            .is_ok());
+        let error = plain_call(&state, &session, port, "POST", Some("x"))
+            .await
+            .unwrap_err();
+        assert_eq!(error.0, StatusCode::FORBIDDEN);
+        assert!(error.1.contains("egress rules"), "{}", error.1);
+        assert_eq!(hits(&counter), 1);
+        assert!(state.store.list_approvals().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn dlp_holds_a_request_carrying_a_secret_and_never_stores_it() {
+        let (port, counter) = upstream_counter().await;
+        let (state, session) = state_and_session().await;
+        let session = deploy_local_agent(&state, &session, |m| m.dlp = true).await;
+        // A clean request goes straight through.
+        assert!(plain_call(&state, &session, port, "POST", Some("hello"))
+            .await
+            .is_ok());
+        assert_eq!(hits(&counter), 1);
+
+        let secret = "AKIAIOSFODNN7EXAMPLE";
+        let waiter = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(async move {
+                plain_call(
+                    &state,
+                    &session,
+                    port,
+                    "POST",
+                    Some(&format!("key={secret}")),
+                )
+                .await
+            })
+        };
+        let pending = wait_pending(&state, session.id).await;
+        assert_eq!(pending.kind, ApprovalKind::Send);
+        let stored = format!("{:?} {}", pending.planned_action, pending.prompt);
+        assert!(stored.contains("aws-access-key"), "{stored}");
+        assert!(!stored.contains(secret), "secret leaked: {stored}");
+        assert_eq!(hits(&counter), 1, "held request must not have been sent");
+        state
+            .store
+            .transition_approval(pending.id, ApprovalStatus::Denied, None, None)
+            .await
+            .unwrap();
+        assert!(waiter.await.unwrap().is_err());
+        assert_eq!(hits(&counter), 1);
+    }
+
+    #[tokio::test]
+    async fn reading_untrusted_content_taints_and_a_tainted_session_needs_approval_to_write() {
+        let (port, counter) = upstream_counter().await;
+        let (state, session) = state_and_session().await;
+        let session = deploy_local_agent(&state, &session, |m| {
+            m.taint = Some(crate::model::TaintPolicy {
+                trusted_hosts: vec!["trusted.example".into()],
+            });
+        })
+        .await;
+        // A fresh session is clean, so its first write is not held.
+        assert!(state
+            .store
+            .get_session(session.id)
+            .await
+            .unwrap()
+            .tainted_by
+            .is_empty());
+        assert!(plain_call(&state, &session, port, "POST", Some("a"))
+            .await
+            .is_ok());
+        // Any response from an untrusted host is content the agent has read, so
+        // even that first write's reply taints the session.
+        assert!(plain_call(&state, &session, port, "GET", None)
+            .await
+            .is_ok());
+        let tainted = state.store.get_session(session.id).await.unwrap();
+        assert_eq!(tainted.tainted_by, vec!["127.0.0.1".to_string()]);
+        let entries = state.store.audit.list(Some(session.id), 50).await.unwrap();
+        assert!(entries.iter().any(|e| e.action == "session.tainted"));
+        // Reads still flow; a write is held.
+        assert!(plain_call(&state, &session, port, "GET", None)
+            .await
+            .is_ok());
+        let before = hits(&counter);
+        let waiter = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(async move { plain_call(&state, &session, port, "POST", Some("b")).await })
+        };
+        let pending = wait_pending(&state, session.id).await;
+        assert!(
+            pending.prompt.contains("tainted by 127.0.0.1"),
+            "{}",
+            pending.prompt
+        );
+        assert_eq!(hits(&counter), before);
+        state
+            .store
+            .transition_approval(
+                pending.id,
+                ApprovalStatus::Approved,
+                None,
+                Some(GrantScope::Once),
+            )
+            .await
+            .unwrap();
+        assert!(waiter.await.unwrap().is_ok());
+        // An operator clearing the taint frees later writes.
+        state.store.untaint_session(session.id).await.unwrap();
+        assert!(plain_call(&state, &session, port, "POST", Some("c"))
+            .await
+            .is_ok());
+    }
+
+    #[tokio::test]
+    async fn trusted_hosts_do_not_taint() {
+        let (port, _counter) = upstream_counter().await;
+        let (state, session) = state_and_session().await;
+        let session = deploy_local_agent(&state, &session, |m| {
+            m.taint = Some(crate::model::TaintPolicy {
+                trusted_hosts: vec!["127.0.0.1".into()],
+            });
+        })
+        .await;
+        assert!(plain_call(&state, &session, port, "GET", None)
+            .await
+            .is_ok());
+        assert!(state
+            .store
+            .get_session(session.id)
+            .await
+            .unwrap()
+            .tainted_by
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_tainted_session_cannot_be_auto_allowed_by_sentinel() {
+        let mut cfg = reviewer(r#"{"verdict":"allow","reason":"looks fine"}"#).await;
+        cfg.can_allow = true;
+        let (state, session) = state_and_session_with(Some(cfg)).await;
+        let mut m = manifest(EgressMode::Sentinel, Some(30));
+        m.taint = Some(Default::default());
+        // Untainted: the reviewer's allow lets it through with no human.
+        authorize_unlisted_host(&state, &session, &m, &url(), "GET")
+            .await
+            .unwrap();
+        assert!(state.store.list_approvals().await.is_empty());
+        // Tainted: the same verdict now escalates to a person.
+        state
+            .store
+            .taint_session(session.id, "evil.example")
+            .await
+            .unwrap();
+        let waiter = {
+            let (state, session, m) = (state.clone(), session.clone(), m.clone());
+            tokio::spawn(async move {
+                authorize_unlisted_host(&state, &session, &m, &url(), "GET").await
+            })
+        };
+        let pending = wait_pending(&state, session.id).await;
+        assert!(pending.planned_action.as_ref().unwrap()["sentinel"]
+            .as_str()
+            .unwrap()
+            .contains("tainted"));
+        state
+            .store
+            .transition_approval(pending.id, ApprovalStatus::Denied, None, None)
+            .await
+            .unwrap();
+        assert!(waiter.await.unwrap().is_err());
+    }
+
+    #[tokio::test]
+    async fn only_the_operator_can_untaint_a_session() {
+        let (state, session) =
+            state_and_session_cfg(|c| c.api_token = Some("operator".into())).await;
+        state
+            .store
+            .taint_session(session.id, "evil.example")
+            .await
+            .unwrap();
+        let uri = format!("/v1/sessions/{}/untaint", session.id);
+        let public = || crate::app::public_router(state.clone());
+        assert_eq!(
+            status(public(), "POST", &uri, Some("cap")).await,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            status(broker_router(state.clone()), "POST", &uri, Some("cap")).await,
+            StatusCode::NOT_FOUND
+        );
+        assert!(!state
+            .store
+            .get_session(session.id)
+            .await
+            .unwrap()
+            .tainted_by
+            .is_empty());
+        assert_eq!(
+            status(public(), "POST", &uri, Some("operator")).await,
+            StatusCode::OK
+        );
+        assert!(state
+            .store
+            .get_session(session.id)
+            .await
+            .unwrap()
+            .tainted_by
+            .is_empty());
+        let entries = state.store.audit.list(Some(session.id), 50).await.unwrap();
+        assert!(entries.iter().any(|e| e.action == "session.untainted"));
     }
 }

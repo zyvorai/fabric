@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sentinel::SentinelConfig;
+use crate::{notify::ApprovalWebhook, sentinel::SentinelConfig};
 use anyhow::{Context, Result};
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
@@ -24,7 +24,11 @@ pub struct Config {
     /// Reviewer model for `egress_mode: "sentinel"`. Absent means sentinel
     /// agents fall back to asking an operator.
     pub sentinel: Option<SentinelConfig>,
+    /// Where new approvals are pushed so a person sees them. See `notify`.
+    pub approval_webhook: Option<ApprovalWebhook>,
     /// Ceilings for a manifest's `resources`. Absent means FluxVM's own limits decide.
+    /// Force `confinement: strict` for every agent, whatever its manifest says.
+    pub confine_all: bool,
     pub max_vcpus: Option<u8>,
     pub max_memory_mib: Option<u64>,
     pub egress_advertise_host: Option<String>,
@@ -70,6 +74,8 @@ impl Config {
             credentials_file: env_opt("ZYVOR_AGENT_CREDENTIALS_FILE").map(PathBuf::from),
             skill_scopes_file: env_opt("ZYVOR_AGENT_SKILL_SCOPES_FILE").map(PathBuf::from),
             sentinel: sentinel_from_env()?,
+            approval_webhook: approval_webhook_from_env()?,
+            confine_all: env_opt("ZYVOR_AGENT_CONFINE").is_some_and(|v| v == "1"),
             max_vcpus: env_opt("ZYVOR_AGENT_MAX_VCPUS")
                 .map(|v| v.parse().context("invalid ZYVOR_AGENT_MAX_VCPUS"))
                 .transpose()?,
@@ -119,6 +125,16 @@ fn proxy_listen_from_env() -> Result<Option<SocketAddr>> {
         .parse()
         .map(Some)
         .context("invalid ZYVOR_AGENT_PROXY_LISTEN")
+}
+
+fn approval_webhook_from_env() -> Result<Option<ApprovalWebhook>> {
+    let Some(url) = env_opt("ZYVOR_AGENT_APPROVAL_WEBHOOK") else {
+        return Ok(None);
+    };
+    let secret = env_opt("ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET").context(
+        "ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET is required when ZYVOR_AGENT_APPROVAL_WEBHOOK is set",
+    )?;
+    Ok(Some(ApprovalWebhook { url, secret }))
 }
 
 fn sentinel_from_env() -> Result<Option<SentinelConfig>> {

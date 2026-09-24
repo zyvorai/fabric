@@ -36,6 +36,20 @@ pub struct AgentManifest {
     /// replacement. Needs a QEMU-backed FluxVM template; see [`HomeVolume`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home_volume: Option<HomeVolume>,
+    /// Per-host limits on brokered requests: methods, path prefixes, body size.
+    /// A host with any rule needs a matching one; hosts without rules are unrestricted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub egress_rules: Vec<EgressRule>,
+    /// Hold a brokered request that carries a secret-shaped string (a key, a
+    /// token, a private key) for an operator's decision.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub dlp: bool,
+    /// Taint the session when it reads content from a host outside `trusted_hosts`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taint: Option<TaintPolicy>,
+    /// `strict` drops all sandbox traffic except to the egress broker and proxy.
+    #[serde(default, skip_serializing_if = "Confinement::is_off")]
+    pub confinement: Confinement,
     /// Size of each sandbox. `None` uses the FluxVM template's own size.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
@@ -144,6 +158,32 @@ impl AgentManifest {
         }
     }
 
+    /// Deploy-time checks for `egress_rules` and `taint`.
+    pub fn validate_egress_policy(&self) -> Result<(), String> {
+        for rule in &self.egress_rules {
+            if rule.host.trim().is_empty() {
+                return Err("egress_rules host may not be empty".into());
+            }
+            for method in &rule.methods {
+                if method.is_empty() || !method.chars().all(|c| c.is_ascii_alphabetic()) {
+                    return Err(format!("egress_rules has invalid method {method:?}"));
+                }
+            }
+            if rule.path_prefixes.iter().any(|p| !p.starts_with('/')) {
+                return Err("egress_rules path_prefixes must start with '/'".into());
+            }
+            if rule.max_body_bytes == Some(0) {
+                return Err("egress_rules max_body_bytes must be greater than zero".into());
+            }
+        }
+        if let Some(taint) = &self.taint {
+            if taint.trusted_hosts.iter().any(|h| h.trim().is_empty()) {
+                return Err("taint.trusted_hosts may not contain an empty host".into());
+            }
+        }
+        Ok(())
+    }
+
     /// Deploy-time checks for `resources` against the operator's ceilings.
     pub fn validate_resources(
         &self,
@@ -227,6 +267,43 @@ pub const MIN_EGRESS_APPROVAL_SECONDS: u64 = 5;
 /// Kept under the guest fetch client's own header timeout so the agent sees a
 /// clean refusal from the broker rather than a client-side timeout.
 pub const MAX_EGRESS_APPROVAL_SECONDS: u64 = 240;
+
+/// A limit on what the agent may send to a host. See [`crate::l7::check_rules`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EgressRule {
+    /// Exact host or parent suffix, as in `egress_allow_hosts`.
+    pub host: String,
+    /// Allowed methods. Empty means any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub methods: Vec<String>,
+    /// Allowed path prefixes. Empty means any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub path_prefixes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_body_bytes: Option<u64>,
+}
+
+/// Which hosts do not taint a session that reads from them.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaintPolicy {
+    #[serde(default)]
+    pub trusted_hosts: Vec<String>,
+}
+
+/// Whether the sandbox network is confined to the broker and proxy.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum Confinement {
+    #[default]
+    Off,
+    Strict,
+}
+
+impl Confinement {
+    pub fn is_off(&self) -> bool {
+        *self == Self::Off
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -395,6 +472,10 @@ pub struct SessionRecord {
     pub parent_session_id: Option<Uuid>,
     #[serde(default)]
     pub user_id: Option<String>,
+    /// Untrusted hosts this session has read from. Non-empty means tainted; see
+    /// [`TaintPolicy`]. Cleared only by an operator.
+    #[serde(default)]
+    pub tainted_by: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -417,6 +498,7 @@ pub struct SessionView {
     pub error: Option<String>,
     pub parent_session_id: Option<Uuid>,
     pub user_id: Option<String>,
+    pub tainted_by: Vec<String>,
 }
 
 impl From<SessionRecord> for SessionView {
@@ -440,6 +522,7 @@ impl From<SessionRecord> for SessionView {
             error: v.error,
             parent_session_id: v.parent_session_id,
             user_id: v.user_id,
+            tainted_by: v.tainted_by,
         }
     }
 }
@@ -845,6 +928,10 @@ mod home_volume_tests {
 
     fn manifest(home: Option<HomeVolume>) -> AgentManifest {
         AgentManifest {
+            egress_rules: vec![],
+            dlp: false,
+            taint: None,
+            confinement: Default::default(),
             resources: None,
             template: "qemu-node".into(),
             credentials: vec![],
@@ -1040,5 +1127,21 @@ mod home_volume_tests {
             serde_json::to_value(sized).unwrap()["resources"]["vcpus"],
             2
         );
+    }
+
+    #[test]
+    fn confinement_is_omitted_when_off_and_kebab_case_when_strict() {
+        let off = serde_json::to_value(manifest(None)).unwrap();
+        assert!(off.get("confinement").is_none());
+        let strict = AgentManifest {
+            confinement: Confinement::Strict,
+            ..manifest(None)
+        };
+        assert_eq!(
+            serde_json::to_value(strict).unwrap()["confinement"],
+            "strict"
+        );
+        let parsed: Confinement = serde_json::from_str("\"strict\"").unwrap();
+        assert_eq!(parsed, Confinement::Strict);
     }
 }

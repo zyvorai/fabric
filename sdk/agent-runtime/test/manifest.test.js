@@ -3,9 +3,9 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildManifest } from "../src/manifest.js";
+import { buildManifest, parseRule } from "../src/manifest.js";
 
-const base = () => ({ template: "t", credential: [], allowHost: [], skill: [], allowPrivateNetwork: false });
+const base = () => ({ template: "t", credential: [], allowHost: [], skill: [], taintTrust: [], rule: [], allowPrivateNetwork: false });
 
 test("a deploy with no newer flags keeps the original manifest shape", () => {
   const manifest = buildManifest(base(), "node");
@@ -43,4 +43,26 @@ test("skills", () => {
   const m = buildManifest({ ...base(), skill: ["review", "lint@abc123"], skillScope: "team" }, "node");
   assert.deepEqual(m.skills, ["review", "lint@abc123"]);
   assert.equal(m.skill_scope, "team");
+});
+
+test("containment flags", () => {
+  const off = buildManifest({ ...base(), confinement: "off" }, "node");
+  assert.equal("confinement" in off, false);
+  const m = buildManifest(
+    { ...base(), confinement: "strict", dlp: true, taintTrust: ["docs.example.com"], rule: ["api.example.com:post:/v1/messages:1024"] },
+    "node",
+  );
+  assert.equal(m.confinement, "strict");
+  assert.equal(m.dlp, true);
+  assert.deepEqual(m.taint, { trusted_hosts: ["docs.example.com"] });
+  assert.deepEqual(m.egress_rules, [{ host: "api.example.com", methods: ["POST"], path_prefixes: ["/v1/messages"], max_body_bytes: 1024 }]);
+  assert.deepEqual(buildManifest({ ...base(), taint: true }, "node").taint, { trusted_hosts: [] });
+  assert.throws(() => buildManifest({ ...base(), confinement: "loose" }, "node"), /--confinement/);
+});
+
+test("rule specs", () => {
+  assert.deepEqual(parseRule("api.example.com"), { host: "api.example.com" });
+  assert.deepEqual(parseRule("api.example.com:GET,HEAD"), { host: "api.example.com", methods: ["GET", "HEAD"] });
+  assert.throws(() => parseRule(":GET"), /host is required/);
+  assert.throws(() => parseRule("h:GET::0"), /positive integer/);
 });

@@ -45,7 +45,7 @@ Two limits to know about:
 - The proxy sees only `host:port` of a TLS connection. It cannot inject
   credentials, and it cannot review URL paths. Only `CONNECT` to the ports in
   `ZYVOR_AGENT_PROXY_CONNECT_PORTS` (default `443`) is served; plain `http://` is refused.
-- **It only constrains a guest that has no other route out.** The template's
-  network must reach only the host gateway; if FluxVM gives the guest direct
-  internet access, a browser (or any program) can ignore the proxy. Verify with
+- **It only constrains a guest that has no other route out.** Deploy the agent with
+  `"confinement": "strict"` so FluxVM drops everything except the broker and proxy
+  ports; otherwise a browser (or any program) can ignore the proxy. Verify with
   `curl --noproxy '*' https://example.com` from inside a session: it must fail.

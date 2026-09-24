@@ -10,6 +10,22 @@ function positiveInt(flag, value) {
 }
 
 /**
+ * Parse `host[:METHOD,METHOD][:/path,/path][:maxBytes]` into an egress rule, e.g.
+ * `api.example.com:GET` or `api.example.com:POST:/v1/messages:65536`.
+ */
+export function parseRule(text) {
+  const [host, methods = "", paths = "", max = ""] = text.split(":");
+  if (!host) throw new Error(`--rule ${text}: host is required`);
+  const rule = { host };
+  const methodList = methods.split(",").filter(Boolean);
+  const pathList = paths.split(",").filter(Boolean);
+  if (methodList.length > 0) rule.methods = methodList.map((m) => m.toUpperCase());
+  if (pathList.length > 0) rule.path_prefixes = pathList;
+  if (max !== "") rule.max_body_bytes = positiveInt(`--rule ${text} max bytes`, max);
+  return rule;
+}
+
+/**
  * Build the agent manifest sent to POST /v1/agents from parsed CLI flags.
  * Fields the runtime treats as optional are only included when a flag sets
  * them, so a deploy that uses none of the newer flags produces the same
@@ -57,6 +73,18 @@ export function buildManifest(flags, runtime) {
       memory_mib: positiveInt("--memory-mib", flags.memoryMib),
     };
   }
+
+  if (flags.confinement !== undefined) {
+    if (!["off", "strict"].includes(flags.confinement)) {
+      throw new Error("--confinement must be off or strict");
+    }
+    if (flags.confinement === "strict") manifest.confinement = "strict";
+  }
+  if (flags.dlp) manifest.dlp = true;
+  if (flags.taintTrust.length > 0 || flags.taint) {
+    manifest.taint = { trusted_hosts: flags.taintTrust };
+  }
+  if (flags.rule.length > 0) manifest.egress_rules = flags.rule.map(parseRule);
 
   if (flags.skill.length > 0) manifest.skills = flags.skill;
   if (flags.skillScope) manifest.skill_scope = flags.skillScope;

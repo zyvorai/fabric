@@ -210,6 +210,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
         .route("/v1/sessions/{id}/steer", post(steer_session))
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
+        .route("/v1/sessions/{id}/untaint", post(untaint_session))
         .route("/v1/sessions/{id}/hibernate", post(hibernate_session))
         .route("/v1/sessions/{id}/resume", post(resume_session))
         .route("/v1/sessions/{id}/events", get(stream_events))
@@ -303,6 +304,9 @@ async fn deploy_agent(
                 "egress_approval_timeout_seconds must be between {MIN_EGRESS_APPROVAL_SECONDS} and {MAX_EGRESS_APPROVAL_SECONDS}"
             )));
         }
+    }
+    if let Err(message) = req.manifest.validate_egress_policy() {
+        return Err(ApiError::bad_request(message));
     }
     if let Err(message) = req
         .manifest
@@ -574,6 +578,7 @@ pub(crate) async fn create_session(
             error: None,
             parent_session_id: req.parent_session_id,
             user_id: req.user_id.clone(),
+            tainted_by: vec![],
         };
         if let Err(error) = state.store.save_session(record.clone()).await {
             if prewarmed {
@@ -855,6 +860,32 @@ async fn provision_guest(
         )
         .await?;
     }
+    let host = match state.config.egress_advertise_host.as_deref() {
+        Some(v) => v.to_string(),
+        None => {
+            with_timeout(
+                HEALTH_CHECK_ATTEMPT_TIMEOUT,
+                state.fluxvm.default_gateway(session.sandbox_id),
+            )
+            .await?
+        }
+    };
+    // Confine before any agent code is written to or run in the guest, and fail
+    // the session rather than run it unconfined.
+    if state.config.confine_all || agent.manifest.confinement == crate::model::Confinement::Strict {
+        let gateway = crate::confine::parse_gateway(&host)?;
+        let policy = crate::confine::strict_policy(
+            gateway,
+            state.config.egress_listen.port(),
+            state.config.proxy_listen.map(|addr| addr.port()),
+        );
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.set_network_policy(session.sandbox_id, &policy),
+        )
+        .await
+        .context("applying sandbox network confinement")?;
+    }
     with_timeout(
         HEALTH_CHECK_ATTEMPT_TIMEOUT,
         state.fluxvm.fs_write(
@@ -868,16 +899,6 @@ async fn provision_guest(
 
     mount_skills(state, session, agent).await?;
 
-    let host = match state.config.egress_advertise_host.as_deref() {
-        Some(v) => v.to_string(),
-        None => {
-            with_timeout(
-                HEALTH_CHECK_ATTEMPT_TIMEOUT,
-                state.fluxvm.default_gateway(session.sandbox_id),
-            )
-            .await?
-        }
-    };
     let broker = format!(
         "http://{}:{}",
         format_host(&host),
@@ -1019,6 +1040,39 @@ pub(crate) async fn steer_session(
         .await
         .map_err(ApiError::internal)?;
     Ok((StatusCode::ACCEPTED, Json(value)))
+}
+
+/// Clear a session's taint after an operator has looked at what it read. The
+/// agent cannot call this: it sits behind the operator token, on the public
+/// router only.
+async fn untaint_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<SessionView>> {
+    require_session(&state, id).await?;
+    let hosts = state
+        .store
+        .untaint_session(id)
+        .await
+        .map_err(ApiError::internal)?;
+    if !hosts.is_empty() {
+        if let Err(error) = state
+            .store
+            .audit
+            .append(
+                Some(id),
+                AuditPhase::Approved,
+                "session.untainted",
+                None,
+                json!({"was_tainted_by": hosts}),
+            )
+            .await
+        {
+            tracing::error!(%error, "failed to write audit entry");
+        }
+    }
+    let session = require_session(&state, id).await?;
+    Ok(Json(session.into()))
 }
 
 async fn cancel_session(
@@ -1687,6 +1741,7 @@ pub(crate) async fn audit_approval_planned(state: &AppState, record: &ApprovalRe
     if let Err(error) = result {
         tracing::error!(%error, approval_id = %record.id, "failed to write audit entry");
     }
+    crate::notify::approval_requested(state, record);
 }
 
 async fn delegate_session(

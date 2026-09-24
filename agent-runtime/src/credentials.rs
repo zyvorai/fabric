@@ -32,6 +32,30 @@ pub struct CredentialDescriptor {
     /// (optional `FABRIC_AI_API_KEY` when endpoint keys are enabled).
     #[serde(default = "default_kind")]
     pub kind: String,
+    /// Methods (or `*` for any) that need a human decision before this credential
+    /// is used, e.g. `["POST"]` for a mail-sending or checkout credential.
+    #[serde(default)]
+    pub requires_approval: Vec<String>,
+    /// What such an approval is called to the operator: `send` (default) or `purchase`.
+    #[serde(default)]
+    pub approval_kind: Option<String>,
+}
+
+impl CredentialDescriptor {
+    /// The approval kind this request needs, if its method requires one.
+    pub fn approval_kind_for(
+        &self,
+        method: &reqwest::Method,
+    ) -> Option<crate::model::ApprovalKind> {
+        let needed = self
+            .requires_approval
+            .iter()
+            .any(|m| m == "*" || m.eq_ignore_ascii_case(method.as_str()));
+        needed.then_some(match self.approval_kind.as_deref() {
+            Some("purchase") => crate::model::ApprovalKind::Purchase,
+            _ => crate::model::ApprovalKind::Send,
+        })
+    }
 }
 
 fn default_kind() -> String {
@@ -107,6 +131,18 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
             format!("credential '{name}' has invalid allowed method '{method}'")
         })?;
     }
+    for method in &d.requires_approval {
+        if method != "*" {
+            reqwest::Method::from_bytes(method.as_bytes()).with_context(|| {
+                format!("credential '{name}' has invalid requires_approval method '{method}'")
+            })?;
+        }
+    }
+    if let Some(kind) = d.approval_kind.as_deref() {
+        if !matches!(kind, "send" | "purchase") {
+            bail!("credential '{name}' approval_kind must be 'send' or 'purchase'");
+        }
+    }
     if d.path_prefixes.iter().any(|p| !p.starts_with('/')) {
         bail!("credential '{name}' path_prefixes must start with '/'");
     }
@@ -173,6 +209,8 @@ mod tests {
             path_prefixes: vec!["/v1/".into()],
             allowed_ports: vec![8443],
             kind: "provider".into(),
+            requires_approval: vec![],
+            approval_kind: None,
         };
         assert!(credential_allows_request(
             &d,
@@ -204,5 +242,44 @@ mod tests {
             "/v1/run",
             9443
         ));
+    }
+
+    fn gated(methods: &[&str], kind: Option<&str>) -> CredentialDescriptor {
+        serde_json::from_value(serde_json::json!({
+            "host": "mail.example", "header": "authorization", "env": "K",
+            "requires_approval": methods, "approval_kind": kind,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn approval_kind_follows_the_method_list() {
+        use crate::model::ApprovalKind;
+        let d = gated(&["POST", "delete"], None);
+        assert_eq!(
+            d.approval_kind_for(&reqwest::Method::POST),
+            Some(ApprovalKind::Send)
+        );
+        assert_eq!(
+            d.approval_kind_for(&reqwest::Method::DELETE),
+            Some(ApprovalKind::Send)
+        );
+        assert_eq!(d.approval_kind_for(&reqwest::Method::GET), None);
+        let any = gated(&["*"], Some("purchase"));
+        assert_eq!(
+            any.approval_kind_for(&reqwest::Method::GET),
+            Some(ApprovalKind::Purchase)
+        );
+        assert_eq!(
+            gated(&[], Some("purchase")).approval_kind_for(&reqwest::Method::POST),
+            None
+        );
+    }
+
+    #[test]
+    fn descriptor_validation_rejects_bad_approval_settings() {
+        assert!(validate_descriptor("c", &gated(&["POST", "*"], Some("send"))).is_ok());
+        assert!(validate_descriptor("c", &gated(&["PO ST"], None)).is_err());
+        assert!(validate_descriptor("c", &gated(&["POST"], Some("wire"))).is_err());
     }
 }

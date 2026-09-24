@@ -3,6 +3,13 @@
 ## 0.3.0
 
 ### Added
+- **Agent containment.** `confinement: strict` drops all sandbox traffic except to
+  the egress broker and proxy (FluxVM eBPF policy, fails closed); approvals are
+  pushed to `ZYVOR_AGENT_APPROVAL_WEBHOOK` (HMAC-signed) so a person sees them,
+  and a credential can require a per-request `send`/`purchase` approval; per-host
+  `egress_rules`, `dlp` secret scanning, and per-session `taint` (tainted sessions
+  need approval to write and cannot be auto-allowed by Sentinel;
+  `POST /v1/sessions/{id}/untaint`). `fabric-agent deploy` has flags for each.
 - **`fabric-agent deploy` flags for the newer manifest fields** (egress mode, home
   volume, per-user home, sandbox size, skills) and `user_id` in the SDK types.
 - **Per-user agent VMs.** `home_volume.per_user` gives each `user_id` its own volume

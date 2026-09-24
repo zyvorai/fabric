@@ -167,6 +167,14 @@ async fn open_tunnel(state: &AppState, head: &str) -> Result<Tunnel, Refusal> {
         )
         .await;
     }
+    // Per-host rules constrain methods and paths, which a TLS tunnel hides.
+    if crate::l7::host_has_rules(&agent.manifest.egress_rules, &host) {
+        return refuse(
+            StatusCode::FORBIDDEN,
+            format!("{host} has egress rules that cannot be enforced through a CONNECT tunnel"),
+        )
+        .await;
+    }
     if !agent
         .manifest
         .egress_allow_hosts
@@ -203,6 +211,8 @@ async fn open_tunnel(state: &AppState, head: &str) -> Result<Tunnel, Refusal> {
         json!({"port": port}),
     )
     .await;
+    // The browser is about to read from this host.
+    crate::egress::taint_on_read(state, &session, &agent.manifest, &host).await;
     Ok(Tunnel {
         upstream,
         session_id: session.id,
@@ -426,11 +436,22 @@ mod tests {
         mode: EgressMode,
         target_port: u16,
     ) -> (Arc<AppState>, crate::model::SessionRecord, u16) {
+        setup_with(allow, private, mode, target_port, |_| {}).await
+    }
+
+    async fn setup_with(
+        allow: &[&str],
+        private: bool,
+        mode: EgressMode,
+        target_port: u16,
+        tweak: impl FnOnce(&mut crate::model::AgentManifest),
+    ) -> (Arc<AppState>, crate::model::SessionRecord, u16) {
         let (state, session) =
             state_and_session_cfg(|config| config.proxy_connect_ports = vec![target_port]).await;
         let mut agent_manifest = manifest(mode, Some(5));
         agent_manifest.egress_allow_hosts = allow.iter().map(|h| h.to_string()).collect();
         agent_manifest.allow_private_networks = private;
+        tweak(&mut agent_manifest);
         let deployed = state
             .store
             .deploy_agent(crate::model::DeployAgentRequest {
@@ -566,5 +587,55 @@ mod tests {
         for bad in ["example.com", "example.com:0", "a b:443", ":443", "x/y:443"] {
             assert_eq!(parse_authority(bad), None, "{bad}");
         }
+    }
+
+    #[tokio::test]
+    async fn hosts_with_egress_rules_cannot_be_tunnelled() {
+        let target = echo().await;
+        let (_state, session, proxy) =
+            setup_with(&["127.0.0.1"], true, EgressMode::Deny, target, |m| {
+                m.egress_rules = vec![crate::model::EgressRule {
+                    host: "127.0.0.1".into(),
+                    methods: vec!["GET".into()],
+                    path_prefixes: vec![],
+                    max_body_bytes: None,
+                }];
+            })
+            .await;
+        let status = status_of(
+            proxy,
+            format!(
+                "CONNECT 127.0.0.1:{target} HTTP/1.1\r\nProxy-Authorization: {}\r\n\r\n",
+                basic(session.id, "cap")
+            ),
+        )
+        .await;
+        assert!(status.contains("403"), "{status}");
+    }
+
+    #[tokio::test]
+    async fn a_tunnel_to_an_untrusted_host_taints_the_session() {
+        let target = echo().await;
+        let (state, session, proxy) =
+            setup_with(&["127.0.0.1"], true, EgressMode::Deny, target, |m| {
+                m.taint = Some(Default::default());
+            })
+            .await;
+        let status = status_of(
+            proxy,
+            format!(
+                "CONNECT 127.0.0.1:{target} HTTP/1.1\r\nProxy-Authorization: {}\r\n\r\n",
+                basic(session.id, "cap")
+            ),
+        )
+        .await;
+        assert!(status.contains("200"), "{status}");
+        let tainted = state
+            .store
+            .get_session(session.id)
+            .await
+            .unwrap()
+            .tainted_by;
+        assert_eq!(tainted, vec!["127.0.0.1".to_string()]);
     }
 }

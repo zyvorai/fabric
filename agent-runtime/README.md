@@ -159,6 +159,26 @@ The reviewer's authority is deliberately narrow, because the request it reads is
 
 Changing `egress_mode` or the timeout changes the agent's version, like any manifest change; manifests that leave both at their defaults keep their existing version ids.
 
+## Containment
+
+These controls are aimed at a compromised or prompt-injected agent. They stack: each one assumes the others may be bypassed.
+
+### Network confinement
+
+Every egress control above is moot if the sandbox can reach the internet itself. `"confinement": "strict"` (or `ZYVOR_AGENT_CONFINE=1` on the runtime, which forces it for every agent) applies a FluxVM per-VM eBPF policy before any agent code is written to the guest: only the host gateway, only on the broker and proxy ports; everything else, DNS included, is dropped. The runtime uses FluxVM's `POST /v1/vms/{id}/network/policy` and fails the session rather than run it unconfined if that call fails. The gateway must be an IP address (`ZYVOR_AGENT_EGRESS_ADVERTISE_HOST`, or the guest's default route). **Not yet verified against a live FluxVM:** whether the policy's port rules also match reply traffic on the tap, so try it on a real template and check that `curl --noproxy '*' https://example.com` fails while a brokered request succeeds.
+
+### Approvals that reach a person
+
+Set `ZYVOR_AGENT_APPROVAL_WEBHOOK` and `ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET` and every new approval is POSTed there, signed `x-zyvor-signature: sha256=<HMAC-SHA256 of the body>`, with the approval's kind, subject, prompt, `planned_action`, agent and `user_id` (so a receiver can route it to the right device) and the path to decide it. Delivery retries twice and is journaled as `approval.notify` if it finally fails; it never blocks the request. The receiver answers through the operator API (`POST /v1/approvals/{id}`). The agent cannot: the operator routes sit behind `ZYVOR_AGENT_API_TOKEN` on the public listener, and the broker and proxy listeners that the sandbox can reach serve nothing else (both are tested).
+
+A credential descriptor can require a decision per request: `"requires_approval": ["POST"]` (methods, or `"*"`) and `"approval_kind": "send"` (default) or `"purchase"`. The broker then holds the request after every other check and opens an approval showing the method, the URL without its query string, the credential name, and the body's length and SHA-256, never the body or a header. Each request needs its own decision; nothing is remembered.
+
+### Request rules, secret scanning and taint
+
+- `egress_rules`: `[{"host": "api.example.com", "methods": ["POST"], "path_prefixes": ["/v1/messages"], "max_body_bytes": 65536}]`. A host with any rule needs a matching one; hosts without rules are unrestricted beyond the allowlist. Checked first, so a request the agent may never send never reaches an operator. The CONNECT proxy refuses a host that has rules, because a TLS tunnel hides the method and path.
+- `"dlp": true` holds any brokered request whose URL, headers or body contain a secret-shaped string (private keys, AWS, GitHub, Slack and API-key formats, JWTs) for approval. Only the detector names are stored, never the match. This is pattern matching: it catches accidents and lazy exfiltration, not a determined encoder.
+- `"taint": {"trusted_hosts": [...]}`: a session that reads a response (or opens a tunnel) from a host outside `trusted_hosts` is tainted (`tainted_by` on the session, journaled as `session.tainted`). While tainted, brokered writes (anything but GET/HEAD) need approval and Sentinel's `allow` is downgraded to an operator decision. Only an operator clears it: `POST /v1/sessions/{id}/untaint`. This is per session, not per process: the host cannot see processes inside the guest, and a tunnel is opaque, so it stops the classic "read a hostile page, then send a message" path but not a browser posting to a host it may already reach.
+
 ## Persistent home volume
 
 `"home_volume": {"name": "research-home", "guest_path": "/home/agent"}` in the manifest mounts a FluxVM volume in the agent's sandbox. It is a host directory that outlives the sandbox, every session, and every new version of the agent: `name` defaults to the lowercased agent name, and `guest_path` defaults to `/home/agent`. Write state there and the next session sees it.

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use axum::{routing::post, Router};
 use tower_http::trace::TraceLayer;
 use zyvor_fabric_agent_runtime::{app, config::Config, egress, pool, AppState};
 
@@ -18,10 +17,7 @@ async fn main() -> Result<()> {
     let state = AppState::from_config(config).await?;
 
     let public = app::public_router(state.clone()).layer(TraceLayer::new_for_http());
-    let broker = Router::new()
-        .route("/v1/egress", post(egress::proxy))
-        .with_state(state.clone())
-        .layer(TraceLayer::new_for_http());
+    let broker = egress::broker_router(state.clone()).layer(TraceLayer::new_for_http());
 
     tokio::spawn(app::sync_loop(state.clone()));
     tokio::spawn(app::auto_hibernate_loop(state.clone()));

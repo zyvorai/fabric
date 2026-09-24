@@ -4,11 +4,14 @@
 pub mod app;
 pub mod audit;
 pub mod config;
+pub mod confine;
 pub mod credentials;
 pub mod egress;
 pub mod fluxvm;
+pub mod l7;
 pub mod mcp;
 pub mod model;
+pub mod notify;
 pub mod pool;
 pub mod proxy;
 pub mod schedules;

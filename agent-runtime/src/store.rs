@@ -295,6 +295,35 @@ impl Store {
             .count()
     }
 
+    /// Record that `id` read from an untrusted `host`. True if this is new.
+    pub async fn taint_session(&self, id: Uuid, host: &str) -> Result<bool> {
+        let already = self
+            .get_session(id)
+            .await
+            .is_none_or(|s| s.tainted_by.iter().any(|h| h == host));
+        if already {
+            return Ok(false);
+        }
+        self.update_session(id, |s| {
+            if !s.tainted_by.iter().any(|h| h == host) {
+                s.tainted_by.push(host.to_string());
+            }
+        })
+        .await?;
+        Ok(true)
+    }
+
+    /// Clear a session's taint, returning the hosts that had caused it.
+    pub async fn untaint_session(&self, id: Uuid) -> Result<Vec<String>> {
+        let before = self
+            .get_session(id)
+            .await
+            .map(|s| s.tainted_by)
+            .unwrap_or_default();
+        self.update_session(id, |s| s.tainted_by.clear()).await?;
+        Ok(before)
+    }
+
     /// Non-terminal sessions of one agent that belong to `user_id`.
     pub async fn count_non_terminal_for_user(&self, agent: &str, user_id: &str) -> usize {
         self.sessions
@@ -833,6 +862,10 @@ mod tests {
             bundle_base64: base64::engine::general_purpose::STANDARD
                 .encode("export default () => 1"),
             manifest: AgentManifest {
+                egress_rules: vec![],
+                dlp: false,
+                taint: None,
+                confinement: Default::default(),
                 resources: None,
                 template: "node22".into(),
                 credentials: vec!["openai".into()],
@@ -873,6 +906,10 @@ mod tests {
                 name: "research".into(),
                 bundle_base64: bundle.clone(),
                 manifest: AgentManifest {
+                    egress_rules: vec![],
+                    dlp: false,
+                    taint: None,
+                    confinement: Default::default(),
                     resources: None,
                     template: "node22".into(),
                     credentials: vec![],
@@ -898,6 +935,10 @@ mod tests {
                 name: "research".into(),
                 bundle_base64: bundle,
                 manifest: AgentManifest {
+                    egress_rules: vec![],
+                    dlp: false,
+                    taint: None,
+                    confinement: Default::default(),
                     resources: None,
                     template: "node22".into(),
                     credentials: vec![],
@@ -959,6 +1000,7 @@ mod tests {
                 error: None,
                 parent_session_id: None,
                 user_id: None,
+                tainted_by: vec![],
             })
             .await
             .unwrap();
