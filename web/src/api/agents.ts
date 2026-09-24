@@ -110,6 +110,16 @@ export interface KeepCockpit {
   security_profile?: string | null
   browser_page?: string
   browser_view?: string
+  attestation?: {
+    security_profile?: string | null
+    image_hash?: string | null
+    evidence_class: string
+    snp_launch_verified: boolean
+    tdx_launch_verified: boolean
+    host_recover_allowed: boolean
+    operator_can_read: boolean
+    honesty: string
+  }
   vault?: {
     secret_backend?: string
     unwrap_required?: boolean

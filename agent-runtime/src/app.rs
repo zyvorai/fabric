@@ -252,6 +252,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
         .route("/v1/sessions/{id}/untaint", post(untaint_session))
         .route(
+            "/v1/sessions/{id}/host-recover",
+            post(host_recover_session),
+        )
+        .route(
             "/v1/sessions/{id}/browser/view",
             get(crate::browser::browser_view),
         )
@@ -2184,6 +2188,14 @@ async fn session_cockpit(
             })
         })
         .collect();
+    // FluxVM verified flags stay false until a hardware run wires them through.
+    let receipt = crate::attestation::build_receipt(
+        state.config.security_profile.as_deref(),
+        Some(format!("{}@{}", session.agent, session.agent_version)),
+        session.confidential.as_ref(),
+        false,
+        false,
+    );
     Ok(Json(json!({
         "session_id": id,
         "agent": session.agent,
@@ -2205,15 +2217,117 @@ async fn session_cockpit(
         "browser_port": state.store.get_agent(&session.agent).await.and_then(|a| a.manifest.browser_port),
         "browser_view": format!("/v1/sessions/{id}/browser/view"),
         "browser_page": format!("/keep/browser?session={id}"),
-        "security_profile": state.config.security_profile,
-        "evidence_class": "software-test",
-        "honesty": "Evidence class software-test: the host can still see this VM. Keep 0.2 + attested hardware is required before claiming otherwise.",
+        "security_profile": receipt.security_profile,
+        "evidence_class": receipt.evidence_class,
+        "honesty": receipt.honesty,
+        "attestation": receipt,
         "vault": {
             "secret_backend": crate::unwrap_tokens::SecretBackendKind::HostEnv.as_str(),
             "unwrap_required": state.vault_unwrap_required,
             "unlocked": state.vault_is_unlocked(),
             "honesty": "Secrets still come from host env until Keep 0.2 user-held unwrap.",
         },
+    })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct HostRecoverRequest {
+    /// First operator recover key (`ZYVOR_AGENT_RECOVER_KEY_A`).
+    key_a: String,
+    /// Second operator recover key (`ZYVOR_AGENT_RECOVER_KEY_B`).
+    key_b: String,
+}
+
+/// Break-glass host recover. Confidential profiles always refuse. Measured/standard
+/// require both configured recover keys; still software-test honesty (host could
+/// already see guest memory).
+async fn host_recover_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<HostRecoverRequest>,
+) -> ApiResult<Json<Value>> {
+    let session = state
+        .store
+        .get_session(id)
+        .await
+        .ok_or_else(|| ApiError::not_found("session not found"))?;
+    let receipt = crate::attestation::build_receipt(
+        state.config.security_profile.as_deref(),
+        Some(format!("{}@{}", session.agent, session.agent_version)),
+        session.confidential.as_ref(),
+        false,
+        false,
+    );
+    if !receipt.host_recover_allowed {
+        let _ = state
+            .store
+            .audit
+            .append(
+                Some(id),
+                AuditPhase::Denied,
+                "keep.host_recover.refused",
+                None,
+                json!({
+                    "reason": "confidential",
+                    "security_profile": receipt.security_profile,
+                    "evidence_class": receipt.evidence_class,
+                }),
+            )
+            .await;
+        return Err(ApiError::forbidden(
+            "host recover is forbidden on confidential profiles (Keep 0.2)",
+        ));
+    }
+    let (Some(expect_a), Some(expect_b)) = (
+        state.config.recover_key_a.as_deref(),
+        state.config.recover_key_b.as_deref(),
+    ) else {
+        return Err(ApiError::unavailable(
+            "host recover keys not configured (set ZYVOR_AGENT_RECOVER_KEY_A and _B)",
+        ));
+    };
+    if req.key_a.is_empty()
+        || req.key_b.is_empty()
+        || req.key_a != expect_a
+        || req.key_b != expect_b
+        || req.key_a == req.key_b
+    {
+        let _ = state
+            .store
+            .audit
+            .append(
+                Some(id),
+                AuditPhase::Denied,
+                "keep.host_recover.bad_keys",
+                None,
+                json!({"security_profile": receipt.security_profile}),
+            )
+            .await;
+        return Err(ApiError::forbidden(
+            "host recover requires two distinct configured operator keys",
+        ));
+    }
+    let _ = state
+        .store
+        .audit
+        .append(
+            Some(id),
+            AuditPhase::Performed,
+            "keep.host_recover.granted",
+            None,
+            json!({
+                "security_profile": receipt.security_profile,
+                "evidence_class": receipt.evidence_class,
+                "honesty": "software-test: host could already see guest memory",
+            }),
+        )
+        .await;
+    Ok(Json(json!({
+        "session_id": id,
+        "granted": true,
+        "evidence_class": receipt.evidence_class,
+        "honesty": "Break-glass recorded. Evidence remains software-test until Keep 0.2 hardware attestation; the host could already see this VM.",
+        "attestation": receipt,
     })))
 }
 
@@ -2462,6 +2576,9 @@ async function refresh(){{
     <div>agent: ${{j.agent}} · status: ${{j.status}}</div>
     <div>tainted_by: ${{(j.tainted_by||[]).join(', ')||'—'}}</div>
     <div>pending approvals: ${{(j.pending_approvals||[]).length}}</div>
+    <div style="margin-top:.5rem">evidence: <strong>${{(j.attestation&&j.attestation.evidence_class)||j.evidence_class||'software-test'}}</strong>
+      · operator_can_read: ${{(j.attestation&&j.attestation.operator_can_read)!==false}}
+      · host_recover: ${{(j.attestation&&j.attestation.host_recover_allowed)?'allowed (dual-key)':'forbidden'}}</div>
     <div style="opacity:.75;margin-top:.5rem">${{j.honesty||''}}</div>`;
   $('decisions').textContent=JSON.stringify(j.last_decisions||[],null,2);
 }}

@@ -76,8 +76,12 @@ being treated as policy-verified; signing does not retroactively attest them.
 
 - Flipping `security.snp_launch_verified` / `tdx_launch_verified` on FluxVM
 - User-held unwrap (phone/YubiKey) before vault open
-- No host recover path on confidential profiles
-- Attestation receipt UI that never labels `software-test` as unread-by-operator
-- Process-level taint (today: session-level after brokered reads)
+- Real SNP/TDX launch + block-device home (see confidential-agent-vms.md)
+
+Software scaffolding already in tree (still `software-test`):
+
+- Cockpit / console **attestation receipt** (never labels software-test as unread)
+- `POST /v1/sessions/{id}/host-recover` — **forbidden** on confidential; measured
+  needs dual recover keys (`ZYVOR_AGENT_RECOVER_KEY_A` / `_B`)
 
 Until then: **the host can still see a measured VM.** That is intentional honesty, not an unfinished checkbox we can close in CI without silicon.

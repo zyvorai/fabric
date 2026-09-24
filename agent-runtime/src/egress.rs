@@ -919,6 +919,8 @@ pub(crate) mod ask_tests {
             extra_ca_files: vec![],
             confine_all: false,
             security_profile: None,
+            recover_key_a: None,
+            recover_key_b: None,
             max_vcpus: None,
             max_memory_mib: None,
             egress_advertise_host: None,
