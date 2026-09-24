@@ -10,10 +10,15 @@
 | Full pack metadata | `keepctl pack` → policy, agent pin, vault **names**, FluxVM migrate notes (no raw secrets) |
 | Cockpit UI | `GET /keep/cockpit?session=<uuid>` + JSON `/v1/sessions/{id}/cockpit` |
 | Phone approvals | Webhook payload includes `ui.actions` + `channel: out_of_band` |
-| CI / e2e smoke | `./scripts/keep-e2e.sh` · `.github/workflows/keep.yml` |
+| CI / Keep e2e | `./scripts/keep-e2e.sh` · `.github/workflows/keep.yml` (`keep-e2e` job) |
+| Runtime control-plane e2e | `agent-runtime/scripts/e2e-no-fluxvm.sh` (proxy, Sentinel, DLP, approvals) |
 
 ```bash
+# Full Keep product path (live runtime + FluxVM stub + keepctl) — what CI runs
 ./scripts/keep-e2e.sh
+
+# Optional: also hit a live FluxVM
+KEEP_E2E_FLUXVM=1 ./scripts/keep-e2e.sh
 ```
 
 ## Still not a TEE claim (Keep 0.2 + hardware)

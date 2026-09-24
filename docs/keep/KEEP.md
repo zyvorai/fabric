@@ -18,13 +18,19 @@ not a third repo and not a second VMM.
 # From fabric repo root — no KVM required
 cargo test --manifest-path agent-runtime/Cargo.toml --lib
 cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
-./scripts/keepctl --help
+
+# Full Keep end-to-end (live runtime + FluxVM stub + keepctl)
+./scripts/keep-e2e.sh
+
+# Runtime control-plane e2e (proxy / Sentinel / DLP / phone approvals)
+cargo build --manifest-path agent-runtime/Cargo.toml --release
+BIN=agent-runtime/target/release/zyvor-fabric-agent-runtime \
+  ./agent-runtime/scripts/e2e-no-fluxvm.sh
 ```
 
 GitHub Actions: [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml)  
 Hands-on: [Tutorial 16](../tutorials/16-keep-workstation.md)  
 Production checklist: [PRODUCTION.md](PRODUCTION.md)  
-E2E smoke: `./scripts/keep-e2e.sh`  
 FluxVM measured profiles (sibling repo): `./scripts/test-security-profiles.sh`
 
 ## Quiet part (read this first)
