@@ -331,6 +331,11 @@ CODE=$(http_code -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application
 check "user-held complete refused without attestation" 403 "$CODE"
 VS=$(curl -sf -H "Authorization: Bearer $TOKEN" "$API/v1/vault/status")
 check "vault status lists user_held" "user_held" "$VS"
+check "vault status reports snp_launch_verified" "snp_launch_verified" "$VS"
+check "vault status reports tdx_launch_verified" "tdx_launch_verified" "$VS"
+CK=$(curl -sf -H "Authorization: Bearer $TOKEN" "$API/v1/sessions/$SID/cockpit")
+check "cockpit attestation object" "attestation" "$CK"
+check "cockpit browser_screencast link" "browser_screencast" "$CK"
 
 echo "==> export-token gates (training default off)"
 CODE=$(http_code -H "Authorization: Bearer $TOKEN" "$API/v1/export/audit?limit=10")

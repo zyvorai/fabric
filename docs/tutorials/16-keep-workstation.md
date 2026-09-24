@@ -209,7 +209,9 @@ FluxVM CI for that path: `./scripts/test-security-profiles.sh` in the fluxvm rep
 - Running production Keep without `ZYVOR_AGENT_KEEP_MODE=1` and trusted signers  
 - Opening a third Keep git repository — Keep lives in Fabric  
 
-Next: [docs/keep/KEEP-0.2.md](../keep/KEEP-0.2.md) when you have SNP/TDX + a user-held key.
+Keep 0.2 **soft** scaffolding (receipt, screencast, user-held challenge, fabricd
+proxies) is already in tree — see [KEEP-0.2.md](../keep/KEEP-0.2.md). Hardware
+SNP/TDX + real user-held unwrap is still required before unread-by-operator claims.
 
 ---
 

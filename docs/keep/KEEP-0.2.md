@@ -28,11 +28,13 @@ These ship so the product never mislabels a measured VM:
 3. **Host guest-agent channel helpers** — `FluxVm::process_for_session` /
    `fs_write_for_session` refuse when confidential launch is active.
 4. **Browser screenshot + screencast** — `GET …/browser/screenshot` and
-   `WS …/browser/screencast` (frames only; no input) via FluxVM sandbox WS bridge.
+   `WS …/browser/screencast` (frames only; no input) via FluxVM sandbox WS bridge;
+   fabricd `WS /ws/sessions/{id}/browser/screencast?token=` for the console.
 5. **User-held challenge API** — `POST /v1/vault/user-held/challenge` mints a
    nonce; `complete` reads FluxVM `GET /v1/security/capabilities` and is **403**
    until `snp_launch_verified` / `tdx_launch_verified`. When verified, a
    key-broker **stub** grants a vault lease (wrapped disk key still not done).
+   fabricd proxies `/api/vault/status` and `/api/vault/user-held/*`.
 6. **browser-agent bake script** — [`scripts/keep-bake-browser-agent.sh`](../../scripts/keep-bake-browser-agent.sh).
 
-Until hardware: *the host can still see a measured VM.* That is intentional.
+Soft scaffolding for Keep 0.2 is **complete**. Until hardware: *the host can still see a measured VM.* That is intentional.
