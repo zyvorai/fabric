@@ -727,7 +727,7 @@ impl Store {
 
     pub async fn list_goals(&self) -> Vec<GoalRecord> {
         let mut out: Vec<_> = self.goals.read().await.values().cloned().collect();
-        out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        out.sort_by_key(|a| std::cmp::Reverse(a.updated_at));
         out
     }
 
@@ -744,7 +744,7 @@ impl Store {
 
     pub async fn list_artifacts(&self) -> Vec<ArtifactRecord> {
         let mut out: Vec<_> = self.artifacts.read().await.values().cloned().collect();
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|a| std::cmp::Reverse(a.created_at));
         out
     }
 

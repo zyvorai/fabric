@@ -32,9 +32,10 @@ pub enum GoalStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanStepStatus {
+    #[default]
     Pending,
     Running,
     Blocked,
@@ -57,12 +58,6 @@ pub struct PlanStep {
     pub artifact_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
-}
-
-impl Default for PlanStepStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
