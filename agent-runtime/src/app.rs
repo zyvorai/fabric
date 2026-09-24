@@ -251,10 +251,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}/steer", post(steer_session))
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
         .route("/v1/sessions/{id}/untaint", post(untaint_session))
-        .route(
-            "/v1/sessions/{id}/host-recover",
-            post(host_recover_session),
-        )
+        .route("/v1/sessions/{id}/host-recover", post(host_recover_session))
         .route(
             "/v1/sessions/{id}/browser/view",
             get(crate::browser::browser_view),

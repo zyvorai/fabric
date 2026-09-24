@@ -85,10 +85,7 @@ pub fn host_recover_allowed(
     if confidential.is_some_and(|c| c.active) {
         return false;
     }
-    match profile {
-        Some(p) if p.starts_with("confidential") => false,
-        _ => true,
-    }
+    !matches!(profile, Some(p) if p.starts_with("confidential"))
 }
 
 /// Refuse host-channel guest-agent calls when confidential launch is active.
