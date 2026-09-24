@@ -198,7 +198,7 @@ impl Server {
             packet_mirror: Arc::new(packet_mirror::PacketMirror::new()),
             nat_gateway: Arc::new(nat_gateway::NatGateway::new()),
             net_monitor: Arc::new(net_monitor::NetMonitor::new()),
-            secrets_manager: Arc::new(secrets_manager::SecretsManager::new()),
+            secrets_manager: Arc::new(secrets_manager::SecretsManager::from_env()?),
             dnsmasq_manager: Arc::new(zyvor_fabric_dnsmasq_manager::DnsmasqManager::new(
                 "/run/zyvor-fabricd/dnsmasq",
             )),
@@ -1221,6 +1221,23 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/sessions/{id}/{action}",
             post(api::agent_runtime::session_action),
+        )
+        .route(
+            "/approvals",
+            get(api::agent_runtime::list_approvals).post(api::agent_runtime::create_approval),
+        )
+        .route(
+            "/approvals/{id}",
+            post(api::agent_runtime::decide_approval),
+        )
+        .route("/audit/agent-actions", get(api::agent_runtime::list_audit))
+        .route(
+            "/skills",
+            get(api::agent_runtime::list_skills).post(api::agent_runtime::publish_skill),
+        )
+        .route(
+            "/skills/{name}",
+            get(api::agent_runtime::get_skill).delete(api::agent_runtime::delete_skill),
         )
         // Fabric AI Workloads — Inference MVP (preview)
         .route(

@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    audit::AuditPhase,
     model::{
-        ApprovalRecord, ApprovalStatus, CreateApprovalRequest, CreateSessionRequest,
+        ApprovalKind, ApprovalRecord, ApprovalStatus, CreateApprovalRequest, CreateSessionRequest,
         DecideApprovalRequest, DelegateRequest, DeployAgentRequest, EventsQuery,
         GuestEventsResponse, GuestStatusResponse, SessionRecord, SessionStartMode,
         SessionStartPolicy, SessionStatus, SessionView, SteerRequest, WarmPoolReconcileResult,
-        WarmPoolView,
+        WarmPoolView, MAX_EGRESS_APPROVAL_SECONDS, MIN_EGRESS_APPROVAL_SECONDS,
     },
     pool, AppState,
 };
@@ -26,7 +27,7 @@ use axum::{
 use chrono::Utc;
 use reqwest::Method;
 use serde_json::{json, Value};
-use std::{convert::Infallible, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::Infallible, sync::Arc, time::Duration};
 use uuid::Uuid;
 
 pub(crate) const WORKER: &[u8] = include_bytes!("worker.mjs");
@@ -47,6 +48,100 @@ const SANDBOX_START_TIMEOUT: Duration = Duration::from_secs(120);
 /// able to block the retry loop past its own guest_start_timeout_secs
 /// deadline, which is only ever checked *between* attempts.
 const HEALTH_CHECK_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Create a fresh sandbox for a session, attaching the agent's home volume if
+/// it has one. A volume that is still attached elsewhere is a conflict (the
+/// caller can retry once the other session ends), not a gateway failure.
+/// A `user_id` must be well formed, and is mandatory when the agent's home
+/// volume is per user (otherwise every user would share one volume).
+pub(crate) fn check_session_user(
+    agent: &crate::model::AgentRecord,
+    user_id: Option<&str>,
+) -> ApiResult<()> {
+    if let Some(user) = user_id {
+        crate::model::validate_user_id(user).map_err(ApiError::bad_request)?;
+    }
+    if agent
+        .manifest
+        .home_volume
+        .as_ref()
+        .is_some_and(|v| v.per_user)
+        && user_id.is_none()
+    {
+        return Err(ApiError::bad_request(
+            "this agent's home volume is per user: user_id is required",
+        ));
+    }
+    Ok(())
+}
+
+async fn create_cold_sandbox(
+    state: &AppState,
+    agent: &crate::model::AgentRecord,
+    session_id: Uuid,
+    user_id: Option<&str>,
+) -> ApiResult<crate::fluxvm::SandboxRecord> {
+    let name = format!("agent-{}", &session_id.simple().to_string()[..12]);
+    let volumes: Vec<crate::fluxvm::SandboxVolume> = agent
+        .manifest
+        .home_volume
+        .iter()
+        .filter_map(|v| {
+            Some(crate::fluxvm::SandboxVolume {
+                name: agent.manifest.home_volume_for(&agent.name, user_id)?,
+                guest_path: v.guest_path.clone(),
+            })
+        })
+        .collect();
+    let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
+        name,
+        &agent.manifest.template,
+        None,
+        agent.manifest.runtime_port,
+        &crate::fluxvm::SandboxOptions {
+            volumes: &volumes,
+            resources: agent.manifest.resources,
+            confidential: agent.manifest.confidential,
+        },
+    ))
+    .await
+    .map_err(|error| {
+        if !volumes.is_empty() && error.to_string().contains("already attached") {
+            ApiError::conflict("the agent's home volume is attached to another sandbox")
+        } else {
+            ApiError::bad_gateway(error)
+        }
+    })?;
+    check_confidential(state, agent, &sandbox).await?;
+    Ok(sandbox)
+}
+
+/// Enforce `confidential: required` on a freshly created sandbox. FluxVM refuses
+/// a required launch it cannot do; this also refuses when an older FluxVM ignored
+/// the request and reported nothing, and deletes the sandbox so it never runs
+/// unprotected. `auto` accepts whatever happened and the outcome is recorded.
+async fn check_confidential(
+    state: &AppState,
+    agent: &crate::model::AgentRecord,
+    sandbox: &crate::fluxvm::SandboxRecord,
+) -> ApiResult<()> {
+    if agent.manifest.confidential != crate::model::Confidential::Required {
+        return Ok(());
+    }
+    let active = sandbox.confidential.as_ref().is_some_and(|c| c.active);
+    if active {
+        return Ok(());
+    }
+    let reason = sandbox
+        .confidential
+        .as_ref()
+        .map(|c| c.reason.clone())
+        .unwrap_or_else(|| "FluxVM did not report a confidential status (too old?)".into());
+    let _ = state.fluxvm.delete(sandbox.id).await;
+    Err(ApiError::unavailable(format!(
+        "confidential VM required but not active: {reason}"
+    )))
+}
 
 async fn with_start_timeout<T>(
     fut: impl std::future::Future<Output = anyhow::Result<T>>,
@@ -119,6 +214,12 @@ impl ApiError {
             message: message.into(),
         }
     }
+    pub(crate) fn forbidden(e: impl std::fmt::Display) -> Self {
+        Self {
+            status: StatusCode::FORBIDDEN,
+            message: e.to_string(),
+        }
+    }
     pub(crate) fn internal(e: impl std::fmt::Display) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -133,7 +234,7 @@ impl IntoResponse for ApiError {
     }
 }
 
-type ApiResult<T> = Result<T, ApiError>;
+pub(crate) type ApiResult<T> = Result<T, ApiError>;
 
 pub fn public_router(state: Arc<AppState>) -> Router {
     let protected = Router::new()
@@ -147,6 +248,21 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
         .route("/v1/sessions/{id}/steer", post(steer_session))
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
+        .route("/v1/sessions/{id}/untaint", post(untaint_session))
+        .route(
+            "/v1/sessions/{id}/browser/{*path}",
+            get(crate::browser::devtools),
+        )
+        .route(
+            "/v1/workstations",
+            get(crate::workstations::list_workstations),
+        )
+        .route(
+            "/v1/workstations/{agent}/{user_id}",
+            get(crate::workstations::get_workstation)
+                .put(crate::workstations::put_workstation)
+                .delete(crate::workstations::delete_workstation),
+        )
         .route("/v1/sessions/{id}/hibernate", post(hibernate_session))
         .route("/v1/sessions/{id}/resume", post(resume_session))
         .route("/v1/sessions/{id}/events", get(stream_events))
@@ -177,12 +293,24 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/approvals", get(list_approvals).post(create_approval))
         .route("/v1/approvals/{id}", post(decide_approval))
+        .route("/v1/audit", get(list_audit))
+        .route("/v1/export/audit", get(export_audit))
+        .route(
+            "/v1/agents/{name}/policy",
+            get(get_agent_policy).put(put_agent_policy),
+        )
+        .route("/v1/sessions/{id}/cockpit", get(session_cockpit))
+        .route("/v1/export-tokens", post(mint_export_token))
+        .route("/v1/agents/{name}/pack", get(pack_agent))
+        .route("/v1/skills", get(list_skills).post(publish_skill))
+        .route("/v1/skills/{name}", get(get_skill).delete(delete_skill))
         .route("/mcp", post(crate::mcp::handle))
         .route_layer(middleware::from_fn_with_state(state.clone(), api_auth));
 
     Router::new()
         .route("/healthz", get(|| async { Json(json!({"ok": true})) }))
         .route("/v1/hooks/{id}", post(crate::schedules::webhook_ingress))
+        .route("/keep/cockpit", get(cockpit_page))
         .merge(protected)
         .with_state(state)
 }
@@ -213,7 +341,7 @@ async fn api_auth(
 
 async fn deploy_agent(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<DeployAgentRequest>,
+    Json(mut req): Json<DeployAgentRequest>,
 ) -> ApiResult<(StatusCode, Json<crate::model::AgentRecord>)> {
     if req.manifest.template.trim().is_empty() {
         return Err(ApiError::bad_request("manifest.template is required"));
@@ -231,6 +359,31 @@ async fn deploy_agent(
             "max_concurrent_sessions must be greater than zero",
         ));
     }
+    if let Some(seconds) = req.manifest.egress_approval_timeout_seconds {
+        if !(MIN_EGRESS_APPROVAL_SECONDS..=MAX_EGRESS_APPROVAL_SECONDS).contains(&seconds) {
+            return Err(ApiError::bad_request(format!(
+                "egress_approval_timeout_seconds must be between {MIN_EGRESS_APPROVAL_SECONDS} and {MAX_EGRESS_APPROVAL_SECONDS}"
+            )));
+        }
+    }
+    if let Err(message) = req.manifest.validate_confidential() {
+        return Err(ApiError::bad_request(message));
+    }
+    if let Err(message) = req.manifest.validate_cell_backend() {
+        return Err(ApiError::bad_request(message));
+    }
+    if let Err(message) = req.manifest.validate_egress_policy() {
+        return Err(ApiError::bad_request(message));
+    }
+    if let Err(message) = req
+        .manifest
+        .validate_resources(state.config.max_vcpus, state.config.max_memory_mib)
+    {
+        return Err(ApiError::bad_request(message));
+    }
+    if let Err(message) = req.manifest.validate_home_volume(&req.name) {
+        return Err(ApiError::bad_request(message));
+    }
     if req.manifest.warm_pool_size > 64 {
         return Err(ApiError::bad_request("warm_pool_size may not exceed 64"));
     }
@@ -241,6 +394,18 @@ async fn deploy_agent(
             )));
         }
     }
+    // Pin skills to exact versions now, so republishing a skill later never
+    // changes what this immutable agent version mounts.
+    req.manifest.skills = state
+        .store
+        .skills
+        .pin(
+            &req.manifest.skills,
+            req.manifest.skill_scope.as_deref(),
+            &state.skill_scopes,
+        )
+        .await
+        .map_err(ApiError::bad_request)?;
     let record = state
         .store
         .deploy_agent(req)
@@ -321,6 +486,7 @@ pub(crate) async fn create_session(
     if let Some(value) = request_id.as_deref() {
         validate_request_id(value)?;
     }
+    check_session_user(&agent, req.user_id.as_deref())?;
     let ttl = req.ttl_seconds.or(agent.manifest.ttl_seconds);
     let start_policy = req.start_policy;
     let expires_at = match ttl {
@@ -382,6 +548,20 @@ pub(crate) async fn create_session(
             }
         }
 
+        if let Some(user) = req.user_id.as_deref() {
+            if state
+                .store
+                .count_non_terminal_for_user(&agent.name, user)
+                .await
+                > 0
+            {
+                return Err(ApiError::conflict(format!(
+                    "user '{user}' already has an active session for agent '{}'",
+                    agent.name
+                )));
+            }
+        }
+
         let id = Uuid::new_v4();
         // Reserve the per-session operation lock before the record becomes
         // visible. Sync/expiry/control requests can discover Creating state,
@@ -412,6 +592,7 @@ pub(crate) async fn create_session(
             )));
         }
 
+        let mut confidential: Option<crate::model::ConfidentialStatus> = None;
         let (sandbox_id, start_mode, prewarmed) = if let Some(warm) = warm {
             match with_start_timeout(state.fluxvm.resume(warm.sandbox_id)).await {
                 Ok(()) => (warm.sandbox_id, SessionStartMode::Warm, true),
@@ -434,28 +615,15 @@ pub(crate) async fn create_session(
                             "claimed warm sandbox could not resume; retry after pool replenishment",
                         ));
                     }
-                    let name = format!("agent-{}", &id.simple().to_string()[..12]);
-                    let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
-                        name,
-                        &agent.manifest.template,
-                        None,
-                        agent.manifest.runtime_port,
-                    ))
-                    .await
-                    .map_err(ApiError::bad_gateway)?;
+                    let sandbox =
+                        create_cold_sandbox(&state, &agent, id, req.user_id.as_deref()).await?;
+                    confidential = sandbox.confidential.clone();
                     (sandbox.id, SessionStartMode::Cold, false)
                 }
             }
         } else {
-            let name = format!("agent-{}", &id.simple().to_string()[..12]);
-            let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
-                name,
-                &agent.manifest.template,
-                None,
-                agent.manifest.runtime_port,
-            ))
-            .await
-            .map_err(ApiError::bad_gateway)?;
+            let sandbox = create_cold_sandbox(&state, &agent, id, req.user_id.as_deref()).await?;
+            confidential = sandbox.confidential.clone();
             (sandbox.id, SessionStartMode::Cold, false)
         };
 
@@ -479,6 +647,9 @@ pub(crate) async fn create_session(
             capability_token: random_capability(),
             error: None,
             parent_session_id: req.parent_session_id,
+            user_id: req.user_id.clone(),
+            tainted_by: vec![],
+            confidential: confidential.clone(),
         };
         if let Err(error) = state.store.save_session(record.clone()).await {
             if prewarmed {
@@ -515,6 +686,7 @@ pub(crate) async fn create_session(
                     "start_mode": start_mode,
                     "expires_at": record.expires_at.as_ref(),
                     "parent_session_id": record.parent_session_id,
+                    "confidential": record.confidential,
                 }),
             )
             .await
@@ -662,6 +834,72 @@ async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Resul
     }
 }
 
+/// Write the agent's pinned skills into the sandbox: base skills under
+/// `/opt/zyvor/skills`, scoped ones under `/opt/zyvor/skills-scoped`, each root
+/// with an `INDEX.json`. The scope policy is checked again here because the
+/// operator may have tightened it since the agent was deployed; a skill the
+/// agent may no longer use fails the session rather than being mounted.
+async fn mount_skills(
+    state: &AppState,
+    session: &SessionRecord,
+    agent: &crate::model::AgentRecord,
+) -> Result<()> {
+    use crate::skills::{index_json, mount_plan, split_ref, BASE_MOUNT, SCOPED_MOUNT};
+    if agent.manifest.skills.is_empty() {
+        return Ok(());
+    }
+    let mut bundles = Vec::new();
+    for pin in &agent.manifest.skills {
+        let (name, version) = split_ref(pin);
+        let bundle = state
+            .store
+            .skills
+            .get(name, version)
+            .await
+            .with_context(|| format!("loading pinned skill {pin}"))?;
+        anyhow::ensure!(
+            state
+                .skill_scopes
+                .allows(agent.manifest.skill_scope.as_deref(), bundle.record.scope.as_deref()),
+            "skill {pin} is not permitted for this agent's skill_scope under the current scope policy"
+        );
+        bundles.push(bundle);
+    }
+    for bundle in &bundles {
+        for (path, bytes, mode) in mount_plan(bundle)? {
+            with_timeout(
+                HEALTH_CHECK_ATTEMPT_TIMEOUT,
+                state
+                    .fluxvm
+                    .fs_write(session.sandbox_id, &path, &bytes, mode),
+            )
+            .await
+            .with_context(|| format!("writing skill file {path}"))?;
+        }
+    }
+    for (root, scoped) in [(BASE_MOUNT, false), (SCOPED_MOUNT, true)] {
+        let group: Vec<_> = bundles
+            .iter()
+            .filter(|b| b.record.scope.is_some() == scoped)
+            .collect();
+        if group.is_empty() {
+            continue;
+        }
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                &format!("{root}/INDEX.json"),
+                &index_json(&group),
+                0o444,
+            ),
+        )
+        .await
+        .with_context(|| format!("writing {root}/INDEX.json"))?;
+    }
+    Ok(())
+}
+
 async fn provision_guest(
     state: &AppState,
     session: &SessionRecord,
@@ -694,6 +932,32 @@ async fn provision_guest(
         )
         .await?;
     }
+    let host = match state.config.egress_advertise_host.as_deref() {
+        Some(v) => v.to_string(),
+        None => {
+            with_timeout(
+                HEALTH_CHECK_ATTEMPT_TIMEOUT,
+                state.fluxvm.default_gateway(session.sandbox_id),
+            )
+            .await?
+        }
+    };
+    // Confine before any agent code is written to or run in the guest, and fail
+    // the session rather than run it unconfined.
+    if state.config.confine_all || agent.manifest.confinement == crate::model::Confinement::Strict {
+        let gateway = crate::confine::parse_gateway(&host)?;
+        let policy = crate::confine::strict_policy(
+            gateway,
+            state.config.egress_listen.port(),
+            state.config.proxy_listen.map(|addr| addr.port()),
+        );
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.set_network_policy(session.sandbox_id, &policy),
+        )
+        .await
+        .context("applying sandbox network confinement")?;
+    }
     with_timeout(
         HEALTH_CHECK_ATTEMPT_TIMEOUT,
         state.fluxvm.fs_write(
@@ -705,25 +969,89 @@ async fn provision_guest(
     )
     .await?;
 
-    let host = match state.config.egress_advertise_host.as_deref() {
-        Some(v) => v.to_string(),
-        None => {
-            with_timeout(
-                HEALTH_CHECK_ATTEMPT_TIMEOUT,
-                state.fluxvm.default_gateway(session.sandbox_id),
-            )
-            .await?
-        }
-    };
+    if agent.manifest.inner_container == crate::model::InnerContainer::Strict {
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                crate::contain::GUEST_PATH,
+                crate::contain::SCRIPT.as_bytes(),
+                0o755,
+            ),
+        )
+        .await?;
+    }
+    mount_skills(state, session, agent).await?;
+
     let broker = format!(
         "http://{}:{}",
         format_host(&host),
         state.config.egress_listen.port()
     );
+    // Basic credentials for the CONNECT proxy: the same session id and
+    // capability the JSON broker takes, so the guest gains no new secret.
+    let proxy = state.config.proxy_listen.map(|addr| {
+        format!(
+            "http://{}:{}@{}:{}",
+            session.id,
+            session.capability_token,
+            format_host(&host),
+            addr.port()
+        )
+    });
+    let proxy_env = proxy
+        .map(|url| format!("ZYVOR_EGRESS_PROXY={} ", shell_quote(&url)))
+        .unwrap_or_default();
     let credentials =
         serde_json::to_string(&agent.manifest.credentials).unwrap_or_else(|_| "[]".into());
+    let launcher = crate::contain::launcher_prefix(agent.manifest.inner_container);
+    // With interception on, an agent that holds intercepted credentials gets the
+    // CA in its trust stores and a surrogate for each: never the real secret.
+    let surrogates = match &state.mitm {
+        Some(_) => crate::mitm::surrogates(
+            &state.credentials,
+            &agent.manifest.credentials,
+            &session.capability_token,
+        ),
+        None => Default::default(),
+    };
+    let mut mitm_env = String::new();
+    if let (Some(mitm), false) = (&state.mitm, surrogates.is_empty()) {
+        let installed = with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                crate::mitm::GUEST_CA_PATH,
+                mitm.ca_pem().as_bytes(),
+                0o644,
+            ),
+        )
+        .await;
+        match installed {
+            Ok(()) => {
+                if let Err(error) = with_timeout(
+                    HEALTH_CHECK_ATTEMPT_TIMEOUT,
+                    state
+                        .fluxvm
+                        .process(session.sandbox_id, crate::mitm::GUEST_INSTALL, Some(10)),
+                )
+                .await
+                {
+                    tracing::warn!(%error, "could not install the interception CA in the guest");
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, "could not write the interception CA to the guest")
+            }
+        }
+        mitm_env = format!(
+            "NODE_EXTRA_CA_CERTS={} ZYVOR_SURROGATES={} ",
+            crate::mitm::GUEST_CA_PATH,
+            shell_quote(&serde_json::to_string(&surrogates).unwrap_or_else(|_| "{}".into())),
+        );
+    }
     let command = format!(
-        "mkdir -p /opt/zyvor/agent; ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
+        "mkdir -p /opt/zyvor/agent; {proxy_env}{mitm_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()),
         shell_quote(&session.capability_token),
         shell_quote(&broker),
@@ -780,12 +1108,17 @@ async fn provision_guest(
     Ok(())
 }
 
-async fn list_sessions(State(state): State<Arc<AppState>>) -> Json<Value> {
+async fn list_sessions(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Json<Value> {
+    let user = query.get("user_id");
     let items: Vec<SessionView> = state
         .store
         .list_sessions()
         .await
         .into_iter()
+        .filter(|s| user.is_none_or(|u| s.user_id.as_deref() == Some(u.as_str())))
         .map(Into::into)
         .collect();
     Json(json!({"items": items}))
@@ -839,7 +1172,40 @@ pub(crate) async fn steer_session(
     Ok((StatusCode::ACCEPTED, Json(value)))
 }
 
-async fn cancel_session(
+/// Clear a session's taint after an operator has looked at what it read. The
+/// agent cannot call this: it sits behind the operator token, on the public
+/// router only.
+async fn untaint_session(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<SessionView>> {
+    require_session(&state, id).await?;
+    let hosts = state
+        .store
+        .untaint_session(id)
+        .await
+        .map_err(ApiError::internal)?;
+    if !hosts.is_empty() {
+        if let Err(error) = state
+            .store
+            .audit
+            .append(
+                Some(id),
+                AuditPhase::Approved,
+                "session.untainted",
+                None,
+                json!({"was_tainted_by": hosts}),
+            )
+            .await
+        {
+            tracing::error!(%error, "failed to write audit entry");
+        }
+    }
+    let session = require_session(&state, id).await?;
+    Ok(Json(session.into()))
+}
+
+pub(crate) async fn cancel_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<(StatusCode, Json<SessionView>)> {
@@ -1402,6 +1768,11 @@ fn spawn_delegation(state: &Arc<AppState>, parent: Uuid, data: &Value) {
     let input = data.get("input").cloned().unwrap_or(Value::Null);
     let state = Arc::clone(state);
     tokio::spawn(async move {
+        let user_id = state
+            .store
+            .get_session(parent)
+            .await
+            .and_then(|p| p.user_id);
         let request = CreateSessionRequest {
             agent: target.clone(),
             input,
@@ -1409,6 +1780,7 @@ fn spawn_delegation(state: &Arc<AppState>, parent: Uuid, data: &Value) {
             request_id: Some(format!("delegate:{parent}:{}", Uuid::new_v4().simple())),
             start_policy: SessionStartPolicy::PreferWarm,
             parent_session_id: Some(parent),
+            user_id,
         };
         match create_session(State(state.clone()), Json(request)).await {
             Ok((_, Json(view))) => {
@@ -1458,19 +1830,49 @@ async fn record_approval_request(
     if prompt.is_empty() {
         return Ok(());
     }
-    state
+    let record = ApprovalRecord {
+        id: Uuid::new_v4(),
+        session_id,
+        kind: ApprovalKind::Custom,
+        subject: None,
+        planned_action: None,
+        prompt,
+        status: ApprovalStatus::Pending,
+        comment: None,
+        created_at: Utc::now(),
+        decided_at: None,
+        source_seq: Some(seq),
+        grant_scope: None,
+        broker_held: false,
+    };
+    state.store.save_approval(record.clone()).await?;
+    audit_approval_planned(state, &record).await;
+    Ok(())
+}
+
+/// Append the "planned" journal entry for a freshly opened approval. Audit
+/// failures are logged, not propagated: an unwritable journal must not wedge
+/// a session, and the failure is itself visible in the logs.
+pub(crate) async fn audit_approval_planned(state: &AppState, record: &ApprovalRecord) {
+    let result = state
         .store
-        .save_approval(ApprovalRecord {
-            id: Uuid::new_v4(),
-            session_id,
-            prompt,
-            status: ApprovalStatus::Pending,
-            comment: None,
-            created_at: Utc::now(),
-            decided_at: None,
-            source_seq: Some(seq),
-        })
-        .await
+        .audit
+        .append(
+            Some(record.session_id),
+            AuditPhase::Planned,
+            format!("approval.{}", record.kind.as_str()),
+            record.subject.clone(),
+            json!({
+                "approval_id": record.id,
+                "prompt": record.prompt,
+                "planned_action": record.planned_action,
+            }),
+        )
+        .await;
+    if let Err(error) = result {
+        tracing::error!(%error, approval_id = %record.id, "failed to write audit entry");
+    }
+    crate::notify::approval_requested(state, record);
 }
 
 async fn delegate_session(
@@ -1491,6 +1893,7 @@ async fn delegate_session(
             request_id: Some(format!("delegate:{id}:{}", Uuid::new_v4().simple())),
             start_policy: SessionStartPolicy::PreferWarm,
             parent_session_id: Some(id),
+            user_id: parent.user_id.clone(),
         }),
     )
     .await?;
@@ -1503,6 +1906,454 @@ async fn delegate_session(
         )
         .await;
     Ok((status, Json(view)))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct AuditQuery {
+    #[serde(default)]
+    session_id: Option<Uuid>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+/// Default and maximum page size for `GET /v1/audit`.
+const AUDIT_DEFAULT_LIMIT: usize = 200;
+const AUDIT_MAX_LIMIT: usize = 5000;
+
+async fn list_audit(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<AuditQuery>,
+) -> ApiResult<Json<Value>> {
+    // Operator console: recent journal only (not a trajectory export).
+    let limit = query
+        .limit
+        .unwrap_or(AUDIT_DEFAULT_LIMIT)
+        .clamp(1, AUDIT_MAX_LIMIT.min(500));
+    let items = state
+        .store
+        .audit
+        .list(query.session_id, limit)
+        .await
+        .map_err(ApiError::internal)?;
+    let chain = state
+        .store
+        .audit
+        .verify()
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(json!({"items": items, "chain": chain, "export": false})))
+}
+
+/// Full audit/trajectory export — requires X-Keep-Export-Token (training default off).
+async fn export_audit(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<AuditQuery>,
+) -> ApiResult<Json<Value>> {
+    let export = headers
+        .get("x-keep-export-token")
+        .and_then(|v| v.to_str().ok());
+    state
+        .export_tokens
+        .authorize(export, "audit")
+        .await
+        .map_err(ApiError::forbidden)?;
+    let limit = query
+        .limit
+        .unwrap_or(AUDIT_MAX_LIMIT)
+        .clamp(1, AUDIT_MAX_LIMIT);
+    let items = state
+        .store
+        .audit
+        .list(query.session_id, limit)
+        .await
+        .map_err(ApiError::internal)?;
+    let chain = state
+        .store
+        .audit
+        .verify()
+        .await
+        .map_err(ApiError::internal)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            query.session_id,
+            AuditPhase::Performed,
+            "keep.audit.exported",
+            None,
+            json!({"limit": limit}),
+        )
+        .await;
+    Ok(Json(json!({"items": items, "chain": chain, "export": true})))
+}
+
+/// Keep: readable Sentinel policy as `keep.policy.yaml`.
+async fn get_agent_policy(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Response> {
+    let agent = state
+        .store
+        .get_agent(&name)
+        .await
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
+    let yaml = crate::policy::KeepPolicy::from_manifest(&agent.manifest)
+        .to_yaml()
+        .map_err(ApiError::internal)?;
+    Ok((
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/x-yaml; charset=utf-8",
+        )],
+        yaml,
+    )
+        .into_response())
+}
+
+/// Keep: replace policy from YAML; redeploys a new agent version (sessions keep old contract).
+async fn put_agent_policy(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+    body: String,
+) -> ApiResult<Json<Value>> {
+    let sig = headers
+        .get("x-keep-policy-signature")
+        .and_then(|v| v.to_str().ok());
+    state
+        .policy_trust
+        .verify_yaml(body.as_bytes(), sig)
+        .map_err(ApiError::forbidden)?;
+    let agent = state
+        .store
+        .get_agent(&name)
+        .await
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
+    let policy = crate::policy::KeepPolicy::from_yaml(&body).map_err(ApiError::bad_request)?;
+    let mut manifest = agent.manifest.clone();
+    policy.apply_to_manifest(&mut manifest);
+    let bundle_path = state
+        .config
+        .state_dir
+        .join("agents")
+        .join(&name)
+        .join(&agent.version)
+        .join("bundle.mjs");
+    let bundle = tokio::fs::read(&bundle_path)
+        .await
+        .map_err(ApiError::internal)?;
+    let record = state
+        .store
+        .deploy_agent(crate::model::DeployAgentRequest {
+            name: name.clone(),
+            bundle_base64: base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                bundle,
+            ),
+            manifest,
+        })
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.policy.set",
+            Some(name),
+            json!({"version": record.version}),
+        )
+        .await;
+    Ok(Json(json!({
+        "name": record.name,
+        "version": record.version,
+        "policy": crate::policy::KeepPolicy::from_manifest(&record.manifest),
+    })))
+}
+
+/// Keep cockpit: taint paint + last Sentinel/audit decisions for a session.
+async fn session_cockpit(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<Value>> {
+    let session = state
+        .store
+        .get_session(id)
+        .await
+        .ok_or_else(|| ApiError::not_found("session not found"))?;
+    let decisions = state
+        .store
+        .audit
+        .list(Some(id), 20)
+        .await
+        .map_err(ApiError::internal)?;
+    let pending: Vec<_> = state
+        .store
+        .list_approvals()
+        .await
+        .into_iter()
+        .filter(|a| a.session_id == id && a.status == crate::model::ApprovalStatus::Pending)
+        .collect();
+    let schedules = state.store.list_schedules().await;
+    let upcoming: Vec<_> = schedules
+        .into_iter()
+        .filter(|s| s.agent == session.agent)
+        .take(10)
+        .collect();
+    Ok(Json(json!({
+        "session_id": id,
+        "agent": session.agent,
+        "status": session.status,
+        "tainted_by": session.tainted_by,
+        "taint_visible": !session.tainted_by.is_empty(),
+        "pending_approvals": pending,
+        "last_decisions": decisions,
+        "upcoming_cron": upcoming,
+        "model_socket": state.store.get_agent(&session.agent).await.map(|a| a.manifest.model_socket),
+        "browser_port": state.store.get_agent(&session.agent).await.and_then(|a| a.manifest.browser_port),
+        "honesty": "If FluxVM evidence class is software-test, the host can still see this VM.",
+    })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MintExportTokenRequest {
+    /// What may leave the box (e.g. `trajectory:read:7d`). Empty is refused.
+    scope: String,
+    /// Lifetime in seconds (max 86400).
+    #[serde(default = "default_export_ttl")]
+    ttl_seconds: u64,
+}
+
+fn default_export_ttl() -> u64 {
+    3600
+}
+
+/// Keep: training default off — mint an explicit scoped export token or nothing leaves.
+async fn mint_export_token(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<MintExportTokenRequest>,
+) -> ApiResult<Json<Value>> {
+    let (token, record) = state
+        .export_tokens
+        .mint(&req.scope, req.ttl_seconds)
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.export_token.minted",
+            None,
+            json!({"scope": record.scope, "expires_at": record.expires_at}),
+        )
+        .await;
+    Ok(Json(json!({
+        "token": token,
+        "scope": record.scope,
+        "expires_at": record.expires_at,
+        "note": "Present as X-Keep-Export-Token. Without it, GET /v1/audit and pack export are refused.",
+    })))
+}
+
+/// Keep pack: policy + agent pin + credential *names* (never secrets) + FluxVM migrate notes.
+async fn pack_agent(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> ApiResult<Json<Value>> {
+    let export = headers
+        .get("x-keep-export-token")
+        .and_then(|v| v.to_str().ok());
+    state
+        .export_tokens
+        .authorize(export, "pack")
+        .await
+        .map_err(ApiError::forbidden)?;
+    let agent = state
+        .store
+        .get_agent(&name)
+        .await
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
+    let policy = crate::policy::KeepPolicy::from_manifest(&agent.manifest);
+    let pack = crate::policy::KeepPackManifest {
+        version: 1,
+        agent: agent.name.clone(),
+        agent_version: agent.version.clone(),
+        packed_at: Utc::now().to_rfc3339(),
+        model_socket: agent.manifest.model_socket.clone(),
+        cell_backend: agent.manifest.cell_backend,
+        credential_names: agent.manifest.credentials.clone(),
+        fluxvm_notes: [
+            (
+                "disk".into(),
+                "Copy the FluxVM qcow2 / workspace for this agent's sandboxes separately; keepctl unpack restores policy only.".into(),
+            ),
+            (
+                "vault".into(),
+                "Credential *secrets* stay in host env / credentials file — never in the pack. Re-point ZYVOR_AGENT_CREDENTIALS_FILE on the destination.".into(),
+            ),
+            (
+                "honesty".into(),
+                "Measured evidence is software-test until Keep 0.2 + hardware.".into(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    };
+    Ok(Json(json!({
+        "pack": pack,
+        "policy_yaml": policy.to_yaml().map_err(ApiError::internal)?,
+        "agent": agent,
+    })))
+}
+
+/// Minimal Keep cockpit HTML (visible taint + last decisions). Auth via query token for phone browsers.
+async fn cockpit_page(Query(q): Query<CockpitPageQuery>) -> impl IntoResponse {
+    let session = q.session.unwrap_or_default();
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Keep cockpit</title>
+<style>
+body{{font-family:ui-sans-serif,system-ui,sans-serif;margin:0;background:#0f1419;color:#e7ecf3}}
+header{{padding:1rem 1.25rem;border-bottom:1px solid #243044}}
+main{{display:grid;gap:1rem;padding:1rem;max-width:1100px;margin:0 auto}}
+.card{{background:#162032;border:1px solid #243044;border-radius:12px;padding:1rem}}
+.taint{{background:#3a1515;border-color:#7a2a2a}}
+.ok{{color:#8dffa8}}.bad{{color:#ff8d8d}}
+pre{{white-space:pre-wrap;word-break:break-word;font-size:12px}}
+input,button{{font:inherit;padding:.5rem .75rem;border-radius:8px;border:1px solid #345}}
+button{{background:#2b6cff;color:#fff;border:0;cursor:pointer}}
+</style></head><body>
+<header><strong>Keep cockpit</strong> · visible taint · last Sentinel decisions
+<div style="opacity:.7;font-size:13px;margin-top:.35rem">Honesty: if FluxVM evidence is software-test, the host can still see the VM.</div>
+</header>
+<main>
+<div class="card">
+<label>API base <input id="base" value="" placeholder="http://127.0.0.1:9096" style="width:60%"/></label>
+<label>Token <input id="token" type="password" style="width:40%"/></label>
+<label>Session <input id="sid" value="{session}" style="width:50%"/></label>
+<button id="go">Refresh</button>
+</div>
+<div id="status" class="card">Load a session.</div>
+<div class="card"><h3>Last decisions</h3><pre id="decisions">—</pre></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function refresh(){{
+  const base=$('base').value.replace(/\/$/,'')||location.origin;
+  const sid=$('sid').value.trim();
+  const tok=$('token').value.trim();
+  if(!sid){{$('status').textContent='session id required';return;}}
+  const r=await fetch(base+'/v1/sessions/'+sid+'/cockpit',{{headers: tok?{{Authorization:'Bearer '+tok}}:{{}}}});
+  const j=await r.json();
+  if(!r.ok){{$('status').textContent=JSON.stringify(j);return;}}
+  const tainted=(j.tainted_by||[]).length>0;
+  $('status').className='card'+(tainted?' taint':'');
+  $('status').innerHTML=`<div class="${{tainted?'bad':'ok'}}">${{tainted?'TAINTED':'clean'}}</div>
+    <div>agent: ${{j.agent}} · status: ${{j.status}}</div>
+    <div>tainted_by: ${{(j.tainted_by||[]).join(', ')||'—'}}</div>
+    <div>pending approvals: ${{(j.pending_approvals||[]).length}}</div>
+    <div style="opacity:.75;margin-top:.5rem">${{j.honesty||''}}</div>`;
+  $('decisions').textContent=JSON.stringify(j.last_decisions||[],null,2);
+}}
+$('go').onclick=refresh;
+const u=new URL(location.href); if(u.searchParams.get('token')) $('token').value=u.searchParams.get('token');
+if(u.searchParams.get('base')) $('base').value=u.searchParams.get('base');
+if($('sid').value) refresh();
+</script></body></html>"#,
+        session = html_escape(&session)
+    );
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        html,
+    )
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CockpitPageQuery {
+    #[serde(default)]
+    session: Option<String>,
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+async fn list_skills(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
+    let items = state
+        .store
+        .skills
+        .list()
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(json!({"items": items})))
+}
+
+async fn publish_skill(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<crate::skills::PublishSkillRequest>,
+) -> ApiResult<(StatusCode, Json<crate::skills::SkillRecord>)> {
+    let record = state
+        .store
+        .skills
+        .publish(req)
+        .await
+        .map_err(ApiError::bad_request)?;
+    Ok((StatusCode::CREATED, Json(record)))
+}
+
+async fn get_skill(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let current = state
+        .store
+        .skills
+        .get(&name, None)
+        .await
+        .map_err(|e| ApiError::not_found(e.to_string()))?;
+    let versions = state
+        .store
+        .skills
+        .versions(&name)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(
+        json!({"current": current.record, "versions": versions}),
+    ))
+}
+
+/// Refuses while a deployed agent still lists the skill: its pinned version
+/// would vanish and every new session would fail at provisioning.
+async fn delete_skill(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<StatusCode> {
+    if let Some(agent) = state.store.list_agents().await.into_iter().find(|a| {
+        a.manifest
+            .skills
+            .iter()
+            .any(|pin| crate::skills::split_ref(pin).0 == name)
+    }) {
+        return Err(ApiError::conflict(format!(
+            "skill '{name}' is used by agent '{}'; redeploy the agent without it first",
+            agent.name
+        )));
+    }
+    match state.store.skills.delete(&name).await {
+        Ok(true) => Ok(StatusCode::NO_CONTENT),
+        Ok(false) => Err(ApiError::not_found("skill not found")),
+        Err(e) => Err(ApiError::bad_request(e)),
+    }
 }
 
 async fn list_approvals(State(state): State<Arc<AppState>>) -> Json<Value> {
@@ -1523,18 +2374,24 @@ async fn create_approval(
     let record = ApprovalRecord {
         id: Uuid::new_v4(),
         session_id: req.session_id,
+        kind: req.kind,
+        subject: req.subject,
+        planned_action: req.planned_action,
         prompt: req.prompt,
         status: ApprovalStatus::Pending,
         comment: None,
         created_at: Utc::now(),
         decided_at: None,
         source_seq: None,
+        grant_scope: None,
+        broker_held: false,
     };
     state
         .store
         .save_approval(record.clone())
         .await
         .map_err(ApiError::internal)?;
+    audit_approval_planned(&state, &record).await;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -1543,10 +2400,13 @@ async fn decide_approval(
     Path(id): Path<Uuid>,
     Json(req): Json<DecideApprovalRequest>,
 ) -> ApiResult<Json<ApprovalRecord>> {
-    if req.decision == ApprovalStatus::Pending {
+    if !matches!(
+        req.decision,
+        ApprovalStatus::Approved | ApprovalStatus::Denied
+    ) {
         return Err(ApiError::bad_request("decision must be approved or denied"));
     }
-    let Some(mut record) = state.store.get_approval(id).await else {
+    let Some(record) = state.store.get_approval(id).await else {
         return Err(ApiError::not_found("approval not found"));
     };
     if record.status != ApprovalStatus::Pending {
@@ -1556,25 +2416,51 @@ async fn decide_approval(
     if session.status != SessionStatus::Running {
         return Err(ApiError::conflict("session is not running"));
     }
-    record.status = req.decision;
-    record.comment = req.comment.clone();
-    record.decided_at = Some(Utc::now());
-    state
+    let scope = (record.kind == ApprovalKind::Egress).then(|| req.scope.unwrap_or_default());
+    let Some(record) = state
         .store
-        .save_approval(record.clone())
+        .transition_approval(id, req.decision, req.comment.clone(), scope)
         .await
-        .map_err(ApiError::internal)?;
+        .map_err(ApiError::internal)?
+    else {
+        // Decided, or expired, between the read above and now.
+        return Err(ApiError::conflict("approval is already decided"));
+    };
+    let phase = if record.status == ApprovalStatus::Approved {
+        AuditPhase::Approved
+    } else {
+        AuditPhase::Denied
+    };
+    if let Err(error) = state
+        .store
+        .audit
+        .append(
+            Some(record.session_id),
+            phase,
+            format!("approval.{}", record.kind.as_str()),
+            record.subject.clone(),
+            json!({"approval_id": record.id, "comment": record.comment}),
+        )
+        .await
+    {
+        tracing::error!(%error, approval_id = %record.id, "failed to write audit entry");
+    }
     let message = json!({
         "approval_id": record.id,
         "decision": record.status,
         "comment": record.comment,
     });
-    let _ = steer_session(
-        State(state),
-        Path(record.session_id),
-        Json(SteerRequest { message }),
-    )
-    .await?;
+    // An approval the broker is holding (egress, or a send/purchase/DLP/taint hold)
+    // unblocks a request already in flight; the agent is not waiting for steering,
+    // so there is nothing to send it.
+    if record.kind != ApprovalKind::Egress && !record.broker_held {
+        let _ = steer_session(
+            State(state),
+            Path(record.session_id),
+            Json(SteerRequest { message }),
+        )
+        .await?;
+    }
     Ok(Json(record))
 }
 
@@ -1669,5 +2555,105 @@ mod tests {
         let failing = async { Err::<(), _>(anyhow::anyhow!("boom")) };
         let result = with_timeout(Duration::from_secs(5), failing).await;
         assert_eq!(result.unwrap_err().to_string(), "boom");
+    }
+
+    // ---- confidential: auto / required ----
+
+    async fn fluxvm_that_counts_deletes() -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+        let deleted = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = deleted.clone();
+        let app = Router::new().route(
+            "/v1/vms/{id}",
+            axum::routing::delete(move || {
+                let counter = counter.clone();
+                async move {
+                    counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    StatusCode::NO_CONTENT
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (url, deleted)
+    }
+
+    fn agent_with(mode: crate::model::Confidential) -> crate::model::AgentRecord {
+        let mut manifest = crate::egress::ask_tests::manifest(crate::model::EgressMode::Deny, None);
+        manifest.confidential = mode;
+        crate::model::AgentRecord {
+            name: "a".into(),
+            version: "v".into(),
+            digest_sha256: String::new(),
+            manifest,
+            created_at: Utc::now(),
+        }
+    }
+
+    fn sandbox(status: Option<crate::model::ConfidentialStatus>) -> crate::fluxvm::SandboxRecord {
+        crate::fluxvm::SandboxRecord {
+            id: Uuid::new_v4(),
+            guest_ip: None,
+            status: None,
+            confidential: status,
+        }
+    }
+
+    fn status(active: bool, reason: &str) -> Option<crate::model::ConfidentialStatus> {
+        Some(crate::model::ConfidentialStatus {
+            active,
+            tech: active.then(|| "sev-snp".to_string()),
+            reason: reason.into(),
+        })
+    }
+
+    #[tokio::test]
+    async fn required_confidential_refuses_and_deletes_a_sandbox_that_is_not_confidential() {
+        let (url, deleted) = fluxvm_that_counts_deletes().await;
+        let (state, _session) =
+            crate::egress::ask_tests::state_and_session_cfg(|c| c.fluxvm_url = url).await;
+        let agent = agent_with(crate::model::Confidential::Required);
+        let count = || deleted.load(std::sync::atomic::Ordering::SeqCst);
+
+        let inactive = check_confidential(
+            &state,
+            &agent,
+            &sandbox(status(false, "no SEV-SNP or TDX on this host")),
+        )
+        .await;
+        let message = inactive.unwrap_err().message().to_string();
+        assert!(message.contains("no SEV-SNP or TDX"), "{message}");
+        assert_eq!(count(), 1);
+
+        // An older FluxVM that ignores the request reports nothing: also refused.
+        let silent = check_confidential(&state, &agent, &sandbox(None)).await;
+        assert!(silent.unwrap_err().message().contains("did not report"));
+        assert_eq!(count(), 2);
+
+        // An active confidential sandbox is kept.
+        check_confidential(&state, &agent, &sandbox(status(true, "")))
+            .await
+            .unwrap();
+        assert_eq!(count(), 2);
+    }
+
+    #[tokio::test]
+    async fn auto_confidential_falls_back_to_a_normal_vm() {
+        let (url, deleted) = fluxvm_that_counts_deletes().await;
+        let (state, _session) =
+            crate::egress::ask_tests::state_and_session_cfg(|c| c.fluxvm_url = url).await;
+        for mode in [
+            crate::model::Confidential::Auto,
+            crate::model::Confidential::Off,
+        ] {
+            let agent = agent_with(mode);
+            check_confidential(&state, &agent, &sandbox(status(false, "no hardware")))
+                .await
+                .unwrap();
+            check_confidential(&state, &agent, &sandbox(None))
+                .await
+                .unwrap();
+        }
+        assert_eq!(deleted.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 }

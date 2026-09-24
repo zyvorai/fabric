@@ -3,6 +3,61 @@
 ## 0.3.0
 
 ### Added
+- **Inner containment, always-on workstations and a browser tab view.**
+  `inner_container: strict` runs the worker unprivileged in a bubblewrap container
+  (fails closed); `persistent: true` plus `PUT /v1/workstations/{agent}/{user_id}`
+  keeps a user's session running with backoff restarts; `browser_port` lets an
+  operator list the agent's open tabs (read-only; no live view yet).
+- **Confidential VMs when the host has them.** `confidential: auto|required` asks
+  FluxVM (`feat/sandbox-resources`, `GET /v1/host/confidential`) for a
+  hardware-encrypted sandbox and falls back to a normal VM (`auto`) or refuses
+  (`required`), recording the outcome on the session. Launch on SEV-SNP/TDX hardware
+  is not implemented yet, so today `auto` always falls back.
+- **Agent containment.** `confinement: strict` drops all sandbox traffic except to
+  the egress broker and proxy (FluxVM eBPF policy, fails closed); approvals are
+  pushed to `ZYVOR_AGENT_APPROVAL_WEBHOOK` (HMAC-signed) so a person sees them,
+  and a credential can require a per-request `send`/`purchase` approval; per-host
+  `egress_rules`, `dlp` secret scanning, and per-session `taint` (tainted sessions
+  need approval to write and cannot be auto-allowed by Sentinel;
+  `POST /v1/sessions/{id}/untaint`). `fabric-agent deploy` has flags for each.
+- **`fabric-agent deploy` flags for the newer manifest fields** (egress mode, home
+  volume, per-user home, sandbox size, skills) and `user_id` in the SDK types.
+- **Per-user agent VMs.** `home_volume.per_user` gives each `user_id` its own volume
+  and its own one-at-a-time session slot, so one deployed agent serves many users;
+  `resources` sets vCPUs and memory per sandbox (FluxVM `feat/sandbox-resources`,
+  operator ceilings `ZYVOR_AGENT_MAX_VCPUS`/`_MAX_MEMORY_MIB`). Volumes still have no
+  size quota.
+- **HTTPS CONNECT proxy for browsers.** Sandbox browsers reach the internet through
+  the same allowlist, `ask`/`sentinel` review, private-network gate and journal as
+  brokered requests (`ZYVOR_AGENT_PROXY_LISTEN`, default `:18083`), and
+  `agent-runtime/templates/browser-agent` is a Debian + Node + Chromium template
+  recipe. Only effective for guests with no direct route out.
+- **Sentinel egress review.** `egress_mode: "sentinel"` has an operator-configured
+  reviewer model (`ZYVOR_AGENT_SENTINEL_URL`, `_MODEL`) screen requests to unlisted
+  hosts before an operator is asked. It can deny, or escalate to the existing
+  approval flow (which is also what happens on any error or when unconfigured); it
+  can release a single request only with `ZYVOR_AGENT_SENTINEL_CAN_ALLOW=1`, and
+  never grants a session-wide approval. Verdicts are journaled.
+- **Agent skills with scoped mounts.** Immutable, content-addressed skill bundles
+  (`/v1/skills`, `zyvorctl skill`) that agents pin at deploy time via manifest
+  `skills` and mount per session: base skills at `/opt/zyvor/skills`, scoped skills
+  at `/opt/zyvor/skills-scoped` only when the operator's
+  `ZYVOR_AGENT_SKILL_SCOPES_FILE` policy allows the agent's `skill_scope`. The
+  daemon proxies `/api/skills`.
+- **Persistent agent home volume.** A manifest `home_volume` mounts a named FluxVM
+  volume (default `/home/agent`) that survives sandbox replacement and new agent
+  versions. It needs a QEMU-backed FluxVM template, `max_concurrent_sessions: 1`, and
+  no warm pool or idle hibernation; a second session while the volume is attached
+  gets `409`. Requires FluxVM sandbox volumes (`zyvorai/fluxvm` `feat/sandbox-volumes`).
+- **Agent approvals and a tamper-evident action journal** in the agent runtime.
+  Approvals now carry a `kind`, `subject`, and `planned_action`; approvals and
+  brokered egress calls are appended to a SHA-256 hash-chained `audit.jsonl`
+  (`GET /v1/audit`). Agents can opt into `egress_mode: "ask"`: a request to a host
+  outside the allowlist is held while an operator approves it once or for the
+  session (`zyvorctl approval approve --scope session`), and is refused on denial,
+  timeout, or session end. The daemon proxies `/api/approvals` and
+  `/api/audit/agent-actions`; `zyvorctl approval` and `zyvorctl agent-audit` read
+  them.
 - **AI Workloads are Beta on a single cluster** (multi-site HA store stays
   Preview; this is not GA). The control plane now
   records revisioned rolling, canary, and blue/green rollouts; content-addressed
@@ -134,6 +189,11 @@
   responsive throughout.
 
 ### Security
+- The daemon secrets manager now encrypts values at rest with AES-256-GCM
+  (random nonce per value, secret id bound as associated data) instead of a
+  hard-coded XOR key. Set `ZYVOR_SECRETS_KEY` to a base64 32-byte key to keep one
+  key across restarts; an invalid value stops startup. Without it, each process
+  uses a random key, and the store is in-memory only.
 - Bumped `rustls` 0.23.44 → 0.23.45, fixing RUSTSEC-2026-0285 (rustls
   accepted TLS 1.3 handshake messages sent at the wrong encryption level
   when packed into the same record as a key-changing message — the

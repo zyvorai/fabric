@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use axum::{routing::post, Router};
 use tower_http::trace::TraceLayer;
 use zyvor_fabric_agent_runtime::{app, config::Config, egress, pool, AppState};
 
@@ -18,10 +17,7 @@ async fn main() -> Result<()> {
     let state = AppState::from_config(config).await?;
 
     let public = app::public_router(state.clone()).layer(TraceLayer::new_for_http());
-    let broker = Router::new()
-        .route("/v1/egress", post(egress::proxy))
-        .with_state(state.clone())
-        .layer(TraceLayer::new_for_http());
+    let broker = egress::broker_router(state.clone()).layer(TraceLayer::new_for_http());
 
     tokio::spawn(app::sync_loop(state.clone()));
     tokio::spawn(app::auto_hibernate_loop(state.clone()));
@@ -30,10 +26,21 @@ async fn main() -> Result<()> {
     tokio::spawn(zyvor_fabric_agent_runtime::schedules::schedule_loop(
         state.clone(),
     ));
-    tokio::spawn(pool::warm_pool_loop(state));
+    tokio::spawn(zyvor_fabric_agent_runtime::workstations::workstation_loop(
+        state.clone(),
+    ));
+    tokio::spawn(pool::warm_pool_loop(state.clone()));
 
     let public_listener = tokio::net::TcpListener::bind(public_addr).await?;
     let egress_listener = tokio::net::TcpListener::bind(egress_addr).await?;
+    if let Some(proxy_addr) = state.config.proxy_listen {
+        let proxy_listener = tokio::net::TcpListener::bind(proxy_addr).await?;
+        tracing::info!(%proxy_addr, "Fabric Agent Runtime CONNECT proxy listening");
+        tokio::spawn(zyvor_fabric_agent_runtime::proxy::serve(
+            state.clone(),
+            proxy_listener,
+        ));
+    }
     tracing::info!(%public_addr, "Fabric Agent Runtime API listening");
     tracing::info!(%egress_addr, "Fabric Agent Runtime egress broker listening");
 

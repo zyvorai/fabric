@@ -143,11 +143,28 @@ const GROUPS: &[CmdGroup] = &[
     CmdGroup {
         emoji: "👁️",
         title: "Observability:",
-        commands: &[CmdEntry {
-            emoji: "📡",
-            name: "monitor",
-            about: "Manage network monitoring policies and alerts",
-        }],
+        commands: &[
+            CmdEntry {
+                emoji: "📡",
+                name: "monitor",
+                about: "Manage network monitoring policies and alerts",
+            },
+            CmdEntry {
+                emoji: "✋",
+                name: "approval",
+                about: "Review and decide agent approval requests",
+            },
+            CmdEntry {
+                emoji: "🧰",
+                name: "skill",
+                about: "Publish and inspect agent skills",
+            },
+            CmdEntry {
+                emoji: "📜",
+                name: "agent-audit",
+                about: "Show the tamper-evident agent action journal",
+            },
+        ],
     },
     CmdGroup {
         emoji: "💾",

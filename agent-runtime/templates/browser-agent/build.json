@@ -1,0 +1,22 @@
+{
+  "source": "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2",
+  "output": "/var/lib/fluxvm/images/browser-agent.qcow2",
+  "format": "qcow2",
+  "size_gib": 12,
+  "hostname": "browser-agent",
+  "packages": ["chromium", "bubblewrap", "util-linux", "fonts-liberation", "fonts-noto-color-emoji", "ca-certificates", "xz-utils"],
+  "commands": [
+    "tar -xf /root/node20.tar.xz -C /usr/local --strip-components=1",
+    "chmod +x /usr/local/bin/fluxvm-guest-agent",
+    "useradd --create-home --home-dir /home/agent --shell /bin/bash agent || true",
+    "/usr/local/bin/node --version",
+    "chromium --version",
+    "rm -f /root/node20.tar.xz"
+  ],
+  "copy_in": [
+    {"src": "/tmp/node20.tar.xz", "dest": "/root/node20.tar.xz"},
+    {"src": "/path/to/fluxvm/target/release/fluxvm-guest-agent", "dest": "/usr/local/bin/fluxvm-guest-agent"},
+    {"src": "/path/to/fluxvm/systemd/fluxvm-guest-agent.service", "dest": "/etc/systemd/system/fluxvm-guest-agent.service"}
+  ],
+  "enable_services": ["fluxvm-guest-agent"]
+}

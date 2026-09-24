@@ -31,6 +31,7 @@ Deploy JavaScript/TypeScript agents like serverless functions while giving every
 - cron schedules, HMAC webhooks, and bounded loops
 - an MCP endpoint for listing agents, listing executions, and chatting
 - GitHub session CI that runs those paths with no FluxVM and no model key
+- **Keep** product surface: signed `keep.policy.yaml`, BYO `model_socket`, session cockpit (visible taint), `scripts/keepctl`, scoped export tokens (training off by default) — [docs/keep/KEEP.md](../docs/keep/KEEP.md) · [Tutorial 16](../docs/tutorials/16-keep-workstation.md) · [CI](../.github/workflows/keep.yml)
 
 The runtime is intentionally a standalone component in the Fabric repository. It consumes FluxVM's existing `/v1/sandboxes` API directly and does not alter the existing `zyvor-fabricd` VM API or backend workspace.
 
@@ -117,6 +118,133 @@ provider API key. Add a credential with `"kind": "fabric"` (see
 `FABRIC_AI_API_KEY` when endpoint keys are enabled. HTTP to private Maglev
 ports is allowed for `kind: fabric` only.
 
+## Approvals and the action journal
+
+An approval is a request for a human decision. `POST /v1/approvals` takes `session_id`, `prompt`, and optional `kind` (`custom` by default, `egress`, `purchase`, `send`), `subject` (a short target such as a host or recipient), and `planned_action` (structured JSON describing what will run if approved). The coding-agent harness still opens `custom` approvals itself when the CLI prints `ZYVOR_APPROVAL`.
+
+Every approval and every brokered egress call is written to `audit.jsonl` in the state directory, one entry per line:
+
+| Phase | Written when |
+|-------|--------------|
+| `planned` | An approval is opened |
+| `approved` / `denied` | A human decides it |
+| `performed` | An egress call completed |
+| `denied` | An egress call was refused (allowlist, private network, scope, credential grant) |
+| `failed` | An egress call was allowed but failed upstream |
+
+Each entry commits to the previous entry's SHA-256, so editing or deleting a line breaks the chain. `GET /v1/audit` returns entries (newest last, `limit` defaults to 200, maximum 5000, optional `session_id`) plus `chain: {entries, chain_ok, broken_at?}`. Egress entries record the method, host, and path only, never the query string, headers, or credentials. Calls that fail the session capability check (401) are not journaled, because their claimed session id is unproven. A failed journal write is logged and does not fail the request.
+
+Through the Fabric daemon these are `GET/POST /api/approvals`, `POST /api/approvals/{id}`, and `GET /api/audit/agent-actions`; from the CLI, `zyvorctl approval list|approve|deny` and `zyvorctl agent-audit`.
+
+### Asking a human before egress
+
+By default a request to a host outside `egress_allow_hosts` is refused (`"egress_mode": "deny"`). Set `"egress_mode": "ask"` in the manifest and the broker instead holds the request and opens an `egress` approval whose `subject` is the host and whose `planned_action` holds the method and URL without its query string. `egress_approval_timeout_seconds` (5-240, default 90) bounds the wait.
+
+Decide it with `POST /v1/approvals/{id}` and `{"decision":"approved","scope":"once"}`. `once` (the default) releases the requests that were waiting; `session` also allows every later request to that host for the life of the session. Denying, timing out, or ending the session refuses the request with 403; a timed-out approval becomes `expired` and cannot be decided afterwards. Concurrent requests to the same host share one approval.
+
+Approval only lifts the allowlist check. DNS pinning, the private-network gate, and credential host scoping still run afterwards, so approving a host never allows a request into loopback, private, or link-local ranges unless `allow_private_networks` is set. The agent only sees the 403 or the response: approving does not steer the session.
+
+### Sentinel review
+
+`"egress_mode": "sentinel"` puts a reviewer model in front of the operator. For a request to an unlisted host the broker asks an OpenAI-compatible chat endpoint for a verdict, and the reviewer sees only the agent name, its allowlist, and the request's method, host and path (never headers, bodies, query strings, or credentials). Configure it on the runtime:
+
+| Variable | Meaning |
+|---|---|
+| `ZYVOR_AGENT_SENTINEL_URL` | Base URL; `/chat/completions` is appended. Point it at the Fabric inference gateway or any compatible server. |
+| `ZYVOR_AGENT_SENTINEL_MODEL` | Model name. Required when the URL is set. |
+| `ZYVOR_AGENT_SENTINEL_API_KEY` | Optional bearer token. |
+| `ZYVOR_AGENT_SENTINEL_TIMEOUT_SECS` | Per-review timeout, default 15. |
+| `ZYVOR_AGENT_SENTINEL_CAN_ALLOW` | `1` lets an `allow` verdict release a single request. |
+
+The reviewer's authority is deliberately narrow, because the request it reads is written by a possibly injected agent. `deny` refuses the request with 403 and no human is asked. `escalate`, and any error, timeout, unparseable answer, or missing configuration, opens the normal `egress` approval with the reviewer's note in `planned_action.sentinel`. `allow` is treated as `escalate` unless `ZYVOR_AGENT_SENTINEL_CAN_ALLOW=1`, and even then it releases one request and never creates a session grant. Allow and deny verdicts are journaled as `sentinel.egress`. The private-network gate and DNS pinning still apply afterwards.
+
+Changing `egress_mode` or the timeout changes the agent's version, like any manifest change; manifests that leave both at their defaults keep their existing version ids.
+
+## Containment
+
+These controls are aimed at a compromised or prompt-injected agent. They stack: each one assumes the others may be bypassed.
+
+### Network confinement
+
+Every egress control above is moot if the sandbox can reach the internet itself. `"confinement": "strict"` (or `ZYVOR_AGENT_CONFINE=1` on the runtime, which forces it for every agent) applies a FluxVM per-VM eBPF policy before any agent code is written to the guest: only the host gateway, only on the broker and proxy ports; everything else, DNS included, is dropped. The runtime uses FluxVM's `POST /v1/vms/{id}/network/policy` and fails the session rather than run it unconfined if that call fails. The gateway must be an IP address (`ZYVOR_AGENT_EGRESS_ADVERTISE_HOST`, or the guest's default route). **Not yet verified against a live FluxVM:** whether the policy's port rules also match reply traffic on the tap, so try it on a real template and check that `curl --noproxy '*' https://example.com` fails while a brokered request succeeds.
+
+### Approvals that reach a person
+
+Set `ZYVOR_AGENT_APPROVAL_WEBHOOK` and `ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET` and every new approval is POSTed there, signed `x-zyvor-signature: sha256=<HMAC-SHA256 of the body>`, with the approval's kind, subject, prompt, `planned_action`, agent and `user_id` (so a receiver can route it to the right device) and the path to decide it. Delivery retries twice and is journaled as `approval.notify` if it finally fails; it never blocks the request. The receiver answers through the operator API (`POST /v1/approvals/{id}`). The agent cannot: the operator routes sit behind `ZYVOR_AGENT_API_TOKEN` on the public listener, and the broker and proxy listeners that the sandbox can reach serve nothing else (both are tested).
+
+A credential descriptor can require a decision per request: `"requires_approval": ["POST"]` (methods, or `"*"`) and `"approval_kind": "send"` (default) or `"purchase"`. The broker then holds the request after every other check and opens an approval showing the method, the URL without its query string, the credential name, and the body's length and SHA-256, never the body or a header. Each request needs its own decision; nothing is remembered.
+
+### Inside the sandbox: a contained worker
+
+`"inner_container": "strict"` starts the worker (and so any browser it launches) through `/opt/zyvor/contain.sh`, which the runtime writes into the guest: an unprivileged `agent` user in a bubblewrap container with a read-only view of the guest (the agent cannot edit its own bundle, the worker or the launcher), a private `/tmp`, its writable home, no capabilities and no new privileges. The template needs `bubblewrap` and `util-linux` (`templates/browser-agent/build.json` has both), and it fails closed: without them the worker never starts. The VM stays the outer boundary; this limits what an escape from the agent's own process gets. It shares the network namespace on purpose, since the agent must reach the broker, so pair it with `confinement: strict`. Known gap: the guest agent's vsock channel is reachable from that namespace, so set a guest-agent token for an untrusted agent. Not exercised against a live FluxVM guest yet; the launcher's logic is tested with stand-in binaries.
+
+### Always-on workstations
+
+Deploy with `"persistent": true`, then declare a workstation: `PUT /v1/workstations/{agent}/{user_id}` (`GET`, `DELETE`, and `GET /v1/workstations` too; operator token only). The runtime keeps a session running for it and starts a new one when it ends, fails or expires, retrying with exponential backoff (5 s doubling to 5 min) while starts keep failing; the record shows `restarts`, `consecutive_failures`, `last_error` and `next_attempt_at`. State survives restarts through the user's per-user home volume, so it is meant to be used with `home_volume.per_user`. Deleting a workstation cancels its session and leaves the volume.
+
+### Looking at the agent's browser
+
+With `"browser_port": 9222` (Chromium started with remote debugging on that port, bound so FluxVM's sandbox proxy can reach it), an operator can `GET /v1/sessions/{id}/browser/json/list` (also `json`, `json/version`, `json/protocol`) to see the open tabs' titles and URLs. Only those listing paths are forwarded, and the WebSocket and frontend URLs are removed from the reply. **Watching a live screen or taking over is not implemented**: that needs a WebSocket bridge to the guest.
+
+### Confidential VMs, when the host has them
+
+`"confidential": "auto"` asks FluxVM for a hardware-encrypted VM (AMD SEV-SNP or Intel TDX) and quietly runs a normal VM when the host cannot, recording why on the session (`confidential: {active, tech, reason}`, also in the `session.created` event). `"required"` refuses to run without one: FluxVM refuses the launch, and the runtime also deletes any sandbox that comes back without an active confidential status, including from a FluxVM too old to report one. Deploy rejects the combinations that would leak guest memory or disk: `warm_pool_size` and `idle_hibernate_seconds` (a snapshot copies memory out), and, for `required`, `home_volume` (a virtiofs share is readable by the host). `GET /v1/host/confidential` on FluxVM shows what a host offers.
+
+**Not yet real on hardware.** FluxVM detects SEV-SNP and TDX but does not launch confidential guests yet (`LAUNCH_SUPPORTED` is false and guarded by a test): the QEMU arguments for them interact with FluxVM's memory-hotplug and CPU settings and cannot be checked without the hardware. So today `auto` always falls back and `required` always refuses, with an accurate reason. This is TEE isolation only: a user-held key that the operator cannot use is the key-broker work in `docs/design/confidential-agent-vms.md`, not done.
+
+### Request rules, secret scanning and taint
+
+- `egress_rules`: `[{"host": "api.example.com", "methods": ["POST"], "path_prefixes": ["/v1/messages"], "max_body_bytes": 65536}]`. A host with any rule needs a matching one; hosts without rules are unrestricted beyond the allowlist. Checked first, so a request the agent may never send never reaches an operator. The CONNECT proxy refuses a host that has rules, because a TLS tunnel hides the method and path.
+- `"dlp": true` holds any brokered request whose URL, headers or body contain a secret-shaped string (private keys, AWS, GitHub, Slack and API-key formats, JWTs) for approval. Only the detector names are stored, never the match. This is pattern matching: it catches accidents and lazy exfiltration, not a determined encoder.
+- `"taint": {"trusted_hosts": [...]}`: a session that reads a response (or opens a tunnel) from a host outside `trusted_hosts` is tainted (`tainted_by` on the session, journaled as `session.tainted`). While tainted, brokered writes (anything but GET/HEAD) need approval and Sentinel's `allow` is downgraded to an operator decision. Only an operator clears it: `POST /v1/sessions/{id}/untaint`. This is per session, not per process: the host cannot see processes inside the guest, and a tunnel is opaque, so it stops the classic "read a hostile page, then send a message" path but not a browser posting to a host it may already reach.
+
+## Persistent home volume
+
+`"home_volume": {"name": "research-home", "guest_path": "/home/agent"}` in the manifest mounts a FluxVM volume in the agent's sandbox. It is a host directory that outlives the sandbox, every session, and every new version of the agent: `name` defaults to the lowercased agent name, and `guest_path` defaults to `/home/agent`. Write state there and the next session sees it.
+
+Requirements, all checked at deploy time:
+
+- **A QEMU-backed template.** The volume is shared over virtiofs, which the in-tree `flux-vm` backend does not support. `template` must name a FluxVM template whose `spec.json` sets `"backend": "qemu"` (needs FluxVM with sandbox volumes, `feat/sandbox-volumes`, plus `virtiofsd` on the host). A sandbox on QEMU also avoids the 2+ vCPU hang of `flux-vm`, but it cannot be snapshotted.
+- **`max_concurrent_sessions: 1`.** A volume attaches to one sandbox at a time; a second session that tries to start while the volume is attached gets `409`.
+- **No `warm_pool_size` and no `idle_hibernate_seconds`.** Warm sandboxes are created before a session owns the volume, and QEMU sandboxes have no snapshot to hibernate to. A manual hibernate of such a session fails at FluxVM.
+
+### One volume per user
+
+For a fleet of per-user agent VMs, deploy one agent with `"home_volume": {"per_user": true}` and pass a `user_id` when creating a session (`POST /v1/sessions {"agent": "...", "user_id": "alice"}`, also accepted by schedules, loops and webhooks; delegated sessions inherit the parent's). Each user gets the volume `<name>-<user_id>`, at most one session per user runs at a time (a second returns `409`), and `max_concurrent_sessions` becomes an agent-wide cap instead of being forced to 1. `user_id` is 1-32 characters from `[a-z0-9._-]`, and is required for a per-user agent. `GET /v1/sessions?user_id=alice` lists one user's sessions.
+
+The runtime trusts the `user_id` its authenticated API caller asserts. It is not an end-user identity check: put your own authentication in front and derive the id from it. `warm_pool_size` and `idle_hibernate_seconds` are still rejected.
+
+## Sandbox size
+
+`"resources": {"vcpus": 2, "memory_mib": 7900}` sets the size of each sandbox, passed to FluxVM on create (needs FluxVM `feat/sandbox-resources`; an older FluxVM ignores the fields, so check with `nproc` in a session). FluxVM treats the template's own `max_vcpus`/`max_memory_mib` as a ceiling and refuses a larger request. The runtime can add its own ceiling with `ZYVOR_AGENT_MAX_VCPUS` and `ZYVOR_AGENT_MAX_MEMORY_MIB`; a manifest above them is rejected at deploy. Volumes have no size quota (see below), so a "100 GB home" is a host filesystem matter, not something this setting enforces.
+
+## Browsers and the CONNECT proxy
+
+A browser in the sandbox cannot call the JSON egress broker, so the runtime also serves an HTTPS `CONNECT` proxy (`ZYVOR_AGENT_PROXY_LISTEN`, default `0.0.0.0:18083`, `off` disables it). Each session's guest gets `ZYVOR_EGRESS_PROXY=http://<session>:<capability>@<gateway>:<port>`. A tunnel goes through the allowlist, `ask`/`sentinel` review, DNS pinning and the private-network gate, and is journaled as `egress.connect` with byte counts. It sees only `host:port`, so credential injection and path review do not apply; only `CONNECT` to `ZYVOR_AGENT_PROXY_CONNECT_PORTS` (default `443`) is served. It constrains only a guest with no other route to the internet. `templates/browser-agent/` has a Chromium template recipe and a Playwright example.
+
+Volumes are per FluxVM tenant and live under FluxVM's `sandbox.volumes_dir` (default `<state_dir>/volumes`). They have no size quota: the limit is the host filesystem. Deleting the agent or a session does not delete the volume; remove the directory on the FluxVM host to discard the data.
+
+## Skills
+
+A skill is a small bundle of instructions and helper files, with a top-level `SKILL.md`, that an agent can read at run time. Publish one with `POST /v1/skills` (`{"name", "description"?, "scope"?, "files": [{"path", "content_base64", "executable"?}]}`) or `zyvorctl skill publish <dir>`. Limits: 32 files, 512 KiB per file, 2 MiB in total, relative paths of `[A-Za-z0-9._/-]` only. A skill version is the SHA-256 of its content, so publishing identical content again changes nothing and `GET /v1/skills/{name}` lists every version.
+
+An agent lists skills in its manifest as `name` or `name@version`. Deploy rewrites each to an exact `name@version` pin, so republishing a skill never changes what an already deployed agent version mounts. Every session writes the pinned skills into its sandbox:
+
+| Skill | Mounted at |
+|-------|------------|
+| No `scope` (base) | `/opt/zyvor/skills/<name>/`, with `/opt/zyvor/skills/INDEX.json` |
+| With a `scope` | `/opt/zyvor/skills-scoped/<name>/`, with `INDEX.json` beside it |
+
+Files are mode 0444 (0555 when marked executable). This stops accidental edits by the agent process; it is not a security boundary against a guest that runs as root.
+
+A scoped skill is only usable by an agent whose manifest sets `skill_scope` and whose scope the operator's policy allows. The policy is a JSON file named by `ZYVOR_AGENT_SKILL_SCOPES_FILE`:
+
+```json
+{"scopes": {"prod": ["prod"], "internal-test": ["prod", "internal-test"]}}
+```
+
+Each key is an agent `skill_scope`; its value lists the skill scopes that agent may mount. With no file, scoped skills cannot be used at all. The policy is checked at deploy and again when each session is provisioned, so tightening it stops new sessions of already deployed agents from mounting a skill they may no longer use. `DELETE /v1/skills/{name}` returns 409 while a deployed agent lists the skill.
+
 ## Credentials
 
 Create a **descriptor file**, not a secret file:
@@ -169,6 +297,7 @@ Configuration:
 | `ZYVOR_AGENT_FLUXVM_URL` | `http://127.0.0.1:7788` | FluxVM API |
 | `ZYVOR_AGENT_FLUXVM_TOKEN` | unset | FluxVM bearer token |
 | `ZYVOR_AGENT_API_TOKEN` | unset | public Agent Runtime bearer token |
+| `ZYVOR_AGENT_SKILL_SCOPES_FILE` | unset | JSON policy: which skill scopes each agent `skill_scope` may mount (see Skills) |
 | `ZYVOR_AGENT_ALLOW_NO_AUTH` | unset | explicit opt-out to start without `ZYVOR_AGENT_API_TOKEN` |
 | `ZYVOR_AGENT_CREDENTIALS_FILE` | unset | descriptor JSON above |
 | `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` | derived | host address visible from sandbox |
@@ -229,6 +358,8 @@ FABRIC_AGENT_URL=http://127.0.0.1:9096 \
 The deploy command uses esbuild to produce one Node 20 ESM bundle. The deployment version hashes both the executable bundle and its security manifest, so changing an egress/credential grant always creates a new immutable version.
 
 Prefer deploying from the web console instead of the CLI? Build the bundle locally with `fabric-agent build agent.ts --out agent.bundle.mjs` (same esbuild step as `deploy`, minus the POST), then upload it via **Agents → Deploy agent** in the Fabric console. See [Tutorial 13](../docs/tutorials/13-deploy-agent-from-console.md) for the full walkthrough.
+
+`fabric-agent deploy` also sets the newer manifest fields without hand-written JSON: `--egress-mode deny|ask|sentinel`, `--egress-approval-timeout <sec>`, `--home-volume`, `--home-volume-name`, `--home-path`, `--per-user-home`, `--vcpus` with `--memory-mib`, `--skill <name[@version]>` and `--skill-scope`. Flags you leave out are omitted from the manifest, so existing version ids do not change. The SDK's `run()` and `sessions.create()` take `user_id`.
 
 ## Start, stream and steer
 
@@ -364,7 +495,13 @@ POST   /v1/hooks/{id}                 # HMAC signature, not the API bearer token
 POST   /v1/loops
 DELETE /v1/loops/{id}
 GET    /v1/approvals
+POST   /v1/approvals
 POST   /v1/approvals/{id}
+GET    /v1/audit?session_id=&limit=
+GET    /v1/skills
+POST   /v1/skills
+GET    /v1/skills/{name}
+DELETE /v1/skills/{name}
 
 POST   /mcp
 ```
@@ -380,6 +517,17 @@ Session metadata, TTL deadlines, warm-pool claims and the host event journal sur
 ## Continuous integration
 
 `.github/workflows/agent-runtime.yml` typechecks the crate, builds the example bundles, and runs a real session on the GitHub runner. Runners have no FluxVM, so [`agent-runtime/tests/sandbox_stub.py`](tests/sandbox_stub.py) stores the guest files and starts `worker.mjs` or `harness.mjs` with Node on the runner. Provider APIs are not called.
+
+**Keep** (policy YAML, cockpit routes, keepctl, docs) has its own workflow:
+[`.github/workflows/keep.yml`](../.github/workflows/keep.yml). Locally:
+
+```bash
+cargo test --manifest-path agent-runtime/Cargo.toml --lib
+cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+./scripts/keepctl --help
+```
+
+Tutorial: [docs/tutorials/16-keep-workstation.md](../docs/tutorials/16-keep-workstation.md).
 
 [`agent-runtime/tests/session-ci.sh`](tests/session-ci.sh) deploys four agents and checks each path:
 

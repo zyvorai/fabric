@@ -2,6 +2,8 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/zyvorai/fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ci.yml)
+[![Keep](https://github.com/zyvorai/fabric/actions/workflows/keep.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/keep.yml)
+[![Agent Runtime](https://github.com/zyvorai/fabric/actions/workflows/agent-runtime.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/agent-runtime.yml)
 [![AI Workloads](https://github.com/zyvorai/fabric/actions/workflows/ai-workloads.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ai-workloads.yml)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?logo=rust&logoColor=white)](backend/)
 [![React](https://img.shields.io/badge/react-19.2-61DAFB?logo=react&logoColor=white)](web/)
@@ -67,6 +69,7 @@ zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 | Bare-metal remote host | `./scripts/deploy remote USER@HOST` |
 | **Kubernetes (k3s lab / Helm)** | [`./scripts/deploy k8s USER@HOST`](#run-on-kubernetes) → [docs/KUBERNETES.md](docs/KUBERNETES.md) |
 | **AI inference (Beta)** | [Tutorial 15](docs/tutorials/15-ai-workloads.md) · [docs/ai-workloads.md](docs/ai-workloads.md) · console `/app/ai` |
+| **Keep** (open agent workstation) | [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [docs/keep/KEEP.md](docs/keep/KEEP.md) · `./scripts/keepctl` |
 | Declarative VMs | `zyvorctl apply -f config.yaml` |
 | Terraform | [terraform-provider/](terraform-provider/) |
 | K8s operator (CRDs → API) | [operator/](operator/) |
@@ -313,6 +316,7 @@ All figures above are counted directly from source (route definitions, router co
 | Product overview + metrics | [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
 | Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | **AI Workloads (Beta)** | [docs/ai-workloads.md](docs/ai-workloads.md) · [Tutorial 15](docs/tutorials/15-ai-workloads.md) |
 | FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | Agent Runtime | [agent-runtime/README.md](agent-runtime/README.md) · [Tutorials 11–14](docs/tutorials/README.md) |
+| | | | | **Keep** (open agent workstation) | [docs/keep/KEEP.md](docs/keep/KEEP.md) · [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [CI](.github/workflows/keep.yml) · [`scripts/keepctl`](scripts/keepctl) |
 | | | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | | | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | | | | | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |

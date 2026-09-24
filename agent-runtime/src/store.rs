@@ -1,10 +1,13 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::audit::AuditLog;
 use crate::model::{
-    AgentRecord, ApprovalRecord, DeployAgentRequest, LoopRecord, ScheduleRecord, SessionEvent,
-    SessionRecord, SessionStatus, WarmSandboxRecord, WarmSandboxState, WebhookRecord,
+    AgentRecord, ApprovalKind, ApprovalRecord, ApprovalStatus, DeployAgentRequest, GrantScope,
+    LoopRecord, ScheduleRecord, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
+    WarmSandboxState, WebhookRecord, WorkstationRecord,
 };
+use crate::skills::SkillStore;
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use chrono::Utc;
@@ -27,9 +30,14 @@ pub struct Store {
     sessions: RwLock<HashMap<Uuid, SessionRecord>>,
     warm_sandboxes: RwLock<HashMap<Uuid, WarmSandboxRecord>>,
     schedules: RwLock<HashMap<Uuid, ScheduleRecord>>,
+    workstations: RwLock<HashMap<Uuid, WorkstationRecord>>,
     webhooks: RwLock<HashMap<Uuid, WebhookRecord>>,
     loops: RwLock<HashMap<Uuid, LoopRecord>>,
     approvals: RwLock<HashMap<Uuid, ApprovalRecord>>,
+    /// Tamper-evident record of planned, approved, denied and performed actions.
+    pub audit: AuditLog,
+    /// Immutable, content-addressed skill bundles agents can mount.
+    pub skills: SkillStore,
 }
 
 impl Store {
@@ -37,13 +45,18 @@ impl Store {
         let root = root.as_ref().to_path_buf();
         fs::create_dir_all(root.join("agents")).await?;
         fs::create_dir_all(root.join("sessions")).await?;
+        let audit = AuditLog::open(root.join("audit.jsonl")).await?;
+        let skills = SkillStore::open(root.join("skills")).await?;
 
         let store = Self {
+            audit,
+            skills,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
             warm_sandboxes: RwLock::new(HashMap::new()),
             schedules: RwLock::new(HashMap::new()),
+            workstations: RwLock::new(HashMap::new()),
             webhooks: RwLock::new(HashMap::new()),
             loops: RwLock::new(HashMap::new()),
             approvals: RwLock::new(HashMap::new()),
@@ -95,6 +108,8 @@ impl Store {
             .map(|record| (record.sandbox_id, record))
             .collect();
         *self.schedules.write().await = read_id_map(&self.root.join("schedules.json")).await?;
+        *self.workstations.write().await =
+            read_id_map(&self.root.join("workstations.json")).await?;
         *self.webhooks.write().await = read_id_map(&self.root.join("webhooks.json")).await?;
         *self.loops.write().await = read_id_map(&self.root.join("loops.json")).await?;
         *self.approvals.write().await = read_id_map(&self.root.join("approvals.json")).await?;
@@ -281,6 +296,47 @@ impl Store {
             .await
             .values()
             .filter(|s| s.agent == agent && !s.status.is_terminal())
+            .count()
+    }
+
+    /// Record that `id` read from an untrusted `host`. True if this is new.
+    pub async fn taint_session(&self, id: Uuid, host: &str) -> Result<bool> {
+        let already = self
+            .get_session(id)
+            .await
+            .is_none_or(|s| s.tainted_by.iter().any(|h| h == host));
+        if already {
+            return Ok(false);
+        }
+        self.update_session(id, |s| {
+            if !s.tainted_by.iter().any(|h| h == host) {
+                s.tainted_by.push(host.to_string());
+            }
+        })
+        .await?;
+        Ok(true)
+    }
+
+    /// Clear a session's taint, returning the hosts that had caused it.
+    pub async fn untaint_session(&self, id: Uuid) -> Result<Vec<String>> {
+        let before = self
+            .get_session(id)
+            .await
+            .map(|s| s.tainted_by)
+            .unwrap_or_default();
+        self.update_session(id, |s| s.tainted_by.clear()).await?;
+        Ok(before)
+    }
+
+    /// Non-terminal sessions of one agent that belong to `user_id`.
+    pub async fn count_non_terminal_for_user(&self, agent: &str, user_id: &str) -> usize {
+        self.sessions
+            .read()
+            .await
+            .values()
+            .filter(|s| {
+                s.agent == agent && !s.status.is_terminal() && s.user_id.as_deref() == Some(user_id)
+            })
             .count()
     }
 
@@ -557,6 +613,44 @@ impl Store {
         Ok(true)
     }
 
+    pub async fn list_workstations(&self) -> Vec<WorkstationRecord> {
+        let mut out: Vec<_> = self.workstations.read().await.values().cloned().collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
+    pub async fn find_workstation(&self, agent: &str, user_id: &str) -> Option<WorkstationRecord> {
+        self.workstations
+            .read()
+            .await
+            .values()
+            .find(|w| w.agent == agent && w.user_id == user_id)
+            .cloned()
+    }
+
+    pub async fn save_workstation(&self, record: WorkstationRecord) -> Result<()> {
+        let mut map = self.workstations.write().await;
+        map.insert(record.id, record);
+        self.persist_vec(
+            "workstations.json",
+            &map.values().cloned().collect::<Vec<_>>(),
+        )
+        .await
+    }
+
+    pub async fn delete_workstation(&self, id: Uuid) -> Result<bool> {
+        let mut map = self.workstations.write().await;
+        if map.remove(&id).is_none() {
+            return Ok(false);
+        }
+        self.persist_vec(
+            "workstations.json",
+            &map.values().cloned().collect::<Vec<_>>(),
+        )
+        .await?;
+        Ok(true)
+    }
+
     pub async fn list_webhooks(&self) -> Vec<WebhookRecord> {
         let mut out: Vec<_> = self.webhooks.read().await.values().cloned().collect();
         out.sort_by_key(|record| record.created_at);
@@ -637,6 +731,72 @@ impl Store {
             .cloned()
     }
 
+    /// Atomically decide a pending approval. Returns `None` if it was not
+    /// pending (already decided or expired), so a decision and a timeout can
+    /// never both win.
+    pub async fn transition_approval(
+        &self,
+        id: Uuid,
+        status: ApprovalStatus,
+        comment: Option<String>,
+        scope: Option<GrantScope>,
+    ) -> Result<Option<ApprovalRecord>> {
+        let mut map = self.approvals.write().await;
+        let Some(record) = map.get_mut(&id) else {
+            return Ok(None);
+        };
+        if record.status != ApprovalStatus::Pending {
+            return Ok(None);
+        }
+        record.status = status;
+        record.comment = comment;
+        record.decided_at = Some(Utc::now());
+        record.grant_scope = if status == ApprovalStatus::Approved {
+            scope
+        } else {
+            None
+        };
+        let updated = record.clone();
+        self.persist_vec("approvals.json", &map.values().cloned().collect::<Vec<_>>())
+            .await?;
+        Ok(Some(updated))
+    }
+
+    /// Return the pending egress approval for (session, host), or create one
+    /// from `new`. The bool is true when a new record was created, so
+    /// concurrent requests to the same host share a single question.
+    pub async fn open_egress_approval(
+        &self,
+        session_id: Uuid,
+        host: &str,
+        new: ApprovalRecord,
+    ) -> Result<(ApprovalRecord, bool)> {
+        let mut map = self.approvals.write().await;
+        if let Some(existing) = map.values().find(|r| {
+            r.session_id == session_id
+                && r.kind == ApprovalKind::Egress
+                && r.status == ApprovalStatus::Pending
+                && r.subject.as_deref() == Some(host)
+        }) {
+            return Ok((existing.clone(), false));
+        }
+        map.insert(new.id, new.clone());
+        self.persist_vec("approvals.json", &map.values().cloned().collect::<Vec<_>>())
+            .await?;
+        Ok((new, true))
+    }
+
+    /// True when an operator approved this host for the rest of the session.
+    pub async fn has_session_egress_grant(&self, session_id: Uuid, host: &str) -> bool {
+        self.approvals.read().await.values().any(|r| {
+            r.session_id == session_id
+                && r.kind == ApprovalKind::Egress
+                && r.status == ApprovalStatus::Approved
+                && r.grant_scope == Some(GrantScope::Session)
+                && r.subject.as_deref() == Some(host)
+        })
+    }
+
     async fn persist_vec<T: serde::Serialize>(&self, file: &str, records: &[T]) -> Result<()> {
         atomic_write(&self.root.join(file), &serde_json::to_vec_pretty(records)?).await
     }
@@ -677,6 +837,11 @@ impl Identified for ScheduleRecord {
         self.id
     }
 }
+impl Identified for WorkstationRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
 impl Identified for WebhookRecord {
     fn identified_id(&self) -> Uuid {
         self.id
@@ -693,7 +858,7 @@ impl Identified for ApprovalRecord {
     }
 }
 
-async fn atomic_write(path: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
+pub(crate) async fn atomic_write(path: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
     let path_s = path.as_ref().to_string_lossy().into_owned();
     if path_s.contains("..") {
         bail!("refusing path traversal");
@@ -744,6 +909,15 @@ mod tests {
             bundle_base64: base64::engine::general_purpose::STANDARD
                 .encode("export default () => 1"),
             manifest: AgentManifest {
+                egress_rules: vec![],
+                dlp: false,
+                taint: None,
+                confinement: Default::default(),
+                resources: None,
+                confidential: Default::default(),
+                inner_container: Default::default(),
+                persistent: false,
+                browser_port: None,
                 template: "node22".into(),
                 credentials: vec!["openai".into()],
                 egress_allow_hosts: vec!["api.openai.com".into()],
@@ -754,6 +928,13 @@ mod tests {
                 idle_hibernate_seconds: None,
                 warm_pool_size: 0,
                 runtime: Default::default(),
+                egress_mode: Default::default(),
+                home_volume: None,
+                skills: vec![],
+                skill_scope: None,
+                egress_approval_timeout_seconds: None,
+                model_socket: None,
+                cell_backend: None,
             },
         };
         let record = store.deploy_agent(request).await.unwrap();
@@ -778,6 +959,15 @@ mod tests {
                 name: "research".into(),
                 bundle_base64: bundle.clone(),
                 manifest: AgentManifest {
+                    egress_rules: vec![],
+                    dlp: false,
+                    taint: None,
+                    confinement: Default::default(),
+                    resources: None,
+                    confidential: Default::default(),
+                    inner_container: Default::default(),
+                    persistent: false,
+                    browser_port: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.openai.com".into()],
@@ -788,6 +978,13 @@ mod tests {
                     idle_hibernate_seconds: None,
                     warm_pool_size: 0,
                     runtime: Default::default(),
+                    egress_mode: Default::default(),
+                    home_volume: None,
+                    skills: vec![],
+                    skill_scope: None,
+                    egress_approval_timeout_seconds: None,
+                    model_socket: None,
+                    cell_backend: None,
                 },
             })
             .await
@@ -797,6 +994,15 @@ mod tests {
                 name: "research".into(),
                 bundle_base64: bundle,
                 manifest: AgentManifest {
+                    egress_rules: vec![],
+                    dlp: false,
+                    taint: None,
+                    confinement: Default::default(),
+                    resources: None,
+                    confidential: Default::default(),
+                    inner_container: Default::default(),
+                    persistent: false,
+                    browser_port: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.anthropic.com".into()],
@@ -807,6 +1013,13 @@ mod tests {
                     idle_hibernate_seconds: None,
                     warm_pool_size: 0,
                     runtime: Default::default(),
+                    egress_mode: Default::default(),
+                    home_volume: None,
+                    skills: vec![],
+                    skill_scope: None,
+                    egress_approval_timeout_seconds: None,
+                    model_socket: None,
+                    cell_backend: None,
                 },
             })
             .await
@@ -851,6 +1064,9 @@ mod tests {
                 capability_token: "cap".into(),
                 error: None,
                 parent_session_id: None,
+                user_id: None,
+                tainted_by: vec![],
+                confidential: None,
             })
             .await
             .unwrap();
@@ -863,6 +1079,7 @@ mod tests {
             id
         );
         assert_eq!(store.count_non_terminal_for_agent("a").await, 1);
+        assert_eq!(store.count_non_terminal_for_user("a", "alice").await, 0);
         assert_eq!(
             store.append_event(id, "one", json!(1)).await.unwrap().seq,
             1

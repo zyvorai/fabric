@@ -1,6 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::model::Resources;
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use reqwest::{Method, Url};
@@ -22,6 +23,10 @@ pub struct SandboxRecord {
     pub guest_ip: Option<String>,
     #[serde(default)]
     pub status: Option<String>,
+    /// Present when the create request asked for `confidential`. An older FluxVM
+    /// ignores the request and omits this.
+    #[serde(default)]
+    pub confidential: Option<crate::model::ConfidentialStatus>,
 }
 
 #[derive(Debug, Serialize)]
@@ -31,6 +36,29 @@ struct SandboxCreate<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     ttl_seconds: Option<u64>,
     http_proxy_port: u16,
+    #[serde(skip_serializing_if = "<[SandboxVolume]>::is_empty")]
+    volumes: &'a [SandboxVolume],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vcpus: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    memory_mib: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    confidential: Option<&'static str>,
+}
+
+/// A FluxVM sandbox volume (`POST /v1/sandboxes` `volumes`).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct SandboxVolume {
+    pub name: String,
+    pub guest_path: String,
+}
+
+/// What a sandbox gets beyond its template: volumes, size, confidential launch.
+#[derive(Debug, Default)]
+pub struct SandboxOptions<'a> {
+    pub volumes: &'a [SandboxVolume],
+    pub resources: Option<Resources>,
+    pub confidential: crate::model::Confidential,
 }
 
 impl FluxVm {
@@ -88,6 +116,7 @@ impl FluxVm {
         template: &str,
         ttl_seconds: Option<u64>,
         runtime_port: u16,
+        options: &SandboxOptions<'_>,
     ) -> Result<SandboxRecord> {
         let response = self
             .auth(self.http.post(self.url("/v1/sandboxes")?))
@@ -96,6 +125,11 @@ impl FluxVm {
                 template,
                 ttl_seconds,
                 http_proxy_port: runtime_port,
+                volumes: options.volumes,
+                vcpus: options.resources.map(|r| r.vcpus),
+                memory_mib: options.resources.map(|r| r.memory_mib),
+                confidential: (!options.confidential.is_off())
+                    .then_some(options.confidential.as_str()),
             })
             .send()
             .await?;
@@ -197,6 +231,20 @@ impl FluxVm {
         bail!("FluxVM delete failed: {status}")
     }
 
+    /// Replace the sandbox's L4 network policy (`POST /v1/vms/{id}/network/policy`).
+    pub async fn set_network_policy(&self, id: Uuid, policy: &Value) -> Result<()> {
+        let response = self
+            .auth(
+                self.http
+                    .post(self.url(&format!("/v1/vms/{id}/network/policy"))?),
+            )
+            .json(policy)
+            .send()
+            .await?;
+        let _: Value = self.parse(response).await?;
+        Ok(())
+    }
+
     pub async fn default_gateway(&self, id: Uuid) -> Result<String> {
         let value = self
             .process(
@@ -221,5 +269,105 @@ impl FluxVm {
             bail!("sandbox did not report a default gateway; use tap+netns or set ZYVOR_AGENT_EGRESS_ADVERTISE_HOST")
         }
         Ok(stdout)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn set_network_policy_posts_the_policy_to_the_vm() {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let sink = seen.clone();
+        let app = axum::Router::new().route(
+            "/v1/vms/{id}/network/policy",
+            axum::routing::post(
+                move |axum::extract::Path(id): axum::extract::Path<String>,
+                      axum::Json(body): axum::Json<Value>| {
+                    let sink = sink.clone();
+                    async move {
+                        *sink.lock().unwrap() = Some((id, body.clone()));
+                        axum::Json(body)
+                    }
+                },
+            ),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = FluxVm::new(&format!("http://{addr}"), None).unwrap();
+        let id = Uuid::new_v4();
+        let policy = crate::confine::strict_policy("10.0.2.1".parse().unwrap(), 18082, None);
+        client.set_network_policy(id, &policy).await.unwrap();
+        let (seen_id, seen_body) = seen.lock().unwrap().clone().unwrap();
+        assert_eq!(seen_id, id.to_string());
+        assert_eq!(seen_body, policy);
+    }
+
+    #[tokio::test]
+    async fn set_network_policy_surfaces_a_fluxvm_error() {
+        let app = axum::Router::new().route(
+            "/v1/vms/{id}/network/policy",
+            axum::routing::post(|| async {
+                (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "invalid eBPF allow CIDR",
+                )
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = FluxVm::new(&format!("http://{addr}"), None).unwrap();
+        let error = client
+            .set_network_policy(Uuid::new_v4(), &json!({}))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("400") && error.contains("invalid eBPF allow CIDR"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn sandbox_create_omits_volumes_unless_present() {
+        let none = serde_json::to_value(SandboxCreate {
+            name: "n".into(),
+            template: "t",
+            ttl_seconds: None,
+            http_proxy_port: 8080,
+            volumes: &[],
+            vcpus: None,
+            memory_mib: None,
+            confidential: None,
+        })
+        .unwrap();
+        assert!(none.get("volumes").is_none());
+        assert!(none.get("vcpus").is_none() && none.get("memory_mib").is_none());
+        assert!(none.get("confidential").is_none());
+
+        let volumes = [SandboxVolume {
+            name: "home".into(),
+            guest_path: "/home/agent".into(),
+        }];
+        let some = serde_json::to_value(SandboxCreate {
+            name: "n".into(),
+            template: "t",
+            ttl_seconds: None,
+            http_proxy_port: 8080,
+            volumes: &volumes,
+            vcpus: Some(2),
+            memory_mib: Some(7900),
+            confidential: Some("auto"),
+        })
+        .unwrap();
+        assert_eq!(some["volumes"][0]["name"], "home");
+        assert_eq!(some["volumes"][0]["guest_path"], "/home/agent");
+        assert_eq!(
+            (some["vcpus"].as_u64(), some["memory_mib"].as_u64()),
+            (Some(2), Some(7900))
+        );
     }
 }
