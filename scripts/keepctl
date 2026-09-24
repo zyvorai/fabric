@@ -10,7 +10,9 @@
 #   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
 #   keepctl unwrap-token|unwrap|vault-status  # software vault ceremony (host-env)
 #   keepctl user-held-challenge|user-held-complete  # Keep 0.2 scaffold (refused without SNP/TDX)
-#   keepctl browser tabs|shot <session-id>  # operator listing / JPEG
+#   keepctl browser tabs|shot|script|doctor|profile|checkout <session-id> …
+#   keepctl session pause|resume <session-id> [--reason vault_fill|operator_watch|taint]
+#   keepctl browse replay <session-id>   # download browse.spec.mjs
 #   keepctl pack   <path>            # workspace hint + policy + manifest pin
 #   keepctl unpack <path>            # restore policy onto an agent
 #   keepctl export-token …           # scoped trajectory export (default: none)
@@ -248,17 +250,67 @@ PY
     sub="${1:-}"
     id="${2:-}"
     [[ -n "$sub" && -n "$id" ]] || {
-      echo "usage: keepctl browser tabs|shot <session-id>" >&2
+      echo "usage: keepctl browser tabs|shot|script|doctor|profile|checkout <session-id> [seq]" >&2
       exit 1
     }
     case "$sub" in
       tabs|view) api GET "/v1/sessions/${id}/browser/view" ;;
       shot|screenshot) api GET "/v1/sessions/${id}/browser/screenshot" ;;
+      script) api GET "/v1/sessions/${id}/browser/script" ;;
+      doctor) api GET "/v1/sessions/${id}/browser/doctor" ;;
+      profile) api GET "/v1/sessions/${id}/browser/profile" ;;
+      checkout)
+        seq="${3:-}"
+        [[ -n "$seq" ]] || { echo "usage: keepctl browser checkout <session-id> <seq>" >&2; exit 1; }
+        api GET "/v1/sessions/${id}/browser/checkout?seq=${seq}"
+        ;;
       *)
-        echo "usage: keepctl browser tabs|shot <session-id>" >&2
+        echo "usage: keepctl browser tabs|shot|script|doctor|profile|checkout <session-id>" >&2
         exit 1
         ;;
     esac
+    echo
+    ;;
+
+  session)
+    sub="${1:-}"
+    id="${2:-}"
+    [[ -n "$sub" && -n "$id" ]] || {
+      echo "usage: keepctl session pause|resume <session-id> [--reason …]" >&2
+      exit 1
+    }
+    case "$sub" in
+      pause)
+        shift 2 || true
+        reason="operator_watch"
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --reason) reason=$2; shift 2 ;;
+            *) shift ;;
+          esac
+        done
+        api POST "/v1/sessions/${id}/agent-pause" -H 'Content-Type: application/json' \
+          -d "{\"reason\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$reason")}"
+        ;;
+      resume)
+        api POST "/v1/sessions/${id}/agent-resume" -H 'Content-Type: application/json' -d '{}'
+        ;;
+      *)
+        echo "usage: keepctl session pause|resume <session-id>" >&2
+        exit 1
+        ;;
+    esac
+    echo
+    ;;
+
+  browse)
+    sub="${1:-}"
+    id="${2:-}"
+    [[ "$sub" == "replay" && -n "$id" ]] || {
+      echo "usage: keepctl browse replay <session-id>" >&2
+      exit 1
+    }
+    api GET "/v1/sessions/${id}/browser/script"
     echo
     ;;
 

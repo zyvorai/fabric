@@ -232,6 +232,27 @@ export default function KeepSession() {
         </Card>
 
         <Card className="p-4 space-y-2 text-sm">
+          <h2 className="text-base font-semibold text-[var(--zf-ink)]">Honesty badge</h2>
+          {(() => {
+            const badge = cockpit?.badge ?? cockpit?.browser?.badge
+            if (!badge) {
+              return <p className="text-[var(--zf-muted)]">No badge yet.</p>
+            }
+            return (
+              <code className="block text-xs font-mono text-[var(--zf-ink)] break-all">
+                evidence={badge.evidence ?? 'software-test'} · operator_can_read=
+                {String(badge.operator_can_read ?? true)} · host_recover=
+                {badge.host_recover ?? 'allowed'} · browser={badge.browser ?? 'a11y-only'} ·
+                proxy={badge.proxy ?? 'strict'}
+                {cockpit?.agent_paused_reason
+                  ? ` · paused=${cockpit.agent_paused_reason}`
+                  : ''}
+              </code>
+            )
+          })()}
+        </Card>
+
+        <Card className="p-4 space-y-2 text-sm">
           <h2 className="text-base font-semibold text-[var(--zf-ink)]">Browser capability</h2>
           {(() => {
             const b = cockpit?.browser
@@ -247,14 +268,16 @@ export default function KeepSession() {
                 <div className="font-medium">
                   Browser: {b.ready ? 'ready' : 'not ready'} · CDP {b.cdp ? 'up' : 'off'} · proxy{' '}
                   {b.confined ? 'confined' : 'not confined'}
+                  {b.agent_paused_reason ? ` · paused=${b.agent_paused_reason}` : ''}
                 </div>
                 <div className="text-[var(--zf-muted)] text-xs">
                   taint={(b.tainted_by?.length ? b.tainted_by.join(', ') : '—')} · evidence=
                   {b.evidence_class ?? 'software-test'} · tools=
                   {b.tools_allowed ? 'allowed' : 'blocked'}
+                  {b.network_identity ? ` · id=${b.network_identity}` : ''}
                 </div>
                 <p className="text-[12px] text-[var(--zf-muted)] pt-2 border-t border-[var(--zf-hairline)]">
-                  {b.honesty}
+                  {typeof b.honesty === 'string' ? b.honesty : b.badge?.honesty}
                 </p>
               </>
             )

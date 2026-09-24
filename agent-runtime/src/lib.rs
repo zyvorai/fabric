@@ -4,6 +4,7 @@
 pub mod app;
 pub mod attestation;
 pub mod audit;
+pub mod browse_ifc;
 pub mod browser;
 pub mod config;
 pub mod confine;

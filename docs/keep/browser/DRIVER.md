@@ -72,3 +72,5 @@ Debugger URLs are stripped from listings. Screencast is frames only — **no inp
 ```
 
 Pins: Node `v20.18.1`, `playwright-core@1.49.1`, Debian `chromium` + `chromium-driver`.
+
+Product feats (pause, IFC, trajectory, badge): [BROWSER-0.3.md](BROWSER-0.3.md).

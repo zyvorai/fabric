@@ -10,7 +10,8 @@
 | Agent runtime | Policy YAML, goals/artifacts, cockpit, export-token | `agent-runtime/` |
 | Packaged agents | `infra-ops`, `migration-op`, `deploy-op` + `_fabric` | [`examples/keep-agents/`](../../examples/keep-agents/) |
 | Keep console view | Goal → task → evidence → approval → outcome | `/app/keep/:sessionId` |
-| Keep 0.2 | **Soft scaffolding complete** + brokered browser (a11y driver, MCP, bake); **hardware still gated** | [`KEEP-0.2.md`](KEEP-0.2.md) · [`browser/DRIVER.md`](browser/DRIVER.md) |
+| Keep 0.2 | **Soft scaffolding complete** + brokered browser; **hardware still gated** | [`KEEP-0.2.md`](KEEP-0.2.md) · [`browser/DRIVER.md`](browser/DRIVER.md) |
+| Keep Browser 0.3 | Split-sight, trajectory-as-code, origin IFC, SNI-identity badge, goal tabs | [`browser/BROWSER-0.3.md`](browser/BROWSER-0.3.md) |
 | CI | Keep workflow (stub e2e) | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
 | Tutorial | Hands-on + pack appendix | [Tutorial 16](../tutorials/16-keep-workstation.md) |
 

@@ -613,6 +613,14 @@ pub enum SessionStartMode {
     Warm,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentPausedReason {
+    VaultFill,
+    OperatorWatch,
+    Taint,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionRecord {
     pub id: Uuid,
@@ -658,6 +666,12 @@ pub struct SessionRecord {
     /// How the sandbox was launched, when the agent asked for `confidential`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidential: Option<ConfidentialStatus>,
+    /// Split-sight: agent tools paused while operator/vault owns the cell.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_paused_reason: Option<AgentPausedReason>,
+    /// Origin lattice + browse trajectory (Keep Browser 0.3).
+    #[serde(default)]
+    pub browse: crate::browse_ifc::BrowseState,
 }
 
 /// A promise that a user's agent VM stays up: the runtime keeps a session
@@ -703,6 +717,8 @@ pub struct SessionView {
     pub user_id: Option<String>,
     pub tainted_by: Vec<String>,
     pub confidential: Option<ConfidentialStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_paused_reason: Option<AgentPausedReason>,
 }
 
 impl From<SessionRecord> for SessionView {
@@ -728,6 +744,7 @@ impl From<SessionRecord> for SessionView {
             user_id: v.user_id,
             tainted_by: v.tainted_by,
             confidential: v.confidential,
+            agent_paused_reason: v.agent_paused_reason,
         }
     }
 }

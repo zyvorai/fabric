@@ -3,6 +3,9 @@
 ## 0.3.0
 
 ### Added
+- **Keep Browser 0.3.** Split-sight `agent_paused_reason`, origin taint lattice,
+  trajectory-as-code (`browse-script` artifact), goal-bound tabs, honesty badge,
+  profile inspect, SNI-identity label. Docs: [BROWSER-0.3.md](docs/keep/browser/BROWSER-0.3.md).
 - **Brokered Keep browser (Chromium + Playwright a11y).** Guest `browser-agent`
   template with loopback CDP `:9222` + driver `:9230`; MCP `browser_*` tools;
   `POST …/browser/fill-secret`; `keepctl browser tabs|shot`; policy `browser:`

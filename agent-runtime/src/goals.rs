@@ -77,6 +77,9 @@ pub struct GoalRecord {
     pub plan: Vec<PlanStep>,
     #[serde(default)]
     pub artifact_ids: Vec<Uuid>,
+    /// Goal-bound tabs: browser open must be ⊆ this list when non-empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow_hosts: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -113,6 +116,8 @@ pub struct CreateGoalRequest {
     pub session_id: Option<Uuid>,
     #[serde(default)]
     pub plan: Vec<CreatePlanStep>,
+    #[serde(default)]
+    pub allow_hosts: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -132,6 +137,8 @@ pub struct PatchGoalRequest {
     pub session_id: Option<Uuid>,
     #[serde(default)]
     pub plan: Option<Vec<PlanStep>>,
+    #[serde(default)]
+    pub allow_hosts: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -172,6 +179,8 @@ pub struct ListQuery {
     pub goal_id: Option<Uuid>,
     #[serde(default)]
     pub session_id: Option<Uuid>,
+    #[serde(default)]
+    pub kind: Option<String>,
     #[serde(default)]
     pub limit: Option<usize>,
 }
@@ -227,6 +236,7 @@ pub(crate) async fn create_goal(
         status: GoalStatus::Open,
         plan,
         artifact_ids: vec![],
+        allow_hosts: req.allow_hosts,
         created_at: now,
         updated_at: now,
     };
@@ -280,6 +290,9 @@ pub(crate) async fn patch_goal(
     if let Some(plan) = req.plan {
         goal.plan = plan;
     }
+    if let Some(hosts) = req.allow_hosts {
+        goal.allow_hosts = hosts;
+    }
     goal.updated_at = Utc::now();
     state
         .store
@@ -287,6 +300,51 @@ pub(crate) async fn patch_goal(
         .await
         .map_err(ApiError::internal)?;
     Ok(Json(goal))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GoalBrowseRequest {
+    pub url: String,
+}
+
+/// Open a URL under this goal's allow_hosts (binds session.browse.goal_id).
+pub(crate) async fn goal_browse(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<GoalBrowseRequest>,
+) -> ApiResult<Json<Value>> {
+    let goal = state
+        .store
+        .get_goal(id)
+        .await
+        .ok_or_else(|| ApiError::not_found("goal not found"))?;
+    let session_id = goal
+        .session_id
+        .ok_or_else(|| ApiError::bad_request("goal needs session_id before browse"))?;
+    if let Some(host) = crate::browse_ifc::host_from_url(&req.url) {
+        if !goal.allow_hosts.is_empty() && !crate::policy::host_matches_list(&host, &goal.allow_hosts)
+        {
+            return Err(ApiError::forbidden("host outside goal.allow_hosts"));
+        }
+    }
+    let _ = state
+        .store
+        .update_session(session_id, |s| {
+            s.browse.goal_id = Some(id);
+        })
+        .await
+        .map_err(ApiError::internal)?;
+    let result = crate::browser::driver_call(
+        &state,
+        session_id,
+        json!({ "tool": "open", "url": req.url }),
+    )
+    .await?;
+    Ok(Json(json!({
+        "goal_id": id,
+        "session_id": session_id,
+        "result": result,
+    })))
 }
 
 /// Advance a plan step; opens an approval when moving a `requires_approval` step to done/blocked.
@@ -415,6 +473,9 @@ pub(crate) async fn list_artifacts(
     }
     if let Some(agent) = q.agent.as_deref() {
         items.retain(|a| a.agent.as_deref() == Some(agent));
+    }
+    if let Some(kind) = q.kind.as_deref() {
+        items.retain(|a| a.kind == kind);
     }
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
     items.truncate(limit);
@@ -572,6 +633,7 @@ mod tests {
                         detail: None,
                     },
                 ],
+                allow_hosts: vec![],
             }),
         )
         .await
@@ -603,6 +665,7 @@ mod tests {
                 agent: None,
                 goal_id: Some(goal.id),
                 session_id: None,
+                kind: None,
                 limit: None,
             }),
         )
@@ -647,6 +710,8 @@ mod tests {
                 user_id: None,
                 tainted_by: vec![],
                 confidential: None,
+                agent_paused_reason: None,
+                browse: Default::default(),
             })
             .await
             .unwrap();
@@ -664,6 +729,7 @@ mod tests {
                     requires_approval: true,
                     detail: None,
                 }],
+                allow_hosts: vec![],
             }),
         )
         .await

@@ -386,10 +386,11 @@ Same daemon port as Fabric (default **9095**). Catalog uses `daemon.public_url` 
 
 - Soft Keep 0.2: vault ceremony, screencast, user-held challenge scaffold, fabricd proxies
 - **Brokered browser:** Chromium CDP `:9222` + a11y driver `:9230` (`browser-agent` template)
+- **Keep Browser 0.3:** split-sight pause, trajectory-as-code, origin IFC, SNI-identity, goal tabs, honesty badge
 - MCP tools `browser_open|snapshot|act|tabs|close` (no HTML/DOM/evaluate to the model)
 - Host `POST …/browser/fill-secret` after vault `authorize_resolve` (password never in transcript)
 - Policy `browser:` block in `keep.policy.yaml` (allow_hosts, file:// deny, downloads deny, confinement:strict gate)
-- Operator: `keepctl browser tabs|shot`, KeepSession capability card, screenshot rate-limit
+- Operator: `keepctl browser|session|browse`, KeepSession capability + honesty badge
 - Pack: `examples/keep-agents/browser-research/`
-- Docs: [docs/keep/browser/DRIVER.md](docs/keep/browser/DRIVER.md)
+- Docs: [DRIVER.md](docs/keep/browser/DRIVER.md), [BROWSER-0.3.md](docs/keep/browser/BROWSER-0.3.md)
 - Evidence class remains **software-test** until SNP/TDX (hardware Keep 0.2 gated)

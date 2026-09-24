@@ -958,6 +958,8 @@ pub(crate) mod ask_tests {
             user_id: None,
             tainted_by: vec![],
             confidential: None,
+            agent_paused_reason: None,
+            browse: Default::default(),
         };
         state.store.save_session(session.clone()).await.unwrap();
         (state, session)

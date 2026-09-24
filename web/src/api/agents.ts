@@ -121,6 +121,34 @@ export interface KeepCockpit {
     tainted_by?: string[]
     evidence_class?: string
     honesty?: string
+    agent_paused_reason?: string | null
+    network_identity?: string
+    badge?: {
+      evidence?: string
+      operator_can_read?: boolean
+      host_recover?: string
+      browser?: string
+      proxy?: string
+      agent_paused_reason?: string | null
+      network_identity?: string | null
+      honesty?: string
+    }
+  }
+  agent_paused_reason?: string | null
+  browse?: {
+    goal_id?: string | null
+    steps?: number
+    network_identity?: string | null
+    cookie_jar?: string
+    origins?: string[]
+  }
+  badge?: {
+    evidence?: string
+    operator_can_read?: boolean
+    host_recover?: string
+    browser?: string
+    proxy?: string
+    honesty?: string
   }
   attestation?: {
     security_profile?: string | null
