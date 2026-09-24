@@ -3,6 +3,8 @@
 ## 0.3.0
 
 ### Added
+- **`fabric-agent deploy` flags for the newer manifest fields** (egress mode, home
+  volume, per-user home, sandbox size, skills) and `user_id` in the SDK types.
 - **Per-user agent VMs.** `home_volume.per_user` gives each `user_id` its own volume
   and its own one-at-a-time session slot, so one deployed agent serves many users;
   `resources` sets vCPUs and memory per sandbox (FluxVM `feat/sandbox-resources`,

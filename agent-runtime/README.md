@@ -320,6 +320,8 @@ The deploy command uses esbuild to produce one Node 20 ESM bundle. The deploymen
 
 Prefer deploying from the web console instead of the CLI? Build the bundle locally with `fabric-agent build agent.ts --out agent.bundle.mjs` (same esbuild step as `deploy`, minus the POST), then upload it via **Agents → Deploy agent** in the Fabric console. See [Tutorial 13](../docs/tutorials/13-deploy-agent-from-console.md) for the full walkthrough.
 
+`fabric-agent deploy` also sets the newer manifest fields without hand-written JSON: `--egress-mode deny|ask|sentinel`, `--egress-approval-timeout <sec>`, `--home-volume`, `--home-volume-name`, `--home-path`, `--per-user-home`, `--vcpus` with `--memory-mib`, `--skill <name[@version]>` and `--skill-scope`. Flags you leave out are omitted from the manifest, so existing version ids do not change. The SDK's `run()` and `sessions.create()` take `user_id`.
+
 ## Start, stream and steer
 
 ```ts

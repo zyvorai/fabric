@@ -6,6 +6,7 @@ import { build } from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildManifest } from "./manifest.js";
 
 function usage(exitCode = 0) {
   console.log(`fabric-agent deploy <agent.ts> --name <name> --template <fluxvm-template> [options]
@@ -21,6 +22,15 @@ Options (deploy):
   --max-concurrency <n>     cap non-terminal sessions for this agent
   --idle-hibernate <sec>    hibernate only while blocked in ctx.nextSteer()
   --warm-pool <n>           keep n single-use sandboxes prewarmed
+  --egress-mode <mode>      deny (default), ask, or sentinel for hosts off the allowlist
+  --egress-approval-timeout <sec>  how long ask/sentinel wait for a decision (5-240)
+  --home-volume             persistent /home/agent volume (QEMU template; one session at a time)
+  --home-volume-name <name> volume name (default: the agent name)
+  --home-path <path>        where the volume mounts in the guest (default /home/agent)
+  --per-user-home           one volume per session user_id, so one agent serves many users
+  --vcpus <n> --memory-mib <n>  sandbox size (give both)
+  --skill <name[@version]>  repeatable skill to mount
+  --skill-scope <scope>     which scoped skills this agent may mount
   --url <url>               Fabric Agent Runtime URL
   --token <token>           Fabric Agent Runtime bearer token
 
@@ -47,6 +57,13 @@ if (command === "deploy") {
     console.error("runtime must be node, claude, codex, or gemini");
     process.exit(1);
   }
+  let manifest;
+  try {
+    manifest = buildManifest(flags, runtime);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
   const bundle = runtime === "node" ? (await buildBundle(entry)).bundle : await readFile(entry);
   const baseUrl = (flags.url || process.env.FABRIC_AGENT_URL || "http://127.0.0.1:9096").replace(/\/$/, "");
   const token = flags.token || process.env.FABRIC_AGENT_TOKEN;
@@ -59,18 +76,7 @@ if (command === "deploy") {
     body: JSON.stringify({
       name: flags.name,
       bundle_base64: Buffer.from(bundle).toString("base64"),
-      manifest: {
-        template: flags.template,
-        runtime,
-        credentials: flags.credential,
-        egress_allow_hosts: flags.allowHost,
-        allow_private_networks: flags.allowPrivateNetwork,
-        runtime_port: Number(flags.runtimePort || 8080),
-        ttl_seconds: flags.ttl ? Number(flags.ttl) : null,
-        max_concurrent_sessions: flags.maxConcurrency ? Number(flags.maxConcurrency) : null,
-        idle_hibernate_seconds: flags.idleHibernate ? Number(flags.idleHibernate) : null,
-        warm_pool_size: flags.warmPool ? Number(flags.warmPool) : 0,
-      },
+      manifest,
     }),
   });
   const result = await response.json().catch(() => ({}));
@@ -110,11 +116,19 @@ async function buildBundle(entryPath) {
 }
 
 function parseFlags(argv) {
-  const out = { credential: [], allowHost: [], allowPrivateNetwork: false };
+  const out = { credential: [], allowHost: [], skill: [], allowPrivateNetwork: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--allow-private-network") {
       out.allowPrivateNetwork = true;
+      continue;
+    }
+    if (arg === "--home-volume") {
+      out.homeVolume = true;
+      continue;
+    }
+    if (arg === "--per-user-home") {
+      out.perUserHome = true;
       continue;
     }
     const value = argv[i + 1];
@@ -131,6 +145,14 @@ function parseFlags(argv) {
       case "--max-concurrency": out.maxConcurrency = value; break;
       case "--idle-hibernate": out.idleHibernate = value; break;
       case "--warm-pool": out.warmPool = value; break;
+      case "--egress-mode": out.egressMode = value; break;
+      case "--egress-approval-timeout": out.egressApprovalTimeout = value; break;
+      case "--home-volume-name": out.homeVolumeName = value; break;
+      case "--home-path": out.homePath = value; break;
+      case "--vcpus": out.vcpus = value; break;
+      case "--memory-mib": out.memoryMib = value; break;
+      case "--skill": out.skill.push(value); break;
+      case "--skill-scope": out.skillScope = value; break;
       case "--url": out.url = value; break;
       case "--token": out.token = value; break;
       case "--out": out.out = value; break;

@@ -29,6 +29,8 @@ export interface CreateSessionRequest<TInput = unknown> {
   ttl_seconds?: number;
   request_id?: string;
   start_policy?: "prefer-warm" | "require-warm" | "cold-only";
+  /** The user this session is for. Required by agents deployed with a per-user home volume. */
+  user_id?: string;
 }
 
 export interface SessionEvent {
@@ -47,6 +49,7 @@ export declare class Session {
   status: string;
   last_event_seq: number;
   request_id?: string | null;
+  user_id?: string | null;
   start_policy: "prefer-warm" | "require-warm" | "cold-only";
   start_mode: "cold" | "warm";
   startup_ms?: number | null;
@@ -64,7 +67,7 @@ export declare class Session {
 
 export declare class Fabric {
   constructor(options?: FabricOptions);
-  agent(name: string): { run(input?: unknown, options?: { ttl_seconds?: number; request_id?: string; start_policy?: "prefer-warm" | "require-warm" | "cold-only" }): Promise<Session> };
+  agent(name: string): { run(input?: unknown, options?: { ttl_seconds?: number; request_id?: string; user_id?: string; start_policy?: "prefer-warm" | "require-warm" | "cold-only" }): Promise<Session> };
   sessions: {
     create(request: CreateSessionRequest): Promise<Session>;
     createMany(requests: CreateSessionRequest[], options?: { concurrency?: number }): Promise<Session[]>;
