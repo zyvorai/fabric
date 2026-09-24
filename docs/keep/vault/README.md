@@ -35,9 +35,11 @@ keepctl user-held-challenge         # → {id, nonce} for phone/YubiKey ceremony
 keepctl user-held-complete ID NONCE # → 403 until snp/tdx_launch_verified
 ```
 
-`POST /v1/vault/user-held/challenge` and `…/complete`. Complete is **fail-closed**
-while FluxVM verified flags are false. Vault opens for real only after the user’s
-phone or YubiKey unwraps a key onto a measured/attested guest. No “operator may
-open for support” on confidential.
+`POST /v1/vault/user-held/challenge` and `…/complete`. Complete reads FluxVM
+`GET /v1/security/capabilities` and is **fail-closed** while verified flags are
+false. When a hardware run flips them, complete grants a vault lease via the
+key-broker **stub** (wrapped LUKS disk key still not implemented). Vault opens
+for real only after the user’s phone or YubiKey unwraps a key onto a
+measured/attested guest. No “operator may open for support” on confidential.
 Connector scopes like OAuth for CLI tools: `github:read:one-repo`, not a raw PAT.
 Payment rails stay pluggable (Stripe Link / virtual card / paste OTP).

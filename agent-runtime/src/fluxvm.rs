@@ -29,6 +29,19 @@ pub struct SandboxRecord {
     pub confidential: Option<crate::model::ConfidentialStatus>,
 }
 
+/// FluxVM `GET /v1/security/capabilities` (Phase 6 HostCapabilities subset).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct HostSecurityCapabilities {
+    #[serde(default)]
+    pub snp_present: bool,
+    #[serde(default)]
+    pub tdx_present: bool,
+    #[serde(default)]
+    pub snp_launch_verified: bool,
+    #[serde(default)]
+    pub tdx_launch_verified: bool,
+}
+
 #[derive(Debug, Serialize)]
 struct SandboxCreate<'a> {
     name: String,
@@ -111,6 +124,15 @@ impl FluxVm {
     pub async fn get_sandbox(&self, id: Uuid) -> Result<SandboxRecord> {
         let response = self
             .auth(self.http.get(self.url(&format!("/v1/vms/{id}"))?))
+            .send()
+            .await?;
+        self.parse(response).await
+    }
+
+    /// Host SNP/TDX capability + launch-verified flags (fail-closed when unreachable).
+    pub async fn security_capabilities(&self) -> Result<HostSecurityCapabilities> {
+        let response = self
+            .auth(self.http.get(self.url("/v1/security/capabilities")?))
             .send()
             .await?;
         self.parse(response).await
@@ -470,5 +492,25 @@ mod tests {
             (Some(2), Some(7900))
         );
         assert_eq!(some["security_profile"], "measured");
+    }
+
+    #[test]
+    fn security_capabilities_parse_launch_flags() {
+        let caps: HostSecurityCapabilities = serde_json::from_value(json!({
+            "qemu": true,
+            "secure_boot_ready": false,
+            "swtpm": false,
+            "signed_catalog_configured": false,
+            "snp_present": true,
+            "tdx_present": false,
+            "snp_launch_verified": true,
+            "tdx_launch_verified": false
+        }))
+        .unwrap();
+        assert!(caps.snp_present);
+        assert!(caps.snp_launch_verified);
+        assert!(!caps.tdx_launch_verified);
+        let empty: HostSecurityCapabilities = serde_json::from_value(json!({})).unwrap();
+        assert!(!empty.snp_launch_verified && !empty.tdx_launch_verified);
     }
 }

@@ -140,6 +140,29 @@ impl AppState {
         guard.is_some_and(|until| until > Utc::now())
     }
 
+    /// FluxVM launch-verified flags. Unreachable / old FluxVM → `(false, false)`.
+    pub async fn launch_verified_flags(&self) -> (bool, bool) {
+        match self.fluxvm.security_capabilities().await {
+            Ok(c) => (c.snp_launch_verified, c.tdx_launch_verified),
+            Err(e) => {
+                tracing::debug!(
+                    error = %e,
+                    "FluxVM security capabilities unavailable; treating launch as unverified"
+                );
+                (false, false)
+            }
+        }
+    }
+
+    /// Grant a vault unlock lease (Keep unwrap / user-held complete).
+    pub fn unlock_vault_until(&self, until: DateTime<Utc>) {
+        let mut g = self
+            .vault_unlocked_until
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        *g = Some(until);
+    }
+
     pub fn session_lock(&self, id: Uuid) -> Arc<tokio::sync::Mutex<()>> {
         let mut locks = self.session_locks.lock().unwrap_or_else(|e| e.into_inner());
         if locks.len() > 10_000 {

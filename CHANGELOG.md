@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **Keep 0.2 soft scaffold follow-through.** Cockpit/vault read FluxVM
+  `GET /v1/security/capabilities` for `snp_launch_verified` /
+  `tdx_launch_verified`; user-held complete fail-closes until verified, then
+  grants a vault lease via key-broker stub (wrapped disk key still not
+  implemented). Browser screencast WS + screenshot links on cockpit;
+  `scripts/keep-bake-browser-agent.sh`.
 - **Keep guest vsock fix (lab).** Musl-static `fluxvm-guest-agent` in `node22-agent`
   image (glibc host binary failed with `GLIBC_2.39 not found`); QEMU ping/exec healthy.
   Firecracker cell still pending (vsock proxy / rootfs-init).
@@ -40,8 +46,9 @@
   `inner_container: strict` runs the worker unprivileged in a bubblewrap container
   (fails closed); `persistent: true` plus `PUT /v1/workstations/{agent}/{user_id}`
   keeps a user's session running with backoff restarts; `browser_port` plus
-  `/browser/view` give operators a read-only live tab listing (screencast/takeover
-  still not implemented).
+  `/browser/view` give operators a read-only live tab listing; screenshot +
+  read-only screencast (`WS …/browser/screencast`) via FluxVM CDP bridge (input
+  takeover not implemented).
 - **Confidential VMs when the host has them.** `confidential: auto|required` asks
   FluxVM (`feat/sandbox-resources`, `GET /v1/host/confidential`) for a
   hardware-encrypted sandbox and falls back to a normal VM (`auto`) or refuses

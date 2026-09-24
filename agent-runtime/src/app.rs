@@ -2203,13 +2203,13 @@ async fn session_cockpit(
             })
         })
         .collect();
-    // FluxVM verified flags stay false until a hardware run wires them through.
+    let (snp, tdx) = state.launch_verified_flags().await;
     let receipt = crate::attestation::build_receipt(
         state.config.security_profile.as_deref(),
         Some(format!("{}@{}", session.agent, session.agent_version)),
         session.confidential.as_ref(),
-        false,
-        false,
+        snp,
+        tdx,
     );
     Ok(Json(json!({
         "session_id": id,
@@ -2231,6 +2231,8 @@ async fn session_cockpit(
         "model_socket": state.store.get_agent(&session.agent).await.map(|a| a.manifest.model_socket),
         "browser_port": state.store.get_agent(&session.agent).await.and_then(|a| a.manifest.browser_port),
         "browser_view": format!("/v1/sessions/{id}/browser/view"),
+        "browser_screenshot": format!("/v1/sessions/{id}/browser/screenshot"),
+        "browser_screencast": format!("/v1/sessions/{id}/browser/screencast"),
         "browser_page": format!("/keep/browser?session={id}"),
         "security_profile": receipt.security_profile,
         "evidence_class": receipt.evidence_class,
@@ -2266,12 +2268,13 @@ async fn host_recover_session(
         .get_session(id)
         .await
         .ok_or_else(|| ApiError::not_found("session not found"))?;
+    let (snp, tdx) = state.launch_verified_flags().await;
     let receipt = crate::attestation::build_receipt(
         state.config.security_profile.as_deref(),
         Some(format!("{}@{}", session.agent, session.agent_version)),
         session.confidential.as_ref(),
-        false,
-        false,
+        snp,
+        tdx,
     );
     if !receipt.host_recover_allowed {
         let _ = state
@@ -2451,13 +2454,7 @@ async fn unlock_vault(
         .map_err(ApiError::forbidden)?;
     // Lease matches token mint TTL upper bound when required; otherwise no-op unlock.
     let until = Utc::now() + chrono::Duration::hours(1);
-    {
-        let mut g = state
-            .vault_unlocked_until
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        *g = Some(until);
-    }
+    state.unlock_vault_until(until);
     let _ = state
         .store
         .audit
@@ -2483,6 +2480,7 @@ async fn unlock_vault(
 async fn vault_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
     let names: Vec<String> = state.credentials.names();
     let backend = crate::unwrap_tokens::SecretBackendKind::from_env();
+    let (snp, tdx) = state.launch_verified_flags().await;
     Ok(Json(json!({
         "secret_backend": backend.as_str(),
         "unwrap_required": state.vault_unwrap_required,
@@ -2492,8 +2490,9 @@ async fn vault_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<Valu
             "challenge": "/v1/vault/user-held/challenge",
             "complete": "/v1/vault/user-held/complete",
             "attestation_required": true,
-            "snp_launch_verified": false,
-            "tdx_launch_verified": false,
+            "snp_launch_verified": snp,
+            "tdx_launch_verified": tdx,
+            "key_broker": "stub",
         },
         "honesty": "Secrets still come from host env until Keep 0.2 user-held unwrap on attested hardware. Complete is refused while SNP/TDX verified flags are false.",
     })))
@@ -2562,8 +2561,9 @@ async fn user_held_complete(
         .take(req.challenge_id, &req.nonce)
         .await
         .map_err(ApiError::bad_request)?;
-    let _ = req.assertion; // reserved for WebAuthn payload
-    if let Err(e) = crate::unwrap_tokens::user_held_complete_allowed(false, false) {
+    let assertion_present = req.assertion.is_some();
+    let (snp, tdx) = state.launch_verified_flags().await;
+    if let Err(e) = crate::unwrap_tokens::user_held_complete_allowed(snp, tdx) {
         let _ = state
             .store
             .audit
@@ -2574,16 +2574,45 @@ async fn user_held_complete(
                 None,
                 json!({
                     "challenge_id": challenge.id,
+                    "snp_launch_verified": snp,
+                    "tdx_launch_verified": tdx,
                     "reason": e.to_string(),
                 }),
             )
             .await;
         return Err(ApiError::forbidden(e));
     }
-    // Unreachable until hardware flips verified flags (wired later).
-    Err(ApiError::unavailable(
-        "user-held complete path not wired to key broker yet",
-    ))
+    // Key-broker stub: after verified launch, unlock host-env vault lease.
+    // Wrapped disk-key release (confidential-agent-vms.md) is not implemented.
+    let until = Utc::now() + chrono::Duration::hours(1);
+    state.unlock_vault_until(until);
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.vault.user_held.complete",
+            None,
+            json!({
+                "challenge_id": challenge.id,
+                "snp_launch_verified": snp,
+                "tdx_launch_verified": tdx,
+                "assertion_present": assertion_present,
+                "key_broker": "stub",
+                "until": until,
+            }),
+        )
+        .await;
+    Ok(Json(json!({
+        "unlocked": true,
+        "until": until,
+        "snp_launch_verified": snp,
+        "tdx_launch_verified": tdx,
+        "key_broker": "stub",
+        "secret_backend": crate::unwrap_tokens::SecretBackendKind::from_env().as_str(),
+        "honesty": "Launch verified on this host; vault lease granted via key-broker stub. Wrapped disk key / LUKS release is not implemented — secrets may still come from host env.",
+    })))
 }
 
 /// Keep pack: policy + agent pin + credential *names* (never secrets) + FluxVM migrate notes.
