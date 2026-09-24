@@ -31,6 +31,9 @@ Options (deploy):
   --vcpus <n> --memory-mib <n>  sandbox size (give both)
   --confinement <mode>      strict drops all sandbox traffic except to the egress broker/proxy
   --confidential <mode>     auto (use a hardware-encrypted VM if the host has one), or required
+  --inner-container <mode>  strict runs the worker unprivileged in a bubblewrap container
+  --persistent              allow always-on per-user workstations for this agent
+  --browser-port <port>     Chromium remote-debugging port in the guest (read-only tab listing)
   --dlp                     hold requests carrying key/token-shaped strings for approval
   --taint                   taint the session when it reads from an untrusted host
   --trust-host <host>       repeatable host that does not taint (implies --taint)
@@ -133,6 +136,10 @@ function parseFlags(argv) {
       out.homeVolume = true;
       continue;
     }
+    if (arg === "--persistent") {
+      out.persistent = true;
+      continue;
+    }
     if (arg === "--dlp") {
       out.dlp = true;
       continue;
@@ -167,6 +174,8 @@ function parseFlags(argv) {
       case "--memory-mib": out.memoryMib = value; break;
       case "--confinement": out.confinement = value; break;
       case "--confidential": out.confidential = value; break;
+      case "--inner-container": out.innerContainer = value; break;
+      case "--browser-port": out.browserPort = value; break;
       case "--trust-host": out.taintTrust.push(value); break;
       case "--rule": out.rule.push(value); break;
       case "--skill": out.skill.push(value); break;

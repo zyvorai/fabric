@@ -26,6 +26,9 @@ async fn main() -> Result<()> {
     tokio::spawn(zyvor_fabric_agent_runtime::schedules::schedule_loop(
         state.clone(),
     ));
+    tokio::spawn(zyvor_fabric_agent_runtime::workstations::workstation_loop(
+        state.clone(),
+    ));
     tokio::spawn(pool::warm_pool_loop(state.clone()));
 
     let public_listener = tokio::net::TcpListener::bind(public_addr).await?;

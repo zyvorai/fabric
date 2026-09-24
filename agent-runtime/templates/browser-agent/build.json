@@ -4,7 +4,7 @@
   "format": "qcow2",
   "size_gib": 12,
   "hostname": "browser-agent",
-  "packages": ["chromium", "fonts-liberation", "fonts-noto-color-emoji", "ca-certificates", "xz-utils"],
+  "packages": ["chromium", "bubblewrap", "util-linux", "fonts-liberation", "fonts-noto-color-emoji", "ca-certificates", "xz-utils"],
   "commands": [
     "tar -xf /root/node20.tar.xz -C /usr/local --strip-components=1",
     "chmod +x /usr/local/bin/fluxvm-guest-agent",

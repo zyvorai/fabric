@@ -228,7 +228,7 @@ impl IntoResponse for ApiError {
     }
 }
 
-type ApiResult<T> = Result<T, ApiError>;
+pub(crate) type ApiResult<T> = Result<T, ApiError>;
 
 pub fn public_router(state: Arc<AppState>) -> Router {
     let protected = Router::new()
@@ -243,6 +243,20 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}/steer", post(steer_session))
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
         .route("/v1/sessions/{id}/untaint", post(untaint_session))
+        .route(
+            "/v1/sessions/{id}/browser/{*path}",
+            get(crate::browser::devtools),
+        )
+        .route(
+            "/v1/workstations",
+            get(crate::workstations::list_workstations),
+        )
+        .route(
+            "/v1/workstations/{agent}/{user_id}",
+            get(crate::workstations::get_workstation)
+                .put(crate::workstations::put_workstation)
+                .delete(crate::workstations::delete_workstation),
+        )
         .route("/v1/sessions/{id}/hibernate", post(hibernate_session))
         .route("/v1/sessions/{id}/resume", post(resume_session))
         .route("/v1/sessions/{id}/events", get(stream_events))
@@ -937,6 +951,18 @@ async fn provision_guest(
     )
     .await?;
 
+    if agent.manifest.inner_container == crate::model::InnerContainer::Strict {
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                crate::contain::GUEST_PATH,
+                crate::contain::SCRIPT.as_bytes(),
+                0o755,
+            ),
+        )
+        .await?;
+    }
     mount_skills(state, session, agent).await?;
 
     let broker = format!(
@@ -960,8 +986,9 @@ async fn provision_guest(
         .unwrap_or_default();
     let credentials =
         serde_json::to_string(&agent.manifest.credentials).unwrap_or_else(|_| "[]".into());
+    let launcher = crate::contain::launcher_prefix(agent.manifest.inner_container);
     let command = format!(
-        "mkdir -p /opt/zyvor/agent; {proxy_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
+        "mkdir -p /opt/zyvor/agent; {proxy_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()),
         shell_quote(&session.capability_token),
         shell_quote(&broker),
@@ -1115,7 +1142,7 @@ async fn untaint_session(
     Ok(Json(session.into()))
 }
 
-async fn cancel_session(
+pub(crate) async fn cancel_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<(StatusCode, Json<SessionView>)> {

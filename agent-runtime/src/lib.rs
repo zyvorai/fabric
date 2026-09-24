@@ -3,8 +3,10 @@
 
 pub mod app;
 pub mod audit;
+pub mod browser;
 pub mod config;
 pub mod confine;
+pub mod contain;
 pub mod credentials;
 pub mod egress;
 pub mod fluxvm;
@@ -18,6 +20,7 @@ pub mod schedules;
 pub mod sentinel;
 pub mod skills;
 pub mod store;
+pub mod workstations;
 
 use crate::{config::Config, credentials::CredentialVault, fluxvm::FluxVm, store::Store};
 use anyhow::Result;

@@ -173,6 +173,18 @@ Set `ZYVOR_AGENT_APPROVAL_WEBHOOK` and `ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET` and
 
 A credential descriptor can require a decision per request: `"requires_approval": ["POST"]` (methods, or `"*"`) and `"approval_kind": "send"` (default) or `"purchase"`. The broker then holds the request after every other check and opens an approval showing the method, the URL without its query string, the credential name, and the body's length and SHA-256, never the body or a header. Each request needs its own decision; nothing is remembered.
 
+### Inside the sandbox: a contained worker
+
+`"inner_container": "strict"` starts the worker (and so any browser it launches) through `/opt/zyvor/contain.sh`, which the runtime writes into the guest: an unprivileged `agent` user in a bubblewrap container with a read-only view of the guest (the agent cannot edit its own bundle, the worker or the launcher), a private `/tmp`, its writable home, no capabilities and no new privileges. The template needs `bubblewrap` and `util-linux` (`templates/browser-agent/build.json` has both), and it fails closed: without them the worker never starts. The VM stays the outer boundary; this limits what an escape from the agent's own process gets. It shares the network namespace on purpose, since the agent must reach the broker, so pair it with `confinement: strict`. Known gap: the guest agent's vsock channel is reachable from that namespace, so set a guest-agent token for an untrusted agent. Not exercised against a live FluxVM guest yet; the launcher's logic is tested with stand-in binaries.
+
+### Always-on workstations
+
+Deploy with `"persistent": true`, then declare a workstation: `PUT /v1/workstations/{agent}/{user_id}` (`GET`, `DELETE`, and `GET /v1/workstations` too; operator token only). The runtime keeps a session running for it and starts a new one when it ends, fails or expires, retrying with exponential backoff (5 s doubling to 5 min) while starts keep failing; the record shows `restarts`, `consecutive_failures`, `last_error` and `next_attempt_at`. State survives restarts through the user's per-user home volume, so it is meant to be used with `home_volume.per_user`. Deleting a workstation cancels its session and leaves the volume.
+
+### Looking at the agent's browser
+
+With `"browser_port": 9222` (Chromium started with remote debugging on that port, bound so FluxVM's sandbox proxy can reach it), an operator can `GET /v1/sessions/{id}/browser/json/list` (also `json`, `json/version`, `json/protocol`) to see the open tabs' titles and URLs. Only those listing paths are forwarded, and the WebSocket and frontend URLs are removed from the reply. **Watching a live screen or taking over is not implemented**: that needs a WebSocket bridge to the guest.
+
 ### Confidential VMs, when the host has them
 
 `"confidential": "auto"` asks FluxVM for a hardware-encrypted VM (AMD SEV-SNP or Intel TDX) and quietly runs a normal VM when the host cannot, recording why on the session (`confidential: {active, tech, reason}`, also in the `session.created` event). `"required"` refuses to run without one: FluxVM refuses the launch, and the runtime also deletes any sandbox that comes back without an active confidential status, including from a FluxVM too old to report one. Deploy rejects the combinations that would leak guest memory or disk: `warm_pool_size` and `idle_hibernate_seconds` (a snapshot copies memory out), and, for `required`, `home_volume` (a virtiofs share is readable by the host). `GET /v1/host/confidential` on FluxVM shows what a host offers.

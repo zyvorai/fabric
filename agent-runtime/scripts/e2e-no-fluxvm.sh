@@ -240,6 +240,23 @@ check "an oversized body is refused by the host's egress rules, before any appro
 check "  ...naming the rule" "egress rules" "$(cat "$W/broker.out")"
 check_eq "no approval was opened for it" "" "$(pending_json)"
 
+echo "== workstations, confidential, browser, inner container"
+check "confidential + warm pool is rejected at deploy" 400 "$(deploy badconf '{"template":"t","confidential":"auto","warm_pool_size":1}')"
+check "confidential: required + home volume is rejected" 400 "$(deploy badconf2 '{"template":"t","confidential":"required","home_volume":{"per_user":true}}')"
+check "a persistent, contained, browser agent deploys" 200 "$(deploy desk '{"template":"t","persistent":true,"inner_container":"strict","confidential":"auto","browser_port":9222,"home_volume":{"per_user":true}}' | sed 's/^20[01]$/200/')"
+check "a non-persistent agent cannot have a workstation" 409 "$(api -X PUT "$API/v1/workstations/allow/alice")"
+check "the agent's capability cannot create workstations" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer ${CAP[allow]}" "$API/v1/workstations/desk/alice")"
+check "the operator declares a workstation" 201 "$(api -X PUT "$API/v1/workstations/desk/alice")"
+for _ in $(seq 20); do
+  ws=$(curl -s -H "Authorization: Bearer $TOKEN" "$API/v1/workstations/desk/alice")
+  [[ "$ws" == *'"consecutive_failures":0'* ]] || break; sleep 0.5
+done
+check "the loop tried to start it and recorded the failure (FluxVM is unreachable here)" '"last_error"' "$ws"
+check_eq "  ...with a backoff scheduled" true "$(python3 -c 'import sys,json;print(json.loads(sys.argv[1]).get("next_attempt_at") is not None)' "$ws")"
+check "the tab view refuses an agent without browser_port" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$API/v1/sessions/${SID[allow]}/browser/json/list")"
+check "  ...and mutating DevTools paths" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$API/v1/sessions/${SID[allow]}/browser/json/new")"
+check "the operator removes the workstation" 204 "$(api -X DELETE "$API/v1/workstations/desk/alice")"
+
 echo "== journal"
 audit=$(curl -s -H "Authorization: Bearer $TOKEN" "$API/v1/audit?limit=200")
 check "egress.connect entries recorded" egress.connect "$audit"

@@ -86,6 +86,14 @@ export function buildManifest(flags, runtime) {
     }
     if (flags.confidential !== "off") manifest.confidential = flags.confidential;
   }
+  if (flags.innerContainer !== undefined) {
+    if (!["off", "strict"].includes(flags.innerContainer)) {
+      throw new Error("--inner-container must be off or strict");
+    }
+    if (flags.innerContainer === "strict") manifest.inner_container = "strict";
+  }
+  if (flags.persistent) manifest.persistent = true;
+  if (flags.browserPort !== undefined) manifest.browser_port = positiveInt("--browser-port", flags.browserPort);
   if (flags.dlp) manifest.dlp = true;
   if (flags.taintTrust.length > 0 || flags.taint) {
     manifest.taint = { trusted_hosts: flags.taintTrust };

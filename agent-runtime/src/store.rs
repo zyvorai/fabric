@@ -5,7 +5,7 @@ use crate::audit::AuditLog;
 use crate::model::{
     AgentRecord, ApprovalKind, ApprovalRecord, ApprovalStatus, DeployAgentRequest, GrantScope,
     LoopRecord, ScheduleRecord, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
-    WarmSandboxState, WebhookRecord,
+    WarmSandboxState, WebhookRecord, WorkstationRecord,
 };
 use crate::skills::SkillStore;
 use anyhow::{bail, Context, Result};
@@ -30,6 +30,7 @@ pub struct Store {
     sessions: RwLock<HashMap<Uuid, SessionRecord>>,
     warm_sandboxes: RwLock<HashMap<Uuid, WarmSandboxRecord>>,
     schedules: RwLock<HashMap<Uuid, ScheduleRecord>>,
+    workstations: RwLock<HashMap<Uuid, WorkstationRecord>>,
     webhooks: RwLock<HashMap<Uuid, WebhookRecord>>,
     loops: RwLock<HashMap<Uuid, LoopRecord>>,
     approvals: RwLock<HashMap<Uuid, ApprovalRecord>>,
@@ -55,6 +56,7 @@ impl Store {
             sessions: RwLock::new(HashMap::new()),
             warm_sandboxes: RwLock::new(HashMap::new()),
             schedules: RwLock::new(HashMap::new()),
+            workstations: RwLock::new(HashMap::new()),
             webhooks: RwLock::new(HashMap::new()),
             loops: RwLock::new(HashMap::new()),
             approvals: RwLock::new(HashMap::new()),
@@ -106,6 +108,8 @@ impl Store {
             .map(|record| (record.sandbox_id, record))
             .collect();
         *self.schedules.write().await = read_id_map(&self.root.join("schedules.json")).await?;
+        *self.workstations.write().await =
+            read_id_map(&self.root.join("workstations.json")).await?;
         *self.webhooks.write().await = read_id_map(&self.root.join("webhooks.json")).await?;
         *self.loops.write().await = read_id_map(&self.root.join("loops.json")).await?;
         *self.approvals.write().await = read_id_map(&self.root.join("approvals.json")).await?;
@@ -609,6 +613,44 @@ impl Store {
         Ok(true)
     }
 
+    pub async fn list_workstations(&self) -> Vec<WorkstationRecord> {
+        let mut out: Vec<_> = self.workstations.read().await.values().cloned().collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
+    pub async fn find_workstation(&self, agent: &str, user_id: &str) -> Option<WorkstationRecord> {
+        self.workstations
+            .read()
+            .await
+            .values()
+            .find(|w| w.agent == agent && w.user_id == user_id)
+            .cloned()
+    }
+
+    pub async fn save_workstation(&self, record: WorkstationRecord) -> Result<()> {
+        let mut map = self.workstations.write().await;
+        map.insert(record.id, record);
+        self.persist_vec(
+            "workstations.json",
+            &map.values().cloned().collect::<Vec<_>>(),
+        )
+        .await
+    }
+
+    pub async fn delete_workstation(&self, id: Uuid) -> Result<bool> {
+        let mut map = self.workstations.write().await;
+        if map.remove(&id).is_none() {
+            return Ok(false);
+        }
+        self.persist_vec(
+            "workstations.json",
+            &map.values().cloned().collect::<Vec<_>>(),
+        )
+        .await?;
+        Ok(true)
+    }
+
     pub async fn list_webhooks(&self) -> Vec<WebhookRecord> {
         let mut out: Vec<_> = self.webhooks.read().await.values().cloned().collect();
         out.sort_by_key(|record| record.created_at);
@@ -795,6 +837,11 @@ impl Identified for ScheduleRecord {
         self.id
     }
 }
+impl Identified for WorkstationRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
 impl Identified for WebhookRecord {
     fn identified_id(&self) -> Uuid {
         self.id
@@ -868,6 +915,9 @@ mod tests {
                 confinement: Default::default(),
                 resources: None,
                 confidential: Default::default(),
+                inner_container: Default::default(),
+                persistent: false,
+                browser_port: None,
                 template: "node22".into(),
                 credentials: vec!["openai".into()],
                 egress_allow_hosts: vec!["api.openai.com".into()],
@@ -913,6 +963,9 @@ mod tests {
                     confinement: Default::default(),
                     resources: None,
                     confidential: Default::default(),
+                    inner_container: Default::default(),
+                    persistent: false,
+                    browser_port: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.openai.com".into()],
@@ -943,6 +996,9 @@ mod tests {
                     confinement: Default::default(),
                     resources: None,
                     confidential: Default::default(),
+                    inner_container: Default::default(),
+                    persistent: false,
+                    browser_port: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.anthropic.com".into()],

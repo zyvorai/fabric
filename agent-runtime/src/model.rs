@@ -47,6 +47,17 @@ pub struct AgentManifest {
     /// Taint the session when it reads content from a host outside `trusted_hosts`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taint: Option<TaintPolicy>,
+    /// Chromium's remote-debugging port inside the guest. Lets an operator list
+    /// the agent's open tabs (read-only). See [`crate::browser`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browser_port: Option<u16>,
+    /// Allow operator-declared always-on workstations for this agent. See
+    /// [`crate::workstations`].
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub persistent: bool,
+    /// `strict` runs the worker unprivileged in a bubblewrap container.
+    #[serde(default, skip_serializing_if = "InnerContainer::is_off")]
+    pub inner_container: InnerContainer,
     /// Run in a hardware-encrypted VM when the host can (`auto`), or only then
     /// (`required`). Not a substitute for key custody: see the design spec.
     #[serde(default, skip_serializing_if = "Confidential::is_off")]
@@ -312,6 +323,23 @@ pub struct TaintPolicy {
     pub trusted_hosts: Vec<String>,
 }
 
+/// Run the worker as an unprivileged user in a bubblewrap container inside the
+/// sandbox. The template needs `bubblewrap` and `util-linux`; launching fails
+/// closed if they are missing.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum InnerContainer {
+    #[default]
+    Off,
+    Strict,
+}
+
+impl InnerContainer {
+    pub fn is_off(&self) -> bool {
+        *self == Self::Off
+    }
+}
+
 /// Whether the sandbox should run as a hardware-encrypted confidential VM.
 /// `auto` uses one when the host has the hardware and otherwise runs a normal
 /// VM (the outcome is recorded on the session); `required` refuses to run
@@ -537,6 +565,27 @@ pub struct SessionRecord {
     /// How the sandbox was launched, when the agent asked for `confidential`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidential: Option<ConfidentialStatus>,
+}
+
+/// A promise that a user's agent VM stays up: the runtime keeps a session
+/// running for it, restarting with backoff. See [`crate::workstations`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkstationRecord {
+    pub id: Uuid,
+    pub agent: String,
+    pub user_id: String,
+    pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub active_session_id: Option<Uuid>,
+    /// Sessions started for this workstation so far.
+    #[serde(default)]
+    pub restarts: u32,
+    #[serde(default)]
+    pub consecutive_failures: u32,
+    #[serde(default)]
+    pub last_error: Option<String>,
+    #[serde(default)]
+    pub next_attempt_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1001,6 +1050,9 @@ mod home_volume_tests {
             confinement: Default::default(),
             resources: None,
             confidential: Default::default(),
+            inner_container: Default::default(),
+            persistent: false,
+            browser_port: None,
             template: "qemu-node".into(),
             credentials: vec![],
             egress_allow_hosts: vec![],
@@ -1257,5 +1309,21 @@ mod home_volume_tests {
         m.confidential = Confidential::Off;
         m.warm_pool_size = 5;
         assert!(m.validate_confidential().is_ok());
+    }
+
+    #[test]
+    fn inner_container_is_omitted_when_off() {
+        assert!(serde_json::to_value(manifest(None))
+            .unwrap()
+            .get("inner_container")
+            .is_none());
+        let m = AgentManifest {
+            inner_container: InnerContainer::Strict,
+            ..manifest(None)
+        };
+        assert_eq!(
+            serde_json::to_value(m).unwrap()["inner_container"],
+            "strict"
+        );
     }
 }

@@ -3,6 +3,11 @@
 ## 0.3.0
 
 ### Added
+- **Inner containment, always-on workstations and a browser tab view.**
+  `inner_container: strict` runs the worker unprivileged in a bubblewrap container
+  (fails closed); `persistent: true` plus `PUT /v1/workstations/{agent}/{user_id}`
+  keeps a user's session running with backoff restarts; `browser_port` lets an
+  operator list the agent's open tabs (read-only; no live view yet).
 - **Confidential VMs when the host has them.** `confidential: auto|required` asks
   FluxVM (`feat/sandbox-resources`, `GET /v1/host/confidential`) for a
   hardware-encrypted sandbox and falls back to a normal VM (`auto`) or refuses

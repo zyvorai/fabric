@@ -73,3 +73,18 @@ test("confidential modes", () => {
   assert.equal(buildManifest({ ...base(), confidential: "required" }, "node").confidential, "required");
   assert.throws(() => buildManifest({ ...base(), confidential: "yes" }, "node"), /--confidential/);
 });
+
+test("inner container", () => {
+  assert.equal("inner_container" in buildManifest({ ...base(), innerContainer: "off" }, "node"), false);
+  assert.equal(buildManifest({ ...base(), innerContainer: "strict" }, "node").inner_container, "strict");
+  assert.throws(() => buildManifest({ ...base(), innerContainer: "x" }, "node"), /--inner-container/);
+});
+
+test("persistent and browser port", () => {
+  const plain = buildManifest(base(), "node");
+  assert.equal("persistent" in plain || "browser_port" in plain, false);
+  const m = buildManifest({ ...base(), persistent: true, browserPort: "9222" }, "node");
+  assert.equal(m.persistent, true);
+  assert.equal(m.browser_port, 9222);
+  assert.throws(() => buildManifest({ ...base(), browserPort: "0" }, "node"), /positive integer/);
+});
