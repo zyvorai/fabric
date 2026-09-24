@@ -1235,6 +1235,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/sessions/{id}/browser/screenshot",
             get(api::agent_runtime::session_browser_screenshot),
         )
+        .route("/vault/status", get(api::agent_runtime::vault_status))
+        .route(
+            "/vault/user-held/challenge",
+            post(api::agent_runtime::vault_user_held_challenge),
+        )
+        .route(
+            "/vault/user-held/complete",
+            post(api::agent_runtime::vault_user_held_complete),
+        )
         .route(
             "/sessions/{id}/{action}",
             post(api::agent_runtime::session_action),
@@ -2691,6 +2700,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let mut ws_routes = Router::new()
         .route("/console/{name}", get(websocket::console_handler))
         .route("/vnc/{name}", get(vnc_proxy::vnc_handler::<AppState>))
+        .route(
+            "/sessions/{id}/browser/screencast",
+            get(api::agent_runtime::session_browser_screencast),
+        )
         .with_state(state.clone());
 
     // Browsers' native WebSocket constructor can't set an Authorization
