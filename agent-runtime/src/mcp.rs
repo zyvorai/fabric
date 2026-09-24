@@ -3,9 +3,8 @@
 
 //! Small MCP server over the agent HTTP API.
 //!
-//! Cursor or Claude Code can list agents, list executions, and chat with an
-//! agent. Chat creates a session or steers an existing one. It does not
-//! grant credentials or open egress beyond that agent's manifest.
+//! Cursor or Claude Code can list agents, list executions, chat with an agent,
+//! and drive the Keep a11y browser tools (no raw Playwright / DOM).
 
 use crate::{
     app::{self, ApiError},
@@ -96,6 +95,69 @@ fn tools() -> Vec<Value> {
                 "required": ["message"]
             }),
         ),
+        tool(
+            "browser_open",
+            "Open a URL in the Keep cell browser (a11y driver). Requires confinement:strict.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": { "type": "string" },
+                    "url": { "type": "string" }
+                },
+                "required": ["session_id", "url"]
+            }),
+        ),
+        tool(
+            "browser_snapshot",
+            "Accessibility snapshot with @eN refs (no HTML).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": { "type": "string" },
+                    "interactive": { "type": "boolean" }
+                },
+                "required": ["session_id"]
+            }),
+        ),
+        tool(
+            "browser_act",
+            "Act on a snapshot ref: click|fill|type|press|scroll. Password fill returns needs_host_fill.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": { "type": "string" },
+                    "op": { "type": "string" },
+                    "ref": { "type": "string" },
+                    "text": { "type": "string" },
+                    "key": { "type": "string" },
+                    "dy": { "type": "number" }
+                },
+                "required": ["session_id", "op"]
+            }),
+        ),
+        tool(
+            "browser_tabs",
+            "List open tabs (title + url only).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": { "type": "string" }
+                },
+                "required": ["session_id"]
+            }),
+        ),
+        tool(
+            "browser_close",
+            "Close a browser tab.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "session_id": { "type": "string" },
+                    "tab": { "type": "string" }
+                },
+                "required": ["session_id"]
+            }),
+        ),
     ]
 }
 
@@ -117,12 +179,67 @@ async fn call_tool(state: &Arc<AppState>, params: &Value) -> Result<Value, (i32,
         "list_agents" => json!({"items": state.store.list_agents().await}),
         "list_executions" => list_executions(state, &args).await?,
         "chat_with_agent" => chat(state, &args).await?,
+        "browser_open" => {
+            browser_tool_proxy(
+                state,
+                &args,
+                json!({"tool": "open", "url": args.get("url")}),
+            )
+            .await?
+        }
+        "browser_snapshot" => {
+            browser_tool_proxy(
+                state,
+                &args,
+                json!({
+                    "tool": "snapshot",
+                    "interactive": args.get("interactive").and_then(|v| v.as_bool()).unwrap_or(true)
+                }),
+            )
+            .await?
+        }
+        "browser_act" => {
+            // Never forward secret/password to the guest driver — host fill-secret only.
+            let mut body = json!({"tool": "act"});
+            if let Some(obj) = body.as_object_mut() {
+                for key in ["op", "ref", "text", "key", "dy"] {
+                    if let Some(v) = args.get(key) {
+                        obj.insert(key.to_string(), v.clone());
+                    }
+                }
+            }
+            browser_tool_proxy(state, &args, body).await?
+        }
+        "browser_tabs" => browser_tool_proxy(state, &args, json!({"tool": "tabs"})).await?,
+        "browser_close" => {
+            browser_tool_proxy(
+                state,
+                &args,
+                json!({"tool": "close", "tab": args.get("tab")}),
+            )
+            .await?
+        }
         _ => return Err((-32602, format!("unknown tool {name}"))),
     };
     Ok(json!({
         "content": [{ "type": "text", "text": value.to_string() }],
         "isError": false
     }))
+}
+
+async fn browser_tool_proxy(
+    state: &AppState,
+    args: &Value,
+    body: Value,
+) -> Result<Value, (i32, String)> {
+    let raw = args
+        .get("session_id")
+        .and_then(Value::as_str)
+        .ok_or((-32602, "session_id is required".into()))?;
+    let id = Uuid::parse_str(raw).map_err(|_| (-32602, "session_id is not a uuid".into()))?;
+    crate::browser::driver_call(state, id, body)
+        .await
+        .map_err(api_error)
 }
 
 async fn list_executions(state: &AppState, args: &Value) -> Result<Value, (i32, String)> {
@@ -193,15 +310,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exposes_list_chat_and_executions() {
+    fn exposes_list_chat_executions_and_browser_tools() {
         let listed = tools();
         let names: Vec<_> = listed
             .iter()
             .filter_map(|tool| tool.get("name").and_then(Value::as_str))
             .collect();
-        assert_eq!(
-            names,
-            vec!["list_agents", "list_executions", "chat_with_agent"]
-        );
+        assert!(names.contains(&"list_agents"));
+        assert!(names.contains(&"browser_open"));
+        assert!(names.contains(&"browser_snapshot"));
+        assert!(names.contains(&"browser_act"));
+        assert!(names.contains(&"browser_tabs"));
+        assert!(names.contains(&"browser_close"));
     }
 }

@@ -51,6 +51,9 @@ pub struct AgentManifest {
     /// the agent's open tabs (read-only). See [`crate::browser`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub browser_port: Option<u16>,
+    /// Keep brokered-browser policy (a11y driver, not raw CDP for the model).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browser: Option<BrowserPolicy>,
     /// Allow operator-declared always-on workstations for this agent. See
     /// [`crate::workstations`].
     #[serde(default, skip_serializing_if = "is_false")]
@@ -363,6 +366,54 @@ pub struct EgressRule {
 pub struct TaintPolicy {
     #[serde(default)]
     pub trusted_hosts: Vec<String>,
+}
+
+/// Brokered browser controls (Keep). Model tools use the a11y driver; CONNECT
+/// still gates page traffic. Defaults are fail-closed for downloads / file URLs.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BrowserPolicy {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow_hosts: Vec<String>,
+    /// Hosts whose Keep policy `action` is `purchase` or `send` — `browser_open`
+    /// refuses until an operator approves that action.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub high_risk_hosts: Vec<String>,
+    #[serde(default = "default_true")]
+    pub block_file_url: bool,
+    #[serde(default = "default_max_tabs")]
+    pub max_tabs: u32,
+    /// When true, guest driver refuses evaluate/DOM (always enforced in driver.mjs).
+    #[serde(default = "default_true")]
+    pub snapshot_only: bool,
+    /// `deny` (default) or `ask`.
+    #[serde(default = "default_deny_downloads")]
+    pub downloads: String,
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_max_tabs() -> u32 {
+    8
+}
+fn default_deny_downloads() -> String {
+    "deny".into()
+}
+
+impl Default for BrowserPolicy {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            allow_hosts: vec![],
+            high_risk_hosts: vec![],
+            block_file_url: true,
+            max_tabs: 8,
+            snapshot_only: true,
+            downloads: "deny".into(),
+        }
+    }
 }
 
 /// Run the worker as an unprivileged user in a bubblewrap container inside the
@@ -1095,6 +1146,7 @@ mod home_volume_tests {
             inner_container: Default::default(),
             persistent: false,
             browser_port: None,
+            browser: None,
             template: "qemu-node".into(),
             credentials: vec![],
             egress_allow_hosts: vec![],

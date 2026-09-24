@@ -3,6 +3,10 @@
 ## 0.3.0
 
 ### Added
+- **Brokered Keep browser (Chromium + Playwright a11y).** Guest `browser-agent`
+  template with loopback CDP `:9222` + driver `:9230`; MCP `browser_*` tools;
+  `POST …/browser/fill-secret`; `keepctl browser tabs|shot`; policy `browser:`
+  block; bake + CI smoke scripts. Docs: [DRIVER.md](docs/keep/browser/DRIVER.md).
 - **Keep 0.2 soft scaffold follow-through.** Cockpit/vault read FluxVM
   `GET /v1/security/capabilities` for `snp_launch_verified` /
   `tdx_launch_verified`; user-held complete fail-closes until verified, then

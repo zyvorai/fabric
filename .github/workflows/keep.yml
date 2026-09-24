@@ -13,6 +13,8 @@ on:
       - "docs/keep/**"
       - "scripts/keepctl"
       - "scripts/keep-e2e.sh"
+      - "scripts/keep-bake-browser-agent.sh"
+      - "scripts/keep-bake-browser-smoke.sh"
       - "docs/tutorials/16-keep-workstation.md"
       - ".github/workflows/keep.yml"
   pull_request:
@@ -21,6 +23,8 @@ on:
       - "docs/keep/**"
       - "scripts/keepctl"
       - "scripts/keep-e2e.sh"
+      - "scripts/keep-bake-browser-agent.sh"
+      - "scripts/keep-bake-browser-smoke.sh"
       - "docs/tutorials/16-keep-workstation.md"
       - ".github/workflows/keep.yml"
 
@@ -46,6 +50,18 @@ jobs:
           cargo test --manifest-path agent-runtime/Cargo.toml credentials -- --nocapture
           cargo test --manifest-path agent-runtime/Cargo.toml notify -- --nocapture
           cargo test --manifest-path agent-runtime/Cargo.toml --lib
+
+  keep-browser-bake-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+      - name: browser-agent template smoke (no KVM)
+        run: |
+          chmod +x scripts/keep-bake-browser-smoke.sh
+          ./scripts/keep-bake-browser-smoke.sh
 
   keep-e2e:
     runs-on: ubuntu-latest
