@@ -13,6 +13,20 @@
   descriptor file. The operator of the host can read it. This is **not** a claim
   that the agent cell is unread by the operator.
 
+### Optional software unwrap ceremony
+
+When `ZYVOR_AGENT_VAULT_UNWRAP_REQUIRED=1`:
+
+```bash
+keepctl unwrap-token vault          # → token (still host-env secrets)
+keepctl unwrap "$TOKEN"             # unlocks inject for ~1h
+keepctl vault-status                # names + honesty; never secret values
+```
+
+`POST /v1/vault/unwrap-tokens`, `POST /v1/vault/unwrap`, `GET /v1/vault/status`.
+Cockpit includes `vault.{secret_backend,unwrap_required,unlocked,honesty}`.
+Backend is always labeled `host-env` until Keep 0.2.
+
 ## Keep 0.2
 
 Vault opens only after the user’s phone or YubiKey unwraps a key onto a

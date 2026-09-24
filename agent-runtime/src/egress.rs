@@ -279,19 +279,30 @@ pub(crate) async fn proxy_inner(
         let port = url
             .port_or_known_default()
             .unwrap_or(if is_fabric { 80 } else { 443 });
-        let (descriptor, secret) = state
-            .credentials
-            .authorize_resolve(
-                name,
-                &ResolveContext {
-                    host,
-                    method: &method,
-                    path: url.path(),
-                    port,
-                    user_id: session.user_id.as_deref(),
-                },
-            )
-            .map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?;
+        let (descriptor, secret) = {
+            if !state.vault_is_unlocked() {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    "vault locked: POST /v1/vault/unwrap with a minted unwrap token \
+                     (ZYVOR_AGENT_VAULT_UNWRAP_REQUIRED=1). Secrets still come from host env \
+                     (software-test)."
+                        .into(),
+                ));
+            }
+            state
+                .credentials
+                .authorize_resolve(
+                    name,
+                    &ResolveContext {
+                        host,
+                        method: &method,
+                        path: url.path(),
+                        port,
+                        user_id: session.user_id.as_deref(),
+                    },
+                )
+                .map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?
+        };
         if let Some(kind) = descriptor.approval_kind_for(&method) {
             needs_approval = Some((kind, name.to_string()));
         }

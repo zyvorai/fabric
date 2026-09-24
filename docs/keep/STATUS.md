@@ -38,4 +38,4 @@ KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-live-lab.sh
 ## Honesty
 
 Measured = `software-test`. Host can still see the VM until Keep 0.2 + hardware.
-Guest vsock worker may still be pending on some lab images — see [pilot-runs/README.md](pilot-runs/README.md).
+Guest vsock on QEMU `node22-agent` is healthy with musl-static guest-agent; Firecracker cell still pending — see [pilot-runs/README.md](pilot-runs/README.md).

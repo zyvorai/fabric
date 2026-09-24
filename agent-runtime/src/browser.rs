@@ -124,6 +124,7 @@ pub(crate) async fn browser_view(
         "session_id": id,
         "tabs": tabs,
         "mode": "listing",
+        "honesty": "Live tab listing only (software-test). Screencast and input takeover are not implemented; host can still see the guest.",
         "note": "Live tab listing only. Screencast and takeover are not implemented in Keep 0.1.",
     })))
 }

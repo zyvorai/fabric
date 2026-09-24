@@ -5,9 +5,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Shield } from 'lucide-react'
 import {
+  BrowserView,
   KeepCockpit,
   decideApproval,
   getSession,
+  getSessionBrowserView,
   getSessionCockpit,
   SessionView,
 } from '../api/agents'
@@ -23,6 +25,7 @@ export default function KeepSession() {
   const toast = useToastContext()
   const [session, setSession] = useState<SessionView | null>(null)
   const [cockpit, setCockpit] = useState<KeepCockpit | null>(null)
+  const [browser, setBrowser] = useState<BrowserView | null>(null)
   const { loading, loadError, run } = usePageLoader('Failed to load Keep session')
 
   const load = useCallback(() => {
@@ -34,6 +37,12 @@ export default function KeepSession() {
       ])
       setSession(s)
       setCockpit(c)
+      try {
+        const b = await getSessionBrowserView(sessionId)
+        setBrowser(b)
+      } catch {
+        setBrowser(null)
+      }
     })
   }, [run, sessionId])
 
@@ -138,6 +147,44 @@ export default function KeepSession() {
                 </li>
               ))}
             </ul>
+          )}
+        </Card>
+
+        <Card className="p-4 space-y-2 text-sm">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-[var(--zf-ink)]">Browser</h2>
+            {cockpit?.browser_page && (
+              <a
+                href={cockpit.browser_page}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-[var(--zf-muted)] underline"
+              >
+                Open live view
+              </a>
+            )}
+          </div>
+          {!browser ? (
+            <p className="text-[var(--zf-muted)]">
+              Tab listing unavailable (session needs a running browser_port agent). Listing only —
+              no screencast or input takeover.
+            </p>
+          ) : (browser.tabs?.length ?? 0) === 0 ? (
+            <p className="text-[var(--zf-muted)]">No open tabs reported.</p>
+          ) : (
+            <ul className="space-y-2">
+              {browser.tabs.map((t) => (
+                <li key={t.id} className="truncate">
+                  <span className="font-medium">{t.title || '(untitled)'}</span>
+                  <span className="text-[var(--zf-muted)]"> · {t.url}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {(browser?.honesty || cockpit?.vault?.honesty) && (
+            <p className="text-[12px] text-[var(--zf-muted)] pt-2 border-t border-[var(--zf-hairline)]">
+              {browser?.honesty ?? cockpit?.vault?.honesty}
+            </p>
           )}
         </Card>
 

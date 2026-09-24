@@ -109,10 +109,28 @@ export interface KeepCockpit {
   honesty?: string
   security_profile?: string | null
   browser_page?: string
+  browser_view?: string
+  vault?: {
+    secret_backend?: string
+    unwrap_required?: boolean
+    unlocked?: boolean
+    honesty?: string
+  }
+}
+
+export interface BrowserView {
+  mode: string
+  honesty?: string
+  note?: string
+  tabs: Array<{ id: string; title: string; url: string; type?: string }>
 }
 
 export async function getSessionCockpit(id: string): Promise<KeepCockpit> {
   return apiGet(`/api/sessions/${encodeURIComponent(id)}/cockpit`)
+}
+
+export async function getSessionBrowserView(id: string): Promise<BrowserView> {
+  return apiGet(`/api/sessions/${encodeURIComponent(id)}/browser/view`)
 }
 
 export async function decideApproval(

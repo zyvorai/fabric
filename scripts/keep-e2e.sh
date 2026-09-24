@@ -441,6 +441,7 @@ http.server.HTTPServer(('127.0.0.1',PORT),H).serve_forever()
     ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" \
     ZYVOR_AGENT_CONFINE=1 \
     ZYVOR_AGENT_SECURITY_PROFILE=measured \
+    ZYVOR_AGENT_EGRESS_ADVERTISE_HOST="${ZYVOR_AGENT_EGRESS_ADVERTISE_HOST:-169.254.0.1}" \
     ZYVOR_AGENT_CREDENTIALS_FILE="$W/creds.json" \
     ZYVOR_AGENT_APPROVAL_WEBHOOK="http://127.0.0.1:${LIVE_HOOK}/hook" \
     ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET="keep-hook" \
@@ -622,7 +623,6 @@ print(next((a['status'] for a in items if a['id']=='$APPROVAL_ID'),''))" 2>/dev/
               FAIL=$((FAIL + 1))
             fi
           fi
-          echo "guest_worker=pending_vsock" >"$W/guest-status"
         fi
       fi
 

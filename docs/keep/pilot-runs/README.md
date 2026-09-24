@@ -14,7 +14,13 @@ Labeled when [`./scripts/keep-pilot-gate.sh`](../../scripts/keep-pilot-gate.sh) 
 
 ## Guest worker note
 
-QEMU `node22-agent` boots to login. Guest **vsock agent** readiness for the Node worker is still flaky on some hosts (`connect(vsock): Connection reset`). When that happens the gate still proves control-plane OOB approve/deny and records `guest_worker=pending_vsock` in the run dir. Fixing vsock bake is follow-up; it does not block the Keep 0.1 pilot control-plane claim.
+QEMU `node22-agent` boots with a **musl-static** `fluxvm-guest-agent` (host glibc
+builds fail inside the Jammy guest with `GLIBC_2.39 not found`). After that bake,
+host `POST …/agent/ping` returns 200 and the gate can record `guest_worker=ok`.
+
+Firecracker (`node22-fc` / `flux-vm` backend) still fails vsock proxy readiness on
+this lab image — keep QEMU for the pilot guest-worker claim until FC rootfs+kernel
+init is fixed.
 
 ## Honesty
 

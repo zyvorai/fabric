@@ -480,6 +480,26 @@ pub async fn session_cockpit(
     .await
 }
 
+/// Keep browser live listing (tabs only; no CDP WebSocket).
+pub async fn session_browser_view(
+    RequireRead(claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Response {
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
+    }
+    proxy(
+        &state,
+        Method::GET,
+        &format!("/v1/sessions/{id}/browser/view"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
 pub async fn list_approvals(
     RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,

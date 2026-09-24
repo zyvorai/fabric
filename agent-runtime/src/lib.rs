@@ -24,13 +24,15 @@ pub mod schedules;
 pub mod sentinel;
 pub mod skills;
 pub mod store;
+pub mod unwrap_tokens;
 pub mod workstations;
 
 use crate::{
     config::Config, credentials::CredentialVault, export_tokens::ExportTokenStore, fluxvm::FluxVm,
-    policy::PolicyTrust, store::Store,
+    policy::PolicyTrust, store::Store, unwrap_tokens::UnwrapTokenStore,
 };
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -52,6 +54,12 @@ pub struct AppState {
     pub policy_trust: PolicyTrust,
     /// Keep: scoped export tokens (training default off).
     pub export_tokens: ExportTokenStore,
+    /// Keep 0.1 software vault ceremony (host-env secrets still).
+    pub unwrap_tokens: UnwrapTokenStore,
+    /// When `ZYVOR_AGENT_VAULT_UNWRAP_REQUIRED=1`, credential inject needs unlock.
+    pub vault_unwrap_required: bool,
+    /// Active unwrap lease end (None = locked when required).
+    pub vault_unlocked_until: Mutex<Option<DateTime<Utc>>>,
     /// Serializes the idempotency/quota reservation section of session creation,
     /// one lock per agent name so a slow or hung FluxVM call for one agent can
     /// never block session creation for every other agent on the process.
@@ -89,6 +97,7 @@ impl AppState {
         }
         let policy_trust = PolicyTrust::from_env()?;
         let export_tokens = ExportTokenStore::open(&config.state_dir).await?;
+        let unwrap_tokens = UnwrapTokenStore::open(&config.state_dir).await?;
         Ok(Arc::new(Self {
             config,
             store,
@@ -100,10 +109,25 @@ impl AppState {
             extra_roots,
             policy_trust,
             export_tokens,
+            unwrap_tokens,
+            vault_unwrap_required: unwrap_tokens::unwrap_required_from_env(),
+            vault_unlocked_until: Mutex::new(None),
             session_create_locks: Mutex::new(HashMap::new()),
             warm_pool_reconcile_lock: tokio::sync::Mutex::new(()),
             session_locks: Mutex::new(HashMap::new()),
         }))
+    }
+
+    /// Whether credential injection may proceed (Keep 0.1 software unwrap gate).
+    pub fn vault_is_unlocked(&self) -> bool {
+        if !self.vault_unwrap_required {
+            return true;
+        }
+        let guard = self
+            .vault_unlocked_until
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        guard.is_some_and(|until| until > Utc::now())
     }
 
     pub fn session_lock(&self, id: Uuid) -> Arc<tokio::sync::Mutex<()>> {

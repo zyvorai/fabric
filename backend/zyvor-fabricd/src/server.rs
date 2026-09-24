@@ -1224,6 +1224,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(api::agent_runtime::session_cockpit),
         )
         .route(
+            "/sessions/{id}/browser/view",
+            get(api::agent_runtime::session_browser_view),
+        )
+        .route(
             "/sessions/{id}/{action}",
             post(api::agent_runtime::session_action),
         )

@@ -3,6 +3,14 @@
 ## 0.3.0
 
 ### Added
+- **Keep guest vsock fix (lab).** Musl-static `fluxvm-guest-agent` in `node22-agent`
+  image (glibc host binary failed with `GLIBC_2.39 not found`); QEMU ping/exec healthy.
+  Firecracker cell still pending (vsock proxy / rootfs-init).
+- **Vault software unwrap ceremony.** Optional `ZYVOR_AGENT_VAULT_UNWRAP_REQUIRED=1`
+  with `POST /v1/vault/unwrap-tokens`, `POST /v1/vault/unwrap`, `GET /v1/vault/status`
+  (`secret_backend: host-env` honesty). `keepctl unwrap-token|unwrap|vault-status`.
+- **Keep console browser listing.** `/app/keep/:sessionId` polls tab listing;
+  fabricd proxies `GET /api/sessions/{id}/browser/view`.
 - **Keep 0.1 pilot gate.** Live FluxVM e2e requires a registered agent template
   (no soft-pass); `./scripts/keep-pilot-gate.sh` runs happy + deny paths and
   archives logs under `docs/keep/pilot-runs/`; console Keep view at

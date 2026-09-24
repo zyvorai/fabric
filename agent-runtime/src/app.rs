@@ -324,6 +324,9 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/sessions/{id}/cockpit", get(session_cockpit))
         .route("/v1/export-tokens", post(mint_export_token))
+        .route("/v1/vault/status", get(vault_status))
+        .route("/v1/vault/unwrap-tokens", post(mint_unwrap_token))
+        .route("/v1/vault/unwrap", post(unlock_vault))
         .route("/v1/agents/{name}/pack", get(pack_agent))
         .route("/v1/skills", get(list_skills).post(publish_skill))
         .route("/v1/skills/{name}", get(get_skill).delete(delete_skill))
@@ -2207,6 +2210,12 @@ async fn session_cockpit(
         "security_profile": state.config.security_profile,
         "evidence_class": "software-test",
         "honesty": "Evidence class software-test: the host can still see this VM. Keep 0.2 + attested hardware is required before claiming otherwise.",
+        "vault": {
+            "secret_backend": crate::unwrap_tokens::SecretBackendKind::HostEnv.as_str(),
+            "unwrap_required": state.vault_unwrap_required,
+            "unlocked": state.vault_is_unlocked(),
+            "honesty": "Secrets still come from host env until Keep 0.2 user-held unwrap.",
+        },
     })))
 }
 
@@ -2248,7 +2257,110 @@ async fn mint_export_token(
         "token": token,
         "scope": record.scope,
         "expires_at": record.expires_at,
+        "id": record.id,
         "note": "Present as X-Keep-Export-Token. Without it, GET /v1/audit and pack export are refused.",
+    })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MintUnwrapTokenRequest {
+    #[serde(default = "default_vault_scope")]
+    scope: String,
+    #[serde(default = "default_export_ttl")]
+    ttl_seconds: u64,
+}
+
+fn default_vault_scope() -> String {
+    "vault".into()
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct UnlockVaultRequest {
+    token: String,
+}
+
+async fn mint_unwrap_token(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<MintUnwrapTokenRequest>,
+) -> ApiResult<Json<Value>> {
+    let (token, record) = state
+        .unwrap_tokens
+        .mint(&req.scope, req.ttl_seconds)
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.unwrap_token.minted",
+            None,
+            json!({
+                "scope": record.scope,
+                "expires_at": record.expires_at,
+                "honesty": "software-test host-env vault ceremony",
+            }),
+        )
+        .await;
+    Ok(Json(json!({
+        "token": token,
+        "scope": record.scope,
+        "expires_at": record.expires_at,
+        "id": record.id,
+        "secret_backend": crate::unwrap_tokens::SecretBackendKind::HostEnv.as_str(),
+        "honesty": "Unlock still reads secrets from host env. Keep 0.2 needs user-held unwrap on attested hardware.",
+    })))
+}
+
+async fn unlock_vault(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<UnlockVaultRequest>,
+) -> ApiResult<Json<Value>> {
+    state
+        .unwrap_tokens
+        .authorize(Some(&req.token))
+        .await
+        .map_err(ApiError::forbidden)?;
+    // Lease matches token mint TTL upper bound when required; otherwise no-op unlock.
+    let until = Utc::now() + chrono::Duration::hours(1);
+    {
+        let mut g = state
+            .vault_unlocked_until
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        *g = Some(until);
+    }
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.vault.unlocked",
+            None,
+            json!({
+                "until": until,
+                "secret_backend": crate::unwrap_tokens::SecretBackendKind::HostEnv.as_str(),
+            }),
+        )
+        .await;
+    Ok(Json(json!({
+        "unlocked": true,
+        "until": until,
+        "secret_backend": crate::unwrap_tokens::SecretBackendKind::HostEnv.as_str(),
+        "honesty": "Host can still read secrets. This is not Keep 0.2 attested unwrap.",
+    })))
+}
+
+async fn vault_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
+    let names: Vec<String> = state.credentials.names();
+    Ok(Json(json!({
+        "secret_backend": crate::unwrap_tokens::SecretBackendKind::HostEnv.as_str(),
+        "unwrap_required": state.vault_unwrap_required,
+        "unlocked": state.vault_is_unlocked(),
+        "credential_names": names,
+        "honesty": "Secrets still come from host env until Keep 0.2 user-held unwrap on attested hardware.",
     })))
 }
 
