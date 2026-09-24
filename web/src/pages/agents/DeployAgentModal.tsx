@@ -43,6 +43,7 @@ export default function DeployAgentModal({ open, onClose, onDeployed }: DeployAg
   const [maxConcurrentSessions, setMaxConcurrentSessions] = useState('')
   const [idleHibernateSeconds, setIdleHibernateSeconds] = useState('')
   const [warmPoolSize, setWarmPoolSize] = useState('0')
+  const [perUserHome, setPerUserHome] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -58,6 +59,7 @@ export default function DeployAgentModal({ open, onClose, onDeployed }: DeployAg
     setMaxConcurrentSessions('')
     setIdleHibernateSeconds('')
     setWarmPoolSize('0')
+    setPerUserHome(true)
     setFormError(null)
   }
 
@@ -123,6 +125,7 @@ export default function DeployAgentModal({ open, onClose, onDeployed }: DeployAg
         max_concurrent_sessions: parseOptionalNumber('Max concurrent sessions', maxConcurrentSessions) ?? undefined,
         idle_hibernate_seconds: parseOptionalNumber('Idle hibernate', idleHibernateSeconds) ?? undefined,
         warm_pool_size: Number(warmPoolSize),
+        ...(perUserHome ? { home_volume: { per_user: true } } : {}),
       }
       await deployAgent({ name: name.trim(), bundle_base64, manifest })
       toast.success(`Deployed ${name.trim()}`)
@@ -297,6 +300,16 @@ export default function DeployAgentModal({ open, onClose, onDeployed }: DeployAg
             disabled={submitting}
           />
           Allow private/link-local egress destinations
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-[var(--zf-ink)]">
+          <input
+            type="checkbox"
+            checked={perUserHome}
+            onChange={(e) => setPerUserHome(e.target.checked)}
+            disabled={submitting}
+          />
+          Per-user home volume (multi-tenant: each user gets their own disk)
         </label>
 
         <div className="grid grid-cols-2 gap-3">

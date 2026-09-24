@@ -11,6 +11,7 @@ pub mod credentials;
 pub mod egress;
 pub mod export_tokens;
 pub mod fluxvm;
+pub mod goals;
 pub mod l7;
 pub mod mcp;
 pub mod mitm;

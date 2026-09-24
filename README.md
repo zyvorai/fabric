@@ -69,7 +69,7 @@ zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 | Bare-metal remote host | `./scripts/deploy remote USER@HOST` |
 | **Kubernetes (k3s lab / Helm)** | [`./scripts/deploy k8s USER@HOST`](#run-on-kubernetes) → [docs/KUBERNETES.md](docs/KUBERNETES.md) |
 | **AI inference (Beta)** | [Tutorial 15](docs/tutorials/15-ai-workloads.md) · [docs/ai-workloads.md](docs/ai-workloads.md) · console `/app/ai` |
-| **Keep** (open agent workstation) | [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [docs/keep/KEEP.md](docs/keep/KEEP.md) · `./scripts/keepctl` |
+| **Keep** (open agent workstation) | [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [docs/keep/KEEP.md](docs/keep/KEEP.md) · `./scripts/keep-live-lab.sh` · console `/keep` · `./scripts/keepctl` |
 | Declarative VMs | `zyvorctl apply -f config.yaml` |
 | Terraform | [terraform-provider/](terraform-provider/) |
 | K8s operator (CRDs → API) | [operator/](operator/) |
@@ -316,7 +316,7 @@ All figures above are counted directly from source (route definitions, router co
 | Product overview + metrics | [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
 | Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | **AI Workloads (Beta)** | [docs/ai-workloads.md](docs/ai-workloads.md) · [Tutorial 15](docs/tutorials/15-ai-workloads.md) |
 | FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | Agent Runtime | [agent-runtime/README.md](agent-runtime/README.md) · [Tutorials 11–14](docs/tutorials/README.md) |
-| | | | | **Keep** (open agent workstation) | [docs/keep/KEEP.md](docs/keep/KEEP.md) · [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [CI](.github/workflows/keep.yml) · [`scripts/keepctl`](scripts/keepctl) |
+| | | | | **Keep** (open agent workstation) | [docs/keep/KEEP.md](docs/keep/KEEP.md) · [PRODUCTION.md](docs/keep/PRODUCTION.md) · [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [CI](.github/workflows/keep.yml) · [`scripts/keep-live-lab.sh`](scripts/keep-live-lab.sh) · console `/keep` |
 | | | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | | | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | | | | | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |

@@ -12,18 +12,20 @@ measured security profile.
 > can still see a measured VM.* Evidence class `software-test` must never be
 > marketed as “the operator cannot read this.” See [docs/keep/KEEP.md](../keep/KEEP.md).
 
-GitHub Actions runs the unit/policy suite without KVM:
-[`.github/workflows/keep.yml`](../../.github/workflows/keep.yml).
+GitHub Actions runs the unit/policy suite + stub e2e without KVM:
+[`.github/workflows/keep.yml`](../../.github/workflows/keep.yml).  
+Lab live FluxVM gate: [`./scripts/keep-live-lab.sh`](../../scripts/keep-live-lab.sh) · [PRODUCTION.md](../keep/PRODUCTION.md).
 
 ---
 
 ## What you will learn
 
 1. How Keep maps onto Fabric agent-runtime + FluxVM (no third repo).
-2. How to run the same tests CI runs.
-3. How to export/import `keep.policy.yaml` with `keepctl`.
-4. How to open a session cockpit (taint + last decisions).
-5. How training stays off unless you mint an export token.
+2. How to run the CI suite and the Keep 0.1 live lab gate.
+3. How to run **Keep mode** (fail-closed signed policy).
+4. How to export/import `keep.policy.yaml` with `keepctl`.
+5. How to open cockpit + browser live view.
+6. How training stays off unless you mint an export token.
 
 ---
 
@@ -33,24 +35,45 @@ GitHub Actions runs the unit/policy suite without KVM:
 cd fabric
 cargo test --manifest-path agent-runtime/Cargo.toml --lib
 cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+./scripts/keep-e2e.sh
 ./scripts/keepctl --help
 ```
 
-Expect ~135 lib tests green. That is the same gate as the Keep workflow.
+Expect ~143 lib tests green and stub e2e PASS. That is the same gate as the Keep workflow.
+
+On a host with FluxVM up:
+
+```bash
+./scripts/keep-live-lab.sh
+# Guest boot needs a registered template (Tutorial 11 node22-agent) or:
+# KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-live-lab.sh
+```
 
 ---
 
-## Step 1 — Start the agent runtime
+## Step 1 — Start the agent runtime (Keep mode)
 
 ```bash
+# Generate a one-off Ed25519 seed for this lab (32-byte hex)
+SEED=$(python3 -c 'import os; print(os.urandom(32).hex())')
+PUB=$(./agent-runtime/target/release/examples/keep_sign_policy pubkey "$SEED" \
+  2>/dev/null || cargo run --manifest-path agent-runtime/Cargo.toml --example keep_sign_policy -- pubkey "$SEED")
+
 export ZYVOR_AGENT_LISTEN=127.0.0.1:9096
 export ZYVOR_AGENT_API_TOKEN=dev-token
 export ZYVOR_AGENT_FLUXVM_URL=http://127.0.0.1:7788
+export ZYVOR_AGENT_KEEP_MODE=1
+export ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB"
+export ZYVOR_AGENT_CONFINE=1          # optional but recommended
+export ZYVOR_AGENT_SECURITY_PROFILE=measured  # default under Keep mode
 # optional: approval webhook your phone/CLI can reach
 # export ZYVOR_AGENT_APPROVAL_WEBHOOK=https://…
 
 cargo run --manifest-path agent-runtime/Cargo.toml --release
 ```
+
+Keep mode **refuses to start** without trusted signers, and refuses unsigned
+`PUT /v1/agents/{name}/policy`.
 
 ```bash
 export KEEP_API=http://127.0.0.1:9096
@@ -72,13 +95,15 @@ Use Tutorial 11’s deploy JSON shape, and add Keep fields:
     "template": "node22-agent",
     "egress_mode": "ask",
     "egress_allow_hosts": ["api.github.com"],
+    "confinement": "strict",
     "taint": { "trusted_hosts": ["api.github.com"] },
     "model_socket": {
       "base_url": "https://api.x.ai/v1",
       "model": "grok-4",
       "credential": "xai"
     },
-    "cell_backend": "firecracker"
+    "cell_backend": "firecracker",
+    "browser_port": 9222
   }
 }
 ```
@@ -88,36 +113,49 @@ Use Tutorial 11’s deploy JSON shape, and add Keep fields:
 ```
 
 `model_socket` is the BYO brain — swap Grok / local GGUF / vLLM without rebuilding the cell.  
-`cell_backend: firecracker` records the Keep 0.1 intent (agent kernel ≠ host kernel); the live sandbox still follows FluxVM’s sandbox API today.
+`cell_backend: firecracker` records the Keep 0.1 intent (agent kernel ≠ host kernel); the live sandbox still follows FluxVM’s sandbox API today.  
+Console UX: marketing `/keep` → **Open Agents** when signed in.
 
 ---
 
-## Step 3 — Readable Sentinel policy
+## Step 3 — Readable Sentinel policy (must be signed)
 
 ```bash
 ./scripts/keepctl policy show keep-demo > /tmp/keep.policy.yaml
-cat /tmp/keep.policy.yaml
-# edit allow/deny/ask/taint, then:
-./scripts/keepctl policy set keep-demo /tmp/keep.policy.yaml
+# edit allow/deny/ask/taint, then sign and set:
+./agent-runtime/target/release/examples/keep_sign_policy sign "$SEED" /tmp/keep.policy.yaml \
+  > /tmp/keep.policy.yaml.sig
+./scripts/keepctl policy set keep-demo /tmp/keep.policy.yaml /tmp/keep.policy.yaml.sig
 ```
 
-Example schema: [docs/keep/sentinel/keep.policy.yaml](../keep/sentinel/keep.policy.yaml).
+Unsigned `PUT` returns **403** in Keep mode. Example schema:
+[docs/keep/sentinel/keep.policy.yaml](../keep/sentinel/keep.policy.yaml).
 
 High-risk actions (buy / send / delete) must go through `/v1/approvals` / your
 webhook — never confirm inside the agent chat.
 
+Credentials use host-side `authorize_resolve` allowlists
+([vault/README.md](../keep/vault/README.md)); secrets remain host-readable until Keep 0.2.
+
 ---
 
-## Step 4 — Cockpit: visible taint
+## Step 4 — Cockpit + browser live view
 
 After a session exists:
 
 ```bash
 SID=<session-uuid>
-./scripts/keepctl cockpit "$SID" | jq '{tainted_by, taint_visible, last_decisions, honesty}'
+./scripts/keepctl cockpit "$SID" | jq '{tainted_by, taint_visible, evidence_class, browser_view, honesty}'
+# HTML (phone-friendly):
+open "$KEEP_API/keep/cockpit?session=$SID"
+# Tab listing (needs browser_port on the agent):
+curl -sS -H "Authorization: Bearer $KEEP_TOKEN" \
+  "$KEEP_API/v1/sessions/$SID/browser/view" | jq .
+open "$KEEP_API/keep/browser?session=$SID"
 ```
 
-Untrusted reads paint `tainted_by`; egress flips to ask. Hidden eBPF is not the product — **visible** decisions are.
+Untrusted reads paint `tainted_by`; egress flips to ask. Screencast and input
+takeover are **not** in Keep 0.1 — see [browser/README.md](../keep/browser/README.md).
 
 ---
 
@@ -156,6 +194,9 @@ curl -sS -X POST http://127.0.0.1:7788/v1/vms \
   --data @examples/qemu-measured.json
 ```
 
+Under Keep mode the agent-runtime defaults `ZYVOR_AGENT_SECURITY_PROFILE=measured`
+on sandbox create. Cockpit still labels evidence `software-test`.
+
 FluxVM CI for that path: `./scripts/test-security-profiles.sh` in the fluxvm repo.
 
 ---
@@ -165,6 +206,32 @@ FluxVM CI for that path: `./scripts/test-security-profiles.sh` in the fluxvm rep
 - Approvals inside the agent chat  
 - Calling `software-test` evidence “hardware attestation”  
 - Treating QEMU `extra_args` as proof of confidential launch  
+- Running production Keep without `ZYVOR_AGENT_KEEP_MODE=1` and trusted signers  
 - Opening a third Keep git repository — Keep lives in Fabric  
 
 Next: [docs/keep/KEEP-0.2.md](../keep/KEEP-0.2.md) when you have SNP/TDX + a user-held key.
+
+---
+
+## Appendix — Packaged agents (infra, migration, deploy)
+
+Keep ships three Fabric-facing packs under [`examples/keep-agents/`](../../examples/keep-agents/):
+
+| Pack | Reads | Writes (ask) | Artifact |
+|---|---|---|---|
+| `infra-ops` | alerts, VMs, lifecycle compliance | restart / remediation | incident timeline |
+| `migration-op` | `/api/migrations/*`, GuestKit inspect | create/cancel/rescue | wave plan + checklist |
+| `deploy-op` | `/readyz`, `/health` | none by default | FABRIC_DOCTOR readiness |
+
+Shared `_fabric` connector + `fabric-api` credential recipe. Goals/artifacts API:
+[`docs/keep/goals/README.md`](../keep/goals/README.md).
+
+```bash
+# Runtime must be up; credentials file includes fabric-api; FABRIC_API_TOKEN set
+./scripts/keep-pack-demo.sh infra-ops
+# Stub bundle without fabric-agent:
+KEEP_PACK_DRY=1 ./scripts/keep-pack-demo.sh deploy-op
+```
+
+Loop: create goal → session work → `POST /v1/artifacts` → advance `requires_approval` step →
+`/v1/approvals` → audit. Cockpit exposes `active_goal` / `recent_artifacts`.

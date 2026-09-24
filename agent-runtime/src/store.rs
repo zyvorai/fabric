@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::audit::AuditLog;
+use crate::goals::{ArtifactRecord, GoalRecord};
 use crate::model::{
     AgentRecord, ApprovalKind, ApprovalRecord, ApprovalStatus, DeployAgentRequest, GrantScope,
     LoopRecord, ScheduleRecord, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
@@ -34,6 +35,8 @@ pub struct Store {
     webhooks: RwLock<HashMap<Uuid, WebhookRecord>>,
     loops: RwLock<HashMap<Uuid, LoopRecord>>,
     approvals: RwLock<HashMap<Uuid, ApprovalRecord>>,
+    goals: RwLock<HashMap<Uuid, GoalRecord>>,
+    artifacts: RwLock<HashMap<Uuid, ArtifactRecord>>,
     /// Tamper-evident record of planned, approved, denied and performed actions.
     pub audit: AuditLog,
     /// Immutable, content-addressed skill bundles agents can mount.
@@ -60,6 +63,8 @@ impl Store {
             webhooks: RwLock::new(HashMap::new()),
             loops: RwLock::new(HashMap::new()),
             approvals: RwLock::new(HashMap::new()),
+            goals: RwLock::new(HashMap::new()),
+            artifacts: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -113,6 +118,8 @@ impl Store {
         *self.webhooks.write().await = read_id_map(&self.root.join("webhooks.json")).await?;
         *self.loops.write().await = read_id_map(&self.root.join("loops.json")).await?;
         *self.approvals.write().await = read_id_map(&self.root.join("approvals.json")).await?;
+        *self.goals.write().await = read_id_map(&self.root.join("goals.json")).await?;
+        *self.artifacts.write().await = read_id_map(&self.root.join("artifacts.json")).await?;
         Ok(())
     }
 
@@ -718,6 +725,40 @@ impl Store {
             .await
     }
 
+    pub async fn list_goals(&self) -> Vec<GoalRecord> {
+        let mut out: Vec<_> = self.goals.read().await.values().cloned().collect();
+        out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        out
+    }
+
+    pub async fn get_goal(&self, id: Uuid) -> Option<GoalRecord> {
+        self.goals.read().await.get(&id).cloned()
+    }
+
+    pub async fn save_goal(&self, record: GoalRecord) -> Result<()> {
+        let mut map = self.goals.write().await;
+        map.insert(record.id, record);
+        self.persist_vec("goals.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    pub async fn list_artifacts(&self) -> Vec<ArtifactRecord> {
+        let mut out: Vec<_> = self.artifacts.read().await.values().cloned().collect();
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out
+    }
+
+    pub async fn get_artifact(&self, id: Uuid) -> Option<ArtifactRecord> {
+        self.artifacts.read().await.get(&id).cloned()
+    }
+
+    pub async fn save_artifact(&self, record: ArtifactRecord) -> Result<()> {
+        let mut map = self.artifacts.write().await;
+        map.insert(record.id, record);
+        self.persist_vec("artifacts.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
     pub async fn approval_for_event(
         &self,
         session_id: Uuid,
@@ -853,6 +894,16 @@ impl Identified for LoopRecord {
     }
 }
 impl Identified for ApprovalRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
+impl Identified for GoalRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
+impl Identified for ArtifactRecord {
     fn identified_id(&self) -> Uuid {
         self.id
     }

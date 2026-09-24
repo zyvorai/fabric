@@ -16,6 +16,7 @@ import NotFound from './pages/NotFound'
 import Home from './pages/marketing/Home'
 import Product from './pages/marketing/Product'
 import Platform from './pages/marketing/Platform'
+import Keep from './pages/marketing/Keep'
 import SecurityPage from './pages/marketing/Security'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -34,6 +35,7 @@ const ContainerGroups = lazy(() => import('./pages/ContainerGroups'))
 const Agents = lazy(() => import('./pages/Agents'))
 const AiWorkloads = lazy(() => import('./pages/AiWorkloads'))
 const Sessions = lazy(() => import('./pages/Sessions'))
+const KeepSession = lazy(() => import('./pages/KeepSession'))
 const Schedules = lazy(() => import('./pages/Schedules'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
 const Analytics = lazy(() => import('./pages/Analytics'))
@@ -147,6 +149,7 @@ function ConsoleRoutes() {
             <Route path="agents" element={<Agents />} />
             <Route path="sessions" element={<Sessions />} />
             <Route path="sessions/:id" element={<Sessions />} />
+            <Route path="keep/:sessionId" element={<KeepSession />} />
             <Route path="schedules" element={<Schedules />} />
             <Route path="autoscale" element={<AutoscalePage />} />
             <Route path="zones" element={<Zones />} />
@@ -242,6 +245,7 @@ function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/product" element={<Product />} />
       <Route path="/platform" element={<Platform />} />
+      <Route path="/keep" element={<Keep />} />
       <Route path="/security" element={<SecurityPage />} />
       <Route path="/sign-in" element={<SignIn />} />
       <Route path="/login" element={<Navigate to="/sign-in" replace />} />

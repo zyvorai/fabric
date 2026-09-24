@@ -1,6 +1,13 @@
 # Keep Sentinel — policy schema
 
-Policy is a **signed file** you can diff in git. Unsigned policy must not load.
+Policy is a **signed file** you can diff in git.
+
+**Keep mode** (`ZYVOR_AGENT_KEEP_MODE=1`): runtime refuses to start without
+`ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS`, and every `PUT …/policy` must carry
+`X-Keep-Policy-Signature`. Unsigned policy must not load.
+
+Without Keep mode, signatures are required only when trusted signers are configured
+(unless `ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=0`).
 
 ## Example (`keep.policy.yaml`)
 
@@ -27,5 +34,12 @@ taint:
 
 ## Signature
 
-Ed25519 over the canonical YAML bytes (same family as FluxVM catalog signers).
-The load path verifies against device-trusted public keys before applying.
+Ed25519 over the exact YAML bytes the API receives (`X-Keep-Policy-Signature: <hex>`).
+
+```bash
+./agent-runtime/target/release/examples/keep_sign_policy sign "$SEED" keep.policy.yaml \
+  > keep.policy.yaml.sig
+./scripts/keepctl policy set <agent> keep.policy.yaml keep.policy.yaml.sig
+```
+
+See [PRODUCTION.md](../PRODUCTION.md) and [Tutorial 16](../../tutorials/16-keep-workstation.md).

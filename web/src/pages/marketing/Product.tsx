@@ -26,9 +26,12 @@ export default function Product() {
           <h2>Storage &amp; resilience</h2>
           <p>Pools and volumes, Ceph, backups, replication, fault tolerance, and site recovery — without assembling an OpenStack.</p>
         </div>
-        <div className="pt-4">
+        <div className="pt-4 flex flex-wrap gap-3">
           <Link to="/sign-in" className="zf-btn zf-btn-primary">
             Sign in to console
+          </Link>
+          <Link to="/keep" className="zf-btn zf-btn-secondary">
+            Meet Keep →
           </Link>
         </div>
       </section>

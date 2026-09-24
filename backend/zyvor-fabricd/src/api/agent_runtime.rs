@@ -3,16 +3,24 @@
 
 //! Thin reverse-proxy from Fabric JWT-auth'd `/api/agents|sessions/*`
 //! onto the sibling `zyvor-fabric-agent-runtime` service (`:9096`).
+//!
+//! Multi-tenant / multi-user rules (Keep-style personal agents):
+//! - Deploy / session write: `RequireWrite` (Admin or User), not Admin-only.
+//! - Non-admin with a JWT `tenant` claim: agent names are namespaced
+//!   `t.{tenant}.{name}` and list/get are filtered to that prefix.
+//! - Session create always stamps `user_id` from JWT `sub` for non-admins
+//!   (admins may override). List/get/mutate sessions are scoped to that user
+//!   for non-admins.
 
 use axum::{
     body::Body,
     extract::{Path, Query, State},
-    http::{header, HeaderMap, Method, StatusCode},
+    http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
-use security::{RequireAdmin, RequireRead};
-use serde_json::json;
+use security::{Claims, RequireAdmin, RequireRead, RequireWrite, Role};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -86,7 +94,7 @@ async fn proxy(
         Ok(resp) => {
             let status =
                 StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-            let mut headers = HeaderMap::new();
+            let mut headers = axum::http::HeaderMap::new();
             if let Some(ct) = resp.headers().get(header::CONTENT_TYPE) {
                 headers.insert(header::CONTENT_TYPE, ct.clone());
             }
@@ -113,7 +121,6 @@ async fn proxy(
 }
 
 fn urlencoding_encode(s: &str) -> String {
-    // Minimal encode for query values (enough for after=<seq>).
     s.chars()
         .map(|c| match c {
             'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
@@ -122,30 +129,163 @@ fn urlencoding_encode(s: &str) -> String {
         .collect()
 }
 
+/// Sanitize JWT subject / tenant into agent-runtime name components.
+pub(crate) fn sanitize_name_component(raw: &str, max: usize) -> String {
+    let mut out = String::new();
+    for b in raw.bytes() {
+        let c = if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.') {
+            b as char
+        } else {
+            '-'
+        };
+        if out.is_empty() && !(c.is_ascii_alphanumeric()) {
+            continue;
+        }
+        out.push(c.to_ascii_lowercase());
+        if out.len() >= max {
+            break;
+        }
+    }
+    if out.is_empty() {
+        "user".into()
+    } else {
+        out
+    }
+}
+
+pub(crate) fn tenant_agent_prefix(tenant: &str) -> String {
+    format!("t.{}", sanitize_name_component(tenant, 40))
+}
+
+pub(crate) fn scope_agent_name(claims: &Claims, name: &str) -> String {
+    if claims.role == Role::Admin {
+        return name.to_string();
+    }
+    match claims.tenant.as_deref() {
+        Some(t) if !t.is_empty() => {
+            let prefix = tenant_agent_prefix(t);
+            let bare = name
+                .strip_prefix(&format!("{prefix}."))
+                .unwrap_or(name);
+            let bare = sanitize_name_component(bare, 40);
+            format!("{prefix}.{bare}")
+        }
+        _ => name.to_string(),
+    }
+}
+
+pub(crate) fn agent_visible(claims: &Claims, name: &str) -> bool {
+    if claims.role == Role::Admin {
+        return true;
+    }
+    match claims.tenant.as_deref() {
+        Some(t) if !t.is_empty() => {
+            let prefix = format!("{}.", tenant_agent_prefix(t));
+            name.starts_with(&prefix)
+        }
+        _ => true,
+    }
+}
+
+pub(crate) fn session_user_id(claims: &Claims) -> String {
+    // agent-runtime MAX_USER_ID_CHARS = 32
+    sanitize_name_component(&claims.sub, 32)
+}
+
+fn json_response(status: StatusCode, value: Value) -> Response {
+    (status, Json(value)).into_response()
+}
+
+async fn proxy_json(
+    state: &AppState,
+    method: Method,
+    path: &str,
+    query: Option<&HashMap<String, String>>,
+    body: Option<Value>,
+) -> Result<(StatusCode, Value), Response> {
+    let resp = proxy(state, method, path, query, body, None).await;
+    let status = resp.status();
+    let bytes = axum::body::to_bytes(resp.into_body(), 16 * 1024 * 1024)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": format!("agent-runtime body: {e}") })),
+            )
+                .into_response()
+        })?;
+    let value = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or_else(|_| {
+            json!({ "raw": String::from_utf8_lossy(&bytes) })
+        })
+    };
+    Ok((status, value))
+}
+
 pub async fn list_agents(
-    RequireRead(_): RequireRead,
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    proxy(&state, Method::GET, "/v1/agents", None, None, None).await
+    match proxy_json(&state, Method::GET, "/v1/agents", None, None).await {
+        Ok((status, mut value)) => {
+            if let Some(items) = value.get_mut("items").and_then(|v| v.as_array_mut()) {
+                items.retain(|item| {
+                    item.get("name")
+                        .and_then(|n| n.as_str())
+                        .is_some_and(|n| agent_visible(&claims, n))
+                });
+            }
+            json_response(status, value)
+        }
+        Err(resp) => resp,
+    }
 }
 
 pub async fn deploy_agent(
-    RequireAdmin(_): RequireAdmin,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
-    Json(body): Json<serde_json::Value>,
+    Json(mut body): Json<Value>,
 ) -> Response {
-    proxy(&state, Method::POST, "/v1/agents", None, Some(body), None).await
+    if let Some(name) = body.get("name").and_then(|v| v.as_str()) {
+        let scoped = scope_agent_name(&claims, name);
+        body["name"] = Value::String(scoped);
+    }
+    // Non-admin deploys default to per-user home so sessions need user_id.
+    if claims.role != Role::Admin {
+        if let Some(manifest) = body.get_mut("manifest").and_then(|m| m.as_object_mut()) {
+            if !manifest.contains_key("home_volume") {
+                manifest.insert(
+                    "home_volume".into(),
+                    json!({ "per_user": true }),
+                );
+            }
+        }
+    }
+    match proxy_json(&state, Method::POST, "/v1/agents", None, Some(body)).await {
+        Ok((status, value)) => json_response(status, value),
+        Err(resp) => resp,
+    }
 }
 
 pub async fn get_agent(
-    RequireRead(_): RequireRead,
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Response {
+    let scoped = scope_agent_name(&claims, &name);
+    if !agent_visible(&claims, &scoped) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "agent not found" })),
+        )
+            .into_response();
+    }
     proxy(
         &state,
         Method::GET,
-        &format!("/v1/agents/{name}"),
+        &format!("/v1/agents/{scoped}"),
         None,
         None,
         None,
@@ -154,41 +294,112 @@ pub async fn get_agent(
 }
 
 pub async fn list_sessions(
-    RequireRead(_): RequireRead,
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    proxy(&state, Method::GET, "/v1/sessions", None, None, None).await
+    match proxy_json(&state, Method::GET, "/v1/sessions", None, None).await {
+        Ok((status, mut value)) => {
+            if claims.role != Role::Admin {
+                let uid = session_user_id(&claims);
+                if let Some(items) = value.get_mut("items").and_then(|v| v.as_array_mut()) {
+                    items.retain(|item| {
+                        let agent_ok = item
+                            .get("agent")
+                            .and_then(|n| n.as_str())
+                            .is_some_and(|n| agent_visible(&claims, n));
+                        let user_ok = item
+                            .get("user_id")
+                            .and_then(|u| u.as_str())
+                            .is_none_or(|u| u == uid);
+                        agent_ok && user_ok
+                    });
+                }
+            }
+            json_response(status, value)
+        }
+        Err(resp) => resp,
+    }
 }
 
 pub async fn create_session(
-    RequireAdmin(_): RequireAdmin,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
-    Json(body): Json<serde_json::Value>,
+    Json(mut body): Json<Value>,
 ) -> Response {
-    proxy(&state, Method::POST, "/v1/sessions", None, Some(body), None).await
+    if let Some(agent) = body.get("agent").and_then(|v| v.as_str()) {
+        body["agent"] = Value::String(scope_agent_name(&claims, agent));
+    }
+    let uid = session_user_id(&claims);
+    if claims.role != Role::Admin {
+        body["user_id"] = Value::String(uid);
+    } else if body.get("user_id").and_then(|v| v.as_str()).is_none() {
+        // Admin runs without user_id unless the agent requires per-user home.
+        // Leave absent; runtime will 400 if required.
+    }
+    match proxy_json(&state, Method::POST, "/v1/sessions", None, Some(body)).await {
+        Ok((status, value)) => json_response(status, value),
+        Err(resp) => resp,
+    }
 }
 
-pub async fn get_session(
-    RequireRead(_): RequireRead,
-    State(state): State<Arc<AppState>>,
-    Path(id): Path<String>,
-) -> Response {
-    proxy(
-        &state,
+async fn session_owned(
+    state: &AppState,
+    claims: &Claims,
+    id: &str,
+) -> Result<Value, Response> {
+    let (status, value) = proxy_json(
+        state,
         Method::GET,
         &format!("/v1/sessions/{id}"),
         None,
         None,
-        None,
     )
-    .await
+    .await?;
+    if !status.is_success() {
+        return Err(json_response(status, value));
+    }
+    if claims.role == Role::Admin {
+        return Ok(value);
+    }
+    let uid = session_user_id(claims);
+    let agent_ok = value
+        .get("agent")
+        .and_then(|n| n.as_str())
+        .is_some_and(|n| agent_visible(claims, n));
+    let user_ok = value
+        .get("user_id")
+        .and_then(|u| u.as_str())
+        .is_none_or(|u| u == uid);
+    if agent_ok && user_ok {
+        Ok(value)
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "session not found" })),
+        )
+            .into_response())
+    }
 }
 
-pub async fn delete_session(
-    RequireAdmin(_): RequireAdmin,
+pub async fn get_session(
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Response {
+    match session_owned(&state, &claims, &id).await {
+        Ok(value) => json_response(StatusCode::OK, value),
+        Err(resp) => resp,
+    }
+}
+
+pub async fn delete_session(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Response {
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
+    }
     proxy(
         &state,
         Method::DELETE,
@@ -201,10 +412,10 @@ pub async fn delete_session(
 }
 
 pub async fn session_action(
-    RequireAdmin(_): RequireAdmin,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path((id, action)): Path<(String, String)>,
-    body: Result<Json<serde_json::Value>, axum::extract::rejection::JsonRejection>,
+    body: Result<Json<Value>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     let allowed = matches!(action.as_str(), "steer" | "cancel" | "hibernate" | "resume");
     if !allowed {
@@ -213,6 +424,9 @@ pub async fn session_action(
             Json(json!({ "error": "unknown session action" })),
         )
             .into_response();
+    }
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
     }
     let payload = body.ok().map(|Json(v)| v);
     proxy(
@@ -227,11 +441,14 @@ pub async fn session_action(
 }
 
 pub async fn session_events(
-    RequireRead(_): RequireRead,
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
+    }
     proxy(
         &state,
         Method::GET,
@@ -243,17 +460,39 @@ pub async fn session_events(
     .await
 }
 
+/// Keep cockpit: goal, artifacts, pending approvals, last decisions.
+pub async fn session_cockpit(
+    RequireRead(claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Response {
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
+    }
+    proxy(
+        &state,
+        Method::GET,
+        &format!("/v1/sessions/{id}/cockpit"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
 pub async fn list_approvals(
-    RequireRead(_): RequireRead,
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Response {
+    // Approvals remain operator-visible; non-admins still need write to decide.
+    let _ = claims;
     proxy(&state, Method::GET, "/v1/approvals", None, None, None).await
 }
 
 pub async fn create_approval(
-    RequireAdmin(_): RequireAdmin,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
-    Json(body): Json<serde_json::Value>,
+    Json(body): Json<Value>,
 ) -> Response {
     proxy(
         &state,
@@ -269,10 +508,10 @@ pub async fn create_approval(
 /// Approve or deny a pending approval. The id is validated as a UUID because
 /// it is interpolated into the upstream path.
 pub async fn decide_approval(
-    RequireAdmin(_): RequireAdmin,
+    RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-    Json(body): Json<serde_json::Value>,
+    Json(body): Json<Value>,
 ) -> Response {
     if uuid::Uuid::parse_str(&id).is_err() {
         return (
@@ -330,7 +569,7 @@ pub async fn list_skills(
 pub async fn publish_skill(
     RequireAdmin(_): RequireAdmin,
     State(state): State<Arc<AppState>>,
-    Json(body): Json<serde_json::Value>,
+    Json(body): Json<Value>,
 ) -> Response {
     proxy(&state, Method::POST, "/v1/skills", None, Some(body), None).await
 }
@@ -378,6 +617,16 @@ mod tests {
     use super::*;
     use crate::config::AgentRuntimeConfig;
 
+    fn claims(role: Role, sub: &str, tenant: Option<&str>) -> Claims {
+        Claims {
+            sub: sub.into(),
+            role,
+            exp: usize::MAX,
+            jti: "t".into(),
+            tenant: tenant.map(str::to_string),
+        }
+    }
+
     #[test]
     fn skill_names_cannot_reach_other_upstream_paths() {
         assert!(valid_skill_name("notes-1.2_x"));
@@ -407,5 +656,36 @@ mod tests {
     fn urlencoding_encode_leaves_safe_chars() {
         assert_eq!(urlencoding_encode("after"), "after");
         assert_eq!(urlencoding_encode("a b"), "a%20b");
+    }
+
+    #[test]
+    fn tenant_user_agent_names_are_prefixed() {
+        let c = claims(Role::User, "Alice/One", Some("Acme Corp"));
+        assert_eq!(scope_agent_name(&c, "research"), "t.acme-corp.research");
+        assert!(agent_visible(&c, "t.acme-corp.research"));
+        assert!(!agent_visible(&c, "t.other.research"));
+        assert!(!agent_visible(&c, "research"));
+    }
+
+    #[test]
+    fn admin_sees_all_agents_unprefixed() {
+        let c = claims(Role::Admin, "admin", Some("acme"));
+        assert_eq!(scope_agent_name(&c, "research"), "research");
+        assert!(agent_visible(&c, "t.other.x"));
+    }
+
+    #[test]
+    fn session_user_id_sanitizes_subject() {
+        let c = claims(Role::User, "Alice/One", None);
+        assert_eq!(session_user_id(&c), "alice-one");
+        let uuid = claims(
+            Role::User,
+            "8bb0203c-1798-4884-8602-b80ca2c02fe9",
+            Some("acme"),
+        );
+        let uid = session_user_id(&uuid);
+        assert!(uid.len() <= 32);
+        assert!(uid.chars().next().unwrap().is_ascii_alphanumeric());
+        assert_eq!(&uid, "8bb0203c-1798-4884-8602-b80ca2c0");
     }
 }

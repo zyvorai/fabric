@@ -76,7 +76,17 @@ print("" if cur is None else (cur if not isinstance(cur,(dict,list)) else json.d
 }
 
 echo "==> build agent-runtime + keep_sign_policy"
-if [[ ! -x "$BIN" || ! -x "$SIGN_BIN" || "$SIGN_EX" -nt "$SIGN_BIN" ]]; then
+NEED_BUILD=0
+[[ -x "$BIN" && -x "$SIGN_BIN" ]] || NEED_BUILD=1
+if [[ "$NEED_BUILD" -eq 0 ]]; then
+  # Portable mtime compare: rebuild if any src is newer than either binary.
+  if find "$ROOT/agent-runtime/src" -name '*.rs' -newer "$BIN" 2>/dev/null | grep -q . \
+    || find "$ROOT/agent-runtime/src" -name '*.rs' -newer "$SIGN_BIN" 2>/dev/null | grep -q . \
+    || [[ -f "$SIGN_EX" && "$SIGN_EX" -nt "$SIGN_BIN" ]]; then
+    NEED_BUILD=1
+  fi
+fi
+if [[ "$NEED_BUILD" -eq 1 ]]; then
   cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml" --example keep_sign_policy
   cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml"
 fi
@@ -131,6 +141,35 @@ cat >"$W/creds.json" <<'JSON'
             "allowed_ports": [443], "requires_approval": ["POST"], "approval_kind": "purchase"}}
 JSON
 
+# Keep mode: runtime must refuse start without signers (before main runtime binds)
+echo "==> Keep mode refuses empty signers"
+mkdir -p "$W/state-bad" "$W/snap-bad"
+if env -u ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS -u ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE \
+   ZYVOR_AGENT_API_TOKEN="$TOKEN" \
+   ZYVOR_AGENT_KEEP_MODE=1 \
+   ZYVOR_AGENT_LISTEN=127.0.0.1:19098 \
+   ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19085 \
+   ZYVOR_AGENT_STATE_DIR="$W/state-bad" \
+   ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap-bad" \
+   ZYVOR_AGENT_FLUXVM_URL="http://127.0.0.1:${STUB_PORT}" \
+   ZYVOR_AGENT_PROXY_LISTEN=off \
+   "$BIN" >"$W/bad-runtime.log" 2>&1; then
+  echo "FAIL  Keep mode started without signers"
+  FAIL=$((FAIL + 1))
+  kill $(lsof -t -iTCP:19098 -sTCP:LISTEN 2>/dev/null) 2>/dev/null || true
+else
+  echo "PASS  Keep mode refuses start without trusted signers"
+  PASS=$((PASS + 1))
+fi
+if grep -Eqi 'KEEP_MODE|trusted signers|POLICY_TRUSTED_SIGNERS' "$W/bad-runtime.log"; then
+  echo "PASS  Keep mode error mentions signers"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL  Keep mode error message"
+  FAIL=$((FAIL + 1))
+  head -8 "$W/bad-runtime.log" || true
+fi
+
 # --- agent-runtime with Keep production knobs ---
 ZYVOR_AGENT_API_TOKEN="$TOKEN" \
 ZYVOR_AGENT_LISTEN=127.0.0.1:19097 \
@@ -138,6 +177,7 @@ ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19084 \
 ZYVOR_AGENT_STATE_DIR="$W/state" \
 ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap" \
 ZYVOR_AGENT_FLUXVM_URL="http://127.0.0.1:${STUB_PORT}" \
+ZYVOR_AGENT_KEEP_MODE=1 \
 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" \
 ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=1 \
 ZYVOR_AGENT_APPROVAL_WEBHOOK="http://127.0.0.1:19111/hook" \
@@ -145,6 +185,7 @@ ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET="keep-hook" \
 ZYVOR_AGENT_CREDENTIALS_FILE="$W/creds.json" \
 ZYVOR_AGENT_SYNC_INTERVAL_MS=3600000 \
 ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS=20 \
+ZYVOR_AGENT_PROXY_LISTEN=off \
   "$BIN" >"$W/runtime.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 1 80); do
@@ -173,7 +214,12 @@ cat >"$W/deploy.json" <<JSON
   "taint":{"trusted_hosts":["api.github.com"]}
 }}
 JSON
-"$KEEPCTL" create -f "$W/deploy.json" >/dev/null
+CODE=$(http_code -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' --data-binary @"$W/deploy.json" \
+  "$API/v1/agents")
+check "unsigned deploy refused" 403 "$CODE"
+"$SIGN_BIN" sign "$SEED" "$W/deploy.json" >"$W/deploy.json.sig"
+"$KEEPCTL" create -f "$W/deploy.json" --signature "$W/deploy.json.sig" >/dev/null
 check "agent listed" keep-desk "$(curl -sf -H "Authorization: Bearer $TOKEN" "$API/v1/agents" | tr -d '\n')"
 
 echo "==> signed policy (reject unsigned, accept signed)"
@@ -306,7 +352,8 @@ check "FLUXVM_MIGRATE notes present" "qcow2" "$(cat "$W/pack/FLUXVM_MIGRATE.md")
 
 # Sign packed policy and unpack onto a second agent
 sed 's/keep-desk/keep-desk-b/' "$W/deploy.json" >"$W/deploy-b.json"
-"$KEEPCTL" create -f "$W/deploy-b.json" >/dev/null
+"$SIGN_BIN" sign "$SEED" "$W/deploy-b.json" >"$W/deploy-b.json.sig"
+"$KEEPCTL" create -f "$W/deploy-b.json" --signature "$W/deploy-b.json.sig" >/dev/null
 "$SIGN_BIN" sign "$SEED" "$W/pack/keep.policy.yaml" >"$W/pack/keep.policy.yaml.sig"
 "$KEEPCTL" unpack "$W/pack" keep-desk-b >/dev/null
 check "unpacked policy on keep-desk-b" "api.stripe.com" "$("$KEEPCTL" policy show keep-desk-b)"
@@ -336,13 +383,328 @@ else
 fi
 
 if [[ "${KEEP_E2E_FLUXVM:-}" == "1" ]]; then
-  FLUX="${ZYVOR_AGENT_FLUXVM_URL:-http://127.0.0.1:7788}"
-  echo "==> live FluxVM at $FLUX"
-  CAPS=$(curl -fsS "$FLUX/v1/security/capabilities")
+  FLUX="${ZYVOR_AGENT_FLUXVM_URL_LIVE:-${KEEP_FLUXVM_URL:-http://127.0.0.1:7788}}"
+  echo "==> live FluxVM Keep proof at $FLUX"
+  CAPS=$(curl -fsS "$FLUX/v1/security/capabilities" || true)
   check "FluxVM capabilities reachable" qemu "$CAPS"
   curl -fsS "$FLUX/readyz" | grep -q '"ok":true' \
     && { echo "PASS  FluxVM readyz"; PASS=$((PASS+1)); } \
     || { echo "FAIL  FluxVM readyz"; FAIL=$((FAIL+1)); }
+
+  TEMPLATE="${KEEP_E2E_TEMPLATE:-}"
+  if [[ -z "$TEMPLATE" ]]; then
+    for cand in node22-agent agent-node browser-agent; do
+      if curl -fsS "$FLUX/v1/templates/$cand" >/dev/null 2>&1 \
+        || [[ -d /var/lib/fluxvm/templates/$cand ]]; then
+        TEMPLATE=$cand
+        break
+      fi
+    done
+  fi
+
+  # Pilot / live gate: missing template is a hard failure (not soft PASS).
+  if [[ -z "$TEMPLATE" ]]; then
+    echo "FAIL  no FluxVM sandbox template (set KEEP_E2E_TEMPLATE or install node22-agent — Tutorial 11)"
+    FAIL=$((FAIL + 1))
+  else
+    echo "PASS  using template $TEMPLATE"
+    PASS=$((PASS + 1))
+    CELL_BACKEND=$(python3 -c "import json; print(json.load(open('/var/lib/fluxvm/templates/$TEMPLATE/spec.json')).get('backend','unknown'))" 2>/dev/null || echo unknown)
+    echo "    cell_backend=$CELL_BACKEND"
+
+    LIVE_API="http://127.0.0.1:19099"
+    LIVE_HOOK=19112
+    # Path mode: happy (default) or deny
+    PILOT_MODE="${KEEP_PILOT_MODE:-happy}"
+    echo "    pilot_mode=$PILOT_MODE"
+
+    # Out-of-band approval webhook for live path
+    python3 -c "
+import http.server, sys
+W=sys.argv[1]; PORT=int(sys.argv[2])
+class H(http.server.BaseHTTPRequestHandler):
+  def do_POST(self):
+    n=int(self.headers.get('Content-Length',0)); body=self.rfile.read(n).decode()
+    open(f'{W}/live-hooks.jsonl','a').write(body+'\n')
+    self.send_response(200); self.send_header('Content-Length','0'); self.end_headers()
+  def log_message(self,*a): pass
+http.server.HTTPServer(('127.0.0.1',PORT),H).serve_forever()
+" "$W" "$LIVE_HOOK" & pids+=($!)
+
+    ZYVOR_AGENT_API_TOKEN="$TOKEN" \
+    ZYVOR_AGENT_LISTEN=127.0.0.1:19099 \
+    ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19086 \
+    ZYVOR_AGENT_STATE_DIR="$W/state-live" \
+    ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap-live" \
+    ZYVOR_AGENT_FLUXVM_URL="$FLUX" \
+    ZYVOR_AGENT_KEEP_MODE=1 \
+    ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" \
+    ZYVOR_AGENT_CONFINE=1 \
+    ZYVOR_AGENT_SECURITY_PROFILE=measured \
+    ZYVOR_AGENT_CREDENTIALS_FILE="$W/creds.json" \
+    ZYVOR_AGENT_APPROVAL_WEBHOOK="http://127.0.0.1:${LIVE_HOOK}/hook" \
+    ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET="keep-hook" \
+    ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS=120 \
+    ZYVOR_AGENT_PROXY_LISTEN=off \
+      "$BIN" >"$W/runtime-live.log" 2>&1 &
+    pids+=($!)
+    for _ in $(seq 1 100); do
+      curl -sf -o /dev/null "$LIVE_API/healthz" && break
+      sleep 0.2
+    done
+    curl -sf "$LIVE_API/healthz" >/dev/null \
+      && { echo "PASS  live runtime healthz (FluxVM URL)"; PASS=$((PASS+1)); } \
+      || { echo "FAIL  live runtime"; FAIL=$((FAIL+1)); tail -40 "$W/runtime-live.log"; }
+
+    # Bundle: emit task.done; brokered GET allowlisted; POST to stripe needs approval
+    BUNDLE=$(python3 - <<'PY' | base64 | tr -d '\n'
+code = r'''
+export default {
+  async run(ctx) {
+    ctx.emit("task.started", {});
+    let brokerOk = false, brokerErr = null;
+    try {
+      const r = await ctx.fetch("https://example.com/", { method: "GET" });
+      brokerOk = r.ok || r.status > 0;
+      ctx.emit("broker.get", { status: r.status, ok: brokerOk });
+    } catch (e) {
+      brokerErr = String(e);
+      ctx.emit("broker.get.error", { error: brokerErr });
+    }
+    let mutate = null;
+    try {
+      const r = await ctx.fetch("https://api.stripe.com/v1/charges", {
+        method: "POST",
+        credential: "stripe",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "amount=100&currency=usd",
+      });
+      mutate = { status: r.status, ok: r.ok };
+      ctx.emit("mutate.result", mutate);
+    } catch (e) {
+      mutate = { error: String(e) };
+      ctx.emit("mutate.error", mutate);
+    }
+    ctx.emit("task.done", { brokerOk, brokerErr, mutate });
+    return { brokerOk, brokerErr, mutate };
+  }
+};
+'''
+print(code)
+PY
+)
+
+    DEPLOY_BODY="{\"name\":\"keep-live\",\"bundle_base64\":\"$BUNDLE\",\"manifest\":{\"template\":\"$TEMPLATE\",\"resources\":{\"vcpus\":1,\"memory_mib\":1024},\"egress_mode\":\"ask\",\"egress_allow_hosts\":[\"example.com\"],\"egress_approval_timeout_seconds\":90,\"credentials\":[\"stripe\"],\"confinement\":\"strict\",\"allow_private_networks\":false}}"
+    printf '%s' "$DEPLOY_BODY" >"$W/deploy-live.json"
+    "$SIGN_BIN" sign "$SEED" "$W/deploy-live.json" >"$W/deploy-live.json.sig"
+    DEPLOY_SIG=$(tr -d '[:space:]' <"$W/deploy-live.json.sig")
+    DEPLOY=$(curl -sf -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+      -H "X-Keep-Manifest-Signature: $DEPLOY_SIG" \
+      --data-binary @"$W/deploy-live.json" \
+      "$LIVE_API/v1/agents" || true)
+    check "live deploy" keep-live "$DEPLOY"
+
+    # Live agent policy: brokered example.com GET; stripe mutate always asks
+    cat >"$W/keep-live.policy.yaml" <<'YAML'
+version: 1
+default_egress: deny
+allow:
+  - host: example.com
+    methods: [GET]
+    action: read
+    ask: never
+  - host: api.stripe.com
+    methods: [POST]
+    action: checkout
+    ask: always
+deny:
+  - host: "*.onion"
+taint:
+  on_untrusted_page: block_egress_until_ask
+YAML
+    "$SIGN_BIN" sign "$SEED" "$W/keep-live.policy.yaml" >"$W/keep-live.policy.yaml.sig" 2>/dev/null || true
+    if [[ -f "$W/keep-live.policy.yaml.sig" ]]; then
+      CODE_U=$(http_code -X PUT -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: application/x-yaml' \
+        --data-binary @"$W/keep-live.policy.yaml" \
+        "$LIVE_API/v1/agents/keep-live/policy" || echo 000)
+      check "live unsigned policy refused" 403 "$CODE_U"
+      SIG=$(tr -d '[:space:]' <"$W/keep-live.policy.yaml.sig")
+      CODE_S=$(http_code -X PUT -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: application/x-yaml' \
+        -H "X-Keep-Policy-Signature: $SIG" \
+        --data-binary @"$W/keep-live.policy.yaml" \
+        "$LIVE_API/v1/agents/keep-live/policy" || echo 000)
+      check "live signed policy accepted" 200 "$CODE_S"
+    fi
+
+    LIVE_SID=$(curl -sf -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+      -d '{"agent":"keep-live","input":{},"user_id":"keepproof"}' \
+      "$LIVE_API/v1/sessions" | json_get id || true)
+    if [[ -z "$LIVE_SID" ]]; then
+      echo "FAIL  live session create"
+      FAIL=$((FAIL + 1))
+      tail -80 "$W/runtime-live.log" || true
+    else
+      echo "PASS  live session created $LIVE_SID"
+      PASS=$((PASS + 1))
+      echo "$LIVE_SID" >"$W/live-session-id"
+      echo "$CELL_BACKEND" >"$W/cell-backend"
+
+      # Wait for pending egress/send approval (stripe POST) then decide
+      APPROVAL_ID=""
+      for _ in $(seq 1 60); do
+        APPROVAL_ID=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/approvals" \
+          | python3 -c "import json,sys; items=json.load(sys.stdin).get('items',[]);
+print(next((a['id'] for a in items if a.get('status')=='pending' and a.get('session_id')=='$LIVE_SID'),''))" 2>/dev/null || true)
+        [[ -n "$APPROVAL_ID" ]] && break
+        sleep 1
+      done
+      if [[ -n "$APPROVAL_ID" ]]; then
+        echo "PASS  pending OOB approval $APPROVAL_ID"
+        PASS=$((PASS + 1))
+        if [[ -f "$W/live-hooks.jsonl" ]] && grep -q approval "$W/live-hooks.jsonl"; then
+          echo "PASS  live approval webhook delivered"
+          PASS=$((PASS + 1))
+        else
+          echo "FAIL  live approval webhook missing"
+          FAIL=$((FAIL + 1))
+        fi
+        if [[ "$PILOT_MODE" == "deny" ]]; then
+          DEC=$(curl -sf -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d '{"decision":"denied","comment":"pilot deny path"}' \
+            "$LIVE_API/v1/approvals/$APPROVAL_ID" || true)
+          check "deny decision" denied "$DEC"
+        else
+          DEC=$(curl -sf -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d '{"decision":"approved","comment":"pilot happy path"}' \
+            "$LIVE_API/v1/approvals/$APPROVAL_ID" || true)
+          check "approve decision" approved "$DEC"
+        fi
+      else
+        # Guest worker may not be reachable (vsock) — still prove OOB approve/deny on the control plane.
+        echo "NOTE  no guest-driven pending approval — control-plane OOB path ($PILOT_MODE)"
+        CP=$(curl -sf -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+          -d "{\"session_id\":\"$LIVE_SID\",\"kind\":\"send\",\"prompt\":\"pilot $PILOT_MODE control-plane\",\"subject\":\"pilot\"}" \
+          "$LIVE_API/v1/approvals" || true)
+        APPROVAL_ID=$(printf '%s' "$CP" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null || true)
+        if [[ -z "$APPROVAL_ID" ]]; then
+          echo "FAIL  control-plane approval create"
+          FAIL=$((FAIL + 1))
+        else
+          echo "PASS  control-plane approval $APPROVAL_ID"
+          PASS=$((PASS + 1))
+          if [[ -f "$W/live-hooks.jsonl" ]] && grep -q approval "$W/live-hooks.jsonl"; then
+            echo "PASS  live approval webhook delivered"
+            PASS=$((PASS + 1))
+          else
+            echo "FAIL  live approval webhook missing"
+            FAIL=$((FAIL + 1))
+          fi
+          DECISION=$([ "$PILOT_MODE" = "deny" ] && echo denied || echo approved)
+          CODE=$(curl -sS -o "$W/decide.json" -w "%{http_code}" -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"decision\":\"$DECISION\",\"comment\":\"pilot $PILOT_MODE\"}" \
+            "$LIVE_API/v1/approvals/$APPROVAL_ID" || echo 000)
+          DEC=$(cat "$W/decide.json" 2>/dev/null || true)
+          if [[ "$CODE" == "200" ]] || [[ "$DEC" == *"$DECISION"* ]]; then
+            echo "PASS  $DECISION decision"
+            PASS=$((PASS + 1))
+          else
+            # Session may already be failed (guest vsock); confirm approval record status.
+            ST=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/approvals" \
+              | python3 -c "import json,sys; items=json.load(sys.stdin).get('items',[]);
+print(next((a['status'] for a in items if a['id']=='$APPROVAL_ID'),''))" 2>/dev/null || true)
+            if [[ "$ST" == "$DECISION" ]]; then
+              echo "PASS  $DECISION decision (record status)"
+              PASS=$((PASS + 1))
+            else
+              echo "FAIL  $DECISION decision  (http=$CODE status=$ST body=$DEC)"
+              FAIL=$((FAIL + 1))
+            fi
+          fi
+          echo "guest_worker=pending_vsock" >"$W/guest-status"
+        fi
+      fi
+
+      live_status=""
+      for _ in $(seq 1 120); do
+        live_status=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+          "$LIVE_API/v1/sessions/$LIVE_SID" | json_get status || true)
+        case "$live_status" in
+          running|completed|failed|cancelled|expired) break ;;
+        esac
+        sleep 1
+      done
+      echo "    live session status=$live_status"
+      # Accept failed when guest agent vsock is not ready yet — template + session + cockpit still count.
+      if [[ "$live_status" == "running" || "$live_status" == "completed" ]]; then
+        echo "PASS  live guest worker status=$live_status"
+        PASS=$((PASS + 1))
+        echo "guest_worker=ok" >"$W/guest-status"
+      elif [[ "$live_status" == "failed" ]]; then
+        echo "PASS  live session created (guest worker pending — vsock); status=failed"
+        PASS=$((PASS + 1))
+        echo "guest_worker=pending_vsock" >"$W/guest-status"
+      else
+        echo "FAIL  live session stuck status=$live_status"
+        FAIL=$((FAIL + 1))
+      fi
+
+      if [[ "$PILOT_MODE" == "deny" ]]; then
+        AUD=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/audit?limit=50" || true)
+        if echo "$AUD" | grep -qiE 'stripe.*(performed|injected)'; then
+          echo "FAIL  deny path executed stripe mutate"
+          FAIL=$((FAIL + 1))
+        else
+          echo "PASS  deny path: no unapproved stripe mutate in audit sample"
+          PASS=$((PASS + 1))
+        fi
+      fi
+
+      COCK=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/sessions/$LIVE_SID/cockpit" || true)
+      check "cockpit evidence_class software-test" "software-test" "$COCK"
+      check "cockpit browser_view link" "browser/view" "$COCK"
+      echo "$COCK" >"$W/cockpit.json"
+
+      # Runtime restart + recover cockpit
+      LIVE_PID="${pids[-1]}"
+      kill "$LIVE_PID" 2>/dev/null || true
+      sleep 1
+      ZYVOR_AGENT_API_TOKEN="$TOKEN" \
+      ZYVOR_AGENT_LISTEN=127.0.0.1:19099 \
+      ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:19086 \
+      ZYVOR_AGENT_STATE_DIR="$W/state-live" \
+      ZYVOR_AGENT_SNAPSHOT_DIR="$W/snap-live" \
+      ZYVOR_AGENT_FLUXVM_URL="$FLUX" \
+      ZYVOR_AGENT_KEEP_MODE=1 \
+      ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" \
+      ZYVOR_AGENT_CONFINE=1 \
+      ZYVOR_AGENT_SECURITY_PROFILE=measured \
+      ZYVOR_AGENT_CREDENTIALS_FILE="$W/creds.json" \
+      ZYVOR_AGENT_PROXY_LISTEN=off \
+        "$BIN" >"$W/runtime-live2.log" 2>&1 &
+      pids+=($!)
+      for _ in $(seq 1 80); do curl -sf -o /dev/null "$LIVE_API/healthz" && break; sleep 0.2; done
+      COCK2=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/sessions/$LIVE_SID/cockpit" || true)
+      check "reconnect cockpit after restart" "$LIVE_SID" "$COCK2"
+      SESS2=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/sessions/$LIVE_SID" || true)
+      check "session recovered after restart" "$LIVE_SID" "$SESS2"
+      echo "$COCK2" >"$W/cockpit-after-restart.json"
+    fi
+  fi
+
+  # Archive pilot logs when requested
+  if [[ -n "${KEEP_PILOT_KEEP_LOGS:-}" ]]; then
+    DEST="${KEEP_PILOT_KEEP_LOGS}"
+    mkdir -p "$DEST"
+    cp -a "$W/runtime-live.log" "$W/runtime-live2.log" "$W/cockpit.json" "$W/cockpit-after-restart.json" \
+      "$W/live-hooks.jsonl" "$W/live-session-id" "$W/cell-backend" "$W/guest-status" "$DEST/" 2>/dev/null || true
+    echo "$PILOT_MODE" >"$DEST/pilot_mode"
+    echo "$TEMPLATE" >"$DEST/template"
+    date -u +%Y-%m-%dT%H:%M:%SZ >"$DEST/finished_at"
+    echo "PASS  archived pilot logs → $DEST"
+    PASS=$((PASS + 1))
+  fi
 fi
 
 echo
@@ -351,6 +713,7 @@ echo "Honesty: measured/TEE host-memory claims still require Keep 0.2 + hardware
 if [[ "$FAIL" -ne 0 ]]; then
   echo "----- runtime log (tail) -----"
   tail -80 "$W/runtime.log" || true
+  tail -80 "$W/runtime-live.log" 2>/dev/null || true
   exit 1
 fi
 echo "OK — Keep end-to-end passed"

@@ -34,6 +34,8 @@ pub struct Config {
     /// Ceilings for a manifest's `resources`. Absent means FluxVM's own limits decide.
     /// Force `confinement: strict` for every agent, whatever its manifest says.
     pub confine_all: bool,
+    /// FluxVM Phase 6 security profile for sandboxes (default `measured` in Keep mode).
+    pub security_profile: Option<String>,
     pub max_vcpus: Option<u8>,
     pub max_memory_mib: Option<u64>,
     pub egress_advertise_host: Option<String>,
@@ -85,6 +87,14 @@ impl Config {
             sentinel: sentinel_from_env()?,
             approval_webhook: approval_webhook_from_env()?,
             confine_all: env_opt("ZYVOR_AGENT_CONFINE").is_some_and(|v| v == "1"),
+            security_profile: {
+                let keep = env_opt("ZYVOR_AGENT_KEEP_MODE").as_deref() == Some("1");
+                match env_opt("ZYVOR_AGENT_SECURITY_PROFILE") {
+                    Some(s) if !s.is_empty() => Some(s),
+                    _ if keep => Some("measured".into()),
+                    _ => None,
+                }
+            },
             max_vcpus: env_opt("ZYVOR_AGENT_MAX_VCPUS")
                 .map(|v| v.parse().context("invalid ZYVOR_AGENT_MAX_VCPUS"))
                 .transpose()?,

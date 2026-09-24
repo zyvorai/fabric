@@ -9,15 +9,19 @@ import { PageHeader, EmptyState, Card } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 import { useToastContext } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
 import { toastFailure } from '../utils/toastError'
 import DeployAgentModal from './agents/DeployAgentModal'
 
 export default function Agents() {
   const toast = useToastContext()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [agents, setAgents] = useState<AgentRecord[]>([])
   const [showDeploy, setShowDeploy] = useState(false)
   const { loading, loadError, run } = usePageLoader('Failed to load agents')
+  const isAdmin = user?.role === 'admin'
+  const canDeploy = user?.role === 'admin' || user?.role === 'user'
 
   const load = useCallback(() => {
     return run(async () => {
@@ -32,7 +36,10 @@ export default function Agents() {
 
   const runSession = async (name: string) => {
     try {
-      const session = await createSession({ agent: name })
+      const session = await createSession({
+        agent: name,
+        ...(isAdmin ? {} : { user_id: user?.id }),
+      })
       toast.success(`Session ${session.id} created`)
       navigate(`/app/sessions/${session.id}`)
     } catch (e) {
@@ -48,9 +55,11 @@ export default function Agents() {
         onRefresh={() => void load()}
         refreshing={loading}
         primaryAction={
-          <button type="button" className="zf-btn zf-btn-primary zf-btn-sm" onClick={() => setShowDeploy(true)}>
-            <Plus className="w-3.5 h-3.5" /> Deploy agent
-          </button>
+          canDeploy ? (
+            <button type="button" className="zf-btn zf-btn-primary zf-btn-sm" onClick={() => setShowDeploy(true)}>
+              <Plus className="w-3.5 h-3.5" /> Deploy agent
+            </button>
+          ) : undefined
         }
         actions={
           <Link to="/app/sessions" className="zf-btn zf-btn-ghost">
@@ -58,16 +67,24 @@ export default function Agents() {
           </Link>
         }
       />
+      {user?.tenant && (
+        <p className="mb-3 text-xs text-[var(--zf-muted)]">
+          Tenant <span className="font-mono text-[var(--zf-ink)]">{user.tenant}</span>
+          {!isAdmin && ' — agents are namespaced to your tenant; sessions bind to your user id.'}
+        </p>
+      )}
       <PageLoadBanner title="Could not load agents" headline={loadError} onRetry={() => void load()} />
       {agents.length === 0 && !loadError ? (
         <EmptyState
           icon={<Bot className="w-8 h-8" />}
           title="No agents deployed"
-          description="Build a bundle with `fabric-agent build` and deploy it here, or use the agent-runtime CLI directly (requires [agent_runtime] in zyvor-fabricd.toml)."
+          description="Start from a Keep pack (infra-ops, migration-op, deploy-op) under examples/keep-agents/, or open Keep on a session at /app/keep/:sessionId. Requires [agent_runtime] in zyvor-fabricd.toml."
           action={
-            <button type="button" className="zf-btn zf-btn-primary" onClick={() => setShowDeploy(true)}>
-              <Plus className="w-3.5 h-3.5" /> Deploy agent
-            </button>
+            canDeploy ? (
+              <button type="button" className="zf-btn zf-btn-primary" onClick={() => setShowDeploy(true)}>
+                <Plus className="w-3.5 h-3.5" /> Deploy agent
+              </button>
+            ) : undefined
           }
         />
       ) : (
@@ -85,18 +102,20 @@ export default function Agents() {
             <tbody>
               {agents.map((a) => (
                 <tr key={a.name} className="border-b border-[var(--zf-hairline)] last:border-0">
-                  <td className="px-4 py-3 font-medium">{a.name}</td>
+                  <td className="px-4 py-3 font-medium font-mono text-xs">{a.name}</td>
                   <td className="px-4 py-3 font-mono text-xs">{a.version}</td>
                   <td className="px-4 py-3">{a.manifest?.template ?? '—'}</td>
                   <td className="px-4 py-3 text-[var(--zf-muted)]">{a.created_at}</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      className="zf-btn zf-btn-primary zf-btn-sm"
-                      onClick={() => void runSession(a.name)}
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Run session
-                    </button>
+                    {canDeploy && (
+                      <button
+                        type="button"
+                        className="zf-btn zf-btn-primary zf-btn-sm"
+                        onClick={() => void runSession(a.name)}
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Run session
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

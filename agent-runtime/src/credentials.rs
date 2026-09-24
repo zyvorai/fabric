@@ -36,6 +36,9 @@ pub struct CredentialDescriptor {
     /// is used, e.g. `["POST"]` for a mail-sending or checkout credential.
     #[serde(default)]
     pub requires_approval: Vec<String>,
+    /// Session `user_id` allowlist. Empty means any user (including no user_id).
+    #[serde(default)]
+    pub allowed_users: Vec<String>,
     /// Let the CONNECT proxy terminate TLS for this credential's host so a
     /// per-session surrogate token the agent holds can be swapped for the real
     /// secret in flight. Needs `ZYVOR_AGENT_MITM_CA_DIR`; see `mitm`.
@@ -143,6 +146,53 @@ impl CredentialVault {
         }
         Ok((descriptor, format!("{}{}", descriptor.prefix, value)))
     }
+
+    /// Credential authority (Keep 0.1): resolve a secret only when the request
+    /// matches the descriptor allowlist for host / method / path / port / user.
+    /// Secrets still come from host env — user-held unwrap is Keep 0.2.
+    pub fn authorize_resolve(
+        &self,
+        name: &str,
+        ctx: &ResolveContext<'_>,
+    ) -> Result<(&CredentialDescriptor, String)> {
+        let descriptor = self.descriptor(name).with_context(|| {
+            format!("credential '{name}' is not configured on this Fabric host")
+        })?;
+        if !host_matches(&descriptor.host, ctx.host) {
+            bail!("credential '{name}' cannot be used for host {}", ctx.host);
+        }
+        if !credential_allows_request(descriptor, ctx.method, ctx.path, ctx.port) {
+            bail!(
+                "credential '{name}' policy denies {} {} on port {}",
+                ctx.method.as_str(),
+                ctx.path,
+                ctx.port
+            );
+        }
+        if !descriptor.allowed_users.is_empty() {
+            let Some(uid) = ctx.user_id.filter(|u| !u.is_empty()) else {
+                bail!("credential '{name}' requires a session user_id");
+            };
+            if !descriptor
+                .allowed_users
+                .iter()
+                .any(|u| u.eq_ignore_ascii_case(uid))
+            {
+                bail!("credential '{name}' is not allowed for user '{uid}'");
+            }
+        }
+        self.resolve(name)
+    }
+}
+
+/// Request context for [`CredentialVault::authorize_resolve`].
+#[derive(Debug, Clone, Copy)]
+pub struct ResolveContext<'a> {
+    pub host: &'a str,
+    pub method: &'a reqwest::Method,
+    pub path: &'a str,
+    pub port: u16,
+    pub user_id: Option<&'a str>,
 }
 
 fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
@@ -241,6 +291,7 @@ mod tests {
             allowed_ports: vec![8443],
             kind: "provider".into(),
             requires_approval: vec![],
+            allowed_users: vec![],
             approval_kind: None,
             intercept: false,
         };
@@ -313,5 +364,48 @@ mod tests {
         assert!(validate_descriptor("c", &gated(&["POST", "*"], Some("send"))).is_ok());
         assert!(validate_descriptor("c", &gated(&["PO ST"], None)).is_err());
         assert!(validate_descriptor("c", &gated(&["POST"], Some("wire"))).is_err());
+    }
+
+    #[test]
+    fn authorize_resolve_checks_user_allowlist() {
+        std::env::set_var("AUTH_TEST_KEY", "secret-value");
+        let mut map = HashMap::new();
+        map.insert(
+            "mail".into(),
+            serde_json::from_value::<CredentialDescriptor>(serde_json::json!({
+                "host": "mail.example",
+                "header": "authorization",
+                "env": "AUTH_TEST_KEY",
+                "allowed_users": ["alice"],
+            }))
+            .unwrap(),
+        );
+        let vault = CredentialVault::from_descriptors(map);
+        let method = reqwest::Method::GET;
+        let denied = vault.authorize_resolve(
+            "mail",
+            &ResolveContext {
+                host: "mail.example",
+                method: &method,
+                path: "/",
+                port: 443,
+                user_id: Some("bob"),
+            },
+        );
+        assert!(denied.is_err());
+        let ok = vault
+            .authorize_resolve(
+                "mail",
+                &ResolveContext {
+                    host: "mail.example",
+                    method: &method,
+                    path: "/",
+                    port: 443,
+                    user_id: Some("alice"),
+                },
+            )
+            .unwrap();
+        assert!(ok.1.contains("secret-value"));
+        std::env::remove_var("AUTH_TEST_KEY");
     }
 }
