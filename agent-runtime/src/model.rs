@@ -888,6 +888,10 @@ pub struct ApprovalRecord {
     /// Guest event sequence that opened this request, when it came from the sandbox.
     #[serde(default)]
     pub source_seq: Option<u64>,
+    /// True when the egress broker is holding a request for this decision. No
+    /// agent is waiting for steering, so deciding it must not steer the session.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub broker_held: bool,
     /// Set when an egress approval is approved.
     #[serde(default)]
     pub grant_scope: Option<GrantScope>,

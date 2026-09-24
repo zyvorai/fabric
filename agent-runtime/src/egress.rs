@@ -678,6 +678,7 @@ pub(crate) async fn authorize_unlisted_host(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        broker_held: true,
     };
     let (approval, created) = state
         .store
@@ -839,6 +840,7 @@ async fn hold_for_approval(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        broker_held: true,
     };
     state
         .store
@@ -1804,5 +1806,50 @@ pub(crate) mod ask_tests {
             .is_empty());
         let entries = state.store.audit.list(Some(session.id), 50).await.unwrap();
         assert!(entries.iter().any(|e| e.action == "session.untainted"));
+    }
+
+    /// Regression: deciding an approval the broker is holding used to steer the
+    /// session too, which fails when the guest is unreachable and is meaningless
+    /// because no agent is waiting for it.
+    #[tokio::test]
+    async fn deciding_a_broker_held_approval_does_not_steer_the_session() {
+        let (state, session) =
+            state_and_session_cfg(|c| c.api_token = Some("operator".into())).await;
+        let open = |held: bool| ApprovalRecord {
+            id: uuid::Uuid::new_v4(),
+            session_id: session.id,
+            kind: ApprovalKind::Send,
+            subject: Some("mail.example".into()),
+            planned_action: None,
+            prompt: "send".into(),
+            status: ApprovalStatus::Pending,
+            comment: None,
+            created_at: chrono::Utc::now(),
+            decided_at: None,
+            source_seq: None,
+            broker_held: held,
+            grant_scope: None,
+        };
+        let held = open(true);
+        state.store.save_approval(held.clone()).await.unwrap();
+        let uri = format!("/v1/approvals/{}", held.id);
+        let public = crate::app::public_router(state.clone());
+        assert_eq!(
+            status(public, "POST", &uri, Some("operator")).await,
+            StatusCode::OK
+        );
+        assert_eq!(
+            state.store.get_approval(held.id).await.unwrap().status,
+            ApprovalStatus::Approved
+        );
+        // Control: an agent-initiated approval still steers the (unreachable) guest.
+        let asked = open(false);
+        state.store.save_approval(asked.clone()).await.unwrap();
+        let uri = format!("/v1/approvals/{}", asked.id);
+        let public = crate::app::public_router(state.clone());
+        assert_ne!(
+            status(public, "POST", &uri, Some("operator")).await,
+            StatusCode::OK
+        );
     }
 }

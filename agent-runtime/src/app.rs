@@ -1713,6 +1713,7 @@ async fn record_approval_request(
         decided_at: None,
         source_seq: Some(seq),
         grant_scope: None,
+        broker_held: false,
     };
     state.store.save_approval(record.clone()).await?;
     audit_approval_planned(state, &record).await;
@@ -1908,6 +1909,7 @@ async fn create_approval(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        broker_held: false,
     };
     state
         .store
@@ -1973,9 +1975,10 @@ async fn decide_approval(
         "decision": record.status,
         "comment": record.comment,
     });
-    // An egress approval unblocks a request the broker is already holding; the
-    // agent is not waiting for steering, so there is nothing to send it.
-    if record.kind != ApprovalKind::Egress {
+    // An approval the broker is holding (egress, or a send/purchase/DLP/taint hold)
+    // unblocks a request already in flight; the agent is not waiting for steering,
+    // so there is nothing to send it.
+    if record.kind != ApprovalKind::Egress && !record.broker_held {
         let _ = steer_session(
             State(state),
             Path(record.session_id),

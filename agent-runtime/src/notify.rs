@@ -166,6 +166,7 @@ mod tests {
             decided_at: None,
             source_seq: None,
             grant_scope: None,
+            broker_held: false,
         }
     }
 
