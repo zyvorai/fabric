@@ -49,6 +49,43 @@ const SANDBOX_START_TIMEOUT: Duration = Duration::from_secs(120);
 /// deadline, which is only ever checked *between* attempts.
 const HEALTH_CHECK_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Create a fresh sandbox for a session, attaching the agent's home volume if
+/// it has one. A volume that is still attached elsewhere is a conflict (the
+/// caller can retry once the other session ends), not a gateway failure.
+async fn create_cold_sandbox(
+    state: &AppState,
+    agent: &crate::model::AgentRecord,
+    session_id: Uuid,
+) -> ApiResult<crate::fluxvm::SandboxRecord> {
+    let name = format!("agent-{}", &session_id.simple().to_string()[..12]);
+    let volumes: Vec<crate::fluxvm::SandboxVolume> = agent
+        .manifest
+        .home_volume
+        .iter()
+        .filter_map(|v| {
+            Some(crate::fluxvm::SandboxVolume {
+                name: agent.manifest.home_volume_name(&agent.name)?,
+                guest_path: v.guest_path.clone(),
+            })
+        })
+        .collect();
+    with_start_timeout(state.fluxvm.create_sandbox(
+        name,
+        &agent.manifest.template,
+        None,
+        agent.manifest.runtime_port,
+        &volumes,
+    ))
+    .await
+    .map_err(|error| {
+        if !volumes.is_empty() && error.to_string().contains("already attached") {
+            ApiError::conflict("the agent's home volume is attached to another sandbox")
+        } else {
+            ApiError::bad_gateway(error)
+        }
+    })
+}
+
 async fn with_start_timeout<T>(
     fut: impl std::future::Future<Output = anyhow::Result<T>>,
 ) -> anyhow::Result<T> {
@@ -239,6 +276,9 @@ async fn deploy_agent(
                 "egress_approval_timeout_seconds must be between {MIN_EGRESS_APPROVAL_SECONDS} and {MAX_EGRESS_APPROVAL_SECONDS}"
             )));
         }
+    }
+    if let Err(message) = req.manifest.validate_home_volume(&req.name) {
+        return Err(ApiError::bad_request(message));
     }
     if req.manifest.warm_pool_size > 64 {
         return Err(ApiError::bad_request("warm_pool_size may not exceed 64"));
@@ -443,28 +483,12 @@ pub(crate) async fn create_session(
                             "claimed warm sandbox could not resume; retry after pool replenishment",
                         ));
                     }
-                    let name = format!("agent-{}", &id.simple().to_string()[..12]);
-                    let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
-                        name,
-                        &agent.manifest.template,
-                        None,
-                        agent.manifest.runtime_port,
-                    ))
-                    .await
-                    .map_err(ApiError::bad_gateway)?;
+                    let sandbox = create_cold_sandbox(&state, &agent, id).await?;
                     (sandbox.id, SessionStartMode::Cold, false)
                 }
             }
         } else {
-            let name = format!("agent-{}", &id.simple().to_string()[..12]);
-            let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
-                name,
-                &agent.manifest.template,
-                None,
-                agent.manifest.runtime_port,
-            ))
-            .await
-            .map_err(ApiError::bad_gateway)?;
+            let sandbox = create_cold_sandbox(&state, &agent, id).await?;
             (sandbox.id, SessionStartMode::Cold, false)
         };
 

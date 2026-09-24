@@ -827,6 +827,7 @@ mod tests {
                 warm_pool_size: 0,
                 runtime: Default::default(),
                 egress_mode: Default::default(),
+                home_volume: None,
                 egress_approval_timeout_seconds: None,
             },
         };
@@ -863,6 +864,7 @@ mod tests {
                     warm_pool_size: 0,
                     runtime: Default::default(),
                     egress_mode: Default::default(),
+                    home_volume: None,
                     egress_approval_timeout_seconds: None,
                 },
             })
@@ -884,6 +886,7 @@ mod tests {
                     warm_pool_size: 0,
                     runtime: Default::default(),
                     egress_mode: Default::default(),
+                    home_volume: None,
                     egress_approval_timeout_seconds: None,
                 },
             })

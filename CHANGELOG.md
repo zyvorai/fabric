@@ -3,6 +3,11 @@
 ## 0.3.0
 
 ### Added
+- **Persistent agent home volume.** A manifest `home_volume` mounts a named FluxVM
+  volume (default `/home/agent`) that survives sandbox replacement and new agent
+  versions. It needs a QEMU-backed FluxVM template, `max_concurrent_sessions: 1`, and
+  no warm pool or idle hibernation; a second session while the volume is attached
+  gets `409`. Requires FluxVM sandbox volumes (`zyvorai/fluxvm` `feat/sandbox-volumes`).
 - **Agent approvals and a tamper-evident action journal** in the agent runtime.
   Approvals now carry a `kind`, `subject`, and `planned_action`; approvals and
   brokered egress calls are appended to a SHA-256 hash-chained `audit.jsonl`

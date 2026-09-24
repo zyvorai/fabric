@@ -611,6 +611,7 @@ mod ask_tests {
             warm_pool_size: 0,
             runtime: Default::default(),
             egress_mode: mode,
+            home_volume: None,
             egress_approval_timeout_seconds: timeout,
         }
     }

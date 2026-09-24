@@ -145,6 +145,18 @@ Approval only lifts the allowlist check. DNS pinning, the private-network gate, 
 
 Changing `egress_mode` or the timeout changes the agent's version, like any manifest change; manifests that leave both at their defaults keep their existing version ids.
 
+## Persistent home volume
+
+`"home_volume": {"name": "research-home", "guest_path": "/home/agent"}` in the manifest mounts a FluxVM volume in the agent's sandbox. It is a host directory that outlives the sandbox, every session, and every new version of the agent: `name` defaults to the lowercased agent name, and `guest_path` defaults to `/home/agent`. Write state there and the next session sees it.
+
+Requirements, all checked at deploy time:
+
+- **A QEMU-backed template.** The volume is shared over virtiofs, which the in-tree `flux-vm` backend does not support. `template` must name a FluxVM template whose `spec.json` sets `"backend": "qemu"` (needs FluxVM with sandbox volumes, `feat/sandbox-volumes`, plus `virtiofsd` on the host). A sandbox on QEMU also avoids the 2+ vCPU hang of `flux-vm`, but it cannot be snapshotted.
+- **`max_concurrent_sessions: 1`.** A volume attaches to one sandbox at a time; a second session that tries to start while the volume is attached gets `409`.
+- **No `warm_pool_size` and no `idle_hibernate_seconds`.** Warm sandboxes are created before a session owns the volume, and QEMU sandboxes have no snapshot to hibernate to. A manual hibernate of such a session fails at FluxVM.
+
+Volumes are per FluxVM tenant and live under FluxVM's `sandbox.volumes_dir` (default `<state_dir>/volumes`). They have no size quota: the limit is the host filesystem. Deleting the agent or a session does not delete the volume; remove the directory on the FluxVM host to discard the data.
+
 ## Credentials
 
 Create a **descriptor file**, not a secret file:

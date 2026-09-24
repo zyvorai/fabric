@@ -25,6 +25,10 @@ pub struct AgentManifest {
     /// `deny` (default) refuses it; `ask` holds it while an operator decides.
     #[serde(default, skip_serializing_if = "EgressMode::is_deny")]
     pub egress_mode: EgressMode,
+    /// Persistent directory mounted in the sandbox so state survives sandbox
+    /// replacement. Needs a QEMU-backed FluxVM template; see [`HomeVolume`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_volume: Option<HomeVolume>,
     /// How long an `ask` request waits for a decision before it is refused.
     /// `None` uses [`DEFAULT_EGRESS_APPROVAL_SECONDS`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -51,6 +55,80 @@ pub struct AgentManifest {
     /// new version.
     #[serde(default)]
     pub runtime: AgentRuntimeKind,
+}
+
+/// A named FluxVM volume mounted into the agent's sandbox. The volume outlives
+/// the sandbox and every session, and can be attached to one sandbox at a time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HomeVolume {
+    /// FluxVM volume name (`[a-z0-9._-]`, up to 63). Defaults to the lowercased
+    /// agent name, so a new version of the same agent keeps its data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default = "default_home_path")]
+    pub guest_path: String,
+}
+
+fn default_home_path() -> String {
+    "/home/agent".into()
+}
+
+/// The FluxVM volume name rule, checked here so a bad manifest fails at deploy
+/// rather than on the first session.
+fn valid_volume_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit())
+        && name.len() <= 63
+        && !name.contains("..")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-'))
+}
+
+impl AgentManifest {
+    /// The volume name this manifest resolves to for `agent`, if it has a home volume.
+    pub fn home_volume_name(&self, agent: &str) -> Option<String> {
+        self.home_volume
+            .as_ref()
+            .map(|v| v.name.clone().unwrap_or_else(|| agent.to_ascii_lowercase()))
+    }
+
+    /// Deploy-time checks for `home_volume`. FluxVM re-validates everything;
+    /// these catch mistakes early and reject combinations that cannot work.
+    pub fn validate_home_volume(&self, agent: &str) -> Result<(), String> {
+        let Some(volume) = &self.home_volume else {
+            return Ok(());
+        };
+        let name = self.home_volume_name(agent).unwrap_or_default();
+        if !valid_volume_name(&name) {
+            return Err(format!(
+                "home_volume name {name:?} is not a valid FluxVM volume name ([a-z0-9._-], up to 63); set home_volume.name"
+            ));
+        }
+        let path = &volume.guest_path;
+        if !path.starts_with('/')
+            || path.len() > 128
+            || !path
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '.' | '-'))
+        {
+            return Err(format!(
+                "home_volume.guest_path {path:?} is not a valid absolute path"
+            ));
+        }
+        // A volume is attached to one sandbox at a time and is bound when the
+        // sandbox is created, so these settings cannot work alongside it.
+        if self.max_concurrent_sessions != Some(1) {
+            return Err("home_volume requires max_concurrent_sessions to be 1: the volume can be attached to one sandbox at a time".into());
+        }
+        if self.warm_pool_size > 0 {
+            return Err("home_volume cannot be combined with warm_pool_size: warm sandboxes are created before a session owns the volume".into());
+        }
+        if self.idle_hibernate_seconds.is_some() {
+            return Err("home_volume cannot be combined with idle_hibernate_seconds: volume-backed (QEMU) sandboxes cannot be snapshotted".into());
+        }
+        Ok(())
+    }
 }
 
 pub const DEFAULT_EGRESS_APPROVAL_SECONDS: u64 = 90;
@@ -645,4 +723,100 @@ pub struct DelegateRequest {
     pub agent: String,
     #[serde(default)]
     pub input: Value,
+}
+
+#[cfg(test)]
+mod home_volume_tests {
+    use super::*;
+
+    fn manifest(home: Option<HomeVolume>) -> AgentManifest {
+        AgentManifest {
+            template: "qemu-node".into(),
+            credentials: vec![],
+            egress_allow_hosts: vec![],
+            allow_private_networks: false,
+            runtime_port: 8080,
+            ttl_seconds: None,
+            max_concurrent_sessions: Some(1),
+            idle_hibernate_seconds: None,
+            warm_pool_size: 0,
+            runtime: Default::default(),
+            egress_mode: Default::default(),
+            home_volume: home,
+            egress_approval_timeout_seconds: None,
+        }
+    }
+
+    fn home(name: Option<&str>, path: &str) -> Option<HomeVolume> {
+        Some(HomeVolume {
+            name: name.map(str::to_string),
+            guest_path: path.into(),
+        })
+    }
+
+    #[test]
+    fn no_home_volume_is_always_valid_and_serializes_unchanged() {
+        assert!(manifest(None).validate_home_volume("Any-Name").is_ok());
+        // Version ids hash the serialized manifest; an absent home volume must add nothing.
+        let value = serde_json::to_value(manifest(None)).unwrap();
+        assert!(value.get("home_volume").is_none());
+    }
+
+    #[test]
+    fn volume_name_defaults_to_the_lowercased_agent_name() {
+        let m = manifest(home(None, "/home/agent"));
+        assert_eq!(
+            m.home_volume_name("Research-Bot").as_deref(),
+            Some("research-bot")
+        );
+        assert!(m.validate_home_volume("Research-Bot").is_ok());
+        let named = manifest(home(Some("shared-home"), "/home/agent"));
+        assert_eq!(named.home_volume_name("x").as_deref(), Some("shared-home"));
+        assert_eq!(manifest(None).home_volume_name("x"), None);
+    }
+
+    #[test]
+    fn an_agent_name_that_is_not_a_valid_volume_name_needs_an_explicit_one() {
+        // Agent names may contain uppercase-insensitive characters but also
+        // leading '_' or '.', which FluxVM volume names do not allow.
+        let m = manifest(home(None, "/home/agent"));
+        assert!(m.validate_home_volume("_hidden").is_err());
+        let fixed = manifest(home(Some("hidden"), "/home/agent"));
+        assert!(fixed.validate_home_volume("_hidden").is_ok());
+    }
+
+    #[test]
+    fn rejects_bad_paths_and_incompatible_settings() {
+        assert!(manifest(home(None, "home/agent"))
+            .validate_home_volume("a")
+            .is_err());
+        assert!(manifest(home(None, "/home/a b"))
+            .validate_home_volume("a")
+            .is_err());
+        assert!(manifest(home(None, "/home/a;x"))
+            .validate_home_volume("a")
+            .is_err());
+
+        let mut m = manifest(home(None, "/home/agent"));
+        m.max_concurrent_sessions = None;
+        assert!(m
+            .validate_home_volume("a")
+            .unwrap_err()
+            .contains("max_concurrent_sessions"));
+        let mut m = manifest(home(None, "/home/agent"));
+        m.max_concurrent_sessions = Some(2);
+        assert!(m.validate_home_volume("a").is_err());
+        let mut m = manifest(home(None, "/home/agent"));
+        m.warm_pool_size = 1;
+        assert!(m
+            .validate_home_volume("a")
+            .unwrap_err()
+            .contains("warm_pool_size"));
+        let mut m = manifest(home(None, "/home/agent"));
+        m.idle_hibernate_seconds = Some(60);
+        assert!(m
+            .validate_home_volume("a")
+            .unwrap_err()
+            .contains("hibernate"));
+    }
 }

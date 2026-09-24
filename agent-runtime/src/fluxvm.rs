@@ -31,6 +31,15 @@ struct SandboxCreate<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     ttl_seconds: Option<u64>,
     http_proxy_port: u16,
+    #[serde(skip_serializing_if = "<[SandboxVolume]>::is_empty")]
+    volumes: &'a [SandboxVolume],
+}
+
+/// A FluxVM sandbox volume (`POST /v1/sandboxes` `volumes`).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct SandboxVolume {
+    pub name: String,
+    pub guest_path: String,
 }
 
 impl FluxVm {
@@ -88,6 +97,7 @@ impl FluxVm {
         template: &str,
         ttl_seconds: Option<u64>,
         runtime_port: u16,
+        volumes: &[SandboxVolume],
     ) -> Result<SandboxRecord> {
         let response = self
             .auth(self.http.post(self.url("/v1/sandboxes")?))
@@ -96,6 +106,7 @@ impl FluxVm {
                 template,
                 ttl_seconds,
                 http_proxy_port: runtime_port,
+                volumes,
             })
             .send()
             .await?;
@@ -221,5 +232,38 @@ impl FluxVm {
             bail!("sandbox did not report a default gateway; use tap+netns or set ZYVOR_AGENT_EGRESS_ADVERTISE_HOST")
         }
         Ok(stdout)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sandbox_create_omits_volumes_unless_present() {
+        let none = serde_json::to_value(SandboxCreate {
+            name: "n".into(),
+            template: "t",
+            ttl_seconds: None,
+            http_proxy_port: 8080,
+            volumes: &[],
+        })
+        .unwrap();
+        assert!(none.get("volumes").is_none());
+
+        let volumes = [SandboxVolume {
+            name: "home".into(),
+            guest_path: "/home/agent".into(),
+        }];
+        let some = serde_json::to_value(SandboxCreate {
+            name: "n".into(),
+            template: "t",
+            ttl_seconds: None,
+            http_proxy_port: 8080,
+            volumes: &volumes,
+        })
+        .unwrap();
+        assert_eq!(some["volumes"][0]["name"], "home");
+        assert_eq!(some["volumes"][0]["guest_path"], "/home/agent");
     }
 }
