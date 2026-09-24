@@ -5,7 +5,9 @@
 //!
 //! **Keep mode** (`ZYVOR_AGENT_KEEP_MODE=1`): trusted signers are required at
 //! startup, and every PUT policy must carry a valid Ed25519 signature
-//! (`X-Keep-Policy-Signature: <hex>`). `ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=0`
+//! (`X-Keep-Policy-Signature: <hex>`). Agent deploy (`POST /v1/agents`) uses the
+//! same scheme over the exact JSON body (`X-Keep-Manifest-Signature`).
+//! `ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=0`
 //! is ignored in Keep mode (fail-closed).
 //!
 //! Without Keep mode, when `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS` is set, PUT
@@ -101,11 +103,31 @@ impl PolicyTrust {
                 _ => !trusted_signers.is_empty(),
             }
         };
-        Ok(Self {
+        let trust = Self {
             trusted_signers,
             require_signature,
             keep_mode,
-        })
+        };
+        trust.validate_configuration()?;
+        Ok(trust)
+    }
+
+    fn validate_configuration(&self) -> Result<()> {
+        if self.keep_mode && (self.trusted_signers.is_empty() || !self.require_signature) {
+            bail!("Keep mode requires trusted policy signers and signature enforcement");
+        }
+        Ok(())
+    }
+
+    /// Sign the exact JSON request body on direct deployments. The policy YAML
+    /// covers only a subset of manifest fields, so signing its projection would
+    /// leave security-sensitive fields writable without authorization.
+    pub fn verify_deployment(&self, body: &[u8], signature_hex: Option<&str>) -> Result<()> {
+        if !self.keep_mode {
+            return Ok(());
+        }
+        self.verify_yaml(body, signature_hex)
+            .context("Keep mode requires X-Keep-Manifest-Signature over the exact deployment JSON")
     }
 
     pub fn verify_yaml(&self, yaml: &[u8], signature_hex: Option<&str>) -> Result<()> {
@@ -333,5 +355,34 @@ mod tests {
             keep_mode: false,
         };
         trust.verify_yaml(b"version: 1\n", None).unwrap();
+    }
+
+    #[test]
+    fn keep_deployment_signature_covers_full_request() {
+        let seed = [9u8; 32];
+        let trust = PolicyTrust {
+            trusted_signers: vec![SigningKey::from_bytes(&seed).verifying_key().to_bytes()],
+            require_signature: true,
+            keep_mode: true,
+        };
+        let body = br#"{"name":"operator","manifest":{"allow_private_networks":false}}"#;
+        let signature = sign_policy_yaml(body, &seed);
+        trust.verify_deployment(body, Some(&signature)).unwrap();
+        assert!(trust.verify_deployment(body, None).is_err());
+        let changed = br#"{"name":"operator","manifest":{"allow_private_networks":true}}"#;
+        assert!(trust.verify_deployment(changed, Some(&signature)).is_err());
+    }
+
+    #[test]
+    fn keep_mode_refuses_missing_signer_or_disabled_enforcement() {
+        let mut trust = PolicyTrust {
+            keep_mode: true,
+            ..Default::default()
+        };
+        assert!(trust.validate_configuration().is_err());
+        trust.trusted_signers.push([1u8; 32]);
+        assert!(trust.validate_configuration().is_err());
+        trust.require_signature = true;
+        trust.validate_configuration().unwrap();
     }
 }

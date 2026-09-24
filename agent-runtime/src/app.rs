@@ -14,6 +14,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use axum::{
+    body::Bytes,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
@@ -364,8 +365,18 @@ async fn api_auth(
 
 async fn deploy_agent(
     State(state): State<Arc<AppState>>,
-    Json(mut req): Json<DeployAgentRequest>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<(StatusCode, Json<crate::model::AgentRecord>)> {
+    let signature = headers
+        .get("x-keep-manifest-signature")
+        .and_then(|value| value.to_str().ok());
+    state
+        .policy_trust
+        .verify_deployment(&body, signature)
+        .map_err(ApiError::forbidden)?;
+    let mut req: DeployAgentRequest = serde_json::from_slice(&body)
+        .map_err(ApiError::bad_request)?;
     if req.manifest.template.trim().is_empty() {
         return Err(ApiError::bad_request("manifest.template is required"));
     }

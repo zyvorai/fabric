@@ -108,10 +108,16 @@ PY
   fi
 
   echo "==> deploy $PACK"
+  if [[ -n "${KEEP_POLICY_SEED:-}" ]]; then
+    "$KEEPCTL" policy sign "$DEPLOY" >/dev/null
+  elif [[ ! -f "${DEPLOY}.sig" ]]; then
+    echo "note: Keep mode needs a signed deploy — set KEEP_POLICY_SEED or provide ${DEPLOY}.sig" >&2
+  fi
   RESP=$("$KEEPCTL" create -f "$DEPLOY" 2>&1) || {
     echo "$RESP" >&2
     echo "deploy failed — is agent-runtime up at $BASE?" >&2
     echo "hint: merge examples/keep-agents/_fabric/credentials.fabric-api.json into ZYVOR_AGENT_CREDENTIALS_FILE" >&2
+    echo "hint: Keep mode needs keepctl policy sign + X-Keep-Manifest-Signature" >&2
     exit 1
   }
   echo "$RESP"

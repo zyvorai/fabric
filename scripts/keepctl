@@ -5,8 +5,9 @@
 # keepctl — Keep product CLI (Fabric). Talks to agent-runtime REST; FluxVM is
 # the cell backend. Same verbs as the API. Not a separate repo.
 #
-#   keepctl create …                 # deploy agent (Keep) via agent-runtime
-#   keepctl policy show|set|sign …   # signed keep.policy.yaml
+#   keepctl create -f agent.json --signature agent.json.sig
+#                                   # deploy with signed full manifest in Keep mode
+#   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
 #   keepctl pack   <path>            # workspace hint + policy + manifest pin
 #   keepctl unpack <path>            # restore policy onto an agent
 #   keepctl export-token …           # scoped trajectory export (default: none)
@@ -51,16 +52,27 @@ case "$cmd" in
 
   create)
     file=""
+    sig_file=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
         -f|--file) file=$2; shift 2 ;;
+        --signature) sig_file=$2; shift 2 ;;
         *) echo "unknown arg: $1" >&2; usage 1 ;;
       esac
     done
+    SIG_ARGS=()
+    if [[ -n "$sig_file" ]]; then
+      [[ -f "$sig_file" ]] || { echo "missing signature file: $sig_file" >&2; exit 1; }
+      SIG_ARGS=(-H "X-Keep-Manifest-Signature: $(tr -d ' \n' <"$sig_file")")
+    elif [[ -n "$file" && -f "${file}.sig" ]]; then
+      SIG_ARGS=(-H "X-Keep-Manifest-Signature: $(tr -d ' \n' <"${file}.sig")")
+    elif [[ -n "${KEEP_MANIFEST_SIGNATURE:-}" ]]; then
+      SIG_ARGS=(-H "X-Keep-Manifest-Signature: $KEEP_MANIFEST_SIGNATURE")
+    fi
     if [[ -n "$file" ]]; then
-      api POST /v1/agents -H 'Content-Type: application/json' --data-binary @"$file"
+      api POST /v1/agents -H 'Content-Type: application/json' "${SIG_ARGS[@]}" --data-binary @"$file"
     else
-      api POST /v1/agents -H 'Content-Type: application/json' --data-binary @-
+      api POST /v1/agents -H 'Content-Type: application/json' "${SIG_ARGS[@]}" --data-binary @-
     fi
     echo
     ;;
@@ -122,7 +134,7 @@ PY
         file="${1:-}"
         seed="${2:-${KEEP_POLICY_SEED:-}}"
         [[ -n "$file" && -n "$seed" ]] || {
-          echo "usage: keepctl policy sign <policy.yaml> [seed32hex]" >&2
+          echo "usage: keepctl policy sign <policy.yaml|agent.json> [seed32hex]" >&2
           echo "  or set KEEP_POLICY_SEED; writes <file>.sig and prints hex sig" >&2
           exit 1
         }

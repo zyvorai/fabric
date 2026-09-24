@@ -214,7 +214,12 @@ cat >"$W/deploy.json" <<JSON
   "taint":{"trusted_hosts":["api.github.com"]}
 }}
 JSON
-"$KEEPCTL" create -f "$W/deploy.json" >/dev/null
+CODE=$(http_code -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' --data-binary @"$W/deploy.json" \
+  "$API/v1/agents")
+check "unsigned deploy refused" 403 "$CODE"
+"$SIGN_BIN" sign "$SEED" "$W/deploy.json" >"$W/deploy.json.sig"
+"$KEEPCTL" create -f "$W/deploy.json" --signature "$W/deploy.json.sig" >/dev/null
 check "agent listed" keep-desk "$(curl -sf -H "Authorization: Bearer $TOKEN" "$API/v1/agents" | tr -d '\n')"
 
 echo "==> signed policy (reject unsigned, accept signed)"
@@ -347,7 +352,8 @@ check "FLUXVM_MIGRATE notes present" "qcow2" "$(cat "$W/pack/FLUXVM_MIGRATE.md")
 
 # Sign packed policy and unpack onto a second agent
 sed 's/keep-desk/keep-desk-b/' "$W/deploy.json" >"$W/deploy-b.json"
-"$KEEPCTL" create -f "$W/deploy-b.json" >/dev/null
+"$SIGN_BIN" sign "$SEED" "$W/deploy-b.json" >"$W/deploy-b.json.sig"
+"$KEEPCTL" create -f "$W/deploy-b.json" --signature "$W/deploy-b.json.sig" >/dev/null
 "$SIGN_BIN" sign "$SEED" "$W/pack/keep.policy.yaml" >"$W/pack/keep.policy.yaml.sig"
 "$KEEPCTL" unpack "$W/pack" keep-desk-b >/dev/null
 check "unpacked policy on keep-desk-b" "api.stripe.com" "$("$KEEPCTL" policy show keep-desk-b)"
@@ -488,8 +494,13 @@ print(code)
 PY
 )
 
+    DEPLOY_BODY="{\"name\":\"keep-live\",\"bundle_base64\":\"$BUNDLE\",\"manifest\":{\"template\":\"$TEMPLATE\",\"resources\":{\"vcpus\":1,\"memory_mib\":1024},\"egress_mode\":\"ask\",\"egress_allow_hosts\":[\"example.com\"],\"egress_approval_timeout_seconds\":90,\"credentials\":[\"stripe\"],\"confinement\":\"strict\",\"allow_private_networks\":false}}"
+    printf '%s' "$DEPLOY_BODY" >"$W/deploy-live.json"
+    "$SIGN_BIN" sign "$SEED" "$W/deploy-live.json" >"$W/deploy-live.json.sig"
+    DEPLOY_SIG=$(tr -d '[:space:]' <"$W/deploy-live.json.sig")
     DEPLOY=$(curl -sf -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-      -d "{\"name\":\"keep-live\",\"bundle_base64\":\"$BUNDLE\",\"manifest\":{\"template\":\"$TEMPLATE\",\"resources\":{\"vcpus\":1,\"memory_mib\":1024},\"egress_mode\":\"ask\",\"egress_allow_hosts\":[\"example.com\"],\"egress_approval_timeout_seconds\":90,\"credentials\":[\"stripe\"],\"confinement\":\"strict\",\"allow_private_networks\":false}}" \
+      -H "X-Keep-Manifest-Signature: $DEPLOY_SIG" \
+      --data-binary @"$W/deploy-live.json" \
       "$LIVE_API/v1/agents" || true)
     check "live deploy" keep-live "$DEPLOY"
 

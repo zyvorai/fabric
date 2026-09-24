@@ -10,6 +10,9 @@
   `GET /api/sessions/{id}/cockpit`. Non-broker approvals can be decided after a
   session ends. Docs: [docs/keep/PRODUCTION.md](docs/keep/PRODUCTION.md),
   [docs/keep/STATUS.md](docs/keep/STATUS.md).
+- **Signed agent deployments in Keep mode.** `POST /v1/agents` requires
+  `X-Keep-Manifest-Signature` over the exact JSON body when
+  `ZYVOR_AGENT_KEEP_MODE=1`; `keepctl create --signature` / `policy sign agent.json`.
 - **Keep packaged agents (infra, migration, deploy).** Goals/plans/artifacts API
   (`/v1/goals`, `/v1/artifacts`, advance → `/v1/approvals`); cockpit `active_goal` /
   `recent_artifacts`; shared `_fabric` client + `fabric-api` credential/policy

@@ -13,7 +13,7 @@ KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-pilot-gate.sh
 |---|---|
 | Template required | Missing template → **FAIL** (no soft PASS) |
 | Happy + deny | Gate runs twice; deny path shows no unapproved mutate |
-| Keep-mode signed policy | Startup refuses empty signers; unsigned PUT → 403 |
+| Signed Keep mutations | `ZYVOR_AGENT_KEEP_MODE=1` + trusted signers; startup rejects empty signers. PUT policy needs `X-Keep-Policy-Signature`; POST agent needs `X-Keep-Manifest-Signature` over the exact JSON body. |
 | Session / cockpit / restart | Cockpit `software-test`; session recovers after runtime restart |
 | OOB approvals | Webhook + approve/deny outside agent chat |
 | Console Keep view | `/app/keep/:sessionId` — goal, task, evidence, approval, outcome |
@@ -27,7 +27,7 @@ Latest archived run: [pilot-runs/20260924T141927Z](pilot-runs/20260924T141927Z/)
 |---|---|
 | Stub Keep e2e (CI) | `./scripts/keep-e2e.sh` · `.github/workflows/keep.yml` |
 | **Live FluxVM Keep proof** | `KEEP_E2E_FLUXVM=1 ./scripts/keep-e2e.sh` or `./scripts/keep-live-lab.sh` (needs `KEEP_E2E_TEMPLATE`) |
-| Keep-mode signed policy | `ZYVOR_AGENT_KEEP_MODE=1` + trusted signers; unsigned PUT → 403; start refuses empty signers |
+| Keep-mode signed policy | `ZYVOR_AGENT_KEEP_MODE=1` + trusted signers; unsigned PUT → 403; unsigned deploy → 403; start refuses empty signers |
 | Credential authority | `authorize_resolve` allowlists host/method/path/user; secrets still host-env (not 0.2 unwrap) |
 | Confine | `ZYVOR_AGENT_CONFINE=1` / `confinement: strict` on live path |
 | Measured profile | `ZYVOR_AGENT_SECURITY_PROFILE=measured` (Keep mode default); cockpit `evidence_class: software-test` |
@@ -42,11 +42,24 @@ Latest archived run: [pilot-runs/20260924T141927Z](pilot-runs/20260924T141927Z/)
 KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-live-lab.sh
 ```
 
+To deploy in enforced Keep mode, sign the exact JSON file you send:
+
+```bash
+keepctl policy sign agent.json   # uses KEEP_POLICY_SEED; writes agent.json.sig
+keepctl create -f agent.json --signature agent.json.sig
+```
+
+The signer public key belongs in `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS` on the
+runtime. A policy update still signs the exact YAML sent to PUT. Generic agent
+runtime installations can leave `ZYVOR_AGENT_KEEP_MODE` unset. Existing agents
+created before enforced mode must be redeployed with a signed manifest before
+being treated as policy-verified; signing does not retroactively attest them.
+
 ## Landed in this tree (software / control plane)
 
 | Item | How to verify |
 |---|---|
-| Signed `keep.policy.yaml` | Keep mode or `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS` + signature header |
+| Signed Keep mutations | Keep mode or `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS`; PUT policy + POST deploy require matching Ed25519 signatures (`X-Keep-Policy-Signature` / `X-Keep-Manifest-Signature`) |
 | Export-token gate | `POST /v1/export-tokens`; pack/export need `X-Keep-Export-Token` |
 | Firecracker cell | FluxVM Firecracker templates; `cell_backend: firecracker` |
 | Full pack metadata | `keepctl pack` → policy, agent pin, vault **names** (no raw secrets) |
