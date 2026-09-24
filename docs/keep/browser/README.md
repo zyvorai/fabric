@@ -11,5 +11,7 @@
   session through FluxVM `GET /v1/sandboxes/{id}/ws/{port}/{*path}` and returns
   one JPEG. Input / takeover are still not exposed.
 - `/keep/browser` polls listing + screenshot. Honesty remains **software-test**.
+- Lab proof (CDP stub on `node22-agent`): [pilot-runs/20260924T190954Z](../pilot-runs/20260924T190954Z/).
+  Full Chromium `browser-agent` image bake remains optional.
 - Per-site disposable profiles remain a product goal; template recipes live under
   `agent-runtime/templates/browser-agent/`.
