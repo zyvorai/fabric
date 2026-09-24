@@ -249,6 +249,16 @@ impl AgentManifest {
         Ok(())
     }
 
+    /// Firecracker cells cannot use virtiofs home volumes (QEMU-only).
+    pub fn validate_cell_backend(&self) -> Result<(), String> {
+        match self.cell_backend {
+            Some(CellBackend::Firecracker) if self.home_volume.is_some() => Err(
+                "cell_backend=firecracker cannot use home_volume (virtiofs requires QEMU); use a Firecracker template without volumes or cell_backend=qemu".into(),
+            ),
+            _ => Ok(()),
+        }
+    }
+
     /// Deploy-time checks for `resources` against the operator's ceilings.
     pub fn validate_resources(
         &self,

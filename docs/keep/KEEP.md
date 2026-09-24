@@ -23,6 +23,8 @@ cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
 
 GitHub Actions: [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml)  
 Hands-on: [Tutorial 16](../tutorials/16-keep-workstation.md)  
+Production checklist: [PRODUCTION.md](PRODUCTION.md)  
+E2E smoke: `./scripts/keep-e2e.sh`  
 FluxVM measured profiles (sibling repo): `./scripts/test-security-profiles.sh`
 
 ## Quiet part (read this first)

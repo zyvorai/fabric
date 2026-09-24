@@ -36,7 +36,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2.5"
 uuid = { version = "1.26", features = ["v4", "serde"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 tokio = { version = "1.53", features = ["test-util"] }
+tempfile = "3.27.0"

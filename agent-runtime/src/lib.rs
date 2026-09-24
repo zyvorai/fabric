@@ -9,6 +9,7 @@ pub mod confine;
 pub mod contain;
 pub mod credentials;
 pub mod egress;
+pub mod export_tokens;
 pub mod fluxvm;
 pub mod l7;
 pub mod mcp;
@@ -24,7 +25,10 @@ pub mod skills;
 pub mod store;
 pub mod workstations;
 
-use crate::{config::Config, credentials::CredentialVault, fluxvm::FluxVm, store::Store};
+use crate::{
+    config::Config, credentials::CredentialVault, export_tokens::ExportTokenStore, fluxvm::FluxVm,
+    policy::PolicyTrust, store::Store,
+};
 use anyhow::{Context, Result};
 use std::{
     collections::HashMap,
@@ -43,6 +47,10 @@ pub struct AppState {
     pub mitm: Option<Arc<mitm::Mitm>>,
     /// Extra roots the broker trusts for upstream TLS.
     pub extra_roots: Vec<reqwest::Certificate>,
+    /// Keep: Ed25519 trusted signers for `keep.policy.yaml`.
+    pub policy_trust: PolicyTrust,
+    /// Keep: scoped export tokens (training default off).
+    pub export_tokens: ExportTokenStore,
     /// Serializes the idempotency/quota reservation section of session creation,
     /// one lock per agent name so a slow or hung FluxVM call for one agent can
     /// never block session creation for every other agent on the process.
@@ -78,6 +86,8 @@ impl AppState {
                     .with_context(|| format!("parsing extra CA file {}", path.display()))?,
             );
         }
+        let policy_trust = PolicyTrust::from_env()?;
+        let export_tokens = ExportTokenStore::open(&config.state_dir).await?;
         Ok(Arc::new(Self {
             config,
             store,
@@ -87,6 +97,8 @@ impl AppState {
             egress_http,
             mitm,
             extra_roots,
+            policy_trust,
+            export_tokens,
             session_create_locks: Mutex::new(HashMap::new()),
             warm_pool_reconcile_lock: tokio::sync::Mutex::new(()),
             session_locks: Mutex::new(HashMap::new()),

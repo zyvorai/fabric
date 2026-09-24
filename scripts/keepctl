@@ -53,58 +53,77 @@ case "$cmd" in
     echo
     ;;
 
+  pack)
+    out="${1:-}"
+    name="${2:-}"
+    [[ -n "$out" && -n "$name" ]] || { echo "usage: keepctl pack <dir> <agent>  (needs KEEP_EXPORT_TOKEN with scope pack)" >&2; exit 1; }
+    [[ -n "${KEEP_EXPORT_TOKEN:-}" ]] || { echo "set KEEP_EXPORT_TOKEN (keepctl export-token pack)" >&2; exit 1; }
+    mkdir -p "$out"
+    curl -fsS "${AUTH[@]}" -H "X-Keep-Export-Token: $KEEP_EXPORT_TOKEN" \
+      "$BASE/v1/agents/${name}/pack" >"$out/pack.json"
+    python3 - <<PY
+import json, pathlib
+p = pathlib.Path("$out")
+data = json.loads(p.joinpath("pack.json").read_text())
+p.joinpath("keep.policy.yaml").write_text(data["policy_yaml"])
+p.joinpath("agent.json").write_text(json.dumps(data["agent"], indent=2))
+p.joinpath("pack-manifest.json").write_text(json.dumps(data["pack"], indent=2))
+notes = data["pack"].get("fluxvm_notes", {})
+p.joinpath("FLUXVM_MIGRATE.md").write_text(
+    "# FluxVM migrate\n\n" + "\n".join(f"- **{k}**: {v}" for k, v in notes.items()) + "\n"
+)
+creds = data["pack"].get("credential_names") or []
+p.joinpath("vault-names.json").write_text(json.dumps({"credentials": creds}, indent=2))
+print("wrote keep.policy.yaml agent.json pack-manifest.json vault-names.json FLUXVM_MIGRATE.md")
+PY
+    echo "packed $name → $out (secrets NOT included — rebind credentials file on destination)"
+    ;;
+
+  unpack)
+    dir="${1:-}"
+    name="${2:-}"
+    [[ -n "$dir" && -n "$name" ]] || { echo "usage: keepctl unpack <dir> <agent> [policy.sig]" >&2; exit 1; }
+    [[ -f "$dir/keep.policy.yaml" ]] || { echo "missing $dir/keep.policy.yaml" >&2; exit 1; }
+    SIG_ARGS=()
+    if [[ -n "${3:-}" ]]; then
+      SIG_ARGS=(-H "X-Keep-Policy-Signature: $(tr -d ' \n' <"$3")")
+    elif [[ -f "$dir/keep.policy.yaml.sig" ]]; then
+      SIG_ARGS=(-H "X-Keep-Policy-Signature: $(tr -d ' \n' <"$dir/keep.policy.yaml.sig")")
+    elif [[ -n "${KEEP_POLICY_SIGNATURE:-}" ]]; then
+      SIG_ARGS=(-H "X-Keep-Policy-Signature: $KEEP_POLICY_SIGNATURE")
+    fi
+    api PUT "/v1/agents/${name}/policy" -H 'Content-Type: application/x-yaml' \
+      "${SIG_ARGS[@]}" --data-binary @"$dir/keep.policy.yaml"
+    echo
+    echo "unpacked policy onto $name. Restore qcow2 per FLUXVM_MIGRATE.md; rebind vault secrets on host."
+    ;;
+
   policy)
     sub="${1:-}"; shift || true
     name="${1:-}"; shift || true
-    [[ -n "$name" ]] || { echo "usage: keepctl policy show|set <agent> [file]" >&2; exit 1; }
+    [[ -n "$name" ]] || { echo "usage: keepctl policy show|set <agent> [file] [sig]" >&2; exit 1; }
     case "$sub" in
       show)
         api GET "/v1/agents/${name}/policy"
         echo
         ;;
       set)
-        file="${1:-}"
-        [[ -n "$file" ]] || { echo "usage: keepctl policy set <agent> <policy.yaml>" >&2; exit 1; }
-        api PUT "/v1/agents/${name}/policy" -H 'Content-Type: application/x-yaml' --data-binary @"$file"
+        file="${1:-}"; shift || true
+        [[ -n "$file" ]] || { echo "usage: keepctl policy set <agent> <policy.yaml> [sig-file]" >&2; exit 1; }
+        SIG_ARGS=()
+        if [[ -n "${1:-}" ]]; then
+          SIG_ARGS=(-H "X-Keep-Policy-Signature: $(tr -d ' \n' <"$1")")
+        elif [[ -f "${file}.sig" ]]; then
+          SIG_ARGS=(-H "X-Keep-Policy-Signature: $(tr -d ' \n' <"${file}.sig")")
+        elif [[ -n "${KEEP_POLICY_SIGNATURE:-}" ]]; then
+          SIG_ARGS=(-H "X-Keep-Policy-Signature: $KEEP_POLICY_SIGNATURE")
+        fi
+        api PUT "/v1/agents/${name}/policy" -H 'Content-Type: application/x-yaml' \
+          "${SIG_ARGS[@]}" --data-binary @"$file"
         echo
         ;;
       *) echo "usage: keepctl policy show|set <agent>" >&2; exit 1 ;;
     esac
-    ;;
-
-  pack)
-    out="${1:-}"
-    name="${2:-}"
-    [[ -n "$out" && -n "$name" ]] || { echo "usage: keepctl pack <dir> <agent>" >&2; exit 1; }
-    mkdir -p "$out"
-    api GET "/v1/agents/${name}/policy" >"$out/keep.policy.yaml"
-    api GET "/v1/agents/${name}" >"$out/agent.json"
-    cat >"$out/KEEP_PACK.md" <<EOF
-# Keep pack
-
-Agent: ${name}
-Packed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-Contains:
-- keep.policy.yaml — Sentinel policy (sign before production use)
-- agent.json — manifest pin (includes model_socket, cell_backend)
-
-Workspace disk / sealed vault: copy the FluxVM qcow2 / vault export beside this
-directory, then \`keepctl unpack\` on the destination node.
-
-Honesty: measured evidence is software-test until confidential hardware + user-held key.
-EOF
-    echo "packed $name → $out"
-    ;;
-
-  unpack)
-    dir="${1:-}"
-    name="${2:-}"
-    [[ -n "$dir" && -n "$name" ]] || { echo "usage: keepctl unpack <dir> <agent>" >&2; exit 1; }
-    [[ -f "$dir/keep.policy.yaml" ]] || { echo "missing $dir/keep.policy.yaml" >&2; exit 1; }
-    api PUT "/v1/agents/${name}/policy" -H 'Content-Type: application/x-yaml' --data-binary @"$dir/keep.policy.yaml"
-    echo
-    echo "unpacked policy onto $name (new agent version). Restore qcow2/vault separately on FluxVM."
     ;;
 
   export-token)

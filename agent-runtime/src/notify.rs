@@ -64,6 +64,16 @@ pub fn approval_requested(state: &AppState, record: &ApprovalRecord) {
 pub fn payload(record: &ApprovalRecord, agent: Option<&str>, user_id: Option<&str>) -> Vec<u8> {
     let value: Value = json!({
         "event": "approval.requested",
+        "channel": "out_of_band",
+        "ui": {
+            "title": format!("{} needs approval", record.kind.as_str()),
+            "subtitle": record.subject.clone().unwrap_or_default(),
+            "body": record.prompt,
+            "actions": [
+                {"id": "approve", "label": "Allow", "method": "POST", "path": format!("/v1/approvals/{}", record.id), "body": {"decision": "approved"}},
+                {"id": "deny", "label": "Deny", "method": "POST", "path": format!("/v1/approvals/{}", record.id), "body": {"decision": "denied"}}
+            ]
+        },
         "approval": {
             "id": record.id,
             "session_id": record.session_id,
@@ -76,6 +86,7 @@ pub fn payload(record: &ApprovalRecord, agent: Option<&str>, user_id: Option<&st
             "created_at": record.created_at,
         },
         "decide": {"method": "POST", "path": format!("/v1/approvals/{}", record.id)},
+        "note": "Never confirm this inside the agent chat — the guest cannot reach this webhook.",
     });
     serde_json::to_vec(&value).unwrap_or_default()
 }

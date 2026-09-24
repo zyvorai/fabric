@@ -214,6 +214,12 @@ impl ApiError {
             message: message.into(),
         }
     }
+    pub(crate) fn forbidden(e: impl std::fmt::Display) -> Self {
+        Self {
+            status: StatusCode::FORBIDDEN,
+            message: e.to_string(),
+        }
+    }
     pub(crate) fn internal(e: impl std::fmt::Display) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -288,12 +294,14 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/approvals", get(list_approvals).post(create_approval))
         .route("/v1/approvals/{id}", post(decide_approval))
         .route("/v1/audit", get(list_audit))
+        .route("/v1/export/audit", get(export_audit))
         .route(
             "/v1/agents/{name}/policy",
             get(get_agent_policy).put(put_agent_policy),
         )
         .route("/v1/sessions/{id}/cockpit", get(session_cockpit))
         .route("/v1/export-tokens", post(mint_export_token))
+        .route("/v1/agents/{name}/pack", get(pack_agent))
         .route("/v1/skills", get(list_skills).post(publish_skill))
         .route("/v1/skills/{name}", get(get_skill).delete(delete_skill))
         .route("/mcp", post(crate::mcp::handle))
@@ -302,6 +310,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(|| async { Json(json!({"ok": true})) }))
         .route("/v1/hooks/{id}", post(crate::schedules::webhook_ingress))
+        .route("/keep/cockpit", get(cockpit_page))
         .merge(protected)
         .with_state(state)
 }
@@ -358,6 +367,9 @@ async fn deploy_agent(
         }
     }
     if let Err(message) = req.manifest.validate_confidential() {
+        return Err(ApiError::bad_request(message));
+    }
+    if let Err(message) = req.manifest.validate_cell_backend() {
         return Err(ApiError::bad_request(message));
     }
     if let Err(message) = req.manifest.validate_egress_policy() {
@@ -1912,9 +1924,43 @@ async fn list_audit(
     State(state): State<Arc<AppState>>,
     Query(query): Query<AuditQuery>,
 ) -> ApiResult<Json<Value>> {
+    // Operator console: recent journal only (not a trajectory export).
     let limit = query
         .limit
         .unwrap_or(AUDIT_DEFAULT_LIMIT)
+        .clamp(1, AUDIT_MAX_LIMIT.min(500));
+    let items = state
+        .store
+        .audit
+        .list(query.session_id, limit)
+        .await
+        .map_err(ApiError::internal)?;
+    let chain = state
+        .store
+        .audit
+        .verify()
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(json!({"items": items, "chain": chain, "export": false})))
+}
+
+/// Full audit/trajectory export — requires X-Keep-Export-Token (training default off).
+async fn export_audit(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<AuditQuery>,
+) -> ApiResult<Json<Value>> {
+    let export = headers
+        .get("x-keep-export-token")
+        .and_then(|v| v.to_str().ok());
+    state
+        .export_tokens
+        .authorize(export, "audit")
+        .await
+        .map_err(ApiError::forbidden)?;
+    let limit = query
+        .limit
+        .unwrap_or(AUDIT_MAX_LIMIT)
         .clamp(1, AUDIT_MAX_LIMIT);
     let items = state
         .store
@@ -1928,7 +1974,18 @@ async fn list_audit(
         .verify()
         .await
         .map_err(ApiError::internal)?;
-    Ok(Json(json!({"items": items, "chain": chain})))
+    let _ = state
+        .store
+        .audit
+        .append(
+            query.session_id,
+            AuditPhase::Performed,
+            "keep.audit.exported",
+            None,
+            json!({"limit": limit}),
+        )
+        .await;
+    Ok(Json(json!({"items": items, "chain": chain, "export": true})))
 }
 
 /// Keep: readable Sentinel policy as `keep.policy.yaml`.
@@ -1958,8 +2015,16 @@ async fn get_agent_policy(
 async fn put_agent_policy(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
+    headers: HeaderMap,
     body: String,
 ) -> ApiResult<Json<Value>> {
+    let sig = headers
+        .get("x-keep-policy-signature")
+        .and_then(|v| v.to_str().ok());
+    state
+        .policy_trust
+        .verify_yaml(body.as_bytes(), sig)
+        .map_err(ApiError::forbidden)?;
     let agent = state
         .store
         .get_agent(&name)
@@ -2070,39 +2135,11 @@ async fn mint_export_token(
     State(state): State<Arc<AppState>>,
     Json(req): Json<MintExportTokenRequest>,
 ) -> ApiResult<Json<Value>> {
-    if req.scope.trim().is_empty() {
-        return Err(ApiError::bad_request(
-            "scope is required; training/trajectory export is off by default",
-        ));
-    }
-    let ttl = req.ttl_seconds.clamp(60, 86_400);
-    let token = format!("keep_export_{}", Uuid::new_v4().simple());
-    let path = state.config.state_dir.join("export-tokens.jsonl");
-    let line = json!({
-        "token_sha256": {
-            // store hash only
-        },
-        "scope": req.scope,
-        "ttl_seconds": ttl,
-        "created_at": Utc::now(),
-    });
-    // Persist a hash of the token, never the raw token on disk in plaintext beyond this response.
-    let hash = {
-        use sha2::{Digest, Sha256};
-        hex::encode(Sha256::digest(token.as_bytes()))
-    };
-    let mut entry = line;
-    entry["token_sha256"] = json!(hash);
-    let mut file = tokio::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
+    let (token, record) = state
+        .export_tokens
+        .mint(&req.scope, req.ttl_seconds)
         .await
-        .map_err(ApiError::internal)?;
-    use tokio::io::AsyncWriteExt;
-    file.write_all(format!("{entry}\n").as_bytes())
-        .await
-        .map_err(ApiError::internal)?;
+        .map_err(ApiError::bad_request)?;
     let _ = state
         .store
         .audit
@@ -2111,15 +2148,144 @@ async fn mint_export_token(
             AuditPhase::Performed,
             "keep.export_token.minted",
             None,
-            json!({"scope": req.scope, "ttl_seconds": ttl}),
+            json!({"scope": record.scope, "expires_at": record.expires_at}),
         )
         .await;
     Ok(Json(json!({
         "token": token,
-        "scope": req.scope,
-        "ttl_seconds": ttl,
-        "note": "Present this token to export trajectories. Without it, nothing leaves the box.",
+        "scope": record.scope,
+        "expires_at": record.expires_at,
+        "note": "Present as X-Keep-Export-Token. Without it, GET /v1/audit and pack export are refused.",
     })))
+}
+
+/// Keep pack: policy + agent pin + credential *names* (never secrets) + FluxVM migrate notes.
+async fn pack_agent(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> ApiResult<Json<Value>> {
+    let export = headers
+        .get("x-keep-export-token")
+        .and_then(|v| v.to_str().ok());
+    state
+        .export_tokens
+        .authorize(export, "pack")
+        .await
+        .map_err(ApiError::forbidden)?;
+    let agent = state
+        .store
+        .get_agent(&name)
+        .await
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
+    let policy = crate::policy::KeepPolicy::from_manifest(&agent.manifest);
+    let pack = crate::policy::KeepPackManifest {
+        version: 1,
+        agent: agent.name.clone(),
+        agent_version: agent.version.clone(),
+        packed_at: Utc::now().to_rfc3339(),
+        model_socket: agent.manifest.model_socket.clone(),
+        cell_backend: agent.manifest.cell_backend,
+        credential_names: agent.manifest.credentials.clone(),
+        fluxvm_notes: [
+            (
+                "disk".into(),
+                "Copy the FluxVM qcow2 / workspace for this agent's sandboxes separately; keepctl unpack restores policy only.".into(),
+            ),
+            (
+                "vault".into(),
+                "Credential *secrets* stay in host env / credentials file — never in the pack. Re-point ZYVOR_AGENT_CREDENTIALS_FILE on the destination.".into(),
+            ),
+            (
+                "honesty".into(),
+                "Measured evidence is software-test until Keep 0.2 + hardware.".into(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    };
+    Ok(Json(json!({
+        "pack": pack,
+        "policy_yaml": policy.to_yaml().map_err(ApiError::internal)?,
+        "agent": agent,
+    })))
+}
+
+/// Minimal Keep cockpit HTML (visible taint + last decisions). Auth via query token for phone browsers.
+async fn cockpit_page(Query(q): Query<CockpitPageQuery>) -> impl IntoResponse {
+    let session = q.session.unwrap_or_default();
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Keep cockpit</title>
+<style>
+body{{font-family:ui-sans-serif,system-ui,sans-serif;margin:0;background:#0f1419;color:#e7ecf3}}
+header{{padding:1rem 1.25rem;border-bottom:1px solid #243044}}
+main{{display:grid;gap:1rem;padding:1rem;max-width:1100px;margin:0 auto}}
+.card{{background:#162032;border:1px solid #243044;border-radius:12px;padding:1rem}}
+.taint{{background:#3a1515;border-color:#7a2a2a}}
+.ok{{color:#8dffa8}}.bad{{color:#ff8d8d}}
+pre{{white-space:pre-wrap;word-break:break-word;font-size:12px}}
+input,button{{font:inherit;padding:.5rem .75rem;border-radius:8px;border:1px solid #345}}
+button{{background:#2b6cff;color:#fff;border:0;cursor:pointer}}
+</style></head><body>
+<header><strong>Keep cockpit</strong> · visible taint · last Sentinel decisions
+<div style="opacity:.7;font-size:13px;margin-top:.35rem">Honesty: if FluxVM evidence is software-test, the host can still see the VM.</div>
+</header>
+<main>
+<div class="card">
+<label>API base <input id="base" value="" placeholder="http://127.0.0.1:9096" style="width:60%"/></label>
+<label>Token <input id="token" type="password" style="width:40%"/></label>
+<label>Session <input id="sid" value="{session}" style="width:50%"/></label>
+<button id="go">Refresh</button>
+</div>
+<div id="status" class="card">Load a session.</div>
+<div class="card"><h3>Last decisions</h3><pre id="decisions">—</pre></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function refresh(){{
+  const base=$('base').value.replace(/\/$/,'')||location.origin;
+  const sid=$('sid').value.trim();
+  const tok=$('token').value.trim();
+  if(!sid){{$('status').textContent='session id required';return;}}
+  const r=await fetch(base+'/v1/sessions/'+sid+'/cockpit',{{headers: tok?{{Authorization:'Bearer '+tok}}:{{}}}});
+  const j=await r.json();
+  if(!r.ok){{$('status').textContent=JSON.stringify(j);return;}}
+  const tainted=(j.tainted_by||[]).length>0;
+  $('status').className='card'+(tainted?' taint':'');
+  $('status').innerHTML=`<div class="${{tainted?'bad':'ok'}}">${{tainted?'TAINTED':'clean'}}</div>
+    <div>agent: ${{j.agent}} · status: ${{j.status}}</div>
+    <div>tainted_by: ${{(j.tainted_by||[]).join(', ')||'—'}}</div>
+    <div>pending approvals: ${{(j.pending_approvals||[]).length}}</div>
+    <div style="opacity:.75;margin-top:.5rem">${{j.honesty||''}}</div>`;
+  $('decisions').textContent=JSON.stringify(j.last_decisions||[],null,2);
+}}
+$('go').onclick=refresh;
+const u=new URL(location.href); if(u.searchParams.get('token')) $('token').value=u.searchParams.get('token');
+if(u.searchParams.get('base')) $('base').value=u.searchParams.get('base');
+if($('sid').value) refresh();
+</script></body></html>"#,
+        session = html_escape(&session)
+    );
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        html,
+    )
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CockpitPageQuery {
+    #[serde(default)]
+    session: Option<String>,
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 async fn list_skills(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {

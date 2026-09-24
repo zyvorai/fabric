@@ -36,8 +36,13 @@ jobs:
       - name: Keep / policy / credentials tests
         run: |
           cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+          cargo test --manifest-path agent-runtime/Cargo.toml export_tokens -- --nocapture
           cargo test --manifest-path agent-runtime/Cargo.toml credentials -- --nocapture
           cargo test --manifest-path agent-runtime/Cargo.toml --lib
+      - name: keep-e2e smoke
+        run: |
+          chmod +x scripts/keepctl scripts/keep-e2e.sh
+          ./scripts/keep-e2e.sh
       - name: keepctl script sanity
         run: |
           test -x scripts/keepctl
@@ -48,16 +53,21 @@ jobs:
           test -f docs/keep/KEEP-0.2.md
           test -f docs/keep/sentinel/keep.policy.yaml
           test -f docs/tutorials/16-keep-workstation.md
+          test -f scripts/keep-e2e.sh
       - name: How to re-run locally
         if: always()
         run: |
           cat <<'EOF'
           Locally:
+            ./scripts/keep-e2e.sh
             cargo test --manifest-path agent-runtime/Cargo.toml --lib
-            cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
             ./scripts/keepctl --help
 
+          Production knobs:
+            ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS=<hex32 pubkeys>
+            ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=1
+            X-Keep-Export-Token for GET /v1/export/audit and GET /v1/agents/{name}/pack
+
           Tutorial: docs/tutorials/16-keep-workstation.md
-          Pitch:    docs/keep/KEEP.md
-          Honesty:  measured = software-test; host can still see the VM until 0.2 + hardware.
+          Honesty: measured = software-test; TEE host-memory = Keep 0.2 + hardware only.
           EOF

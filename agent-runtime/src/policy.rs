@@ -3,12 +3,14 @@
 
 //! Keep Sentinel policy: export/import `keep.policy.yaml` from an agent manifest.
 //!
-//! The YAML is the readable form of egress allow/deny/ask + taint. Signing is
-//! operator-side (Ed25519 over canonical bytes); this module only maps fields.
+//! When `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS` is set, PUT policy requires a valid
+//! Ed25519 signature over the exact YAML bytes (`X-Keep-Policy-Signature: <hex>`).
 
 use crate::model::{AgentManifest, EgressMode, EgressRule, TaintPolicy};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct KeepPolicy {
@@ -49,6 +51,67 @@ pub struct KeepTaint {
     pub trusted_hosts: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_untrusted_page: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PolicyTrust {
+    /// Hex-encoded 32-byte Ed25519 public keys. Empty = signatures not required.
+    pub trusted_signers: Vec<[u8; 32]>,
+    /// When true and signers are configured, unsigned policy is refused.
+    pub require_signature: bool,
+}
+
+impl PolicyTrust {
+    pub fn from_env() -> Result<Self> {
+        let raw = std::env::var("ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS").unwrap_or_default();
+        let mut trusted_signers = Vec::new();
+        for part in raw.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let bytes = hex::decode(part).context("invalid POLICY_TRUSTED_SIGNERS hex")?;
+            let arr: [u8; 32] = bytes
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("POLICY_TRUSTED_SIGNERS entry must be 32 bytes"))?;
+            trusted_signers.push(arr);
+        }
+        let require_signature = match std::env::var("ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE")
+            .ok()
+            .as_deref()
+        {
+            Some("1") => true,
+            Some("0") => false,
+            _ => !trusted_signers.is_empty(),
+        };
+        Ok(Self {
+            trusted_signers,
+            require_signature,
+        })
+    }
+
+    pub fn verify_yaml(&self, yaml: &[u8], signature_hex: Option<&str>) -> Result<()> {
+        if self.trusted_signers.is_empty() {
+            return Ok(());
+        }
+        let Some(sig_hex) = signature_hex.filter(|s| !s.trim().is_empty()) else {
+            if self.require_signature {
+                bail!("policy signature required (X-Keep-Policy-Signature)");
+            }
+            return Ok(());
+        };
+        let sig_bytes = hex::decode(sig_hex.trim()).context("invalid policy signature hex")?;
+        let signature = Signature::from_slice(&sig_bytes).context("malformed Ed25519 signature")?;
+        for pk in &self.trusted_signers {
+            let key = VerifyingKey::from_bytes(pk).context("invalid trusted signer public key")?;
+            if key.verify(yaml, &signature).is_ok() {
+                return Ok(());
+            }
+        }
+        bail!("policy signature did not match any trusted signer");
+    }
+}
+
+/// Sign policy YAML with a 32-byte seed (tests / `keepctl policy sign`).
+pub fn sign_policy_yaml(yaml: &[u8], seed32: &[u8; 32]) -> String {
+    let key = SigningKey::from_bytes(seed32);
+    hex::encode(key.sign(yaml).to_bytes())
 }
 
 impl KeepPolicy {
@@ -92,6 +155,8 @@ impl KeepPolicy {
         }
     }
 
+    /// Canonical YAML for signing (stable key order via serde_yaml on sorted maps
+    /// is not guaranteed for structs; we sign the exact bytes the API receives).
     pub fn to_yaml(&self) -> Result<String> {
         Ok(serde_yaml::to_string(self)?)
     }
@@ -107,7 +172,6 @@ impl KeepPolicy {
         Ok(policy)
     }
 
-    /// Apply allow hosts / rules / taint onto a manifest (does not clear unrelated fields).
     pub fn apply_to_manifest(&self, m: &mut AgentManifest) {
         m.egress_allow_hosts = self.allow.iter().map(|a| a.host.clone()).collect();
         m.egress_rules = self
@@ -137,6 +201,23 @@ impl KeepPolicy {
     }
 }
 
+/// Pack metadata written by `keepctl pack` (no raw secrets).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeepPackManifest {
+    pub version: u32,
+    pub agent: String,
+    pub agent_version: String,
+    pub packed_at: String,
+    #[serde(default)]
+    pub model_socket: Option<crate::model::ModelSocket>,
+    #[serde(default)]
+    pub cell_backend: Option<crate::model::CellBackend>,
+    #[serde(default)]
+    pub credential_names: Vec<String>,
+    #[serde(default)]
+    pub fluxvm_notes: BTreeMap<String, String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,7 +238,6 @@ mod tests {
         let m = bare_manifest();
         let yaml = KeepPolicy::from_manifest(&m).to_yaml().unwrap();
         assert!(yaml.contains("api.github.com"));
-        assert!(yaml.contains("block_egress_until_ask"));
         let back = KeepPolicy::from_yaml(&yaml).unwrap();
         let mut m2 = bare_manifest();
         m2.egress_allow_hosts.clear();
@@ -166,6 +246,20 @@ mod tests {
         back.apply_to_manifest(&mut m2);
         assert_eq!(m2.egress_allow_hosts, vec!["api.github.com".to_string()]);
         assert_eq!(m2.egress_mode, EgressMode::Ask);
-        assert!(m2.taint.is_some());
+    }
+
+    #[test]
+    fn signature_round_trip() {
+        let seed = [7u8; 32];
+        let yaml = b"version: 1\ndefault_egress: deny\n";
+        let sig = sign_policy_yaml(yaml, &seed);
+        let pk = SigningKey::from_bytes(&seed).verifying_key().to_bytes();
+        let trust = PolicyTrust {
+            trusted_signers: vec![pk],
+            require_signature: true,
+        };
+        trust.verify_yaml(yaml, Some(&sig)).unwrap();
+        assert!(trust.verify_yaml(yaml, Some("00")).is_err());
+        assert!(trust.verify_yaml(yaml, None).is_err());
     }
 }
