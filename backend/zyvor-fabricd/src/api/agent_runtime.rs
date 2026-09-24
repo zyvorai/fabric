@@ -14,15 +14,24 @@
 
 use axum::{
     body::Body,
-    extract::{Path, Query, State},
+    extract::{
+        ws::{Message as AxumMessage, WebSocket, WebSocketUpgrade},
+        Path, Query, State,
+    },
     http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
+use futures::{SinkExt, StreamExt};
 use security::{Claims, RequireAdmin, RequireRead, RequireWrite, Role};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio_tungstenite::tungstenite::{
+    client::IntoClientRequest,
+    http::header::AUTHORIZATION as WS_AUTHORIZATION,
+    Message as TungsteniteMessage,
+};
 
 use crate::server::AppState;
 
@@ -510,6 +519,126 @@ pub async fn session_browser_screenshot(
     .await
 }
 
+/// Keep read-only screencast WebSocket → agent-runtime (frames only; no input).
+/// Mounted under `/ws/sessions/{id}/browser/screencast` (JWT via `?token=`).
+pub async fn session_browser_screencast(
+    ws: WebSocketUpgrade,
+    RequireRead(claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Response {
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
+    }
+    let (base, token) = match upstream(&state) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
+    let ws_base = match http_base_to_ws(&base) {
+        Ok(u) => u,
+        Err(msg) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": msg })),
+            )
+                .into_response();
+        }
+    };
+    let url = format!("{ws_base}/v1/sessions/{id}/browser/screencast");
+    let mut request = match url.as_str().into_client_request() {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": format!("screencast request: {e}") })),
+            )
+                .into_response();
+        }
+    };
+    if let Some(tok) = token.as_deref() {
+        match format!("Bearer {tok}").parse() {
+            Ok(v) => {
+                request.headers_mut().insert(WS_AUTHORIZATION, v);
+            }
+            Err(e) => {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(json!({ "error": format!("screencast auth header: {e}") })),
+                )
+                    .into_response();
+            }
+        }
+    }
+    let upstream = match tokio_tungstenite::connect_async(request).await {
+        Ok((stream, _)) => stream,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": format!("agent-runtime screencast: {e}") })),
+            )
+                .into_response();
+        }
+    };
+    ws.on_upgrade(move |socket| bridge_screencast(socket, upstream))
+        .into_response()
+}
+
+fn http_base_to_ws(base: &str) -> Result<String, String> {
+    if let Some(rest) = base.strip_prefix("https://") {
+        Ok(format!("wss://{rest}"))
+    } else if let Some(rest) = base.strip_prefix("http://") {
+        Ok(format!("ws://{rest}"))
+    } else {
+        Err(format!("unsupported agent-runtime URL scheme: {base}"))
+    }
+}
+
+async fn bridge_screencast(
+    mut down: WebSocket,
+    upstream: tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
+) {
+    let (mut up_sink, mut up_stream) = upstream.split();
+    loop {
+        tokio::select! {
+            incoming = down.recv() => {
+                let Some(Ok(message)) = incoming else { break };
+                let outgoing = match message {
+                    AxumMessage::Text(text) => TungsteniteMessage::text(text.to_string()),
+                    AxumMessage::Binary(bytes) => TungsteniteMessage::Binary(bytes),
+                    AxumMessage::Ping(bytes) => TungsteniteMessage::Ping(bytes),
+                    AxumMessage::Pong(bytes) => TungsteniteMessage::Pong(bytes),
+                    AxumMessage::Close(_) => {
+                        let _ = up_sink.send(TungsteniteMessage::Close(None)).await;
+                        break;
+                    }
+                };
+                if up_sink.send(outgoing).await.is_err() {
+                    break;
+                }
+            }
+            outgoing = up_stream.next() => {
+                let Some(Ok(message)) = outgoing else { break };
+                let incoming = match message {
+                    TungsteniteMessage::Text(text) => AxumMessage::Text(text.to_string().into()),
+                    TungsteniteMessage::Binary(bytes) => AxumMessage::Binary(bytes),
+                    TungsteniteMessage::Ping(bytes) => AxumMessage::Ping(bytes),
+                    TungsteniteMessage::Pong(bytes) => AxumMessage::Pong(bytes),
+                    TungsteniteMessage::Close(_) => {
+                        let _ = down.send(AxumMessage::Close(None)).await;
+                        break;
+                    }
+                    TungsteniteMessage::Frame(_) => continue,
+                };
+                if down.send(incoming).await.is_err() {
+                    break;
+                }
+            }
+        }
+    }
+}
+
 /// Keep dual-key host recover (forbidden on confidential; measured needs both keys).
 pub async fn session_host_recover(
     RequireWrite(claims): RequireWrite,
@@ -524,6 +653,48 @@ pub async fn session_host_recover(
         &state,
         Method::POST,
         &format!("/v1/sessions/{id}/host-recover"),
+        None,
+        Some(body),
+        None,
+    )
+    .await
+}
+
+/// Keep vault status (credential names + user-held flags; never secret values).
+pub async fn vault_status(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/vault/status", None, None, None).await
+}
+
+/// Mint user-held unwrap challenge (complete still fail-closed without SNP/TDX).
+pub async fn vault_user_held_challenge(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> Response {
+    proxy(
+        &state,
+        Method::POST,
+        "/v1/vault/user-held/challenge",
+        None,
+        Some(body),
+        None,
+    )
+    .await
+}
+
+/// Complete user-held unwrap (proxied; agent-runtime enforces launch-verified gate).
+pub async fn vault_user_held_complete(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> Response {
+    proxy(
+        &state,
+        Method::POST,
+        "/v1/vault/user-held/complete",
         None,
         Some(body),
         None,
@@ -701,6 +872,19 @@ mod tests {
             agent_runtime_base_url(&cfg).as_deref(),
             Some("http://127.0.0.1:9096")
         );
+    }
+
+    #[test]
+    fn http_base_to_ws_rewrites_scheme() {
+        assert_eq!(
+            http_base_to_ws("http://127.0.0.1:9096").unwrap(),
+            "ws://127.0.0.1:9096"
+        );
+        assert_eq!(
+            http_base_to_ws("https://agents.example").unwrap(),
+            "wss://agents.example"
+        );
+        assert!(http_base_to_ws("ftp://nope").is_err());
     }
 
     #[test]

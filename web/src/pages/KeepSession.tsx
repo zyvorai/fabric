@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Shield } from 'lucide-react'
 import {
@@ -15,6 +15,7 @@ import {
   getSessionCockpit,
   SessionView,
 } from '../api/agents'
+import { getToken } from '../api/client'
 import { PageHeader, Card, EmptyState } from '../components/ui'
 import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
@@ -29,6 +30,8 @@ export default function KeepSession() {
   const [cockpit, setCockpit] = useState<KeepCockpit | null>(null)
   const [browser, setBrowser] = useState<BrowserView | null>(null)
   const [shot, setShot] = useState<BrowserScreenshot | null>(null)
+  const [casting, setCasting] = useState(false)
+  const castWs = useRef<WebSocket | null>(null)
   const { loading, loadError, run } = usePageLoader('Failed to load Keep session')
 
   const load = useCallback(() => {
@@ -74,6 +77,59 @@ export default function KeepSession() {
       void load()
     } catch (e) {
       toastFailure(toast, 'Approval decision failed', e)
+    }
+  }
+
+  const stopCast = useCallback(() => {
+    castWs.current?.close()
+    castWs.current = null
+    setCasting(false)
+  }, [])
+
+  useEffect(() => () => stopCast(), [stopCast])
+
+  const toggleCast = () => {
+    if (!sessionId) return
+    if (casting) {
+      stopCast()
+      return
+    }
+    const token = getToken()
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const u = new URL(`${proto}//${window.location.host}/ws/sessions/${sessionId}/browser/screencast`)
+    if (token) u.searchParams.set('token', token)
+    const ws = new WebSocket(u.toString())
+    castWs.current = ws
+    setCasting(true)
+    ws.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(String(ev.data)) as {
+          type?: string
+          mime?: string
+          image_base64?: string
+          honesty?: string
+        }
+        if (m.type === 'frame' && m.image_base64) {
+          setShot({
+            session_id: sessionId,
+            mime: m.mime || 'image/jpeg',
+            image_base64: m.image_base64,
+            title: 'screencast',
+            url: '',
+            honesty: m.honesty,
+          })
+        }
+      } catch {
+        /* ignore non-JSON */
+      }
+    }
+    ws.onerror = () => {
+      toastFailure(toast, 'Screencast failed', new Error('WebSocket error'))
+      stopCast()
+    }
+    ws.onclose = () => {
+      castWs.current = null
+      setCasting(false)
     }
   }
 
@@ -197,16 +253,13 @@ export default function KeepSession() {
         <Card className="p-4 space-y-2 text-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold text-[var(--zf-ink)]">Browser</h2>
-            {cockpit?.browser_page && (
-              <a
-                href={cockpit.browser_page}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-[var(--zf-muted)] underline"
-              >
-                Live view + screencast
-              </a>
-            )}
+            <button
+              type="button"
+              className="text-xs text-[var(--zf-muted)] underline"
+              onClick={toggleCast}
+            >
+              {casting ? 'Stop screencast' : 'Start screencast'}
+            </button>
           </div>
           {!browser ? (
             <p className="text-[var(--zf-muted)]">

@@ -83,8 +83,10 @@ Software scaffolding already in tree (still `software-test`):
 - Cockpit / console **attestation receipt** (never labels software-test as unread)
 - `POST /v1/sessions/{id}/host-recover` — **forbidden** on confidential; measured
   needs dual recover keys (`ZYVOR_AGENT_RECOVER_KEY_A` / `_B`)
-- Browser **screenshot** + **screencast** (frames only; no input)
-- User-held **challenge** API (`keepctl user-held-*`) — complete refused without SNP/TDX
+- Browser **screenshot** + **screencast** (frames only; no input) — fabricd
+  `WS /ws/sessions/{id}/browser/screencast?token=`
+- User-held **challenge** API (`keepctl user-held-*`) — complete refused without SNP/TDX;
+  fabricd `/api/vault/user-held/*` + `/api/vault/status`
 - `scripts/keep-bake-browser-agent.sh` for Chromium template bake
 
 Until then: **the host can still see a measured VM.** That is intentional honesty, not an unfinished checkbox we can close in CI without silicon.

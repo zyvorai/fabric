@@ -8,10 +8,11 @@
   `tdx_launch_verified`; user-held complete fail-closes until verified, then
   grants a vault lease via key-broker stub (wrapped disk key still not
   implemented). Browser screencast WS + screenshot links on cockpit;
-  `scripts/keep-bake-browser-agent.sh`.
+  fabricd proxies screencast (`/ws/sessions/{id}/browser/screencast`) and
+  vault user-held routes; `scripts/keep-bake-browser-agent.sh`.
 - **Keep guest vsock fix (lab).** Musl-static `fluxvm-guest-agent` in `node22-agent`
-  image (glibc host binary failed with `GLIBC_2.39 not found`); QEMU ping/exec healthy.
-  Firecracker cell still pending (vsock proxy / rootfs-init).
+  image (glibc host binary failed with `GLIBC_2.39 not found`); QEMU and
+  Firecracker (`node22-fc` flat rootfs) guest vsock healthy.
 - **Vault software unwrap ceremony.** Optional `ZYVOR_AGENT_VAULT_UNWRAP_REQUIRED=1`
   with `POST /v1/vault/unwrap-tokens`, `POST /v1/vault/unwrap`, `GET /v1/vault/status`
   (`secret_backend: host-env` honesty). `keepctl unwrap-token|unwrap|vault-status`.
