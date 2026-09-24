@@ -36,7 +36,7 @@ pilot gate prefers `node22-fc` when registered.
 | Credential authority | `authorize_resolve` allowlists host/method/path/user; secrets still host-env (not 0.2 unwrap) |
 | Confine | `ZYVOR_AGENT_CONFINE=1` / `confinement: strict` on live path |
 | Measured profile | `ZYVOR_AGENT_SECURITY_PROFILE=measured` (Keep mode default); cockpit `evidence_class: software-test` |
-| Browser live view | `GET /v1/sessions/{id}/browser/view` · `/keep/browser?session=` (tab listing; no takeover) |
+| Browser live view | `GET /v1/sessions/{id}/browser/view` + `/browser/screenshot` (JPEG via CDP bridge); no input takeover |
 | Cockpit / approvals | `GET /keep/cockpit?session=` · out-of-band webhook |
 
 ```bash

@@ -132,7 +132,18 @@ export interface BrowserView {
   mode: string
   honesty?: string
   note?: string
+  screenshot?: string
   tabs: Array<{ id: string; title: string; url: string; type?: string }>
+}
+
+export interface BrowserScreenshot {
+  session_id: string
+  mime: string
+  image_base64: string
+  title?: string
+  url?: string
+  mode?: string
+  honesty?: string
 }
 
 export async function getSessionCockpit(id: string): Promise<KeepCockpit> {
@@ -141,6 +152,10 @@ export async function getSessionCockpit(id: string): Promise<KeepCockpit> {
 
 export async function getSessionBrowserView(id: string): Promise<BrowserView> {
   return apiGet(`/api/sessions/${encodeURIComponent(id)}/browser/view`)
+}
+
+export async function getSessionBrowserScreenshot(id: string): Promise<BrowserScreenshot> {
+  return apiGet(`/api/sessions/${encodeURIComponent(id)}/browser/screenshot`)
 }
 
 export async function decideApproval(
