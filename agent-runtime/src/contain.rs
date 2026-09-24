@@ -61,7 +61,18 @@ mod tests {
         if fake_setpriv {
             write_exe(&bin, "setpriv", "exit 0");
         }
-        let path = format!("{}:/usr/bin:/bin", bin.display());
+        // Hermetic PATH: only the fakes above plus the few basic tools the script
+        // needs, linked in. A real bwrap or setpriv elsewhere on the machine must
+        // not be visible, or the "missing tool" cases would depend on the host.
+        for tool in ["id", "mkdir", "chown"] {
+            let real = ["/usr/bin", "/bin"]
+                .iter()
+                .map(|d| Path::new(d).join(tool))
+                .find(|p| p.exists())
+                .unwrap_or_else(|| panic!("{tool} not found"));
+            std::os::unix::fs::symlink(real, bin.join(tool)).unwrap();
+        }
+        let path = bin.display().to_string();
         let output = Command::new("sh")
             .arg(&script)
             .args(args)

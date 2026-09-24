@@ -252,7 +252,7 @@ for _ in $(seq 20); do
   [[ "$ws" == *'"consecutive_failures":0'* ]] || break; sleep 0.5
 done
 check "the loop tried to start it and recorded the failure (FluxVM is unreachable here)" '"last_error"' "$ws"
-check_eq "  ...with a backoff scheduled" true "$(python3 -c 'import sys,json;print(json.loads(sys.argv[1]).get("next_attempt_at") is not None)' "$ws")"
+check_eq "  ...with a backoff scheduled" True "$(python3 -c 'import sys,json;print(json.loads(sys.argv[1]).get("next_attempt_at") is not None)' "$ws")"
 check "the tab view refuses an agent without browser_port" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$API/v1/sessions/${SID[allow]}/browser/json/list")"
 check "  ...and mutating DevTools paths" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$API/v1/sessions/${SID[allow]}/browser/json/new")"
 check "the operator removes the workstation" 204 "$(api -X DELETE "$API/v1/workstations/desk/alice")"
