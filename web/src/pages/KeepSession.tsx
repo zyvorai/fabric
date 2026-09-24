@@ -204,7 +204,7 @@ export default function KeepSession() {
                 rel="noreferrer"
                 className="text-xs text-[var(--zf-muted)] underline"
               >
-                Open live view
+                Live view + screencast
               </a>
             )}
           </div>

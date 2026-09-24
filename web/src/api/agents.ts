@@ -110,6 +110,8 @@ export interface KeepCockpit {
   security_profile?: string | null
   browser_page?: string
   browser_view?: string
+  browser_screenshot?: string
+  browser_screencast?: string
   attestation?: {
     security_profile?: string | null
     image_hash?: string | null

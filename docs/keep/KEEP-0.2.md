@@ -30,7 +30,9 @@ These ship so the product never mislabels a measured VM:
 4. **Browser screenshot + screencast** — `GET …/browser/screenshot` and
    `WS …/browser/screencast` (frames only; no input) via FluxVM sandbox WS bridge.
 5. **User-held challenge API** — `POST /v1/vault/user-held/challenge` mints a
-   nonce; `complete` is **403** until SNP/TDX verified (`keepctl user-held-*`).
+   nonce; `complete` reads FluxVM `GET /v1/security/capabilities` and is **403**
+   until `snp_launch_verified` / `tdx_launch_verified`. When verified, a
+   key-broker **stub** grants a vault lease (wrapped disk key still not done).
 6. **browser-agent bake script** — [`scripts/keep-bake-browser-agent.sh`](../../scripts/keep-bake-browser-agent.sh).
 
 Until hardware: *the host can still see a measured VM.* That is intentional.
