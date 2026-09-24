@@ -393,7 +393,8 @@ if [[ "${KEEP_E2E_FLUXVM:-}" == "1" ]]; then
 
   TEMPLATE="${KEEP_E2E_TEMPLATE:-}"
   if [[ -z "$TEMPLATE" ]]; then
-    for cand in node22-agent agent-node browser-agent; do
+    # Prefer Firecracker cell when healthy; fall back to QEMU agent templates.
+    for cand in node22-fc node22-agent agent-node browser-agent; do
       if curl -fsS "$FLUX/v1/templates/$cand" >/dev/null 2>&1 \
         || [[ -d /var/lib/fluxvm/templates/$cand ]]; then
         TEMPLATE=$cand

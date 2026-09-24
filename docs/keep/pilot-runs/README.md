@@ -18,9 +18,14 @@ QEMU `node22-agent` boots with a **musl-static** `fluxvm-guest-agent` (host glib
 builds fail inside the Jammy guest with `GLIBC_2.39 not found`). After that bake,
 host `POST …/agent/ping` returns 200 and the gate can record `guest_worker=ok`.
 
-Firecracker (`node22-fc` / `flux-vm` backend) still fails vsock proxy readiness on
-this lab image — keep QEMU for the pilot guest-worker claim until FC rootfs+kernel
-init is fixed.
+Firecracker `node22-fc` needs a **flat ext4** rootfs (not the GPT cloud image):
+Firecracker appends `root=/dev/vda`, which panics on a partitioned disk. Bake with:
+
+```bash
+./scripts/keep-bake-fc-rootfs.sh
+```
+
+The pilot gate prefers `node22-fc` when that template exists.
 
 ## Honesty
 
