@@ -847,15 +847,12 @@ async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Resul
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
     loop {
-        // See HEALTH_CHECK_ATTEMPT_TIMEOUT's doc comment: a single call here
-        // has to be bounded independently of the retry loop's own deadline,
-        // or a stuck call blocks the loop from ever reaching that deadline
-        // check at all.
+        // Prefer agent/ping over process/exec: ping is cheap and reliable once
+        // vsock is up; mkdir-via-exec has been observed to hang past the
+        // attempt timeout on cold boots even when ping already returns 200.
         let attempt = with_timeout(
             HEALTH_CHECK_ATTEMPT_TIMEOUT,
-            state
-                .fluxvm
-                .process(sandbox_id, "mkdir -p /opt/zyvor/agent", Some(10)),
+            state.fluxvm.agent_ping(sandbox_id),
         )
         .await;
         match attempt {
