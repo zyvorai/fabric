@@ -117,6 +117,34 @@ provider API key. Add a credential with `"kind": "fabric"` (see
 `FABRIC_AI_API_KEY` when endpoint keys are enabled. HTTP to private Maglev
 ports is allowed for `kind: fabric` only.
 
+## Approvals and the action journal
+
+An approval is a request for a human decision. `POST /v1/approvals` takes `session_id`, `prompt`, and optional `kind` (`custom` by default, `egress`, `purchase`, `send`), `subject` (a short target such as a host or recipient), and `planned_action` (structured JSON describing what will run if approved). The coding-agent harness still opens `custom` approvals itself when the CLI prints `ZYVOR_APPROVAL`.
+
+Every approval and every brokered egress call is written to `audit.jsonl` in the state directory, one entry per line:
+
+| Phase | Written when |
+|-------|--------------|
+| `planned` | An approval is opened |
+| `approved` / `denied` | A human decides it |
+| `performed` | An egress call completed |
+| `denied` | An egress call was refused (allowlist, private network, scope, credential grant) |
+| `failed` | An egress call was allowed but failed upstream |
+
+Each entry commits to the previous entry's SHA-256, so editing or deleting a line breaks the chain. `GET /v1/audit` returns entries (newest last, `limit` defaults to 200, maximum 5000, optional `session_id`) plus `chain: {entries, chain_ok, broken_at?}`. Egress entries record the method, host, and path only, never the query string, headers, or credentials. Calls that fail the session capability check (401) are not journaled, because their claimed session id is unproven. A failed journal write is logged and does not fail the request.
+
+Through the Fabric daemon these are `GET/POST /api/approvals`, `POST /api/approvals/{id}`, and `GET /api/audit/agent-actions`; from the CLI, `zyvorctl approval list|approve|deny` and `zyvorctl agent-audit`.
+
+### Asking a human before egress
+
+By default a request to a host outside `egress_allow_hosts` is refused (`"egress_mode": "deny"`). Set `"egress_mode": "ask"` in the manifest and the broker instead holds the request and opens an `egress` approval whose `subject` is the host and whose `planned_action` holds the method and URL without its query string. `egress_approval_timeout_seconds` (5-240, default 90) bounds the wait.
+
+Decide it with `POST /v1/approvals/{id}` and `{"decision":"approved","scope":"once"}`. `once` (the default) releases the requests that were waiting; `session` also allows every later request to that host for the life of the session. Denying, timing out, or ending the session refuses the request with 403; a timed-out approval becomes `expired` and cannot be decided afterwards. Concurrent requests to the same host share one approval.
+
+Approval only lifts the allowlist check. DNS pinning, the private-network gate, and credential host scoping still run afterwards, so approving a host never allows a request into loopback, private, or link-local ranges unless `allow_private_networks` is set. The agent only sees the 403 or the response: approving does not steer the session.
+
+Changing `egress_mode` or the timeout changes the agent's version, like any manifest change; manifests that leave both at their defaults keep their existing version ids.
+
 ## Credentials
 
 Create a **descriptor file**, not a secret file:
@@ -364,7 +392,9 @@ POST   /v1/hooks/{id}                 # HMAC signature, not the API bearer token
 POST   /v1/loops
 DELETE /v1/loops/{id}
 GET    /v1/approvals
+POST   /v1/approvals
 POST   /v1/approvals/{id}
+GET    /v1/audit?session_id=&limit=
 
 POST   /mcp
 ```

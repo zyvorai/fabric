@@ -21,6 +21,14 @@ pub struct AgentManifest {
     /// to prevent cloud metadata and internal-network SSRF from untrusted agents.
     #[serde(default)]
     pub allow_private_networks: bool,
+    /// What happens to a request for a host outside `egress_allow_hosts`:
+    /// `deny` (default) refuses it; `ask` holds it while an operator decides.
+    #[serde(default, skip_serializing_if = "EgressMode::is_deny")]
+    pub egress_mode: EgressMode,
+    /// How long an `ask` request waits for a decision before it is refused.
+    /// `None` uses [`DEFAULT_EGRESS_APPROVAL_SECONDS`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub egress_approval_timeout_seconds: Option<u64>,
     #[serde(default = "default_runtime_port")]
     pub runtime_port: u16,
     #[serde(default)]
@@ -43,6 +51,26 @@ pub struct AgentManifest {
     /// new version.
     #[serde(default)]
     pub runtime: AgentRuntimeKind,
+}
+
+pub const DEFAULT_EGRESS_APPROVAL_SECONDS: u64 = 90;
+pub const MIN_EGRESS_APPROVAL_SECONDS: u64 = 5;
+/// Kept under the guest fetch client's own header timeout so the agent sees a
+/// clean refusal from the broker rather than a client-side timeout.
+pub const MAX_EGRESS_APPROVAL_SECONDS: u64 = 240;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum EgressMode {
+    #[default]
+    Deny,
+    Ask,
+}
+
+impl EgressMode {
+    pub fn is_deny(&self) -> bool {
+        *self == Self::Deny
+    }
 }
 
 /// What the sandbox executes. Harness runtimes share one adapter and differ
@@ -525,12 +553,56 @@ pub enum ApprovalStatus {
     Pending,
     Approved,
     Denied,
+    /// Nobody decided in time (or the session ended first); can no longer be decided.
+    Expired,
+}
+
+/// How long an approved egress approval keeps applying.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum GrantScope {
+    /// Only the requests that were waiting when the decision was made.
+    #[default]
+    Once,
+    /// Every later request to the same host in this session.
+    Session,
+}
+
+/// What a human is being asked to approve. `Custom` is the coding-harness
+/// `ZYVOR_APPROVAL` flow and the default for records written before kinds existed.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum ApprovalKind {
+    #[default]
+    Custom,
+    Egress,
+    Purchase,
+    Send,
+}
+
+impl ApprovalKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Custom => "custom",
+            Self::Egress => "egress",
+            Self::Purchase => "purchase",
+            Self::Send => "send",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalRecord {
     pub id: Uuid,
     pub session_id: Uuid,
+    #[serde(default)]
+    pub kind: ApprovalKind,
+    /// Short machine-readable target, e.g. a destination host or recipient.
+    #[serde(default)]
+    pub subject: Option<String>,
+    /// Structured description of the action that will run if approved.
+    #[serde(default)]
+    pub planned_action: Option<Value>,
     pub prompt: String,
     pub status: ApprovalStatus,
     #[serde(default)]
@@ -541,17 +613,29 @@ pub struct ApprovalRecord {
     /// Guest event sequence that opened this request, when it came from the sandbox.
     #[serde(default)]
     pub source_seq: Option<u64>,
+    /// Set when an egress approval is approved.
+    #[serde(default)]
+    pub grant_scope: Option<GrantScope>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateApprovalRequest {
     pub session_id: Uuid,
     pub prompt: String,
+    #[serde(default)]
+    pub kind: ApprovalKind,
+    #[serde(default)]
+    pub subject: Option<String>,
+    #[serde(default)]
+    pub planned_action: Option<Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DecideApprovalRequest {
     pub decision: ApprovalStatus,
+    /// For egress approvals: `once` (default) or `session`. Ignored otherwise.
+    #[serde(default)]
+    pub scope: Option<GrantScope>,
     #[serde(default)]
     pub comment: Option<String>,
 }

@@ -6,43 +6,83 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-/// XOR-based obfuscation key for secret values at rest.
-/// In a production deployment with external KMS, this would be replaced
-/// by envelope encryption using the KMS-managed key.
-const OBFUSCATION_KEY: &[u8] = b"zyvor-fabricd-secrets-at-rest-key-v1!";
+use aes_gcm::{
+    aead::{Aead, KeyInit, Payload},
+    Aes256Gcm, Nonce,
+};
+use base64::Engine;
 
-/// Encrypt a secret value for storage at rest.
-fn encrypt_value(plaintext: &str) -> String {
-    let encrypted: Vec<u8> = plaintext
-        .as_bytes()
-        .iter()
-        .enumerate()
-        .map(|(i, b)| b ^ OBFUSCATION_KEY[i % OBFUSCATION_KEY.len()])
-        .collect();
-    use base64::Engine;
-    base64::engine::general_purpose::STANDARD.encode(&encrypted)
+/// Environment variable holding the base64-encoded 32-byte master key.
+pub const MASTER_KEY_ENV: &str = "ZYVOR_SECRETS_KEY";
+
+/// Ciphertext format marker: `v2:` + base64(nonce[12] || AES-256-GCM ciphertext+tag).
+const CIPHERTEXT_PREFIX: &str = "v2:";
+const NONCE_LEN: usize = 12;
+
+/// Encrypt a secret value for storage at rest. The secret id is bound as
+/// associated data so a ciphertext cannot be moved to another secret.
+fn encrypt_value(key: &[u8; 32], id: &str, plaintext: &str) -> Result<String> {
+    let cipher = Aes256Gcm::new(key.into());
+    let mut nonce_bytes = [0u8; NONCE_LEN];
+    rand::fill(&mut nonce_bytes);
+    let nonce = Nonce::try_from(nonce_bytes.as_slice())
+        .map_err(|_| anyhow::anyhow!("Invalid nonce length"))?;
+    let ciphertext = cipher
+        .encrypt(
+            &nonce,
+            Payload {
+                msg: plaintext.as_bytes(),
+                aad: id.as_bytes(),
+            },
+        )
+        .map_err(|_| anyhow::anyhow!("Failed to encrypt secret"))?;
+    let mut blob = nonce_bytes.to_vec();
+    blob.extend_from_slice(&ciphertext);
+    Ok(format!(
+        "{CIPHERTEXT_PREFIX}{}",
+        base64::engine::general_purpose::STANDARD.encode(blob)
+    ))
 }
 
 /// Decrypt a secret value from storage.
-fn decrypt_value(ciphertext: &str) -> Result<String> {
-    use base64::Engine;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(ciphertext)
+fn decrypt_value(key: &[u8; 32], id: &str, stored: &str) -> Result<String> {
+    let encoded = stored
+        .strip_prefix(CIPHERTEXT_PREFIX)
+        .ok_or_else(|| anyhow::anyhow!("Unsupported secret ciphertext format"))?;
+    let blob = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
         .map_err(|e| anyhow::anyhow!("Failed to decode secret: {}", e))?;
-    let decrypted: Vec<u8> = bytes
-        .iter()
-        .enumerate()
-        .map(|(i, b)| b ^ OBFUSCATION_KEY[i % OBFUSCATION_KEY.len()])
-        .collect();
-    String::from_utf8(decrypted)
+    if blob.len() <= NONCE_LEN {
+        anyhow::bail!("Secret ciphertext is truncated");
+    }
+    let (nonce, ciphertext) = blob.split_at(NONCE_LEN);
+    let nonce = Nonce::try_from(nonce).map_err(|_| anyhow::anyhow!("Invalid nonce length"))?;
+    let plaintext = Aes256Gcm::new(key.into())
+        .decrypt(
+            &nonce,
+            Payload {
+                msg: ciphertext,
+                aad: id.as_bytes(),
+            },
+        )
+        .map_err(|_| anyhow::anyhow!("Failed to decrypt secret (wrong key or tampered data)"))?;
+    String::from_utf8(plaintext)
         .map_err(|e| anyhow::anyhow!("Failed to decode secret as UTF-8: {}", e))
+}
+
+fn parse_master_key(encoded: &str) -> Result<[u8; 32]> {
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded.trim())
+        .map_err(|e| anyhow::anyhow!("{MASTER_KEY_ENV} is not valid base64: {}", e))?;
+    <[u8; 32]>::try_from(bytes.as_slice())
+        .map_err(|_| anyhow::anyhow!("{MASTER_KEY_ENV} must decode to exactly 32 bytes"))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Secret {
     pub id: String,
     pub name: String,
-    /// Encrypted at rest — call `decrypt_value` to read.
+    /// AES-256-GCM ciphertext at rest; use `SecretsManager::get_secret` to read.
     pub value: String,
     pub created: chrono::DateTime<chrono::Utc>,
     pub updated: Option<chrono::DateTime<chrono::Utc>>,
@@ -73,6 +113,7 @@ impl From<&Secret> for SecretInfo {
 
 pub struct SecretsManager {
     secrets: RwLock<HashMap<String, Secret>>,
+    key: [u8; 32],
 }
 
 impl Default for SecretsManager {
@@ -82,9 +123,27 @@ impl Default for SecretsManager {
 }
 
 impl SecretsManager {
+    /// Create a manager with a fresh random key. The store is in-memory, so a
+    /// per-process key is coherent; use [`SecretsManager::from_env`] to pin one.
     pub fn new() -> Self {
+        let mut key = [0u8; 32];
+        rand::fill(&mut key);
+        Self::with_key(key)
+    }
+
+    pub fn with_key(key: [u8; 32]) -> Self {
         Self {
             secrets: RwLock::new(HashMap::new()),
+            key,
+        }
+    }
+
+    /// Use the base64 32-byte key in `ZYVOR_SECRETS_KEY` when set (an invalid
+    /// value is an error, never a silent fallback); otherwise a random key.
+    pub fn from_env() -> Result<Self> {
+        match std::env::var(MASTER_KEY_ENV) {
+            Ok(v) if !v.trim().is_empty() => Ok(Self::with_key(parse_master_key(&v)?)),
+            _ => Ok(Self::new()),
         }
     }
 
@@ -101,10 +160,11 @@ impl SecretsManager {
             anyhow::bail!("Secret value must be between 1 and 65536 characters");
         }
 
+        let id = uuid::Uuid::new_v4().to_string();
         let secret = Secret {
-            id: uuid::Uuid::new_v4().to_string(),
+            value: encrypt_value(&self.key, &id, value)?,
+            id,
             name: name.to_string(),
-            value: encrypt_value(value),
             created: chrono::Utc::now(),
             updated: None,
             metadata: metadata.unwrap_or_default(),
@@ -119,10 +179,9 @@ impl SecretsManager {
 
     pub fn get_secret(&self, id: &str) -> Option<Secret> {
         let secrets = self.secrets.read().unwrap_or_else(|e| e.into_inner());
-        secrets.get(id).cloned().map(|mut s| {
-            s.value = decrypt_value(&s.value).unwrap_or_default();
-            s
-        })
+        let mut s = secrets.get(id).cloned()?;
+        s.value = decrypt_value(&self.key, id, &s.value).ok()?;
+        Some(s)
     }
 
     pub fn list_secrets(&self) -> Vec<SecretInfo> {
@@ -139,7 +198,7 @@ impl SecretsManager {
         let secret = secrets
             .get_mut(id)
             .ok_or_else(|| anyhow::anyhow!("Secret not found: {}", id))?;
-        secret.value = encrypt_value(value);
+        secret.value = encrypt_value(&self.key, id, value)?;
         secret.updated = Some(chrono::Utc::now());
         // Return with decrypted value for immediate use
         let mut result = secret.clone();
@@ -206,24 +265,75 @@ mod tests {
 
     // --- Encryption at rest tests ---
 
+    const KEY: [u8; 32] = [7u8; 32];
+
     #[test]
     fn test_encrypt_decrypt_roundtrip() {
-        let values = ["hello", "s3cret!", "a-longer-value-with-special-chars!@#$%"];
-        for val in &values {
-            let encrypted = encrypt_value(val);
-            let decrypted = decrypt_value(&encrypted).unwrap();
-            assert_eq!(&decrypted, val);
+        for val in ["hello", "s3cret!", "a-longer-value-with-special-chars!@#$%"] {
+            let encrypted = encrypt_value(&KEY, "id-1", val).unwrap();
+            assert_eq!(decrypt_value(&KEY, "id-1", &encrypted).unwrap(), val);
         }
     }
 
     #[test]
-    fn test_encrypt_not_plaintext() {
-        let encrypted = encrypt_value("my-secret-password");
-        assert_ne!(encrypted, "my-secret-password");
+    fn test_encrypt_not_plaintext_and_nonce_unique() {
+        let a = encrypt_value(&KEY, "id", "my-secret-password").unwrap();
+        let b = encrypt_value(&KEY, "id", "my-secret-password").unwrap();
+        assert!(!a.contains("my-secret-password"));
+        assert_ne!(a, b);
     }
 
     #[test]
-    fn test_decrypt_invalid_base64() {
-        assert!(decrypt_value("not-valid-base64!!!").is_err());
+    fn test_wrong_key_or_id_rejected() {
+        let encrypted = encrypt_value(&KEY, "id-1", "value").unwrap();
+        assert!(decrypt_value(&[8u8; 32], "id-1", &encrypted).is_err());
+        assert!(decrypt_value(&KEY, "id-2", &encrypted).is_err());
+    }
+
+    #[test]
+    fn test_tampered_ciphertext_rejected() {
+        let encrypted = encrypt_value(&KEY, "id", "value").unwrap();
+        let mut blob = base64::engine::general_purpose::STANDARD
+            .decode(encrypted.strip_prefix(CIPHERTEXT_PREFIX).unwrap())
+            .unwrap();
+        let last = blob.len() - 1;
+        blob[last] ^= 1;
+        let tampered = format!(
+            "{CIPHERTEXT_PREFIX}{}",
+            base64::engine::general_purpose::STANDARD.encode(blob)
+        );
+        assert!(decrypt_value(&KEY, "id", &tampered).is_err());
+    }
+
+    #[test]
+    fn test_decrypt_invalid_input() {
+        assert!(decrypt_value(&KEY, "id", "not-valid-base64!!!").is_err());
+        assert!(decrypt_value(&KEY, "id", "v2:!!!").is_err());
+        assert!(decrypt_value(&KEY, "id", "v2:AAAA").is_err());
+    }
+
+    #[test]
+    fn test_stored_value_is_ciphertext() {
+        let mgr = SecretsManager::with_key(KEY);
+        let s = mgr.create_secret("k", "plain-value", None).unwrap();
+        let raw = mgr
+            .secrets
+            .read()
+            .unwrap()
+            .get(&s.id)
+            .unwrap()
+            .value
+            .clone();
+        assert!(raw.starts_with(CIPHERTEXT_PREFIX));
+        assert!(!raw.contains("plain-value"));
+    }
+
+    #[test]
+    fn test_parse_master_key() {
+        let good = base64::engine::general_purpose::STANDARD.encode([1u8; 32]);
+        assert_eq!(parse_master_key(&good).unwrap(), [1u8; 32]);
+        assert!(parse_master_key("short").is_err());
+        let short = base64::engine::general_purpose::STANDARD.encode([1u8; 16]);
+        assert!(parse_master_key(&short).is_err());
     }
 }

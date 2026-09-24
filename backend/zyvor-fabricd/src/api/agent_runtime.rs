@@ -243,6 +243,56 @@ pub async fn session_events(
     .await
 }
 
+pub async fn list_approvals(
+    RequireRead(_): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/approvals", None, None, None).await
+}
+
+pub async fn create_approval(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    proxy(&state, Method::POST, "/v1/approvals", None, Some(body), None).await
+}
+
+/// Approve or deny a pending approval. The id is validated as a UUID because
+/// it is interpolated into the upstream path.
+pub async fn decide_approval(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    if uuid::Uuid::parse_str(&id).is_err() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "approval id must be a UUID" })),
+        )
+            .into_response();
+    }
+    proxy(
+        &state,
+        Method::POST,
+        &format!("/v1/approvals/{id}"),
+        None,
+        Some(body),
+        None,
+    )
+    .await
+}
+
+/// Hash-chained journal of planned, approved, denied and performed agent actions.
+pub async fn list_audit(
+    RequireRead(_): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/audit", Some(&query), None, None).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

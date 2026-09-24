@@ -3,6 +3,15 @@
 ## 0.3.0
 
 ### Added
+- **Agent approvals and a tamper-evident action journal** in the agent runtime.
+  Approvals now carry a `kind`, `subject`, and `planned_action`; approvals and
+  brokered egress calls are appended to a SHA-256 hash-chained `audit.jsonl`
+  (`GET /v1/audit`). Agents can opt into `egress_mode: "ask"`: a request to a host
+  outside the allowlist is held while an operator approves it once or for the
+  session (`zyvorctl approval approve --scope session`), and is refused on denial,
+  timeout, or session end. The daemon proxies `/api/approvals` and
+  `/api/audit/agent-actions`; `zyvorctl approval` and `zyvorctl agent-audit` read
+  them.
 - **AI Workloads are Beta on a single cluster** (multi-site HA store stays
   Preview; this is not GA). The control plane now
   records revisioned rolling, canary, and blue/green rollouts; content-addressed
@@ -134,6 +143,11 @@
   responsive throughout.
 
 ### Security
+- The daemon secrets manager now encrypts values at rest with AES-256-GCM
+  (random nonce per value, secret id bound as associated data) instead of a
+  hard-coded XOR key. Set `ZYVOR_SECRETS_KEY` to a base64 32-byte key to keep one
+  key across restarts; an invalid value stops startup. Without it, each process
+  uses a random key, and the store is in-memory only.
 - Bumped `rustls` 0.23.44 → 0.23.45, fixing RUSTSEC-2026-0285 (rustls
   accepted TLS 1.3 handshake messages sent at the wrong encryption level
   when packed into the same record as a key-changing message — the

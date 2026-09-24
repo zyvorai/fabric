@@ -1,9 +1,11 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::audit::AuditLog;
 use crate::model::{
-    AgentRecord, ApprovalRecord, DeployAgentRequest, LoopRecord, ScheduleRecord, SessionEvent,
-    SessionRecord, SessionStatus, WarmSandboxRecord, WarmSandboxState, WebhookRecord,
+    AgentRecord, ApprovalKind, ApprovalRecord, ApprovalStatus, DeployAgentRequest, GrantScope,
+    LoopRecord, ScheduleRecord, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
+    WarmSandboxState, WebhookRecord,
 };
 use anyhow::{bail, Context, Result};
 use base64::Engine;
@@ -30,6 +32,8 @@ pub struct Store {
     webhooks: RwLock<HashMap<Uuid, WebhookRecord>>,
     loops: RwLock<HashMap<Uuid, LoopRecord>>,
     approvals: RwLock<HashMap<Uuid, ApprovalRecord>>,
+    /// Tamper-evident record of planned, approved, denied and performed actions.
+    pub audit: AuditLog,
 }
 
 impl Store {
@@ -37,8 +41,10 @@ impl Store {
         let root = root.as_ref().to_path_buf();
         fs::create_dir_all(root.join("agents")).await?;
         fs::create_dir_all(root.join("sessions")).await?;
+        let audit = AuditLog::open(root.join("audit.jsonl")).await?;
 
         let store = Self {
+            audit,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
@@ -637,6 +643,72 @@ impl Store {
             .cloned()
     }
 
+    /// Atomically decide a pending approval. Returns `None` if it was not
+    /// pending (already decided or expired), so a decision and a timeout can
+    /// never both win.
+    pub async fn transition_approval(
+        &self,
+        id: Uuid,
+        status: ApprovalStatus,
+        comment: Option<String>,
+        scope: Option<GrantScope>,
+    ) -> Result<Option<ApprovalRecord>> {
+        let mut map = self.approvals.write().await;
+        let Some(record) = map.get_mut(&id) else {
+            return Ok(None);
+        };
+        if record.status != ApprovalStatus::Pending {
+            return Ok(None);
+        }
+        record.status = status;
+        record.comment = comment;
+        record.decided_at = Some(Utc::now());
+        record.grant_scope = if status == ApprovalStatus::Approved {
+            scope
+        } else {
+            None
+        };
+        let updated = record.clone();
+        self.persist_vec("approvals.json", &map.values().cloned().collect::<Vec<_>>())
+            .await?;
+        Ok(Some(updated))
+    }
+
+    /// Return the pending egress approval for (session, host), or create one
+    /// from `new`. The bool is true when a new record was created, so
+    /// concurrent requests to the same host share a single question.
+    pub async fn open_egress_approval(
+        &self,
+        session_id: Uuid,
+        host: &str,
+        new: ApprovalRecord,
+    ) -> Result<(ApprovalRecord, bool)> {
+        let mut map = self.approvals.write().await;
+        if let Some(existing) = map.values().find(|r| {
+            r.session_id == session_id
+                && r.kind == ApprovalKind::Egress
+                && r.status == ApprovalStatus::Pending
+                && r.subject.as_deref() == Some(host)
+        }) {
+            return Ok((existing.clone(), false));
+        }
+        map.insert(new.id, new.clone());
+        self.persist_vec("approvals.json", &map.values().cloned().collect::<Vec<_>>())
+            .await?;
+        Ok((new, true))
+    }
+
+    /// True when an operator approved this host for the rest of the session.
+    pub async fn has_session_egress_grant(&self, session_id: Uuid, host: &str) -> bool {
+        self.approvals.read().await.values().any(|r| {
+            r.session_id == session_id
+                && r.kind == ApprovalKind::Egress
+                && r.status == ApprovalStatus::Approved
+                && r.grant_scope == Some(GrantScope::Session)
+                && r.subject.as_deref() == Some(host)
+        })
+    }
+
     async fn persist_vec<T: serde::Serialize>(&self, file: &str, records: &[T]) -> Result<()> {
         atomic_write(&self.root.join(file), &serde_json::to_vec_pretty(records)?).await
     }
@@ -754,6 +826,8 @@ mod tests {
                 idle_hibernate_seconds: None,
                 warm_pool_size: 0,
                 runtime: Default::default(),
+                egress_mode: Default::default(),
+                egress_approval_timeout_seconds: None,
             },
         };
         let record = store.deploy_agent(request).await.unwrap();
@@ -788,6 +862,8 @@ mod tests {
                     idle_hibernate_seconds: None,
                     warm_pool_size: 0,
                     runtime: Default::default(),
+                    egress_mode: Default::default(),
+                    egress_approval_timeout_seconds: None,
                 },
             })
             .await
@@ -807,6 +883,8 @@ mod tests {
                     idle_hibernate_seconds: None,
                     warm_pool_size: 0,
                     runtime: Default::default(),
+                    egress_mode: Default::default(),
+                    egress_approval_timeout_seconds: None,
                 },
             })
             .await

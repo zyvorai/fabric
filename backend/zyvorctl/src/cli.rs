@@ -233,6 +233,21 @@ enum Commands {
     #[command(subcommand)]
     Mirror(MirrorCmd),
 
+    // ─── Agent runtime ───────────────────────────────────────────────────
+    /// Review and decide agent approval requests
+    #[command(subcommand)]
+    Approval(ApprovalCmd),
+
+    /// Show the tamper-evident agent action journal
+    AgentAudit {
+        /// Only entries for this session id
+        #[arg(short, long)]
+        session: Option<String>,
+        /// Maximum number of entries (newest last)
+        #[arg(short, long, default_value_t = 50)]
+        limit: usize,
+    },
+
     // ─── NAT Gateway ─────────────────────────────────────────────────────
     /// Manage NAT rules, pools, and gateways
     #[command(subcommand)]
@@ -575,6 +590,27 @@ enum DnsCmd {
     Records,
     /// Sync DNS
     Sync,
+}
+
+#[derive(Subcommand)]
+enum ApprovalCmd {
+    /// List agent approval requests
+    List,
+    /// Approve a pending request
+    Approve {
+        id: String,
+        #[arg(short, long)]
+        comment: Option<String>,
+        /// For egress requests: `once` (default) or `session` (all later requests to that host)
+        #[arg(long, value_parser = ["once", "session"])]
+        scope: Option<String>,
+    },
+    /// Deny a pending request
+    Deny {
+        id: String,
+        #[arg(short, long)]
+        comment: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2431,6 +2467,52 @@ impl Cli {
                     print_value(&val, fmt);
                 }
             },
+
+            // ── Agent approvals & audit ─────────────────────────────────
+            Commands::Approval(cmd) => match cmd {
+                ApprovalCmd::List => {
+                    let val = api_get(&client, "/approvals").await?;
+                    let items = val.get("items").and_then(|v| v.as_array());
+                    print_resources(items.unwrap_or(&vec![]), fmt);
+                }
+                ApprovalCmd::Approve { id, comment, scope } => {
+                    let body = serde_json::json!({
+                        "decision": "approved",
+                        "comment": comment,
+                        "scope": scope,
+                    });
+                    let val = api_post(&client, &format!("/approvals/{}", id), &body).await?;
+                    println!("Approval '{}' approved", id);
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
+                }
+                ApprovalCmd::Deny { id, comment } => {
+                    let body = serde_json::json!({"decision": "denied", "comment": comment});
+                    let val = api_post(&client, &format!("/approvals/{}", id), &body).await?;
+                    println!("Approval '{}' denied", id);
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
+                }
+            },
+            Commands::AgentAudit { session, limit } => {
+                let mut path = format!("/audit/agent-actions?limit={}", limit);
+                if let Some(session) = session {
+                    path.push_str(&format!("&session_id={}", session));
+                }
+                let val = api_get(&client, &path).await?;
+                let items = val.get("items").and_then(|v| v.as_array());
+                print_resources(items.unwrap_or(&vec![]), fmt);
+                if let Some(chain) = val.get("chain") {
+                    if chain.get("chain_ok") == Some(&serde_json::Value::Bool(false)) {
+                        eprintln!(
+                            "WARNING: audit chain verification FAILED at entry {}",
+                            chain.get("broken_at").unwrap_or(&serde_json::Value::Null)
+                        );
+                    }
+                }
+            }
 
             // ── NAT ─────────────────────────────────────────────────────
             Commands::Nat(cmd) => match cmd {

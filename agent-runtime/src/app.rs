@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    audit::AuditPhase,
     model::{
-        ApprovalRecord, ApprovalStatus, CreateApprovalRequest, CreateSessionRequest,
+        ApprovalKind, ApprovalRecord, ApprovalStatus, CreateApprovalRequest, CreateSessionRequest,
         DecideApprovalRequest, DelegateRequest, DeployAgentRequest, EventsQuery,
         GuestEventsResponse, GuestStatusResponse, SessionRecord, SessionStartMode,
         SessionStartPolicy, SessionStatus, SessionView, SteerRequest, WarmPoolReconcileResult,
-        WarmPoolView,
+        WarmPoolView, MAX_EGRESS_APPROVAL_SECONDS, MIN_EGRESS_APPROVAL_SECONDS,
     },
     pool, AppState,
 };
@@ -177,6 +178,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/approvals", get(list_approvals).post(create_approval))
         .route("/v1/approvals/{id}", post(decide_approval))
+        .route("/v1/audit", get(list_audit))
         .route("/mcp", post(crate::mcp::handle))
         .route_layer(middleware::from_fn_with_state(state.clone(), api_auth));
 
@@ -230,6 +232,13 @@ async fn deploy_agent(
         return Err(ApiError::bad_request(
             "max_concurrent_sessions must be greater than zero",
         ));
+    }
+    if let Some(seconds) = req.manifest.egress_approval_timeout_seconds {
+        if !(MIN_EGRESS_APPROVAL_SECONDS..=MAX_EGRESS_APPROVAL_SECONDS).contains(&seconds) {
+            return Err(ApiError::bad_request(format!(
+                "egress_approval_timeout_seconds must be between {MIN_EGRESS_APPROVAL_SECONDS} and {MAX_EGRESS_APPROVAL_SECONDS}"
+            )));
+        }
     }
     if req.manifest.warm_pool_size > 64 {
         return Err(ApiError::bad_request("warm_pool_size may not exceed 64"));
@@ -1458,19 +1467,47 @@ async fn record_approval_request(
     if prompt.is_empty() {
         return Ok(());
     }
-    state
+    let record = ApprovalRecord {
+        id: Uuid::new_v4(),
+        session_id,
+        kind: ApprovalKind::Custom,
+        subject: None,
+        planned_action: None,
+        prompt,
+        status: ApprovalStatus::Pending,
+        comment: None,
+        created_at: Utc::now(),
+        decided_at: None,
+        source_seq: Some(seq),
+        grant_scope: None,
+    };
+    state.store.save_approval(record.clone()).await?;
+    audit_approval_planned(state, &record).await;
+    Ok(())
+}
+
+/// Append the "planned" journal entry for a freshly opened approval. Audit
+/// failures are logged, not propagated: an unwritable journal must not wedge
+/// a session, and the failure is itself visible in the logs.
+pub(crate) async fn audit_approval_planned(state: &AppState, record: &ApprovalRecord) {
+    let result = state
         .store
-        .save_approval(ApprovalRecord {
-            id: Uuid::new_v4(),
-            session_id,
-            prompt,
-            status: ApprovalStatus::Pending,
-            comment: None,
-            created_at: Utc::now(),
-            decided_at: None,
-            source_seq: Some(seq),
-        })
-        .await
+        .audit
+        .append(
+            Some(record.session_id),
+            AuditPhase::Planned,
+            format!("approval.{}", record.kind.as_str()),
+            record.subject.clone(),
+            json!({
+                "approval_id": record.id,
+                "prompt": record.prompt,
+                "planned_action": record.planned_action,
+            }),
+        )
+        .await;
+    if let Err(error) = result {
+        tracing::error!(%error, approval_id = %record.id, "failed to write audit entry");
+    }
 }
 
 async fn delegate_session(
@@ -1505,6 +1542,41 @@ async fn delegate_session(
     Ok((status, Json(view)))
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct AuditQuery {
+    #[serde(default)]
+    session_id: Option<Uuid>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+/// Default and maximum page size for `GET /v1/audit`.
+const AUDIT_DEFAULT_LIMIT: usize = 200;
+const AUDIT_MAX_LIMIT: usize = 5000;
+
+async fn list_audit(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<AuditQuery>,
+) -> ApiResult<Json<Value>> {
+    let limit = query
+        .limit
+        .unwrap_or(AUDIT_DEFAULT_LIMIT)
+        .clamp(1, AUDIT_MAX_LIMIT);
+    let items = state
+        .store
+        .audit
+        .list(query.session_id, limit)
+        .await
+        .map_err(ApiError::internal)?;
+    let chain = state
+        .store
+        .audit
+        .verify()
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(json!({"items": items, "chain": chain})))
+}
+
 async fn list_approvals(State(state): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({"items": state.store.list_approvals().await}))
 }
@@ -1523,18 +1595,23 @@ async fn create_approval(
     let record = ApprovalRecord {
         id: Uuid::new_v4(),
         session_id: req.session_id,
+        kind: req.kind,
+        subject: req.subject,
+        planned_action: req.planned_action,
         prompt: req.prompt,
         status: ApprovalStatus::Pending,
         comment: None,
         created_at: Utc::now(),
         decided_at: None,
         source_seq: None,
+        grant_scope: None,
     };
     state
         .store
         .save_approval(record.clone())
         .await
         .map_err(ApiError::internal)?;
+    audit_approval_planned(&state, &record).await;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -1543,10 +1620,13 @@ async fn decide_approval(
     Path(id): Path<Uuid>,
     Json(req): Json<DecideApprovalRequest>,
 ) -> ApiResult<Json<ApprovalRecord>> {
-    if req.decision == ApprovalStatus::Pending {
+    if !matches!(
+        req.decision,
+        ApprovalStatus::Approved | ApprovalStatus::Denied
+    ) {
         return Err(ApiError::bad_request("decision must be approved or denied"));
     }
-    let Some(mut record) = state.store.get_approval(id).await else {
+    let Some(record) = state.store.get_approval(id).await else {
         return Err(ApiError::not_found("approval not found"));
     };
     if record.status != ApprovalStatus::Pending {
@@ -1556,25 +1636,50 @@ async fn decide_approval(
     if session.status != SessionStatus::Running {
         return Err(ApiError::conflict("session is not running"));
     }
-    record.status = req.decision;
-    record.comment = req.comment.clone();
-    record.decided_at = Some(Utc::now());
-    state
+    let scope = (record.kind == ApprovalKind::Egress).then(|| req.scope.unwrap_or_default());
+    let Some(record) = state
         .store
-        .save_approval(record.clone())
+        .transition_approval(id, req.decision, req.comment.clone(), scope)
         .await
-        .map_err(ApiError::internal)?;
+        .map_err(ApiError::internal)?
+    else {
+        // Decided, or expired, between the read above and now.
+        return Err(ApiError::conflict("approval is already decided"));
+    };
+    let phase = if record.status == ApprovalStatus::Approved {
+        AuditPhase::Approved
+    } else {
+        AuditPhase::Denied
+    };
+    if let Err(error) = state
+        .store
+        .audit
+        .append(
+            Some(record.session_id),
+            phase,
+            format!("approval.{}", record.kind.as_str()),
+            record.subject.clone(),
+            json!({"approval_id": record.id, "comment": record.comment}),
+        )
+        .await
+    {
+        tracing::error!(%error, approval_id = %record.id, "failed to write audit entry");
+    }
     let message = json!({
         "approval_id": record.id,
         "decision": record.status,
         "comment": record.comment,
     });
-    let _ = steer_session(
-        State(state),
-        Path(record.session_id),
-        Json(SteerRequest { message }),
-    )
-    .await?;
+    // An egress approval unblocks a request the broker is already holding; the
+    // agent is not waiting for steering, so there is nothing to send it.
+    if record.kind != ApprovalKind::Egress {
+        let _ = steer_session(
+            State(state),
+            Path(record.session_id),
+            Json(SteerRequest { message }),
+        )
+        .await?;
+    }
     Ok(Json(record))
 }
 
