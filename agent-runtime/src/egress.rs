@@ -562,6 +562,7 @@ mod ask_tests {
             fluxvm_token: None,
             api_token: None,
             credentials_file: None,
+            skill_scopes_file: None,
             egress_advertise_host: None,
             sync_interval_ms: 300,
             guest_start_timeout_secs: 30,
@@ -612,6 +613,8 @@ mod ask_tests {
             runtime: Default::default(),
             egress_mode: mode,
             home_volume: None,
+            skills: vec![],
+            skill_scope: None,
             egress_approval_timeout_seconds: timeout,
         }
     }
@@ -782,6 +785,9 @@ mod ask_tests {
         let value = serde_json::to_value(manifest(EgressMode::Deny, None)).unwrap();
         assert!(value.get("egress_mode").is_none());
         assert!(value.get("egress_approval_timeout_seconds").is_none());
+        assert!(value.get("skills").is_none());
+        assert!(value.get("skill_scope").is_none());
+        assert!(value.get("home_volume").is_none());
         let asked = serde_json::to_value(manifest(EgressMode::Ask, Some(30))).unwrap();
         assert_eq!(asked["egress_mode"], "ask");
         assert_eq!(asked["egress_approval_timeout_seconds"], 30);

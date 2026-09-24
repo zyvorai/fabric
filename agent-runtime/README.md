@@ -157,6 +157,27 @@ Requirements, all checked at deploy time:
 
 Volumes are per FluxVM tenant and live under FluxVM's `sandbox.volumes_dir` (default `<state_dir>/volumes`). They have no size quota: the limit is the host filesystem. Deleting the agent or a session does not delete the volume; remove the directory on the FluxVM host to discard the data.
 
+## Skills
+
+A skill is a small bundle of instructions and helper files, with a top-level `SKILL.md`, that an agent can read at run time. Publish one with `POST /v1/skills` (`{"name", "description"?, "scope"?, "files": [{"path", "content_base64", "executable"?}]}`) or `zyvorctl skill publish <dir>`. Limits: 32 files, 512 KiB per file, 2 MiB in total, relative paths of `[A-Za-z0-9._/-]` only. A skill version is the SHA-256 of its content, so publishing identical content again changes nothing and `GET /v1/skills/{name}` lists every version.
+
+An agent lists skills in its manifest as `name` or `name@version`. Deploy rewrites each to an exact `name@version` pin, so republishing a skill never changes what an already deployed agent version mounts. Every session writes the pinned skills into its sandbox:
+
+| Skill | Mounted at |
+|-------|------------|
+| No `scope` (base) | `/opt/zyvor/skills/<name>/`, with `/opt/zyvor/skills/INDEX.json` |
+| With a `scope` | `/opt/zyvor/skills-scoped/<name>/`, with `INDEX.json` beside it |
+
+Files are mode 0444 (0555 when marked executable). This stops accidental edits by the agent process; it is not a security boundary against a guest that runs as root.
+
+A scoped skill is only usable by an agent whose manifest sets `skill_scope` and whose scope the operator's policy allows. The policy is a JSON file named by `ZYVOR_AGENT_SKILL_SCOPES_FILE`:
+
+```json
+{"scopes": {"prod": ["prod"], "internal-test": ["prod", "internal-test"]}}
+```
+
+Each key is an agent `skill_scope`; its value lists the skill scopes that agent may mount. With no file, scoped skills cannot be used at all. The policy is checked at deploy and again when each session is provisioned, so tightening it stops new sessions of already deployed agents from mounting a skill they may no longer use. `DELETE /v1/skills/{name}` returns 409 while a deployed agent lists the skill.
+
 ## Credentials
 
 Create a **descriptor file**, not a secret file:
@@ -209,6 +230,7 @@ Configuration:
 | `ZYVOR_AGENT_FLUXVM_URL` | `http://127.0.0.1:7788` | FluxVM API |
 | `ZYVOR_AGENT_FLUXVM_TOKEN` | unset | FluxVM bearer token |
 | `ZYVOR_AGENT_API_TOKEN` | unset | public Agent Runtime bearer token |
+| `ZYVOR_AGENT_SKILL_SCOPES_FILE` | unset | JSON policy: which skill scopes each agent `skill_scope` may mount (see Skills) |
 | `ZYVOR_AGENT_ALLOW_NO_AUTH` | unset | explicit opt-out to start without `ZYVOR_AGENT_API_TOKEN` |
 | `ZYVOR_AGENT_CREDENTIALS_FILE` | unset | descriptor JSON above |
 | `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` | derived | host address visible from sandbox |
@@ -407,6 +429,10 @@ GET    /v1/approvals
 POST   /v1/approvals
 POST   /v1/approvals/{id}
 GET    /v1/audit?session_id=&limit=
+GET    /v1/skills
+POST   /v1/skills
+GET    /v1/skills/{name}
+DELETE /v1/skills/{name}
 
 POST   /mcp
 ```

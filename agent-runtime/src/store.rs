@@ -7,6 +7,7 @@ use crate::model::{
     LoopRecord, ScheduleRecord, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
     WarmSandboxState, WebhookRecord,
 };
+use crate::skills::SkillStore;
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use chrono::Utc;
@@ -34,6 +35,8 @@ pub struct Store {
     approvals: RwLock<HashMap<Uuid, ApprovalRecord>>,
     /// Tamper-evident record of planned, approved, denied and performed actions.
     pub audit: AuditLog,
+    /// Immutable, content-addressed skill bundles agents can mount.
+    pub skills: SkillStore,
 }
 
 impl Store {
@@ -42,9 +45,11 @@ impl Store {
         fs::create_dir_all(root.join("agents")).await?;
         fs::create_dir_all(root.join("sessions")).await?;
         let audit = AuditLog::open(root.join("audit.jsonl")).await?;
+        let skills = SkillStore::open(root.join("skills")).await?;
 
         let store = Self {
             audit,
+            skills,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
@@ -765,7 +770,7 @@ impl Identified for ApprovalRecord {
     }
 }
 
-async fn atomic_write(path: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
+pub(crate) async fn atomic_write(path: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
     let path_s = path.as_ref().to_string_lossy().into_owned();
     if path_s.contains("..") {
         bail!("refusing path traversal");
@@ -828,6 +833,8 @@ mod tests {
                 runtime: Default::default(),
                 egress_mode: Default::default(),
                 home_volume: None,
+                skills: vec![],
+                skill_scope: None,
                 egress_approval_timeout_seconds: None,
             },
         };
@@ -865,6 +872,8 @@ mod tests {
                     runtime: Default::default(),
                     egress_mode: Default::default(),
                     home_volume: None,
+                    skills: vec![],
+                    skill_scope: None,
                     egress_approval_timeout_seconds: None,
                 },
             })
@@ -887,6 +896,8 @@ mod tests {
                     runtime: Default::default(),
                     egress_mode: Default::default(),
                     home_volume: None,
+                    skills: vec![],
+                    skill_scope: None,
                     egress_approval_timeout_seconds: None,
                 },
             })

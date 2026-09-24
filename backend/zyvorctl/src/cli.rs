@@ -238,6 +238,10 @@ enum Commands {
     #[command(subcommand)]
     Approval(ApprovalCmd),
 
+    /// Publish and inspect agent skills
+    #[command(subcommand)]
+    Skill(SkillCmd),
+
     /// Show the tamper-evident agent action journal
     AgentAudit {
         /// Only entries for this session id
@@ -611,6 +615,29 @@ enum ApprovalCmd {
         #[arg(short, long)]
         comment: Option<String>,
     },
+}
+
+#[derive(Subcommand)]
+enum SkillCmd {
+    /// List skills (current version of each)
+    List,
+    /// Show a skill and its versions
+    Show { name: String },
+    /// Publish a skill from a directory containing SKILL.md
+    Publish {
+        /// Directory to read; its files keep their relative paths
+        dir: String,
+        /// Skill name (defaults to the directory name)
+        #[arg(short, long)]
+        name: Option<String>,
+        #[arg(short, long)]
+        description: Option<String>,
+        /// Restrict the skill to agents whose skill_scope the operator allows
+        #[arg(short, long)]
+        scope: Option<String>,
+    },
+    /// Delete a skill (refused while a deployed agent uses it)
+    Delete { name: String },
 }
 
 #[derive(Subcommand)]
@@ -1425,6 +1452,56 @@ async fn api_put(
         anyhow::bail!("{}: {}", status, body);
     }
     Ok(res.json().await?)
+}
+
+/// Read a skill directory into API `files` entries. Symlinks are refused so a
+/// skill cannot smuggle in files from outside the directory; the server enforces
+/// the file-count and size limits.
+fn read_skill_dir(root: &std::path::Path) -> Result<Vec<serde_json::Value>> {
+    use base64::Engine;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn walk(
+        root: &std::path::Path,
+        dir: &std::path::Path,
+        out: &mut Vec<serde_json::Value>,
+    ) -> Result<()> {
+        let mut entries: Vec<_> = std::fs::read_dir(dir)
+            .with_context(|| format!("reading {}", dir.display()))?
+            .collect::<std::io::Result<_>>()?;
+        entries.sort_by_key(|e| e.file_name());
+        for entry in entries {
+            let path = entry.path();
+            let kind = entry.file_type()?;
+            if kind.is_symlink() {
+                anyhow::bail!("{} is a symlink; skills may not contain symlinks", path.display());
+            }
+            if kind.is_dir() {
+                walk(root, &path, out)?;
+                continue;
+            }
+            let rel = path
+                .strip_prefix(root)?
+                .to_str()
+                .context("skill file paths must be valid UTF-8")?
+                .to_string();
+            let mode = std::fs::metadata(&path)?.permissions().mode();
+            out.push(serde_json::json!({
+                "path": rel,
+                "content_base64": base64::engine::general_purpose::STANDARD
+                    .encode(std::fs::read(&path)?),
+                "executable": mode & 0o111 != 0,
+            }));
+        }
+        Ok(())
+    }
+
+    let mut out = Vec::new();
+    walk(root, root, &mut out)?;
+    if out.is_empty() {
+        anyhow::bail!("{} contains no files", root.display());
+    }
+    Ok(out)
 }
 
 async fn api_delete(client: &Client, path: &str) -> Result<()> {
@@ -2494,6 +2571,52 @@ impl Cli {
                     if !matches!(fmt, OutputFormat::Table) {
                         print_value(&val, fmt);
                     }
+                }
+            },
+            Commands::Skill(cmd) => match cmd {
+                SkillCmd::List => {
+                    let val = api_get(&client, "/skills").await?;
+                    let items = val.get("items").and_then(|v| v.as_array());
+                    print_resources(items.unwrap_or(&vec![]), fmt);
+                }
+                SkillCmd::Show { name } => {
+                    let val = api_get(&client, &format!("/skills/{}", name)).await?;
+                    print_value(&val, fmt);
+                }
+                SkillCmd::Publish {
+                    dir,
+                    name,
+                    description,
+                    scope,
+                } => {
+                    let files = read_skill_dir(std::path::Path::new(&dir))?;
+                    let name = match name {
+                        Some(n) => n,
+                        None => std::fs::canonicalize(&dir)?
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .context("cannot derive a skill name from the directory; pass --name")?
+                            .to_string(),
+                    };
+                    let body = serde_json::json!({
+                        "name": name,
+                        "description": description,
+                        "scope": scope,
+                        "files": files,
+                    });
+                    let val = api_post(&client, "/skills", &body).await?;
+                    println!(
+                        "Skill '{}' published as version {}",
+                        name,
+                        val.get("version").and_then(|v| v.as_str()).unwrap_or("?")
+                    );
+                    if !matches!(fmt, OutputFormat::Table) {
+                        print_value(&val, fmt);
+                    }
+                }
+                SkillCmd::Delete { name } => {
+                    api_delete(&client, &format!("/skills/{}", name)).await?;
+                    println!("Skill '{}' deleted", name);
                 }
             },
             Commands::AgentAudit { session, limit } => {

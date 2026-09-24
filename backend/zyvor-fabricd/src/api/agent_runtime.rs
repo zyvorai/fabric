@@ -255,7 +255,15 @@ pub async fn create_approval(
     State(state): State<Arc<AppState>>,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    proxy(&state, Method::POST, "/v1/approvals", None, Some(body), None).await
+    proxy(
+        &state,
+        Method::POST,
+        "/v1/approvals",
+        None,
+        Some(body),
+        None,
+    )
+    .await
 }
 
 /// Approve or deny a pending approval. The id is validated as a UUID because
@@ -293,10 +301,90 @@ pub async fn list_audit(
     proxy(&state, Method::GET, "/v1/audit", Some(&query), None, None).await
 }
 
+/// Skill names go into the upstream path, so they are restricted to the
+/// characters the runtime itself accepts.
+fn valid_skill_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 80
+        && !name.starts_with('.')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+}
+
+fn bad_skill_name() -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "error": "invalid skill name" })),
+    )
+        .into_response()
+}
+
+pub async fn list_skills(
+    RequireRead(_): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/skills", None, None, None).await
+}
+
+pub async fn publish_skill(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    proxy(&state, Method::POST, "/v1/skills", None, Some(body), None).await
+}
+
+pub async fn get_skill(
+    RequireRead(_): RequireRead,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Response {
+    if !valid_skill_name(&name) {
+        return bad_skill_name();
+    }
+    proxy(
+        &state,
+        Method::GET,
+        &format!("/v1/skills/{name}"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
+pub async fn delete_skill(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Response {
+    if !valid_skill_name(&name) {
+        return bad_skill_name();
+    }
+    proxy(
+        &state,
+        Method::DELETE,
+        &format!("/v1/skills/{name}"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::AgentRuntimeConfig;
+
+    #[test]
+    fn skill_names_cannot_reach_other_upstream_paths() {
+        assert!(valid_skill_name("notes-1.2_x"));
+        for bad in ["", ".hidden", "a/b", "..", "a b", "a?x=1", "a#b", "%2e%2e"] {
+            assert!(!valid_skill_name(bad), "{bad:?}");
+        }
+    }
 
     #[test]
     fn agent_runtime_base_url_none_when_unset() {

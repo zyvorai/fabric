@@ -216,6 +216,8 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/approvals", get(list_approvals).post(create_approval))
         .route("/v1/approvals/{id}", post(decide_approval))
         .route("/v1/audit", get(list_audit))
+        .route("/v1/skills", get(list_skills).post(publish_skill))
+        .route("/v1/skills/{name}", get(get_skill).delete(delete_skill))
         .route("/mcp", post(crate::mcp::handle))
         .route_layer(middleware::from_fn_with_state(state.clone(), api_auth));
 
@@ -252,7 +254,7 @@ async fn api_auth(
 
 async fn deploy_agent(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<DeployAgentRequest>,
+    Json(mut req): Json<DeployAgentRequest>,
 ) -> ApiResult<(StatusCode, Json<crate::model::AgentRecord>)> {
     if req.manifest.template.trim().is_empty() {
         return Err(ApiError::bad_request("manifest.template is required"));
@@ -290,6 +292,18 @@ async fn deploy_agent(
             )));
         }
     }
+    // Pin skills to exact versions now, so republishing a skill later never
+    // changes what this immutable agent version mounts.
+    req.manifest.skills = state
+        .store
+        .skills
+        .pin(
+            &req.manifest.skills,
+            req.manifest.skill_scope.as_deref(),
+            &state.skill_scopes,
+        )
+        .await
+        .map_err(ApiError::bad_request)?;
     let record = state
         .store
         .deploy_agent(req)
@@ -695,6 +709,72 @@ async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Resul
     }
 }
 
+/// Write the agent's pinned skills into the sandbox: base skills under
+/// `/opt/zyvor/skills`, scoped ones under `/opt/zyvor/skills-scoped`, each root
+/// with an `INDEX.json`. The scope policy is checked again here because the
+/// operator may have tightened it since the agent was deployed; a skill the
+/// agent may no longer use fails the session rather than being mounted.
+async fn mount_skills(
+    state: &AppState,
+    session: &SessionRecord,
+    agent: &crate::model::AgentRecord,
+) -> Result<()> {
+    use crate::skills::{index_json, mount_plan, split_ref, BASE_MOUNT, SCOPED_MOUNT};
+    if agent.manifest.skills.is_empty() {
+        return Ok(());
+    }
+    let mut bundles = Vec::new();
+    for pin in &agent.manifest.skills {
+        let (name, version) = split_ref(pin);
+        let bundle = state
+            .store
+            .skills
+            .get(name, version)
+            .await
+            .with_context(|| format!("loading pinned skill {pin}"))?;
+        anyhow::ensure!(
+            state
+                .skill_scopes
+                .allows(agent.manifest.skill_scope.as_deref(), bundle.record.scope.as_deref()),
+            "skill {pin} is not permitted for this agent's skill_scope under the current scope policy"
+        );
+        bundles.push(bundle);
+    }
+    for bundle in &bundles {
+        for (path, bytes, mode) in mount_plan(bundle)? {
+            with_timeout(
+                HEALTH_CHECK_ATTEMPT_TIMEOUT,
+                state
+                    .fluxvm
+                    .fs_write(session.sandbox_id, &path, &bytes, mode),
+            )
+            .await
+            .with_context(|| format!("writing skill file {path}"))?;
+        }
+    }
+    for (root, scoped) in [(BASE_MOUNT, false), (SCOPED_MOUNT, true)] {
+        let group: Vec<_> = bundles
+            .iter()
+            .filter(|b| b.record.scope.is_some() == scoped)
+            .collect();
+        if group.is_empty() {
+            continue;
+        }
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                &format!("{root}/INDEX.json"),
+                &index_json(&group),
+                0o444,
+            ),
+        )
+        .await
+        .with_context(|| format!("writing {root}/INDEX.json"))?;
+    }
+    Ok(())
+}
+
 async fn provision_guest(
     state: &AppState,
     session: &SessionRecord,
@@ -737,6 +817,8 @@ async fn provision_guest(
         ),
     )
     .await?;
+
+    mount_skills(state, session, agent).await?;
 
     let host = match state.config.egress_advertise_host.as_deref() {
         Some(v) => v.to_string(),
@@ -1599,6 +1681,74 @@ async fn list_audit(
         .await
         .map_err(ApiError::internal)?;
     Ok(Json(json!({"items": items, "chain": chain})))
+}
+
+async fn list_skills(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
+    let items = state
+        .store
+        .skills
+        .list()
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(json!({"items": items})))
+}
+
+async fn publish_skill(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<crate::skills::PublishSkillRequest>,
+) -> ApiResult<(StatusCode, Json<crate::skills::SkillRecord>)> {
+    let record = state
+        .store
+        .skills
+        .publish(req)
+        .await
+        .map_err(ApiError::bad_request)?;
+    Ok((StatusCode::CREATED, Json(record)))
+}
+
+async fn get_skill(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let current = state
+        .store
+        .skills
+        .get(&name, None)
+        .await
+        .map_err(|e| ApiError::not_found(e.to_string()))?;
+    let versions = state
+        .store
+        .skills
+        .versions(&name)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(
+        json!({"current": current.record, "versions": versions}),
+    ))
+}
+
+/// Refuses while a deployed agent still lists the skill: its pinned version
+/// would vanish and every new session would fail at provisioning.
+async fn delete_skill(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<StatusCode> {
+    if let Some(agent) = state.store.list_agents().await.into_iter().find(|a| {
+        a.manifest
+            .skills
+            .iter()
+            .any(|pin| crate::skills::split_ref(pin).0 == name)
+    }) {
+        return Err(ApiError::conflict(format!(
+            "skill '{name}' is used by agent '{}'; redeploy the agent without it first",
+            agent.name
+        )));
+    }
+    match state.store.skills.delete(&name).await {
+        Ok(true) => Ok(StatusCode::NO_CONTENT),
+        Ok(false) => Err(ApiError::not_found("skill not found")),
+        Err(e) => Err(ApiError::bad_request(e)),
+    }
 }
 
 async fn list_approvals(State(state): State<Arc<AppState>>) -> Json<Value> {

@@ -25,6 +25,13 @@ pub struct AgentManifest {
     /// `deny` (default) refuses it; `ask` holds it while an operator decides.
     #[serde(default, skip_serializing_if = "EgressMode::is_deny")]
     pub egress_mode: EgressMode,
+    /// Skills mounted into the sandbox, as `name` or `name@version`. Deploy
+    /// rewrites each to an exact `name@version` pin.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<String>,
+    /// Which scoped skills this agent may mount, per the operator's scope policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill_scope: Option<String>,
     /// Persistent directory mounted in the sandbox so state survives sandbox
     /// replacement. Needs a QEMU-backed FluxVM template; see [`HomeVolume`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -743,6 +750,8 @@ mod home_volume_tests {
             runtime: Default::default(),
             egress_mode: Default::default(),
             home_volume: home,
+            skills: vec![],
+            skill_scope: None,
             egress_approval_timeout_seconds: None,
         }
     }

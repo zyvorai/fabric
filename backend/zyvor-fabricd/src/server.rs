@@ -1231,6 +1231,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(api::agent_runtime::decide_approval),
         )
         .route("/audit/agent-actions", get(api::agent_runtime::list_audit))
+        .route(
+            "/skills",
+            get(api::agent_runtime::list_skills).post(api::agent_runtime::publish_skill),
+        )
+        .route(
+            "/skills/{name}",
+            get(api::agent_runtime::get_skill).delete(api::agent_runtime::delete_skill),
+        )
         // Fabric AI Workloads — Inference MVP (preview)
         .route(
             "/ai/models",

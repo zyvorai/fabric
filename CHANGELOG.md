@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **Agent skills with scoped mounts.** Immutable, content-addressed skill bundles
+  (`/v1/skills`, `zyvorctl skill`) that agents pin at deploy time via manifest
+  `skills` and mount per session: base skills at `/opt/zyvor/skills`, scoped skills
+  at `/opt/zyvor/skills-scoped` only when the operator's
+  `ZYVOR_AGENT_SKILL_SCOPES_FILE` policy allows the agent's `skill_scope`. The
+  daemon proxies `/api/skills`.
 - **Persistent agent home volume.** A manifest `home_volume` mounts a named FluxVM
   volume (default `/home/agent`) that survives sandbox replacement and new agent
   versions. It needs a QEMU-backed FluxVM template, `max_concurrent_sessions: 1`, and

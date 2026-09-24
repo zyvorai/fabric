@@ -11,6 +11,7 @@ pub mod mcp;
 pub mod model;
 pub mod pool;
 pub mod schedules;
+pub mod skills;
 pub mod store;
 
 use crate::{config::Config, credentials::CredentialVault, fluxvm::FluxVm, store::Store};
@@ -26,6 +27,7 @@ pub struct AppState {
     pub store: Arc<Store>,
     pub fluxvm: FluxVm,
     pub credentials: CredentialVault,
+    pub skill_scopes: skills::SkillScopes,
     pub egress_http: reqwest::Client,
     /// Serializes the idempotency/quota reservation section of session creation,
     /// one lock per agent name so a slow or hung FluxVM call for one agent can
@@ -42,6 +44,7 @@ impl AppState {
         tokio::fs::create_dir_all(&config.snapshot_dir).await?;
         let store = Arc::new(Store::open(&config.state_dir).await?);
         let credentials = CredentialVault::load(config.credentials_file.as_deref()).await?;
+        let skill_scopes = skills::SkillScopes::load(config.skill_scopes_file.as_deref()).await?;
         let fluxvm = FluxVm::new(&config.fluxvm_url, config.fluxvm_token.clone())?;
         let egress_http = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
@@ -52,6 +55,7 @@ impl AppState {
             store,
             fluxvm,
             credentials,
+            skill_scopes,
             egress_http,
             session_create_locks: Mutex::new(HashMap::new()),
             warm_pool_reconcile_lock: tokio::sync::Mutex::new(()),

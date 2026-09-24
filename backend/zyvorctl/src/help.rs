@@ -155,6 +155,11 @@ const GROUPS: &[CmdGroup] = &[
                 about: "Review and decide agent approval requests",
             },
             CmdEntry {
+                emoji: "🧰",
+                name: "skill",
+                about: "Publish and inspect agent skills",
+            },
+            CmdEntry {
                 emoji: "📜",
                 name: "agent-audit",
                 about: "Show the tamper-evident agent action journal",

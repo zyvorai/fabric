@@ -14,6 +14,8 @@ pub struct Config {
     pub fluxvm_token: Option<String>,
     pub api_token: Option<String>,
     pub credentials_file: Option<PathBuf>,
+    /// JSON policy mapping an agent `skill_scope` to the skill scopes it may mount.
+    pub skill_scopes_file: Option<PathBuf>,
     pub egress_advertise_host: Option<String>,
     pub sync_interval_ms: u64,
     pub guest_start_timeout_secs: u64,
@@ -46,6 +48,7 @@ impl Config {
             fluxvm_token: env_opt("ZYVOR_AGENT_FLUXVM_TOKEN"),
             api_token,
             credentials_file: env_opt("ZYVOR_AGENT_CREDENTIALS_FILE").map(PathBuf::from),
+            skill_scopes_file: env_opt("ZYVOR_AGENT_SKILL_SCOPES_FILE").map(PathBuf::from),
             egress_advertise_host: env_opt("ZYVOR_AGENT_EGRESS_ADVERTISE_HOST"),
             sync_interval_ms: env_parse("ZYVOR_AGENT_SYNC_INTERVAL_MS", "300")?,
             guest_start_timeout_secs: env_parse("ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS", "30")?,
