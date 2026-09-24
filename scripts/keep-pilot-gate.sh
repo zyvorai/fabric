@@ -17,7 +17,14 @@ mkdir -p "$BASE/happy" "$BASE/deny"
 
 export KEEP_E2E_FLUXVM=1
 export ZYVOR_AGENT_FLUXVM_URL_LIVE="${ZYVOR_AGENT_FLUXVM_URL_LIVE:-http://127.0.0.1:7788}"
-export KEEP_E2E_TEMPLATE="${KEEP_E2E_TEMPLATE:-node22-agent}"
+# Prefer Firecracker cell when registered; override with KEEP_E2E_TEMPLATE.
+if [[ -z "${KEEP_E2E_TEMPLATE:-}" ]]; then
+  if [[ -d /var/lib/fluxvm/templates/node22-fc ]]; then
+    export KEEP_E2E_TEMPLATE=node22-fc
+  else
+    export KEEP_E2E_TEMPLATE=node22-agent
+  fi
+fi
 
 if [[ -x agent-runtime/target/release/zyvor-fabric-agent-runtime ]]; then
   export KEEP_E2E_BIN="${KEEP_E2E_BIN:-$ROOT/agent-runtime/target/release/zyvor-fabric-agent-runtime}"

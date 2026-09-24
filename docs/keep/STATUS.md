@@ -38,4 +38,6 @@ KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-live-lab.sh
 ## Honesty
 
 Measured = `software-test`. Host can still see the VM until Keep 0.2 + hardware.
-Guest vsock on QEMU `node22-agent` is healthy with musl-static guest-agent; Firecracker cell still pending — see [pilot-runs/README.md](pilot-runs/README.md).
+Guest vsock is healthy on QEMU `node22-agent` (musl-static guest-agent) and on
+Firecracker `node22-fc` (flat ext4 rootfs — see `scripts/keep-bake-fc-rootfs.sh`).
+The pilot gate prefers `node22-fc` when that template is registered.
