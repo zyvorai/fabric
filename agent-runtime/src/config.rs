@@ -36,6 +36,10 @@ pub struct Config {
     pub confine_all: bool,
     /// FluxVM Phase 6 security profile for sandboxes (default `measured` in Keep mode).
     pub security_profile: Option<String>,
+    /// Dual-key break-glass for host recover on measured/standard only (Keep 0.2).
+    /// Both must be set and presented; confidential profiles never accept recover.
+    pub recover_key_a: Option<String>,
+    pub recover_key_b: Option<String>,
     pub max_vcpus: Option<u8>,
     pub max_memory_mib: Option<u64>,
     pub egress_advertise_host: Option<String>,
@@ -95,6 +99,8 @@ impl Config {
                     _ => None,
                 }
             },
+            recover_key_a: env_opt("ZYVOR_AGENT_RECOVER_KEY_A").filter(|s| !s.is_empty()),
+            recover_key_b: env_opt("ZYVOR_AGENT_RECOVER_KEY_B").filter(|s| !s.is_empty()),
             max_vcpus: env_opt("ZYVOR_AGENT_MAX_VCPUS")
                 .map(|v| v.parse().context("invalid ZYVOR_AGENT_MAX_VCPUS"))
                 .transpose()?,

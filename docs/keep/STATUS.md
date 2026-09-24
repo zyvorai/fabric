@@ -10,7 +10,7 @@
 | Agent runtime | Policy YAML, goals/artifacts, cockpit, export-token | `agent-runtime/` |
 | Packaged agents | `infra-ops`, `migration-op`, `deploy-op` + `_fabric` | [`examples/keep-agents/`](../../examples/keep-agents/) |
 | Keep console view | Goal → task → evidence → approval → outcome | `/app/keep/:sessionId` |
-| Keep 0.2 | Documented gate only | `docs/keep/KEEP-0.2.md` |
+| Keep 0.2 | Software scaffolding (receipt + no confidential host-recover); hardware still gated | [`KEEP-0.2.md`](KEEP-0.2.md) |
 | CI | Keep workflow (stub e2e) | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
 | Tutorial | Hands-on + pack appendix | [Tutorial 16](../tutorials/16-keep-workstation.md) |
 

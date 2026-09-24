@@ -160,6 +160,21 @@ impl FluxVm {
         Ok(())
     }
 
+    /// Host-channel write refused when the session's confidential launch is active.
+    pub async fn fs_write_for_session(
+        &self,
+        confidential: Option<&crate::model::ConfidentialStatus>,
+        id: Uuid,
+        path: &str,
+        bytes: &[u8],
+        mode: u32,
+    ) -> Result<()> {
+        if let Some(msg) = crate::attestation::host_channel_forbidden(confidential) {
+            anyhow::bail!("{msg}");
+        }
+        self.fs_write(id, path, bytes, mode).await
+    }
+
     pub async fn process(
         &self,
         id: Uuid,
@@ -175,6 +190,20 @@ impl FluxVm {
             .send()
             .await?;
         self.parse(response).await
+    }
+
+    /// Host-channel exec refused when the session's confidential launch is active.
+    pub async fn process_for_session(
+        &self,
+        confidential: Option<&crate::model::ConfidentialStatus>,
+        id: Uuid,
+        command: &str,
+        timeout_seconds: Option<u64>,
+    ) -> Result<Value> {
+        if let Some(msg) = crate::attestation::host_channel_forbidden(confidential) {
+            anyhow::bail!("{msg}");
+        }
+        self.process(id, command, timeout_seconds).await
     }
 
     /// Light vsock health-check (no exec). Prefer this over `process` while waiting

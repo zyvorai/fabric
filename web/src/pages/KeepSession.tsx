@@ -132,6 +132,41 @@ export default function KeepSession() {
         </Card>
 
         <Card className="p-4 space-y-2 text-sm">
+          <h2 className="text-base font-semibold text-[var(--zf-ink)]">Attestation receipt</h2>
+          {(() => {
+            const a = cockpit?.attestation
+            const evidence = a?.evidence_class ?? cockpit?.evidence_class ?? 'software-test'
+            const canRead = a?.operator_can_read ?? evidence === 'software-test'
+            return (
+              <>
+                <div className="font-medium">
+                  {evidence}
+                  {canRead ? ' · host can read' : ' · launch verified'}
+                </div>
+                <div className="text-[var(--zf-muted)] text-xs space-y-1">
+                  <div>profile: {a?.security_profile ?? cockpit?.security_profile ?? '—'}</div>
+                  <div>image: {a?.image_hash ?? '—'}</div>
+                  <div>
+                    snp_verified={String(a?.snp_launch_verified ?? false)} · tdx_verified=
+                    {String(a?.tdx_launch_verified ?? false)}
+                  </div>
+                  <div>
+                    host recover:{' '}
+                    {a?.host_recover_allowed
+                      ? 'allowed (dual-key break-glass on measured/standard)'
+                      : 'forbidden (confidential)'}
+                  </div>
+                </div>
+                <p className="text-[12px] text-[var(--zf-muted)] pt-2 border-t border-[var(--zf-hairline)]">
+                  {a?.honesty ?? cockpit?.honesty ??
+                    'Evidence class software-test: the host can still see this VM.'}
+                </p>
+              </>
+            )
+          })()}
+        </Card>
+
+        <Card className="p-4 space-y-2 text-sm">
           <h2 className="text-base font-semibold text-[var(--zf-ink)]">Evidence</h2>
           {(cockpit?.recent_artifacts?.length ?? 0) === 0 ? (
             <p className="text-[var(--zf-muted)]">No artifacts yet.</p>

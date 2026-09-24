@@ -490,6 +490,27 @@ pub async fn session_browser_view(
     .await
 }
 
+/// Keep dual-key host recover (forbidden on confidential; measured needs both keys).
+pub async fn session_host_recover(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Response {
+    if let Err(resp) = session_owned(&state, &claims, &id).await {
+        return resp;
+    }
+    proxy(
+        &state,
+        Method::POST,
+        &format!("/v1/sessions/{id}/host-recover"),
+        None,
+        Some(body),
+        None,
+    )
+    .await
+}
+
 pub async fn list_approvals(
     RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,

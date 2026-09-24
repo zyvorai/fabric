@@ -308,6 +308,15 @@ fi
 COCK=$(curl -sf -H "Authorization: Bearer $TOKEN" "$API/v1/sessions/$SID/cockpit")
 check "cockpit JSON has session_id" "$SID" "$COCK"
 check "cockpit honesty note present" "software-test" "$COCK"
+check "cockpit attestation receipt" "attestation" "$COCK"
+check "cockpit operator_can_read" "operator_can_read" "$COCK"
+# host recover without keys configured → 503; with wrong keys would be 403
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"key_a":"x","key_b":"y"}' -X POST "$API/v1/sessions/$SID/host-recover")
+case "$CODE" in
+  403|503) echo "PASS  host-recover refuses without dual keys ($CODE)"; PASS=$((PASS+1)) ;;
+  *) echo "FAIL  host-recover expected 403/503 got $CODE"; FAIL=$((FAIL+1)) ;;
+esac
 HTML=$(curl -sf "$API/keep/cockpit?session=$SID")
 check "cockpit HTML serves" "Keep cockpit" "$HTML"
 check "keepctl cockpit" "$SID" "$("$KEEPCTL" cockpit "$SID")"
@@ -675,6 +684,8 @@ print(next((a['status'] for a in items if a['id']=='$APPROVAL_ID'),''))" 2>/dev/
       COCK=$(curl -sf -H "Authorization: Bearer $TOKEN" "$LIVE_API/v1/sessions/$LIVE_SID/cockpit" || true)
       check "cockpit evidence_class software-test" "software-test" "$COCK"
       check "cockpit browser_view link" "browser/view" "$COCK"
+      check "cockpit attestation receipt" '"attestation"' "$COCK"
+      check "cockpit host_recover_allowed" "host_recover_allowed" "$COCK"
       echo "$COCK" >"$W/cockpit.json"
 
       # Runtime restart + recover cockpit
