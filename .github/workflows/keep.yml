@@ -1,0 +1,63 @@
+name: Keep
+
+# Keep product surface on the agent runtime (policy, cockpit, keepctl).
+# No FluxVM / KVM required for these unit tests.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "agent-runtime/**"
+      - "docs/keep/**"
+      - "scripts/keepctl"
+      - "docs/tutorials/16-keep-workstation.md"
+      - ".github/workflows/keep.yml"
+  pull_request:
+    paths:
+      - "agent-runtime/**"
+      - "docs/keep/**"
+      - "scripts/keepctl"
+      - "docs/tutorials/16-keep-workstation.md"
+      - ".github/workflows/keep.yml"
+
+jobs:
+  keep-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path agent-runtime/Cargo.toml -- --check
+      - name: Clippy
+        run: cargo clippy --manifest-path agent-runtime/Cargo.toml --all-targets -- -D warnings
+      - name: Keep / policy / credentials tests
+        run: |
+          cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+          cargo test --manifest-path agent-runtime/Cargo.toml credentials -- --nocapture
+          cargo test --manifest-path agent-runtime/Cargo.toml --lib
+      - name: keepctl script sanity
+        run: |
+          test -x scripts/keepctl
+          scripts/keepctl --help | grep -q policy
+      - name: Docs present
+        run: |
+          test -f docs/keep/KEEP.md
+          test -f docs/keep/KEEP-0.2.md
+          test -f docs/keep/sentinel/keep.policy.yaml
+          test -f docs/tutorials/16-keep-workstation.md
+      - name: How to re-run locally
+        if: always()
+        run: |
+          cat <<'EOF'
+          Locally:
+            cargo test --manifest-path agent-runtime/Cargo.toml --lib
+            cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+            ./scripts/keepctl --help
+
+          Tutorial: docs/tutorials/16-keep-workstation.md
+          Pitch:    docs/keep/KEEP.md
+          Honesty:  measured = software-test; host can still see the VM until 0.2 + hardware.
+          EOF

@@ -12,6 +12,19 @@ not a third repo and not a second VMM.
 **Runtime:** `fabric/agent-runtime` (Sentinel, vault, egress ask, browser, approvals).  
 **Hypervisor:** FluxVM Phase 6 `security_profile` only.
 
+## How to test (same as CI)
+
+```bash
+# From fabric repo root — no KVM required
+cargo test --manifest-path agent-runtime/Cargo.toml --lib
+cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+./scripts/keepctl --help
+```
+
+GitHub Actions: [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml)  
+Hands-on: [Tutorial 16](../tutorials/16-keep-workstation.md)  
+FluxVM measured profiles (sibling repo): `./scripts/test-security-profiles.sh`
+
 ## Quiet part (read this first)
 
 Until Keep 0.2 on real SNP/TDX hardware with a user-held wrapping key:

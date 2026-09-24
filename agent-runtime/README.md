@@ -31,6 +31,7 @@ Deploy JavaScript/TypeScript agents like serverless functions while giving every
 - cron schedules, HMAC webhooks, and bounded loops
 - an MCP endpoint for listing agents, listing executions, and chatting
 - GitHub session CI that runs those paths with no FluxVM and no model key
+- **Keep** product surface: signed `keep.policy.yaml`, BYO `model_socket`, session cockpit (visible taint), `scripts/keepctl`, scoped export tokens (training off by default) — [docs/keep/KEEP.md](../docs/keep/KEEP.md) · [Tutorial 16](../docs/tutorials/16-keep-workstation.md) · [CI](../.github/workflows/keep.yml)
 
 The runtime is intentionally a standalone component in the Fabric repository. It consumes FluxVM's existing `/v1/sandboxes` API directly and does not alter the existing `zyvor-fabricd` VM API or backend workspace.
 
@@ -516,6 +517,17 @@ Session metadata, TTL deadlines, warm-pool claims and the host event journal sur
 ## Continuous integration
 
 `.github/workflows/agent-runtime.yml` typechecks the crate, builds the example bundles, and runs a real session on the GitHub runner. Runners have no FluxVM, so [`agent-runtime/tests/sandbox_stub.py`](tests/sandbox_stub.py) stores the guest files and starts `worker.mjs` or `harness.mjs` with Node on the runner. Provider APIs are not called.
+
+**Keep** (policy YAML, cockpit routes, keepctl, docs) has its own workflow:
+[`.github/workflows/keep.yml`](../.github/workflows/keep.yml). Locally:
+
+```bash
+cargo test --manifest-path agent-runtime/Cargo.toml --lib
+cargo test --manifest-path agent-runtime/Cargo.toml policy -- --nocapture
+./scripts/keepctl --help
+```
+
+Tutorial: [docs/tutorials/16-keep-workstation.md](../docs/tutorials/16-keep-workstation.md).
 
 [`agent-runtime/tests/session-ci.sh`](tests/session-ci.sh) deploys four agents and checks each path:
 
