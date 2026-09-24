@@ -257,6 +257,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             get(crate::browser::browser_view),
         )
         .route(
+            "/v1/sessions/{id}/browser/screenshot",
+            get(crate::browser::browser_screenshot),
+        )
+        .route(
             "/v1/sessions/{id}/browser/{*path}",
             get(crate::browser::devtools),
         )

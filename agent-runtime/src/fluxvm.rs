@@ -239,6 +239,53 @@ impl FluxVm {
         self.parse(response).await
     }
 
+    /// Open a FluxVM-bridged WebSocket to a guest TCP WebSocket path (CDP, etc.).
+    pub async fn guest_ws(
+        &self,
+        id: Uuid,
+        port: u16,
+        path: &str,
+    ) -> Result<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    > {
+        use tokio_tungstenite::{
+            connect_async,
+            tungstenite::{client::IntoClientRequest, http::header::AUTHORIZATION},
+        };
+
+        let path = path.trim_start_matches('/');
+        let mut ws_base = self.base.clone();
+        let scheme = if self.base.scheme() == "https" {
+            "wss"
+        } else {
+            "ws"
+        };
+        ws_base
+            .set_scheme(scheme)
+            .map_err(|()| anyhow::anyhow!("setting ws scheme"))?;
+        let url = ws_base
+            .join(&format!("/v1/sandboxes/{id}/ws/{port}/{path}"))
+            .with_context(|| format!("joining FluxVM WS URL with {path}"))?;
+        let mut request = url
+            .as_str()
+            .into_client_request()
+            .context("building FluxVM WS request")?;
+        if let Some(token) = &self.token {
+            request.headers_mut().insert(
+                AUTHORIZATION,
+                format!("Bearer {token}")
+                    .parse()
+                    .context("FluxVM bearer header")?,
+            );
+        }
+        let (stream, _) = connect_async(request)
+            .await
+            .context("connecting FluxVM sandbox WS bridge")?;
+        Ok(stream)
+    }
+
     pub async fn pause(&self, id: Uuid) -> Result<()> {
         let response = self
             .auth(self.http.post(self.url(&format!("/v1/vms/{id}/pause"))?))

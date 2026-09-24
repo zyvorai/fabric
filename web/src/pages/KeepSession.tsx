@@ -5,10 +5,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Shield } from 'lucide-react'
 import {
+  BrowserScreenshot,
   BrowserView,
   KeepCockpit,
   decideApproval,
   getSession,
+  getSessionBrowserScreenshot,
   getSessionBrowserView,
   getSessionCockpit,
   SessionView,
@@ -26,6 +28,7 @@ export default function KeepSession() {
   const [session, setSession] = useState<SessionView | null>(null)
   const [cockpit, setCockpit] = useState<KeepCockpit | null>(null)
   const [browser, setBrowser] = useState<BrowserView | null>(null)
+  const [shot, setShot] = useState<BrowserScreenshot | null>(null)
   const { loading, loadError, run } = usePageLoader('Failed to load Keep session')
 
   const load = useCallback(() => {
@@ -42,6 +45,12 @@ export default function KeepSession() {
         setBrowser(b)
       } catch {
         setBrowser(null)
+      }
+      try {
+        const frame = await getSessionBrowserScreenshot(sessionId)
+        setShot(frame)
+      } catch {
+        setShot(null)
       }
     })
   }, [run, sessionId])
@@ -201,8 +210,8 @@ export default function KeepSession() {
           </div>
           {!browser ? (
             <p className="text-[var(--zf-muted)]">
-              Tab listing unavailable (session needs a running browser_port agent). Listing only —
-              no screencast or input takeover.
+              Tab listing unavailable (session needs a running browser_port agent).
+              Screenshot needs the same; input takeover is not implemented.
             </p>
           ) : (browser.tabs?.length ?? 0) === 0 ? (
             <p className="text-[var(--zf-muted)]">No open tabs reported.</p>
@@ -216,9 +225,21 @@ export default function KeepSession() {
               ))}
             </ul>
           )}
-          {(browser?.honesty || cockpit?.vault?.honesty) && (
+          {shot?.image_base64 && (
+            <div className="pt-2 space-y-1">
+              <img
+                alt={shot.title || 'browser screenshot'}
+                className="w-full max-h-80 object-contain rounded border border-[var(--zf-hairline)] bg-black"
+                src={`data:${shot.mime || 'image/jpeg'};base64,${shot.image_base64}`}
+              />
+              <p className="text-[12px] text-[var(--zf-muted)] truncate">
+                {shot.title} · {shot.url}
+              </p>
+            </div>
+          )}
+          {(shot?.honesty || browser?.honesty || cockpit?.vault?.honesty) && (
             <p className="text-[12px] text-[var(--zf-muted)] pt-2 border-t border-[var(--zf-hairline)]">
-              {browser?.honesty ?? cockpit?.vault?.honesty}
+              {shot?.honesty ?? browser?.honesty ?? cockpit?.vault?.honesty}
             </p>
           )}
         </Card>
