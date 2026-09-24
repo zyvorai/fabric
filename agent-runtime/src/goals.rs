@@ -438,7 +438,12 @@ pub(crate) async fn create_artifact(
     }
     // Soft secret scan — refuse obvious key material in artifacts.
     let lower = req.body.to_ascii_lowercase();
-    for needle in ["api_key=", "begin private key", "password=", "authorization: bearer "] {
+    for needle in [
+        "api_key=",
+        "begin private key",
+        "password=",
+        "authorization: bearer ",
+    ] {
         if lower.contains(needle) {
             return Err(ApiError::bad_request(
                 "artifact body looks like it contains a secret",

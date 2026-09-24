@@ -305,10 +305,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/goals/{id}",
             get(crate::goals::get_goal).patch(crate::goals::patch_goal),
         )
-        .route(
-            "/v1/goals/{id}/advance",
-            post(crate::goals::advance_step),
-        )
+        .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
         .route(
             "/v1/artifacts",
             get(crate::goals::list_artifacts).post(crate::goals::create_artifact),
@@ -378,8 +375,8 @@ async fn deploy_agent(
         .policy_trust
         .verify_deployment(&body, signature)
         .map_err(ApiError::forbidden)?;
-    let mut req: DeployAgentRequest = serde_json::from_slice(&body)
-        .map_err(ApiError::bad_request)?;
+    let mut req: DeployAgentRequest =
+        serde_json::from_slice(&body).map_err(ApiError::bad_request)?;
     if req.manifest.template.trim().is_empty() {
         return Err(ApiError::bad_request("manifest.template is required"));
     }
@@ -1975,7 +1972,9 @@ async fn list_audit(
         .verify()
         .await
         .map_err(ApiError::internal)?;
-    Ok(Json(json!({"items": items, "chain": chain, "export": false})))
+    Ok(Json(
+        json!({"items": items, "chain": chain, "export": false}),
+    ))
 }
 
 /// Full audit/trajectory export — requires X-Keep-Export-Token (training default off).
@@ -2019,7 +2018,9 @@ async fn export_audit(
             json!({"limit": limit}),
         )
         .await;
-    Ok(Json(json!({"items": items, "chain": chain, "export": true})))
+    Ok(Json(
+        json!({"items": items, "chain": chain, "export": true}),
+    ))
 }
 
 /// Keep: readable Sentinel policy as `keep.policy.yaml`.

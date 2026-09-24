@@ -47,10 +47,7 @@ impl ExportTokenStore {
         if scope.is_empty() {
             bail!("scope is required");
         }
-        if !scope.starts_with("trajectory:")
-            && !scope.starts_with("audit:")
-            && scope != "pack"
-        {
+        if !scope.starts_with("trajectory:") && !scope.starts_with("audit:") && scope != "pack" {
             bail!("scope must start with trajectory:, audit:, or be 'pack'");
         }
         let ttl = ttl_seconds.clamp(60, 86_400);
