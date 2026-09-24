@@ -106,16 +106,111 @@ impl UnwrapTokenStore {
 }
 
 /// Host-env secrets with an optional operator unwrap ceremony.
+/// `UserHeldPending` labels the Keep 0.2 contract without claiming attestation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecretBackendKind {
     HostEnv,
+    /// Soft label when `ZYVOR_AGENT_VAULT_USER_HELD=1` — still host-env material.
+    UserHeldPending,
 }
 
 impl SecretBackendKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::HostEnv => "host-env",
+            Self::UserHeldPending => "user-held-pending",
         }
+    }
+
+    pub fn from_env() -> Self {
+        if std::env::var("ZYVOR_AGENT_VAULT_USER_HELD").ok().as_deref() == Some("1") {
+            Self::UserHeldPending
+        } else {
+            Self::HostEnv
+        }
+    }
+}
+
+/// Challenge for a future phone/YubiKey unwrap. Completing it without SNP/TDX
+/// verified flags is refused — software scaffolding only.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserHeldChallenge {
+    pub id: Uuid,
+    pub nonce: String,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+pub struct UserHeldChallengeStore {
+    path: PathBuf,
+    lock: Mutex<()>,
+}
+
+impl UserHeldChallengeStore {
+    pub async fn open(root: impl AsRef<Path>) -> Result<Self> {
+        let path = root.as_ref().join("user-held-challenges.jsonl");
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+        Ok(Self {
+            path,
+            lock: Mutex::new(()),
+        })
+    }
+
+    pub async fn mint(&self, ttl_seconds: u64) -> Result<UserHeldChallenge> {
+        let ttl = ttl_seconds.clamp(60, 3_600);
+        let challenge = UserHeldChallenge {
+            id: Uuid::new_v4(),
+            nonce: format!("keep_uh_{}", Uuid::new_v4().simple()),
+            created_at: Utc::now(),
+            expires_at: Utc::now() + Duration::seconds(ttl as i64),
+        };
+        let _g = self.lock.lock().await;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .await?;
+        let mut line = serde_json::to_vec(&challenge)?;
+        line.push(b'\n');
+        file.write_all(&line).await?;
+        file.sync_data().await?;
+        Ok(challenge)
+    }
+
+    pub async fn take(&self, id: Uuid, nonce: &str) -> Result<UserHeldChallenge> {
+        let raw_file = fs::read_to_string(&self.path).await.unwrap_or_default();
+        let now = Utc::now();
+        for line in raw_file.lines().filter(|l| !l.trim().is_empty()) {
+            let Ok(rec) = serde_json::from_str::<UserHeldChallenge>(line) else {
+                continue;
+            };
+            if rec.id != id {
+                continue;
+            }
+            if rec.nonce != nonce {
+                bail!("user-held challenge nonce mismatch");
+            }
+            if rec.expires_at < now {
+                bail!("user-held challenge expired");
+            }
+            return Ok(rec);
+        }
+        bail!("user-held challenge not found");
+    }
+}
+
+/// Refuse attested unlock until FluxVM reports verified SNP/TDX launch.
+pub fn user_held_complete_allowed(snp_verified: bool, tdx_verified: bool) -> Result<()> {
+    if snp_verified || tdx_verified {
+        Ok(())
+    } else {
+        bail!(
+            "user-held unwrap complete refused: FluxVM snp_launch_verified / \
+             tdx_launch_verified are false (Keep 0.2 hardware gate). Challenge \
+             minted for phone/YubiKey ceremony design only; secrets remain host-env."
+        )
     }
 }
 
@@ -138,5 +233,15 @@ mod tests {
         store.authorize(Some(&raw)).await.unwrap();
         assert!(store.authorize(None).await.is_err());
         assert!(store.authorize(Some("bogus")).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn user_held_challenge_roundtrip_and_gate() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = UserHeldChallengeStore::open(dir.path()).await.unwrap();
+        let c = store.mint(300).await.unwrap();
+        store.take(c.id, &c.nonce).await.unwrap();
+        assert!(user_held_complete_allowed(false, false).is_err());
+        assert!(user_held_complete_allowed(true, false).is_ok());
     }
 }

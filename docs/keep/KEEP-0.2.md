@@ -6,7 +6,8 @@ FluxVM `security.snp_launch_verified` / `security.tdx_launch_verified`.
 ## Required (hardware)
 
 1. **User-held unwrap** — vault opens only after phone or YubiKey unwraps a key
-   onto a measured/attested guest.
+   onto a measured/attested guest (`POST /v1/vault/user-held/complete` stays
+   refuse-closed until verified flags are true).
 2. Flip FluxVM SNP/TDX verified flags after one hardware launch; evidence class
    may then become `sev-snp` / `tdx`.
 3. Align with [confidential-agent-vms.md](../design/confidential-agent-vms.md)
@@ -26,5 +27,10 @@ These ship so the product never mislabels a measured VM:
    required; grant is audited and still labeled software-test.
 3. **Host guest-agent channel helpers** — `FluxVm::process_for_session` /
    `fs_write_for_session` refuse when confidential launch is active.
+4. **Browser screenshot + screencast** — `GET …/browser/screenshot` and
+   `WS …/browser/screencast` (frames only; no input) via FluxVM sandbox WS bridge.
+5. **User-held challenge API** — `POST /v1/vault/user-held/challenge` mints a
+   nonce; `complete` is **403** until SNP/TDX verified (`keepctl user-held-*`).
+6. **browser-agent bake script** — [`scripts/keep-bake-browser-agent.sh`](../../scripts/keep-bake-browser-agent.sh).
 
 Until hardware: *the host can still see a measured VM.* That is intentional.

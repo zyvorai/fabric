@@ -261,6 +261,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             get(crate::browser::browser_screenshot),
         )
         .route(
+            "/v1/sessions/{id}/browser/screencast",
+            get(crate::browser::browser_screencast),
+        )
+        .route(
             "/v1/sessions/{id}/browser/{*path}",
             get(crate::browser::devtools),
         )
@@ -329,6 +333,8 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/vault/status", get(vault_status))
         .route("/v1/vault/unwrap-tokens", post(mint_unwrap_token))
         .route("/v1/vault/unwrap", post(unlock_vault))
+        .route("/v1/vault/user-held/challenge", post(user_held_challenge))
+        .route("/v1/vault/user-held/complete", post(user_held_complete))
         .route("/v1/agents/{name}/pack", get(pack_agent))
         .route("/v1/skills", get(list_skills).post(publish_skill))
         .route("/v1/skills/{name}", get(get_skill).delete(delete_skill))
@@ -353,10 +359,18 @@ async fn api_auth(
     let Some(expected) = state.config.api_token.as_deref() else {
         return next.run(request).await;
     };
-    let presented = headers
+    let header_tok = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "));
+    // Browsers cannot set Authorization on WebSocket; allow ?token= for WS upgrades.
+    let query_tok = request.uri().query().and_then(|q| {
+        q.split('&').find_map(|pair| {
+            let (k, v) = pair.split_once('=')?;
+            (k == "token").then_some(v)
+        })
+    });
+    let presented = header_tok.or(query_tok);
     if presented.is_some_and(|v| constant_time_eq(v.as_bytes(), expected.as_bytes())) {
         next.run(request).await
     } else {
@@ -2468,13 +2482,108 @@ async fn unlock_vault(
 
 async fn vault_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
     let names: Vec<String> = state.credentials.names();
+    let backend = crate::unwrap_tokens::SecretBackendKind::from_env();
     Ok(Json(json!({
-        "secret_backend": crate::unwrap_tokens::SecretBackendKind::HostEnv.as_str(),
+        "secret_backend": backend.as_str(),
         "unwrap_required": state.vault_unwrap_required,
         "unlocked": state.vault_is_unlocked(),
         "credential_names": names,
-        "honesty": "Secrets still come from host env until Keep 0.2 user-held unwrap on attested hardware.",
+        "user_held": {
+            "challenge": "/v1/vault/user-held/challenge",
+            "complete": "/v1/vault/user-held/complete",
+            "attestation_required": true,
+            "snp_launch_verified": false,
+            "tdx_launch_verified": false,
+        },
+        "honesty": "Secrets still come from host env until Keep 0.2 user-held unwrap on attested hardware. Complete is refused while SNP/TDX verified flags are false.",
     })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct UserHeldChallengeRequest {
+    #[serde(default = "default_uh_ttl")]
+    ttl_seconds: u64,
+}
+
+fn default_uh_ttl() -> u64 {
+    600
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct UserHeldCompleteRequest {
+    challenge_id: Uuid,
+    nonce: String,
+    /// Reserved for WebAuthn / YubiKey assertion JSON (opaque until hardware).
+    #[serde(default)]
+    assertion: Option<Value>,
+}
+
+/// Mint a user-held unwrap challenge (phone/YubiKey ceremony design).
+async fn user_held_challenge(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<UserHeldChallengeRequest>,
+) -> ApiResult<Json<Value>> {
+    let challenge = state
+        .user_held_challenges
+        .mint(req.ttl_seconds)
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.vault.user_held.challenge",
+            None,
+            json!({
+                "id": challenge.id,
+                "expires_at": challenge.expires_at,
+                "honesty": "challenge only; complete refused without SNP/TDX",
+            }),
+        )
+        .await;
+    Ok(Json(json!({
+        "id": challenge.id,
+        "nonce": challenge.nonce,
+        "expires_at": challenge.expires_at,
+        "secret_backend": crate::unwrap_tokens::SecretBackendKind::from_env().as_str(),
+        "honesty": "Present nonce to phone/YubiKey ceremony. POST /v1/vault/user-held/complete refuses until FluxVM snp/tdx_launch_verified. Secrets remain host-env.",
+    })))
+}
+
+/// Complete user-held unwrap — fail-closed without verified confidential launch.
+async fn user_held_complete(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<UserHeldCompleteRequest>,
+) -> ApiResult<Json<Value>> {
+    let challenge = state
+        .user_held_challenges
+        .take(req.challenge_id, &req.nonce)
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = req.assertion; // reserved for WebAuthn payload
+    if let Err(e) = crate::unwrap_tokens::user_held_complete_allowed(false, false) {
+        let _ = state
+            .store
+            .audit
+            .append(
+                None,
+                AuditPhase::Denied,
+                "keep.vault.user_held.complete_refused",
+                None,
+                json!({
+                    "challenge_id": challenge.id,
+                    "reason": e.to_string(),
+                }),
+            )
+            .await;
+        return Err(ApiError::forbidden(e));
+    }
+    // Unreachable until hardware flips verified flags (wired later).
+    Err(ApiError::unavailable(
+        "user-held complete path not wired to key broker yet",
+    ))
 }
 
 /// Keep pack: policy + agent pin + credential *names* (never secrets) + FluxVM migrate notes.

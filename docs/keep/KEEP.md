@@ -108,7 +108,7 @@ Security profiles (FluxVM Phase 6):
 3. **Firecracker / measured cell** — agent kernel ≠ host kernel intent; `security_profile: measured` → evidence `software-test`.
 4. **Phone-only high-risk approvals** — buy / send / delete via webhook / `/v1/approvals`, never in chat.
 5. **Pack / unpack** — `keepctl pack` → USB or S3 → `keepctl unpack` on another FluxVM node.
-6. **Cockpit + browser live view** — visible taint, last decisions, tab listing (`/keep/browser`); no screencast/takeover yet.
+6. **Cockpit + browser live view** — visible taint, last decisions, tab listing (`/keep/browser`), screenshot + read-only screencast; input takeover not implemented.
 
 Lab gate: `./scripts/keep-live-lab.sh`. Guest boot needs a FluxVM template (Tutorial 11).
 
