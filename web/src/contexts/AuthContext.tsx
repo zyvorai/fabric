@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: response.user_id,
       username: response.username,
       role: response.role,
+      tenant: response.tenant ?? null,
     })
   }, [])
 

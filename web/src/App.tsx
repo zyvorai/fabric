@@ -16,6 +16,7 @@ import NotFound from './pages/NotFound'
 import Home from './pages/marketing/Home'
 import Product from './pages/marketing/Product'
 import Platform from './pages/marketing/Platform'
+import Keep from './pages/marketing/Keep'
 import SecurityPage from './pages/marketing/Security'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -242,6 +243,7 @@ function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/product" element={<Product />} />
       <Route path="/platform" element={<Platform />} />
+      <Route path="/keep" element={<Keep />} />
       <Route path="/security" element={<SecurityPage />} />
       <Route path="/sign-in" element={<SignIn />} />
       <Route path="/login" element={<Navigate to="/sign-in" replace />} />

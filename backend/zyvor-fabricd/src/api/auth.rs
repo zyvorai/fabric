@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use security::{RequireAdmin, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -577,5 +578,117 @@ pub async fn disable_2fa(
 
     Ok(Json(
         serde_json::json!({"message": "2FA disabled successfully"}),
+    ))
+}
+
+// ============================================================================
+// Auth DB user management (admin)
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct CreateAuthUserRequest {
+    pub username: String,
+    pub password: String,
+    /// `admin` | `user` | `viewer` (also accepts legacy `operator` → `user`).
+    pub role: String,
+    #[serde(default)]
+    pub tenant: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AuthUserResponse {
+    pub id: String,
+    pub username: String,
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
+}
+
+fn parse_auth_role(raw: &str) -> Result<Role, (StatusCode, Json<serde_json::Value>)> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "admin" => Ok(Role::Admin),
+        "user" | "operator" => Ok(Role::User),
+        "viewer" => Ok(Role::Viewer),
+        _ => Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Role must be admin, user, or viewer",
+        )),
+    }
+}
+
+/// POST /api/auth/users — create a login user in the SQLite auth DB (with optional tenant).
+pub async fn create_auth_user(
+    RequireAdmin(_claims): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateAuthUserRequest>,
+) -> Result<(StatusCode, Json<AuthUserResponse>), (StatusCode, Json<serde_json::Value>)> {
+    if req.username.is_empty()
+        || req.username.len() > 64
+        || !req
+            .username
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    {
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Invalid username format",
+        ));
+    }
+    if req.password.len() < 8 {
+        return Err(crate::api_error::json_error(
+            StatusCode::BAD_REQUEST,
+            "Password must be at least 8 characters",
+        ));
+    }
+    let role = parse_auth_role(&req.role)?;
+    let tenant = req
+        .tenant
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty());
+
+    let user_db = state.user_db.as_ref().ok_or_else(|| {
+        crate::api_error::json_error(StatusCode::SERVICE_UNAVAILABLE, "Auth DB not configured")
+    })?;
+
+    if user_db
+        .get_by_username(&req.username)
+        .map_err(|_| {
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+        })?
+        .is_some()
+    {
+        return Err(crate::api_error::json_error(
+            StatusCode::CONFLICT,
+            "Username already exists",
+        ));
+    }
+
+    let user = user_db
+        .create_user(&req.username, &req.password, role.clone())
+        .map_err(|e| {
+            tracing::error!("create_auth_user: {e}");
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to create user")
+        })?;
+
+    if let Some(ref t) = tenant {
+        user_db.set_user_tenant(&user.id, Some(t)).map_err(|e| {
+            tracing::error!("set_user_tenant: {e}");
+            crate::api_error::json_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to set tenant")
+        })?;
+    }
+
+    Ok((
+        StatusCode::CREATED,
+        Json(AuthUserResponse {
+            id: user.id,
+            username: user.username,
+            role: match role {
+                Role::Admin => "admin",
+                Role::User => "user",
+                Role::Viewer => "viewer",
+            }
+            .to_string(),
+            tenant,
+        }),
     ))
 }

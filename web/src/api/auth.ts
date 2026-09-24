@@ -13,12 +13,14 @@ export interface LoginResponse {
   user_id: string
   role: string
   username: string
+  tenant?: string | null
 }
 
 export interface UserInfo {
   id: string
   username: string
   role: string
+  tenant?: string | null
 }
 
 const API_BASE = '/api'

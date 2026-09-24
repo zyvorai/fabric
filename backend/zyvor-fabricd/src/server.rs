@@ -416,6 +416,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let mut api_routes = Router::new()
         // Auth - me endpoint (protected)
         .route("/auth/me", get(api::auth::me))
+        .route("/auth/users", post(api::auth::create_auth_user))
         .route("/capabilities", get(api::capabilities::get_capabilities))
         .route("/license", get(routes::get_license_status))
         // VM management routes

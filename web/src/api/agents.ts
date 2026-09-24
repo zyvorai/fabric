@@ -13,6 +13,8 @@ export interface AgentManifest {
   max_concurrent_sessions?: number
   idle_hibernate_seconds?: number
   warm_pool_size?: number
+  /** Per-user home disk — sessions must pass user_id (multi-tenant Keep). */
+  home_volume?: { per_user?: boolean; name?: string }
   /** node runs worker.mjs. claude, codex, and gemini run that CLI inside the template. */
   runtime?: 'node' | 'claude' | 'codex' | 'gemini'
 }
@@ -38,6 +40,7 @@ export interface SessionView {
   request_id?: string | null
   error?: string | null
   parent_session_id?: string | null
+  user_id?: string | null
 }
 
 export async function listAgents(): Promise<{ items: AgentRecord[] }> {
@@ -69,6 +72,8 @@ export async function createSession(body: {
   input?: unknown
   ttl_seconds?: number
   request_id?: string
+  /** Stamped by fabricd from JWT for non-admins; admins may set explicitly. */
+  user_id?: string
 }): Promise<SessionView> {
   return apiPost('/api/sessions', body)
 }
