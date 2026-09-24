@@ -265,6 +265,14 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             get(crate::browser::browser_screencast),
         )
         .route(
+            "/v1/sessions/{id}/browser/tool",
+            post(crate::browser::browser_tool),
+        )
+        .route(
+            "/v1/sessions/{id}/browser/fill-secret",
+            post(crate::browser::browser_fill_secret),
+        )
+        .route(
             "/v1/sessions/{id}/browser/{*path}",
             get(crate::browser::devtools),
         )
@@ -2234,6 +2242,7 @@ async fn session_cockpit(
         "browser_screenshot": format!("/v1/sessions/{id}/browser/screenshot"),
         "browser_screencast": format!("/v1/sessions/{id}/browser/screencast"),
         "browser_page": format!("/keep/browser?session={id}"),
+        "browser": crate::browser::browser_capability(&state, id).await,
         "security_profile": receipt.security_profile,
         "evidence_class": receipt.evidence_class,
         "honesty": receipt.honesty,

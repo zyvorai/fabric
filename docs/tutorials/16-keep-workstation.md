@@ -215,15 +215,43 @@ SNP/TDX + real user-held unwrap is still required before unread-by-operator clai
 
 ---
 
+## Appendix — Brokered browser (`browser-agent`)
+
+Bake on a FluxVM host (Debian Chromium; not Ubuntu snap):
+
+```bash
+curl -fsSL -o /tmp/node20.tar.xz \
+  https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-x64.tar.xz
+(cd /tmp && npm pack playwright-core@1.49.1 && mv playwright-core-*.tgz playwright-pack.tgz)
+./scripts/keep-bake-browser-agent.sh
+```
+
+Deploy with `template=browser-agent`, `browser_port=9222`, `confinement: strict`.
+Driver listens on guest `:9230` (a11y refs). Operator:
+
+```bash
+keepctl browser tabs "$SESSION"
+keepctl browser shot "$SESSION"
+```
+
+MCP tools: `browser_open` / `browser_snapshot` / `browser_act` / `browser_tabs` /
+`browser_close`. Passwords: host `POST /v1/sessions/{id}/browser/fill-secret`.
+Details: [docs/keep/browser/DRIVER.md](../keep/browser/DRIVER.md).
+
+CI syntax check: `./scripts/keep-bake-browser-smoke.sh`.
+
+---
+
 ## Appendix — Packaged agents (infra, migration, deploy)
 
-Keep ships three Fabric-facing packs under [`examples/keep-agents/`](../../examples/keep-agents/):
+Keep ships Fabric-facing packs under [`examples/keep-agents/`](../../examples/keep-agents/):
 
 | Pack | Reads | Writes (ask) | Artifact |
 |---|---|---|---|
 | `infra-ops` | alerts, VMs, lifecycle compliance | restart / remediation | incident timeline |
 | `migration-op` | `/api/migrations/*`, GuestKit inspect | create/cancel/rescue | wave plan + checklist |
 | `deploy-op` | `/readyz`, `/health` | none by default | FABRIC_DOCTOR readiness |
+| `browser-research` | allowlisted browse via a11y driver | none by default | research markdown |
 
 Shared `_fabric` connector + `fabric-api` credential recipe. Goals/artifacts API:
 [`docs/keep/goals/README.md`](../keep/goals/README.md).

@@ -8,6 +8,8 @@
 #   - fluxctl / fluxvm with image build support
 #   - musl or host fluxvm-guest-agent binary
 #   - Node 20 tarball downloaded (image build has no network for commands)
+#   - Optional: pre-packed playwright-core at /tmp/playwright-pack.tgz
+#     (npm pack playwright-core@1.49.1 on a networked host)
 #
 # Usage:
 #   ./scripts/keep-bake-browser-agent.sh
@@ -16,7 +18,8 @@
 #     ./scripts/keep-bake-browser-agent.sh
 #
 # Full image bake can take a long time and needs several GiB free. If the
-# qcow2 already exists, this script only (re)registers the template.
+# qcow2 already exists, this script only (re)registers the template and
+# refreshes guest unit/driver assets into the template dir for operators.
 #
 set -euo pipefail
 
@@ -25,8 +28,10 @@ TPL_SRC="$ROOT/agent-runtime/templates/browser-agent"
 OUT_IMG="${KEEP_BROWSER_OUT:-/var/lib/fluxvm/images/browser-agent.qcow2}"
 TDIR="${KEEP_BROWSER_TEMPLATE_DIR:-/var/lib/fluxvm/templates/browser-agent}"
 NODE_TAR="${KEEP_BROWSER_NODE_TAR:-/tmp/node20.tar.xz}"
+PW_PACK="${KEEP_BROWSER_PLAYWRIGHT_TGZ:-/tmp/playwright-pack.tgz}"
 GUEST_AGENT="${KEEP_BROWSER_GUEST_AGENT:-}"
 UNIT_SRC="${KEEP_BROWSER_UNIT:-}"
+ASSETS_STAGING="${KEEP_BROWSER_ASSETS:-/tmp/browser-agent-assets}"
 
 if [[ -z "$GUEST_AGENT" ]]; then
   for cand in \
@@ -48,8 +53,18 @@ echo "==> browser-agent bake"
 echo "    image:    $OUT_IMG"
 echo "    template: $TDIR"
 echo "    node tar: $NODE_TAR"
+echo "    playwright pack: $PW_PACK"
 echo "    agent:    ${GUEST_AGENT:-MISSING}"
 echo "    unit:     ${UNIT_SRC:-MISSING}"
+
+stage_assets() {
+  rm -rf "$ASSETS_STAGING"
+  mkdir -p "$ASSETS_STAGING"
+  cp "$TPL_SRC/driver.mjs" "$TPL_SRC/example.mjs" "$TPL_SRC/package.json" "$ASSETS_STAGING/"
+  cp "$TPL_SRC/chromium-cdp.service" "$TPL_SRC/browser-driver.service" "$ASSETS_STAGING/"
+}
+
+stage_assets
 
 if [[ ! -f "$OUT_IMG" ]]; then
   [[ -f "$NODE_TAR" ]] || {
@@ -63,18 +78,33 @@ if [[ ! -f "$OUT_IMG" ]]; then
     echo "fluxctl/fluxvm not on PATH" >&2
     exit 1
   }
+  if [[ ! -f "$PW_PACK" ]]; then
+    echo "NOTE: $PW_PACK missing — packing playwright-core from npm if network available"
+    if command -v npm >/dev/null; then
+      TMPPW=$(mktemp -d)
+      (cd "$TMPPW" && npm pack playwright-core@1.49.1 >/dev/null)
+      mv "$TMPPW"/playwright-core-*.tgz "$PW_PACK"
+      rm -rf "$TMPPW"
+    else
+      echo "missing $PW_PACK and npm — create with: npm pack playwright-core@1.49.1" >&2
+      exit 1
+    fi
+  fi
 
   BUILD=$(mktemp)
   trap 'rm -f "$BUILD"' EXIT
-  python3 - "$TPL_SRC/build.json" "$OUT_IMG" "$NODE_TAR" "$GUEST_AGENT" "$UNIT_SRC" "$BUILD" <<'PY'
+  python3 - "$TPL_SRC/build.json" "$OUT_IMG" "$NODE_TAR" "$GUEST_AGENT" "$UNIT_SRC" \
+    "$ASSETS_STAGING" "$PW_PACK" "$BUILD" <<'PY'
 import json, sys
-src, out, node, agent, unit, dest = sys.argv[1:]
+src, out, node, agent, unit, assets, pw, dest = sys.argv[1:]
 spec = json.load(open(src))
 spec["output"] = out
 spec["copy_in"] = [
   {"src": node, "dest": "/root/node20.tar.xz"},
   {"src": agent, "dest": "/usr/local/bin/fluxvm-guest-agent"},
   {"src": unit, "dest": "/etc/systemd/system/fluxvm-guest-agent.service"},
+  {"src": assets, "dest": "/root/browser-assets"},
+  {"src": pw, "dest": "/root/playwright-pack.tgz"},
 ]
 json.dump(spec, open(dest, "w"), indent=2)
 print("wrote", dest)
@@ -92,7 +122,6 @@ fi
 echo "==> registering template"
 sudo mkdir -p "$TDIR"
 sudo cp "$TPL_SRC/spec.json" "$TDIR/spec.json"
-# ensure image path matches
 sudo python3 - <<PY
 import json
 p="$TDIR/spec.json"
@@ -103,5 +132,6 @@ print("registered", p)
 PY
 
 echo "OK — browser-agent template ready"
-echo "    Try a Keep agent with template=browser-agent and browser_port=9222"
-echo "    (start Chromium with --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0)."
+echo "    Manifest: template=browser-agent browser_port=9222 confinement=strict"
+echo "    Guest: Chromium CDP 127.0.0.1:9222 + driver 127.0.0.1:9230"
+echo "    Gate: curl --noproxy '*' https://example.com must FAIL inside the cell"

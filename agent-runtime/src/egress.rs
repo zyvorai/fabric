@@ -974,6 +974,7 @@ pub(crate) mod ask_tests {
             inner_container: Default::default(),
             persistent: false,
             browser_port: None,
+            browser: None,
             template: "t".into(),
             credentials: vec![],
             egress_allow_hosts: vec![],

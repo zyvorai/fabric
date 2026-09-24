@@ -1,51 +1,56 @@
 # browser-agent template
 
-A FluxVM sandbox template with Node.js and Chromium, sized like a per-user
-desktop-style agent VM (2 vCPU, ~7.7 GB). Use it with a per-user home volume:
+A FluxVM sandbox template with Node.js, Chromium (loopback CDP), and the Keep
+a11y driver (Playwright private). Sized like a per-user desktop-style agent VM
+(2 vCPU, ~7.7 GB).
 
 ```json
 {
   "template": "browser-agent",
   "resources": {"vcpus": 2, "memory_mib": 7900},
   "home_volume": {"name": "browser-home", "guest_path": "/home/agent", "per_user": true},
+  "confinement": "strict",
   "egress_mode": "sentinel",
-  "egress_allow_hosts": ["example.com"]
+  "egress_allow_hosts": ["example.com"],
+  "browser_port": 9222
 }
 ```
 
+## Guest services
+
+| Port | Process |
+|---|---|
+| `127.0.0.1:9222` | Chromium CDP (`chromium-cdp.service`) |
+| `127.0.0.1:9230` | a11y driver (`browser-driver.service` → `driver.mjs`) |
+
+Host reaches both via FluxVM sandbox HTTP/WS bridge. CDP is **not** on a public NIC.
+
 ## Build
 
-Same flow as Tutorial 11, on the FluxVM host. Download Node.js first (the image
-build has no network for `commands`); Chromium comes from the Debian package
-list, which does have DNS.
+Same flow as Tutorial 11, on the FluxVM host. Prefer:
 
 ```bash
 curl -fsSL -o /tmp/node20.tar.xz \
   https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-x64.tar.xz
-# edit the /path/to/fluxvm entries in build.json, then:
-sudo fluxvm --config /etc/fluxvm.toml build-image --spec build.json
-sudo mkdir -p /var/lib/fluxvm/templates/browser-agent
-sudo cp spec.json /var/lib/fluxvm/templates/browser-agent/spec.json
+(cd /tmp && npm pack playwright-core@1.49.1 && mv playwright-core-*.tgz playwright-pack.tgz)
+./scripts/keep-bake-browser-agent.sh
 ```
 
-The base is Debian 12 because Ubuntu's `chromium-browser` is a snap stub that
-does not run in a chroot. `spec.json` uses the QEMU backend (needed for home
-volumes) and pins `max_vcpus`/`max_memory_mib`, which FluxVM treats as the
-ceiling for a manifest's `resources`.
+Pins: Node `v20.18.1`, `playwright-core@1.49.1`, Debian `chromium` + `chromium-driver`.
+The base is Debian 12 because Ubuntu's `chromium-browser` is a snap stub.
+
+CI smoke (no KVM): `./scripts/keep-bake-browser-smoke.sh`.
 
 ## Keeping browser traffic on the broker
 
 The guest starts with `ZYVOR_EGRESS_PROXY` set to the runtime's HTTPS CONNECT
-proxy (`ZYVOR_AGENT_PROXY_LISTEN`, default `0.0.0.0:18083`). Tunnels go through
-the agent's allowlist, `ask`/`sentinel` review, DNS pinning, the private-network
-gate, and are journaled as `egress.connect`. See `browser-example.mjs`.
+proxy. See [`docs/keep/browser/DRIVER.md`](../../../docs/keep/browser/DRIVER.md).
 
-Two limits to know about:
+- Only `CONNECT` to `ZYVOR_AGENT_PROXY_CONNECT_PORTS` (default `443`); plain `http://` refused.
+- Deploy with `"confinement": "strict"`. Verify:
+  `curl --noproxy '*' https://example.com` from inside a session **must fail**.
 
-- The proxy sees only `host:port` of a TLS connection. It cannot inject
-  credentials, and it cannot review URL paths. Only `CONNECT` to the ports in
-  `ZYVOR_AGENT_PROXY_CONNECT_PORTS` (default `443`) is served; plain `http://` is refused.
-- **It only constrains a guest that has no other route out.** Deploy the agent with
-  `"confinement": "strict"` so FluxVM drops everything except the broker and proxy
-  ports; otherwise a browser (or any program) can ignore the proxy. Verify with
-  `curl --noproxy '*' https://example.com` from inside a session: it must fail.
+## Agent tools
+
+Models call the driver via host MCP `browser_*` tools (or guest HTTP `:9230`).
+Playwright stays private — snapshot refs only. See DRIVER.md.

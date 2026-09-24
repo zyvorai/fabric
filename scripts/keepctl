@@ -10,6 +10,7 @@
 #   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
 #   keepctl unwrap-token|unwrap|vault-status  # software vault ceremony (host-env)
 #   keepctl user-held-challenge|user-held-complete  # Keep 0.2 scaffold (refused without SNP/TDX)
+#   keepctl browser tabs|shot <session-id>  # operator listing / JPEG
 #   keepctl pack   <path>            # workspace hint + policy + manifest pin
 #   keepctl unpack <path>            # restore policy onto an agent
 #   keepctl export-token …           # scoped trajectory export (default: none)
@@ -33,7 +34,7 @@ else
   AUTH_TOKEN=""
 fi
 usage() {
-  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -240,6 +241,24 @@ PY
     id="${1:-}"
     [[ -n "$id" ]] || { echo "usage: keepctl cockpit <session-id>" >&2; exit 1; }
     api GET "/v1/sessions/${id}/cockpit"
+    echo
+    ;;
+
+  browser)
+    sub="${1:-}"
+    id="${2:-}"
+    [[ -n "$sub" && -n "$id" ]] || {
+      echo "usage: keepctl browser tabs|shot <session-id>" >&2
+      exit 1
+    }
+    case "$sub" in
+      tabs|view) api GET "/v1/sessions/${id}/browser/view" ;;
+      shot|screenshot) api GET "/v1/sessions/${id}/browser/screenshot" ;;
+      *)
+        echo "usage: keepctl browser tabs|shot <session-id>" >&2
+        exit 1
+        ;;
+    esac
     echo
     ;;
 

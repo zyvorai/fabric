@@ -232,6 +232,36 @@ export default function KeepSession() {
         </Card>
 
         <Card className="p-4 space-y-2 text-sm">
+          <h2 className="text-base font-semibold text-[var(--zf-ink)]">Browser capability</h2>
+          {(() => {
+            const b = cockpit?.browser
+            if (!b) {
+              return (
+                <p className="text-[var(--zf-muted)]">
+                  No browser capability (agent needs browser_port + confinement:strict).
+                </p>
+              )
+            }
+            return (
+              <>
+                <div className="font-medium">
+                  Browser: {b.ready ? 'ready' : 'not ready'} · CDP {b.cdp ? 'up' : 'off'} · proxy{' '}
+                  {b.confined ? 'confined' : 'not confined'}
+                </div>
+                <div className="text-[var(--zf-muted)] text-xs">
+                  taint={(b.tainted_by?.length ? b.tainted_by.join(', ') : '—')} · evidence=
+                  {b.evidence_class ?? 'software-test'} · tools=
+                  {b.tools_allowed ? 'allowed' : 'blocked'}
+                </div>
+                <p className="text-[12px] text-[var(--zf-muted)] pt-2 border-t border-[var(--zf-hairline)]">
+                  {b.honesty}
+                </p>
+              </>
+            )
+          })()}
+        </Card>
+
+        <Card className="p-4 space-y-2 text-sm">
           <h2 className="text-base font-semibold text-[var(--zf-ink)]">Evidence</h2>
           {(cockpit?.recent_artifacts?.length ?? 0) === 0 ? (
             <p className="text-[var(--zf-muted)]">No artifacts yet.</p>

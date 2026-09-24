@@ -66,6 +66,145 @@ pub fn debugger_path_from_ws_url(url: &str) -> Option<String> {
     Some(path.to_string())
 }
 
+/// Guest a11y driver HTTP port (Playwright private). CDP remains on browser_port.
+pub const DRIVER_PORT: u16 = 9230;
+
+/// Minimum interval between operator screenshots per session.
+const SCREENSHOT_MIN_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Refuse browser tools unless the agent is confined and browser policy allows.
+pub fn browser_tools_allowed(
+    confinement: crate::model::Confinement,
+    browser: Option<&crate::model::BrowserPolicy>,
+) -> Result<(), &'static str> {
+    if !matches!(confinement, crate::model::Confinement::Strict) {
+        return Err("browser tools require confinement: strict");
+    }
+    if browser.is_some_and(|b| !b.enabled) {
+        return Err("browser tools disabled by keep.policy.yaml browser.enabled=false");
+    }
+    Ok(())
+}
+
+async fn session_agent(
+    state: &AppState,
+    session_id: Uuid,
+) -> ApiResult<(crate::model::SessionRecord, crate::model::AgentRecord)> {
+    let session = state
+        .store
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| ApiError::not_found("session not found"))?;
+    if session.status != SessionStatus::Running {
+        return Err(ApiError::conflict("session is not running"));
+    }
+    let agent = state
+        .store
+        .get_agent_version(&session.agent, &session.agent_version)
+        .await
+        .map_err(|_| ApiError::not_found("agent deployment not found"))?;
+    Ok((session, agent))
+}
+
+/// Call the guest a11y driver (`POST /v1/tool` on DRIVER_PORT).
+pub async fn driver_call(
+    state: &AppState,
+    session_id: Uuid,
+    body: Value,
+) -> ApiResult<Value> {
+    let (session, agent) = session_agent(state, session_id).await?;
+    if let Some(msg) = crate::attestation::host_channel_forbidden(session.confidential.as_ref()) {
+        return Err(ApiError::forbidden(msg));
+    }
+    browser_tools_allowed(agent.manifest.confinement, agent.manifest.browser.as_ref())
+        .map_err(ApiError::forbidden)?;
+    agent
+        .manifest
+        .browser_port
+        .ok_or_else(|| ApiError::not_found("agent has no browser_port"))?;
+    if let Some(url) = body.get("url").and_then(|v| v.as_str()) {
+        if url.starts_with("file:")
+            && agent
+                .manifest
+                .browser
+                .as_ref()
+                .is_none_or(|b| b.block_file_url)
+        {
+            return Err(ApiError::forbidden("file:// URLs are denied by browser policy"));
+        }
+        if let Ok(parsed) = url::Url::parse(url) {
+            if let Some(host) = parsed.host_str() {
+                if let Some(bp) = agent.manifest.browser.as_ref() {
+                    if !bp.allow_hosts.is_empty()
+                        && !crate::policy::host_matches_list(host, &bp.allow_hosts)
+                    {
+                        return Err(ApiError::forbidden(
+                            "host not in browser.allow_hosts",
+                        ));
+                    }
+                    if crate::policy::host_matches_list(host, &bp.high_risk_hosts) {
+                        return Err(ApiError::forbidden(
+                            "high-risk host (purchase|send) requires operator approval before open",
+                        ));
+                    }
+                    if bp.downloads.eq_ignore_ascii_case("deny")
+                        && parsed
+                            .path()
+                            .rsplit('/')
+                            .next()
+                            .is_some_and(|n| n.contains('.') && n.len() > 4)
+                        && matches!(
+                            parsed
+                                .path()
+                                .rsplit('.')
+                                .next()
+                                .map(|e| e.to_ascii_lowercase())
+                                .as_deref(),
+                            Some("exe")
+                                | Some("zip")
+                                | Some("dmg")
+                                | Some("pkg")
+                                | Some("msi")
+                                | Some("deb")
+                                | Some("rpm")
+                        )
+                    {
+                        return Err(ApiError::forbidden("downloads denied by browser policy"));
+                    }
+                }
+            }
+        }
+    }
+    state
+        .fluxvm
+        .guest_request(
+            session.sandbox_id,
+            DRIVER_PORT,
+            Method::POST,
+            "v1/tool",
+            Some(&body),
+        )
+        .await
+        .map_err(ApiError::bad_gateway)
+}
+
+fn rate_limit_screenshot(state: &AppState, id: Uuid) -> ApiResult<()> {
+    let mut map = state
+        .screenshot_last
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let now = std::time::Instant::now();
+    if let Some(prev) = map.get(&id) {
+        if now.duration_since(*prev) < SCREENSHOT_MIN_INTERVAL {
+            return Err(ApiError::too_many(
+                "screenshot rate-limited (min 2s between captures)",
+            ));
+        }
+    }
+    map.insert(id, now);
+    Ok(())
+}
+
 async fn browser_port(state: &AppState, session_id: Uuid) -> ApiResult<(Uuid, u16)> {
     let session = state
         .store
@@ -153,6 +292,7 @@ pub(crate) async fn browser_screenshot(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Value>> {
+    rate_limit_screenshot(&state, id)?;
     let (sandbox_id, port) = browser_port(&state, id).await?;
     let list = state
         .fluxvm
@@ -433,6 +573,152 @@ pub struct BrowserPageQuery {
     pub session: Option<String>,
 }
 
+/// Proxy a tool call to the guest a11y driver (operator / MCP).
+pub(crate) async fn browser_tool(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    let result = driver_call(&state, id, body.clone()).await?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            Some(id),
+            crate::audit::AuditPhase::Performed,
+            "browser.act",
+            None,
+            json!({
+                "tool": body.get("tool").or_else(|| body.get("op")),
+                "ref": body.get("ref"),
+                "url_host": body.get("url").and_then(|u| u.as_str()).and_then(|u| {
+                    url::Url::parse(u).ok().and_then(|p| p.host_str().map(str::to_owned))
+                }),
+            }),
+        )
+        .await;
+    Ok(Json(result))
+}
+
+/// Host-side password fill via CDP after vault authorize_resolve.
+/// Never returns the secret; agent context only sees `{filled:true}`.
+#[derive(Debug, serde::Deserialize)]
+pub struct FillSecretRequest {
+    pub credential: String,
+    /// Origin host for authorize_resolve (e.g. login.example.com).
+    pub host: String,
+    #[serde(default = "default_fill_path")]
+    pub path: String,
+}
+
+fn default_fill_path() -> String {
+    "/".into()
+}
+
+pub(crate) async fn browser_fill_secret(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<FillSecretRequest>,
+) -> ApiResult<Json<Value>> {
+    let (session, agent) = session_agent(&state, id).await?;
+    if let Some(msg) = crate::attestation::host_channel_forbidden(session.confidential.as_ref()) {
+        return Err(ApiError::forbidden(msg));
+    }
+    browser_tools_allowed(agent.manifest.confinement, agent.manifest.browser.as_ref())
+        .map_err(ApiError::forbidden)?;
+    let port = agent
+        .manifest
+        .browser_port
+        .ok_or_else(|| ApiError::not_found("agent has no browser_port"))?;
+    let (_desc, secret) = state
+        .credentials
+        .authorize_resolve(
+            &req.credential,
+            &crate::credentials::ResolveContext {
+                host: &req.host,
+                method: &reqwest::Method::POST,
+                path: &req.path,
+                port: 443,
+                user_id: session.user_id.as_deref(),
+            },
+        )
+        .map_err(ApiError::forbidden)?;
+    let path = first_page_debugger(&state, session.sandbox_id, port).await?;
+    cdp_insert_text(&state, session.sandbox_id, port, &path, &secret)
+        .await
+        .map_err(ApiError::bad_gateway)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            Some(id),
+            crate::audit::AuditPhase::Performed,
+            "browser.fill_secret",
+            None,
+            json!({
+                "credential": req.credential,
+                "host": req.host,
+                "filled": true,
+            }),
+        )
+        .await;
+    Ok(Json(json!({
+        "filled": true,
+        "honesty": "Secret typed via host CDP; value never returned to the model.",
+    })))
+}
+
+async fn cdp_insert_text(
+    state: &AppState,
+    sandbox_id: Uuid,
+    port: u16,
+    debugger_path: &str,
+    text: &str,
+) -> anyhow::Result<()> {
+    let mut ws = state
+        .fluxvm
+        .guest_ws(sandbox_id, port, debugger_path)
+        .await?;
+    ws.send(WsMessage::Text(
+        json!({"id": 1, "method": "Input.insertText", "params": { "text": text }})
+            .to_string()
+            .into(),
+    ))
+    .await?;
+    // Wait for ack or timeout; do not log text.
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), ws.next()).await;
+    let _ = ws.close(None).await;
+    Ok(())
+}
+
+/// Capability strip for cockpit / console.
+pub async fn browser_capability(state: &AppState, session_id: Uuid) -> Value {
+    let Ok((session, agent)) = session_agent(state, session_id).await else {
+        return json!({
+            "ready": false,
+            "cdp": false,
+            "driver": false,
+            "confined": false,
+            "evidence_class": "software-test",
+        });
+    };
+    let confined = matches!(agent.manifest.confinement, crate::model::Confinement::Strict);
+    let cdp = agent.manifest.browser_port.is_some();
+    let enabled = agent.manifest.browser.as_ref().is_none_or(|b| b.enabled);
+    let tools_ok = browser_tools_allowed(agent.manifest.confinement, agent.manifest.browser.as_ref()).is_ok();
+    json!({
+        "ready": cdp && confined && enabled,
+        "cdp": cdp,
+        "driver_port": DRIVER_PORT,
+        "confined": confined,
+        "enabled": enabled,
+        "tools_allowed": tools_ok,
+        "tainted_by": session.tainted_by,
+        "evidence_class": "software-test",
+        "honesty": "software-test: host can still see the guest until Keep 0.2 hardware",
+    })
+}
+
 /// Minimal HTML that polls tab listing + optional screenshot for operators.
 pub async fn browser_page(Query(q): Query<BrowserPageQuery>) -> impl IntoResponse {
     let session = q.session.unwrap_or_default();
@@ -569,5 +855,28 @@ mod tests {
             Some("devtools/page/ABC")
         );
         assert!(debugger_path_from_ws_url("http://nope").is_none());
+    }
+
+    #[test]
+    fn tools_require_strict_confinement() {
+        use crate::model::{BrowserPolicy, Confinement};
+        assert!(browser_tools_allowed(Confinement::Off, None).is_err());
+        assert!(browser_tools_allowed(Confinement::Strict, None).is_ok());
+        let disabled = BrowserPolicy {
+            enabled: false,
+            ..BrowserPolicy::default()
+        };
+        assert!(browser_tools_allowed(Confinement::Strict, Some(&disabled)).is_err());
+    }
+
+    #[test]
+    fn allow_and_high_risk_host_matching() {
+        use crate::policy::host_matches_list;
+        let allow = vec!["example.com".into(), "github.com".into()];
+        assert!(host_matches_list("example.com", &allow));
+        assert!(host_matches_list("www.example.com", &allow));
+        assert!(!host_matches_list("evil.com", &allow));
+        let risk = vec!["checkout.shop.test".into()];
+        assert!(host_matches_list("checkout.shop.test", &risk));
     }
 }

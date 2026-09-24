@@ -76,6 +76,8 @@ pub struct AppState {
     pub warm_pool_reconcile_lock: tokio::sync::Mutex<()>,
     /// Per-session operation locks serialize steer/hibernate/resume/cancel/delete/expiry.
     pub session_locks: Mutex<HashMap<Uuid, Arc<tokio::sync::Mutex<()>>>>,
+    /// Screenshot rate-limit: last capture time per session.
+    pub screenshot_last: Mutex<HashMap<Uuid, std::time::Instant>>,
 }
 
 impl AppState {
@@ -125,6 +127,7 @@ impl AppState {
             session_create_locks: Mutex::new(HashMap::new()),
             warm_pool_reconcile_lock: tokio::sync::Mutex::new(()),
             session_locks: Mutex::new(HashMap::new()),
+            screenshot_last: Mutex::new(HashMap::new()),
         }))
     }
 

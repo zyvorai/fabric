@@ -13,7 +13,7 @@
 //! Without Keep mode, when `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS` is set, PUT
 //! policy requires a signature unless `ZYVOR_AGENT_POLICY_REQUIRE_SIGNATURE=0`.
 
-use crate::model::{AgentManifest, EgressMode, EgressRule, TaintPolicy};
+use crate::model::{AgentManifest, BrowserPolicy, EgressMode, EgressRule, TaintPolicy};
 use anyhow::{bail, Context, Result};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -30,6 +30,8 @@ pub struct KeepPolicy {
     pub deny: Vec<KeepDeny>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taint: Option<KeepTaint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browser: Option<KeepBrowser>,
 }
 
 fn default_deny() -> String {
@@ -58,6 +60,60 @@ pub struct KeepTaint {
     pub trusted_hosts: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_untrusted_page: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct KeepBrowser {
+    #[serde(default = "keep_browser_enabled_default")]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow_hosts: Vec<String>,
+    #[serde(default = "keep_browser_true")]
+    pub block_file_url: bool,
+    #[serde(default = "keep_browser_max_tabs")]
+    pub max_tabs: u32,
+    #[serde(default = "keep_browser_true")]
+    pub snapshot_only: bool,
+    #[serde(default = "keep_browser_downloads")]
+    pub downloads: String,
+}
+
+fn keep_browser_enabled_default() -> bool {
+    true
+}
+fn keep_browser_true() -> bool {
+    true
+}
+fn keep_browser_max_tabs() -> u32 {
+    8
+}
+fn keep_browser_downloads() -> String {
+    "deny".into()
+}
+
+impl KeepBrowser {
+    pub fn to_manifest_policy(&self) -> BrowserPolicy {
+        BrowserPolicy {
+            enabled: self.enabled,
+            allow_hosts: self.allow_hosts.clone(),
+            high_risk_hosts: vec![],
+            block_file_url: self.block_file_url,
+            max_tabs: self.max_tabs,
+            snapshot_only: self.snapshot_only,
+            downloads: self.downloads.clone(),
+        }
+    }
+
+    pub fn from_manifest_policy(p: &BrowserPolicy) -> Self {
+        Self {
+            enabled: p.enabled,
+            allow_hosts: p.allow_hosts.clone(),
+            block_file_url: p.block_file_url,
+            max_tabs: p.max_tabs,
+            snapshot_only: p.snapshot_only,
+            downloads: p.downloads.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -197,12 +253,17 @@ impl KeepPolicy {
             trusted_hosts: t.trusted_hosts.clone(),
             on_untrusted_page: Some("block_egress_until_ask".into()),
         });
+        let browser = m
+            .browser
+            .as_ref()
+            .map(KeepBrowser::from_manifest_policy);
         Self {
             version: 1,
             default_egress: "deny".into(),
             allow,
             deny: vec![],
             taint,
+            browser,
         }
     }
 
@@ -249,7 +310,28 @@ impl KeepPolicy {
                 trusted_hosts: t.trusted_hosts.clone(),
             });
         }
+        if let Some(b) = &self.browser {
+            let mut bp = b.to_manifest_policy();
+            // purchase|send action keys on allow entries → high-risk browser open.
+            for a in &self.allow {
+                if matches!(a.action.as_deref(), Some("purchase") | Some("send"))
+                    && !bp.high_risk_hosts.iter().any(|h| h == &a.host)
+                {
+                    bp.high_risk_hosts.push(a.host.clone());
+                }
+            }
+            m.browser = Some(bp);
+        }
     }
+}
+
+/// Host match for browser allow / high-risk lists (exact or parent suffix).
+pub fn host_matches_list(host: &str, list: &[String]) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    list.iter().any(|pat| {
+        let p = pat.trim_end_matches('.').to_ascii_lowercase();
+        host == p || host.ends_with(&format!(".{p}"))
+    })
 }
 
 /// Pack metadata written by `keepctl pack` (no raw secrets).
@@ -297,6 +379,66 @@ mod tests {
         back.apply_to_manifest(&mut m2);
         assert_eq!(m2.egress_allow_hosts, vec!["api.github.com".to_string()]);
         assert_eq!(m2.egress_mode, EgressMode::Ask);
+    }
+
+    #[test]
+    fn browser_policy_round_trip() {
+        let yaml = r#"
+version: 1
+default_egress: deny
+allow:
+  - host: example.com
+browser:
+  enabled: true
+  allow_hosts: [example.com, github.com]
+  block_file_url: true
+  max_tabs: 4
+  snapshot_only: true
+  downloads: deny
+"#;
+        let p = KeepPolicy::from_yaml(yaml).unwrap();
+        let b = p.browser.as_ref().unwrap();
+        assert!(b.enabled);
+        assert_eq!(b.max_tabs, 4);
+        assert_eq!(b.allow_hosts, vec!["example.com", "github.com"]);
+        let mut m = bare_manifest();
+        p.apply_to_manifest(&mut m);
+        assert_eq!(m.browser.as_ref().unwrap().max_tabs, 4);
+        assert!(m.browser.as_ref().unwrap().block_file_url);
+    }
+
+    #[test]
+    fn purchase_send_actions_become_high_risk_hosts() {
+        let yaml = r#"
+version: 1
+default_egress: deny
+allow:
+  - host: pay.example.com
+    action: purchase
+    ask: always
+  - host: mail.example.com
+    action: send
+  - host: example.com
+browser:
+  enabled: true
+  allow_hosts: [example.com, pay.example.com]
+"#;
+        let p = KeepPolicy::from_yaml(yaml).unwrap();
+        let mut m = bare_manifest();
+        p.apply_to_manifest(&mut m);
+        let bp = m.browser.as_ref().unwrap();
+        assert!(bp.high_risk_hosts.contains(&"pay.example.com".into()));
+        assert!(bp.high_risk_hosts.contains(&"mail.example.com".into()));
+        assert!(!bp.high_risk_hosts.contains(&"example.com".into()));
+    }
+
+    #[test]
+    fn host_matches_list_suffix() {
+        assert!(host_matches_list(
+            "api.github.com",
+            &["github.com".into()]
+        ));
+        assert!(!host_matches_list("github.com.evil", &["github.com".into()]));
     }
 
     #[test]

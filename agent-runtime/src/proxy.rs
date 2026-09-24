@@ -627,13 +627,25 @@ mod tests {
         )
         .await;
         assert!(bad_port.contains("403"), "{bad_port}");
+        let port80 = status_of(
+            proxy,
+            format!("CONNECT example.com:80 HTTP/1.1\r\nProxy-Authorization: {auth}\r\n\r\n"),
+        )
+        .await;
+        assert!(port80.contains("403"), "{port80}");
+        let port8080 = status_of(
+            proxy,
+            format!("CONNECT example.com:8080 HTTP/1.1\r\nProxy-Authorization: {auth}\r\n\r\n"),
+        )
+        .await;
+        assert!(port8080.contains("403"), "{port8080}");
         let entries = state.store.audit.list(Some(session.id), 50).await.unwrap();
         assert!(
             entries
                 .iter()
                 .filter(|e| e.action == "egress.connect" && e.phase == AuditPhase::Denied)
                 .count()
-                >= 2
+                >= 4
         );
     }
 

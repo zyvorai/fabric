@@ -381,3 +381,15 @@ Same daemon port as Fabric (default **9095**). Catalog uses `daemon.public_url` 
 - Makefile for common tasks (`k8s-deploy`, `helm-lint`, …)
 - Docker and Podman support -- `zyvor-fabricd` + FluxVM companion, see `docs/DOCKER.md`
 - Kubernetes manifests under `k8s/base/` and chart under `charts/zyvor-fabric/`
+
+## Keep (agent-runtime)
+
+- Soft Keep 0.2: vault ceremony, screencast, user-held challenge scaffold, fabricd proxies
+- **Brokered browser:** Chromium CDP `:9222` + a11y driver `:9230` (`browser-agent` template)
+- MCP tools `browser_open|snapshot|act|tabs|close` (no HTML/DOM/evaluate to the model)
+- Host `POST …/browser/fill-secret` after vault `authorize_resolve` (password never in transcript)
+- Policy `browser:` block in `keep.policy.yaml` (allow_hosts, file:// deny, downloads deny, confinement:strict gate)
+- Operator: `keepctl browser tabs|shot`, KeepSession capability card, screenshot rate-limit
+- Pack: `examples/keep-agents/browser-research/`
+- Docs: [docs/keep/browser/DRIVER.md](docs/keep/browser/DRIVER.md)
+- Evidence class remains **software-test** until SNP/TDX (hardware Keep 0.2 gated)

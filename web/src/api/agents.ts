@@ -112,6 +112,16 @@ export interface KeepCockpit {
   browser_view?: string
   browser_screenshot?: string
   browser_screencast?: string
+  browser?: {
+    ready?: boolean
+    cdp?: boolean
+    confined?: boolean
+    enabled?: boolean
+    tools_allowed?: boolean
+    tainted_by?: string[]
+    evidence_class?: string
+    honesty?: string
+  }
   attestation?: {
     security_profile?: string | null
     image_hash?: string | null
