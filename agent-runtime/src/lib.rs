@@ -29,8 +29,13 @@ pub mod unwrap_tokens;
 pub mod workstations;
 
 use crate::{
-    config::Config, credentials::CredentialVault, export_tokens::ExportTokenStore, fluxvm::FluxVm,
-    policy::PolicyTrust, store::Store, unwrap_tokens::UnwrapTokenStore,
+    config::Config,
+    credentials::CredentialVault,
+    export_tokens::ExportTokenStore,
+    fluxvm::FluxVm,
+    policy::PolicyTrust,
+    store::Store,
+    unwrap_tokens::{UnwrapTokenStore, UserHeldChallengeStore},
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -57,6 +62,8 @@ pub struct AppState {
     pub export_tokens: ExportTokenStore,
     /// Keep 0.1 software vault ceremony (host-env secrets still).
     pub unwrap_tokens: UnwrapTokenStore,
+    /// Keep 0.2 user-held challenge store (complete refused without SNP/TDX).
+    pub user_held_challenges: UserHeldChallengeStore,
     /// When `ZYVOR_AGENT_VAULT_UNWRAP_REQUIRED=1`, credential inject needs unlock.
     pub vault_unwrap_required: bool,
     /// Active unwrap lease end (None = locked when required).
@@ -99,6 +106,7 @@ impl AppState {
         let policy_trust = PolicyTrust::from_env()?;
         let export_tokens = ExportTokenStore::open(&config.state_dir).await?;
         let unwrap_tokens = UnwrapTokenStore::open(&config.state_dir).await?;
+        let user_held_challenges = UserHeldChallengeStore::open(&config.state_dir).await?;
         Ok(Arc::new(Self {
             config,
             store,
@@ -111,6 +119,7 @@ impl AppState {
             policy_trust,
             export_tokens,
             unwrap_tokens,
+            user_held_challenges,
             vault_unwrap_required: unwrap_tokens::unwrap_required_from_env(),
             vault_unlocked_until: Mutex::new(None),
             session_create_locks: Mutex::new(HashMap::new()),

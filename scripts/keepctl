@@ -9,6 +9,7 @@
 #                                   # deploy with signed full manifest in Keep mode
 #   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
 #   keepctl unwrap-token|unwrap|vault-status  # software vault ceremony (host-env)
+#   keepctl user-held-challenge|user-held-complete  # Keep 0.2 scaffold (refused without SNP/TDX)
 #   keepctl pack   <path>            # workspace hint + policy + manifest pin
 #   keepctl unpack <path>            # restore policy onto an agent
 #   keepctl export-token …           # scoped trajectory export (default: none)
@@ -32,7 +33,7 @@ else
   AUTH_TOKEN=""
 fi
 usage() {
-  sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -213,6 +214,25 @@ PY
 
   vault-status)
     api GET /v1/vault/status
+    echo
+    ;;
+
+  user-held-challenge)
+    ttl="${1:-600}"
+    api POST /v1/vault/user-held/challenge -H 'Content-Type: application/json' \
+      -d "{\"ttl_seconds\":$ttl}"
+    echo
+    ;;
+
+  user-held-complete)
+    id="${1:-}"
+    nonce="${2:-}"
+    [[ -n "$id" && -n "$nonce" ]] || {
+      echo "usage: keepctl user-held-complete <challenge_id> <nonce>" >&2
+      exit 1
+    }
+    api POST /v1/vault/user-held/complete -H 'Content-Type: application/json' \
+      -d "{\"challenge_id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$id"),\"nonce\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$nonce")}"
     echo
     ;;
 

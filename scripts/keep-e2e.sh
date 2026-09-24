@@ -321,6 +321,17 @@ HTML=$(curl -sf "$API/keep/cockpit?session=$SID")
 check "cockpit HTML serves" "Keep cockpit" "$HTML"
 check "keepctl cockpit" "$SID" "$("$KEEPCTL" cockpit "$SID")"
 
+echo "==> user-held unwrap scaffold (refused without SNP/TDX)"
+UH=$("$KEEPCTL" user-held-challenge 300)
+check "user-held challenge has nonce" "nonce" "$UH"
+UH_ID=$(echo "$UH" | json_get id)
+UH_NONCE=$(echo "$UH" | json_get nonce)
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"challenge_id\":\"$UH_ID\",\"nonce\":\"$UH_NONCE\"}" -X POST "$API/v1/vault/user-held/complete")
+check "user-held complete refused without attestation" 403 "$CODE"
+VS=$(curl -sf -H "Authorization: Bearer $TOKEN" "$API/v1/vault/status")
+check "vault status lists user_held" "user_held" "$VS"
+
 echo "==> export-token gates (training default off)"
 CODE=$(http_code -H "Authorization: Bearer $TOKEN" "$API/v1/export/audit?limit=10")
 check "export/audit without token → 403" 403 "$CODE"

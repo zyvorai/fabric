@@ -142,8 +142,9 @@ pub(crate) async fn browser_view(
         "tabs": tabs,
         "mode": "listing",
         "screenshot": format!("/v1/sessions/{id}/browser/screenshot"),
-        "honesty": "Tab listing + optional JPEG screenshot (software-test). Input takeover is not implemented; host can still see the guest.",
-        "note": "Live tab listing. Poll /browser/screenshot for a frame. Input takeover is not implemented.",
+        "screencast": format!("/v1/sessions/{id}/browser/screencast"),
+        "honesty": "Tab listing + screenshot/screencast via host CDP bridge (software-test). Input takeover is not implemented; host can still see the guest.",
+        "note": "Live tab listing. Poll /browser/screenshot or open /browser/screencast WS for frames. Input takeover is not implemented.",
     })))
 }
 
@@ -164,12 +165,7 @@ pub(crate) async fn browser_screenshot(
         .flatten()
         .find(|t| t.get("type").and_then(|v| v.as_str()) == Some("page"))
         .ok_or_else(|| ApiError::not_found("no open page target for screenshot"))?;
-    let ws_url = page
-        .get("webSocketDebuggerUrl")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| ApiError::bad_gateway("page has no webSocketDebuggerUrl"))?;
-    let path = debugger_path_from_ws_url(ws_url)
-        .ok_or_else(|| ApiError::bad_gateway("could not parse debugger path"))?;
+    let path = first_page_debugger(&state, sandbox_id, port).await?;
     let title = page
         .get("title")
         .and_then(|v| v.as_str())
@@ -250,6 +246,187 @@ async fn cdp_capture_jpeg(
     }
 }
 
+/// Resolve the first page target's debugger path for CDP.
+async fn first_page_debugger(state: &AppState, sandbox_id: Uuid, port: u16) -> ApiResult<String> {
+    let list = state
+        .fluxvm
+        .guest_request(sandbox_id, port, Method::GET, "json/list", None)
+        .await
+        .map_err(ApiError::bad_gateway)?;
+    let page = list
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|t| t.get("type").and_then(|v| v.as_str()) == Some("page"))
+        .ok_or_else(|| ApiError::not_found("no open page target for screenshot"))?;
+    let ws_url = page
+        .get("webSocketDebuggerUrl")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| ApiError::bad_gateway("page has no webSocketDebuggerUrl"))?;
+    debugger_path_from_ws_url(ws_url)
+        .ok_or_else(|| ApiError::bad_gateway("could not parse debugger path"))
+}
+
+/// Read-only screencast WebSocket. Operator receives `{type:"frame",…}` only;
+/// input / arbitrary CDP is refused. Present `Authorization: Bearer` or `?token=`.
+pub(crate) async fn browser_screencast(
+    ws: axum::extract::ws::WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<axum::response::Response, ApiError> {
+    let (sandbox_id, port) = browser_port(&state, id).await?;
+    let path = first_page_debugger(&state, sandbox_id, port).await?;
+    Ok(ws.on_upgrade(move |socket| async move {
+        if let Err(e) = run_screencast(state, socket, id, sandbox_id, port, path).await {
+            tracing::warn!(session = %id, error = %e, "screencast ended");
+        }
+    }))
+}
+
+async fn run_screencast(
+    state: Arc<AppState>,
+    mut client: axum::extract::ws::WebSocket,
+    session_id: Uuid,
+    sandbox_id: Uuid,
+    port: u16,
+    debugger_path: String,
+) -> anyhow::Result<()> {
+    use axum::extract::ws::Message as AxumMsg;
+
+    let _ = client
+        .send(AxumMsg::Text(
+            json!({
+                "type": "hello",
+                "session_id": session_id,
+                "mode": "screencast",
+                "honesty": "Host CDP screencast (software-test). No input takeover; host can still see the guest.",
+            })
+            .to_string()
+            .into(),
+        ))
+        .await;
+
+    let mut cdp = state
+        .fluxvm
+        .guest_ws(sandbox_id, port, &debugger_path)
+        .await?;
+    cdp.send(WsMessage::Text(
+        json!({"id": 1, "method": "Page.enable"}).to_string().into(),
+    ))
+    .await?;
+    cdp.send(WsMessage::Text(
+        json!({
+            "id": 2,
+            "method": "Page.startScreencast",
+            "params": {
+                "format": "jpeg",
+                "quality": 50,
+                "maxWidth": 1280,
+                "maxHeight": 720,
+                "everyNthFrame": 2
+            }
+        })
+        .to_string()
+        .into(),
+    ))
+    .await?;
+
+    let mut next_id: i64 = 10;
+    loop {
+        tokio::select! {
+            client_msg = client.next() => {
+                match client_msg {
+                    Some(Ok(AxumMsg::Close(_))) | None => break,
+                    Some(Ok(AxumMsg::Text(t))) => {
+                        let v: Value = serde_json::from_str(&t).unwrap_or(Value::Null);
+                        match v.get("type").and_then(|x| x.as_str()) {
+                            Some("stop") => break,
+                            Some("ack") => {
+                                // Optional frame ack — CDP uses sessionId from event
+                                if let Some(sid) = v.get("sessionId").and_then(|x| x.as_i64()) {
+                                    next_id += 1;
+                                    let _ = cdp.send(WsMessage::Text(
+                                        json!({
+                                            "id": next_id,
+                                            "method": "Page.screencastFrameAck",
+                                            "params": { "sessionId": sid }
+                                        }).to_string().into()
+                                    )).await;
+                                }
+                            }
+                            Some("ping") => {
+                                let _ = client.send(AxumMsg::Text(
+                                    json!({"type":"pong"}).to_string().into()
+                                )).await;
+                            }
+                            _ => {
+                                // Refuse input / arbitrary CDP from the operator.
+                                let _ = client.send(AxumMsg::Text(
+                                    json!({
+                                        "type": "error",
+                                        "error": "only stop/ack/ping allowed; input takeover is not implemented"
+                                    }).to_string().into()
+                                )).await;
+                            }
+                        }
+                    }
+                    Some(Ok(_)) => {}
+                    Some(Err(_)) => break,
+                }
+            }
+            cdp_msg = cdp.next() => {
+                match cdp_msg {
+                    Some(Ok(WsMessage::Text(t))) => {
+                        let v: Value = match serde_json::from_str(&t) {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        if v.get("method").and_then(|m| m.as_str()) == Some("Page.screencastFrame") {
+                            let params = v.get("params").cloned().unwrap_or(Value::Null);
+                            let data = params.get("data").and_then(|d| d.as_str()).unwrap_or("");
+                            let session_id_cdp = params.get("sessionId").cloned();
+                            let meta = params.get("metadata").cloned();
+                            let _ = client.send(AxumMsg::Text(
+                                json!({
+                                    "type": "frame",
+                                    "mime": "image/jpeg",
+                                    "image_base64": data,
+                                    "sessionId": session_id_cdp,
+                                    "metadata": meta,
+                                }).to_string().into()
+                            )).await;
+                            // Auto-ack so Chrome keeps sending frames.
+                            if let Some(sid) = params.get("sessionId").and_then(|x| x.as_i64()) {
+                                next_id += 1;
+                                let _ = cdp.send(WsMessage::Text(
+                                    json!({
+                                        "id": next_id,
+                                        "method": "Page.screencastFrameAck",
+                                        "params": { "sessionId": sid }
+                                    }).to_string().into()
+                                )).await;
+                            }
+                        }
+                    }
+                    Some(Ok(WsMessage::Close(_))) | None => break,
+                    Some(Ok(_)) => {}
+                    Some(Err(_)) => break,
+                }
+            }
+        }
+    }
+    let _ = cdp
+        .send(WsMessage::Text(
+            json!({"id": 99, "method": "Page.stopScreencast"})
+                .to_string()
+                .into(),
+        ))
+        .await;
+    let _ = cdp.close(None).await;
+    let _ = client.send(AxumMsg::Close(None)).await;
+    Ok(())
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct BrowserPageQuery {
     #[serde(default)]
@@ -280,21 +457,24 @@ button{{background:#2b6cff;color:#fff;border:0;cursor:pointer}}
 .muted{{opacity:.7;font-size:13px}}
 img.frame{{max-width:100%;border-radius:8px;border:1px solid #243044;background:#000}}
 </style></head><body>
-<header><strong>Keep browser</strong> · tabs + screenshot
-<div class="muted">JPEG via host CDP bridge (software-test). No input takeover — host can still see the guest.</div>
+<header><strong>Keep browser</strong> · tabs + screencast
+<div class="muted">Host CDP bridge (software-test). Frames only — no input takeover.</div>
 </header>
 <main>
 <div class="card">
 <label>API <input id="base" placeholder="http://127.0.0.1:9096" style="width:55%"/></label>
 <label>Token <input id="token" type="password" style="width:35%"/></label>
 <label>Session <input id="sid" value="{session_esc}" style="width:50%"/></label>
-<button id="go">Refresh</button>
+<button id="go">Refresh tabs</button>
+<button id="cast" type="button">Start screencast</button>
+<button id="stop" type="button">Stop</button>
 </div>
-<div id="shot" class="card muted">Screenshot loads when a page target exists.</div>
+<div id="shot" class="card muted">Screencast / screenshot frames appear here.</div>
 <div id="out" class="card muted">Load a running session with browser_port set.</div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
+let castWs=null;
 async function refresh(){{
   const base=$('base').value.replace(/\/$/,'')||location.origin;
   const sid=$('sid').value.trim();
@@ -307,19 +487,38 @@ async function refresh(){{
   const tabs=j.tabs||[];
   $('out').innerHTML=tabs.length?tabs.map(t=>`<div class="tab"><strong>${{t.title||'(untitled)'}}</strong><div class="muted">${{t.url||''}}</div></div>`).join('')
     :`<div class="muted">No open tabs. ${{j.note||''}}</div>`;
-  try {{
-    const s=await fetch(base+'/v1/sessions/'+sid+'/browser/screenshot',{{headers}});
-    const sj=await s.json();
-    if(s.ok && sj.image_base64){{
-      $('shot').innerHTML=`<img class="frame" alt="browser screenshot" src="data:${{sj.mime||'image/jpeg'}};base64,${{sj.image_base64}}"/>
-        <div class="muted" style="margin-top:.5rem">${{sj.title||''}} · ${{sj.url||''}}</div>
-        <div class="muted">${{sj.honesty||''}}</div>`;
-    }} else {{
-      $('shot').textContent=sj.error||sj.honesty||'screenshot unavailable';
-    }}
-  }} catch(e) {{ $('shot').textContent=String(e); }}
+}}
+function startCast(){{
+  const base=$('base').value.replace(/\/$/,'')||location.origin;
+  const sid=$('sid').value.trim();
+  const tok=$('token').value.trim();
+  if(!sid){{$('shot').textContent='session id required';return;}}
+  if(castWs){{ try{{castWs.close();}}catch(e){{}} }}
+  const u=new URL(base.replace(/^http/,'ws')+'/v1/sessions/'+sid+'/browser/screencast');
+  if(tok) u.searchParams.set('token', tok);
+  castWs=new WebSocket(u);
+  castWs.onmessage=(ev)=>{{
+    try{{
+      const m=JSON.parse(ev.data);
+      if(m.type==='frame' && m.image_base64){{
+        $('shot').innerHTML=`<img class="frame" alt="screencast" src="data:${{m.mime||'image/jpeg'}};base64,${{m.image_base64}}"/>`;
+      }} else if(m.type==='hello' || m.type==='error'){{
+        const note=document.createElement('div'); note.className='muted'; note.textContent=m.honesty||m.error||m.type;
+        if(!$('shot').querySelector('img')) $('shot').textContent=note.textContent;
+      }}
+    }}catch(e){{}}
+  }};
+  castWs.onerror=()=>{{$('shot').textContent='screencast socket error';}};
+  castWs.onclose=()=>{{castWs=null;}};
+}}
+function stopCast(){{
+  if(castWs && castWs.readyState===1) castWs.send(JSON.stringify({{type:'stop'}}));
+  if(castWs) try{{castWs.close();}}catch(e){{}}
+  castWs=null;
 }}
 $('go').onclick=refresh;
+$('cast').onclick=startCast;
+$('stop').onclick=stopCast;
 const u=new URL(location.href);
 if(u.searchParams.get('token')) $('token').value=u.searchParams.get('token');
 if(u.searchParams.get('base')) $('base').value=u.searchParams.get('base');
