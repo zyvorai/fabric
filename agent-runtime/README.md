@@ -169,6 +169,20 @@ Requirements, all checked at deploy time:
 - **`max_concurrent_sessions: 1`.** A volume attaches to one sandbox at a time; a second session that tries to start while the volume is attached gets `409`.
 - **No `warm_pool_size` and no `idle_hibernate_seconds`.** Warm sandboxes are created before a session owns the volume, and QEMU sandboxes have no snapshot to hibernate to. A manual hibernate of such a session fails at FluxVM.
 
+### One volume per user
+
+For a fleet of per-user agent VMs, deploy one agent with `"home_volume": {"per_user": true}` and pass a `user_id` when creating a session (`POST /v1/sessions {"agent": "...", "user_id": "alice"}`, also accepted by schedules, loops and webhooks; delegated sessions inherit the parent's). Each user gets the volume `<name>-<user_id>`, at most one session per user runs at a time (a second returns `409`), and `max_concurrent_sessions` becomes an agent-wide cap instead of being forced to 1. `user_id` is 1-32 characters from `[a-z0-9._-]`, and is required for a per-user agent. `GET /v1/sessions?user_id=alice` lists one user's sessions.
+
+The runtime trusts the `user_id` its authenticated API caller asserts. It is not an end-user identity check: put your own authentication in front and derive the id from it. `warm_pool_size` and `idle_hibernate_seconds` are still rejected.
+
+## Sandbox size
+
+`"resources": {"vcpus": 2, "memory_mib": 7900}` sets the size of each sandbox, passed to FluxVM on create (needs FluxVM `feat/sandbox-resources`; an older FluxVM ignores the fields, so check with `nproc` in a session). FluxVM treats the template's own `max_vcpus`/`max_memory_mib` as a ceiling and refuses a larger request. The runtime can add its own ceiling with `ZYVOR_AGENT_MAX_VCPUS` and `ZYVOR_AGENT_MAX_MEMORY_MIB`; a manifest above them is rejected at deploy. Volumes have no size quota (see below), so a "100 GB home" is a host filesystem matter, not something this setting enforces.
+
+## Browsers and the CONNECT proxy
+
+A browser in the sandbox cannot call the JSON egress broker, so the runtime also serves an HTTPS `CONNECT` proxy (`ZYVOR_AGENT_PROXY_LISTEN`, default `0.0.0.0:18083`, `off` disables it). Each session's guest gets `ZYVOR_EGRESS_PROXY=http://<session>:<capability>@<gateway>:<port>`. A tunnel goes through the allowlist, `ask`/`sentinel` review, DNS pinning and the private-network gate, and is journaled as `egress.connect` with byte counts. It sees only `host:port`, so credential injection and path review do not apply; only `CONNECT` to `ZYVOR_AGENT_PROXY_CONNECT_PORTS` (default `443`) is served. It constrains only a guest with no other route to the internet. `templates/browser-agent/` has a Chromium template recipe and a Playwright example.
+
 Volumes are per FluxVM tenant and live under FluxVM's `sandbox.volumes_dir` (default `<state_dir>/volumes`). They have no size quota: the limit is the host filesystem. Deleting the agent or a session does not delete the volume; remove the directory on the FluxVM host to discard the data.
 
 ## Skills

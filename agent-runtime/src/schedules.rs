@@ -105,7 +105,16 @@ async fn tick_schedule(
     );
     let agent = schedule.agent.clone();
     let input = schedule.input.clone();
-    match admit(state, &agent, input, request_id, None).await {
+    match admit(
+        state,
+        &agent,
+        input,
+        request_id,
+        None,
+        schedule.user_id.clone(),
+    )
+    .await
+    {
         Ok(session_id) => {
             schedule.runs = schedule.runs.saturating_add(1);
             schedule.active_session_id = Some(session_id);
@@ -169,7 +178,16 @@ async fn tick_loop(
     let request_id = format!("loop:{}:{}", record.id, record.runs);
     let agent = record.agent.clone();
     let input = record.input.clone();
-    match admit(state, &agent, input, request_id, None).await {
+    match admit(
+        state,
+        &agent,
+        input,
+        request_id,
+        None,
+        record.user_id.clone(),
+    )
+    .await
+    {
         Ok(session_id) => {
             record.runs = record.runs.saturating_add(1);
             record.active_session_id = Some(session_id);
@@ -262,6 +280,7 @@ async fn admit(
     input: Value,
     request_id: String,
     parent_session_id: Option<Uuid>,
+    user_id: Option<String>,
 ) -> Result<Uuid, String> {
     let req = CreateSessionRequest {
         agent: agent.to_string(),
@@ -270,6 +289,7 @@ async fn admit(
         request_id: Some(request_id),
         start_policy: Default::default(),
         parent_session_id,
+        user_id,
     };
     match app::create_session(State(state.clone()), Json(req)).await {
         Ok((_, Json(view))) => Ok(view.id),
@@ -316,9 +336,10 @@ pub(crate) async fn create_schedule(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateScheduleRequest>,
 ) -> Result<(StatusCode, Json<ScheduleRecord>), ApiError> {
-    if state.store.get_agent(&req.agent).await.is_none() {
+    let Some(agent) = state.store.get_agent(&req.agent).await else {
         return Err(ApiError::not_found("agent not found"));
-    }
+    };
+    crate::app::check_session_user(&agent, req.user_id.as_deref())?;
     let now = Utc::now();
     let next_run_at = next_cron(&req.cron, now).map_err(ApiError::bad_request)?;
     let record = ScheduleRecord {
@@ -338,6 +359,7 @@ pub(crate) async fn create_schedule(
         accounted_session_id: None,
         last_result: None,
         stopped_reason: None,
+        user_id: req.user_id,
     };
     state
         .store
@@ -377,9 +399,10 @@ pub(crate) async fn create_webhook(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateWebhookRequest>,
 ) -> Result<(StatusCode, Json<CreateWebhookResponse>), ApiError> {
-    if state.store.get_agent(&req.agent).await.is_none() {
+    let Some(agent) = state.store.get_agent(&req.agent).await else {
         return Err(ApiError::not_found("agent not found"));
-    }
+    };
+    crate::app::check_session_user(&agent, req.user_id.as_deref())?;
     let secret = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let record = WebhookRecord {
         id: Uuid::new_v4(),
@@ -391,6 +414,7 @@ pub(crate) async fn create_webhook(
         created_at: Utc::now(),
         runs: 0,
         stopped_reason: None,
+        user_id: req.user_id,
     };
     state
         .store
@@ -429,9 +453,10 @@ pub(crate) async fn create_loop(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateLoopRequest>,
 ) -> Result<(StatusCode, Json<LoopRecord>), ApiError> {
-    if state.store.get_agent(&req.agent).await.is_none() {
+    let Some(agent) = state.store.get_agent(&req.agent).await else {
         return Err(ApiError::not_found("agent not found"));
-    }
+    };
+    crate::app::check_session_user(&agent, req.user_id.as_deref())?;
     if !req.bounds.is_bounded() {
         return Err(ApiError::bad_request(
             "a loop needs max_runs, max_duration_secs, max_cost, or max_no_progress",
@@ -454,6 +479,7 @@ pub(crate) async fn create_loop(
         last_result: None,
         stopped_reason: None,
         next_attempt_at: None,
+        user_id: req.user_id,
     };
     state
         .store
@@ -546,9 +572,16 @@ pub(crate) async fn webhook_ingress(
         Some(value) => format!("hook:{id}:{value}"),
         None => format!("hook:{id}:{}", Uuid::new_v4().simple()),
     };
-    let session_id = admit(&state, &webhook.agent, input, request_id, None)
-        .await
-        .map_err(ApiError::bad_gateway)?;
+    let session_id = admit(
+        &state,
+        &webhook.agent,
+        input,
+        request_id,
+        None,
+        webhook.user_id.clone(),
+    )
+    .await
+    .map_err(ApiError::bad_gateway)?;
     webhook.runs = webhook.runs.saturating_add(1);
     state
         .store

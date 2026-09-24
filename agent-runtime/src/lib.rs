@@ -10,6 +10,7 @@ pub mod fluxvm;
 pub mod mcp;
 pub mod model;
 pub mod pool;
+pub mod proxy;
 pub mod schedules;
 pub mod sentinel;
 pub mod skills;

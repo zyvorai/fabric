@@ -295,6 +295,18 @@ impl Store {
             .count()
     }
 
+    /// Non-terminal sessions of one agent that belong to `user_id`.
+    pub async fn count_non_terminal_for_user(&self, agent: &str, user_id: &str) -> usize {
+        self.sessions
+            .read()
+            .await
+            .values()
+            .filter(|s| {
+                s.agent == agent && !s.status.is_terminal() && s.user_id.as_deref() == Some(user_id)
+            })
+            .count()
+    }
+
     pub async fn update_session<F>(&self, id: Uuid, f: F) -> Result<SessionRecord>
     where
         F: FnOnce(&mut SessionRecord),
@@ -821,6 +833,7 @@ mod tests {
             bundle_base64: base64::engine::general_purpose::STANDARD
                 .encode("export default () => 1"),
             manifest: AgentManifest {
+                resources: None,
                 template: "node22".into(),
                 credentials: vec!["openai".into()],
                 egress_allow_hosts: vec!["api.openai.com".into()],
@@ -860,6 +873,7 @@ mod tests {
                 name: "research".into(),
                 bundle_base64: bundle.clone(),
                 manifest: AgentManifest {
+                    resources: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.openai.com".into()],
@@ -884,6 +898,7 @@ mod tests {
                 name: "research".into(),
                 bundle_base64: bundle,
                 manifest: AgentManifest {
+                    resources: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.anthropic.com".into()],
@@ -943,6 +958,7 @@ mod tests {
                 capability_token: "cap".into(),
                 error: None,
                 parent_session_id: None,
+                user_id: None,
             })
             .await
             .unwrap();
@@ -955,6 +971,7 @@ mod tests {
             id
         );
         assert_eq!(store.count_non_terminal_for_agent("a").await, 1);
+        assert_eq!(store.count_non_terminal_for_user("a", "alice").await, 0);
         assert_eq!(
             store.append_event(id, "one", json!(1)).await.unwrap().seq,
             1

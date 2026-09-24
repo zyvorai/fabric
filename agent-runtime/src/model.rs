@@ -36,6 +36,9 @@ pub struct AgentManifest {
     /// replacement. Needs a QEMU-backed FluxVM template; see [`HomeVolume`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home_volume: Option<HomeVolume>,
+    /// Size of each sandbox. `None` uses the FluxVM template's own size.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resources: Option<Resources>,
     /// How long an `ask` request waits for a decision before it is refused.
     /// `None` uses [`DEFAULT_EGRESS_APPROVAL_SECONDS`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -74,6 +77,37 @@ pub struct HomeVolume {
     pub name: Option<String>,
     #[serde(default = "default_home_path")]
     pub guest_path: String,
+    /// Give every user their own volume (`<name>-<user_id>`). Sessions must then
+    /// carry a `user_id`, and the one-at-a-time attach rule applies per user, so
+    /// one deployed agent can serve many users.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub per_user: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// Sandbox size. FluxVM enforces both fields and applies the template's own
+/// `max_vcpus`/`max_memory_mib` as a ceiling.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Resources {
+    pub vcpus: u8,
+    pub memory_mib: u64,
+}
+
+pub const MIN_SANDBOX_MEMORY_MIB: u64 = 128;
+pub const MAX_USER_ID_CHARS: usize = 32;
+
+/// A user id becomes part of a volume name, so it is held to the same
+/// character set: lowercase letters, digits, `.`, `_`, `-`.
+pub fn validate_user_id(user_id: &str) -> Result<(), String> {
+    if user_id.is_empty() || user_id.len() > MAX_USER_ID_CHARS || !valid_volume_name(user_id) {
+        return Err(format!(
+            "user_id must be 1-{MAX_USER_ID_CHARS} characters from [a-z0-9._-], starting with a letter or digit"
+        ));
+    }
+    Ok(())
 }
 
 fn default_home_path() -> String {
@@ -98,6 +132,48 @@ impl AgentManifest {
         self.home_volume
             .as_ref()
             .map(|v| v.name.clone().unwrap_or_else(|| agent.to_ascii_lowercase()))
+    }
+
+    /// The volume for one session: the base name, plus `-<user_id>` when the
+    /// volume is per user.
+    pub fn home_volume_for(&self, agent: &str, user_id: Option<&str>) -> Option<String> {
+        let base = self.home_volume_name(agent)?;
+        match (self.home_volume.as_ref()?.per_user, user_id) {
+            (true, Some(user)) => Some(format!("{base}-{user}")),
+            _ => Some(base),
+        }
+    }
+
+    /// Deploy-time checks for `resources` against the operator's ceilings.
+    pub fn validate_resources(
+        &self,
+        max_vcpus: Option<u8>,
+        max_memory_mib: Option<u64>,
+    ) -> Result<(), String> {
+        let Some(r) = &self.resources else {
+            return Ok(());
+        };
+        if r.vcpus == 0 {
+            return Err("resources.vcpus must be at least 1".into());
+        }
+        if r.memory_mib < MIN_SANDBOX_MEMORY_MIB {
+            return Err(format!(
+                "resources.memory_mib must be at least {MIN_SANDBOX_MEMORY_MIB}"
+            ));
+        }
+        if let Some(max) = max_vcpus.filter(|max| r.vcpus > *max) {
+            return Err(format!(
+                "resources.vcpus {} exceeds this runtime's limit of {max}",
+                r.vcpus
+            ));
+        }
+        if let Some(max) = max_memory_mib.filter(|max| r.memory_mib > *max) {
+            return Err(format!(
+                "resources.memory_mib {} exceeds this runtime's limit of {max}",
+                r.memory_mib
+            ));
+        }
+        Ok(())
     }
 
     /// Deploy-time checks for `home_volume`. FluxVM re-validates everything;
@@ -125,7 +201,15 @@ impl AgentManifest {
         }
         // A volume is attached to one sandbox at a time and is bound when the
         // sandbox is created, so these settings cannot work alongside it.
-        if self.max_concurrent_sessions != Some(1) {
+        if volume.per_user {
+            // Room for `-<user_id>` under the 63-character volume name limit.
+            if name.len() + 1 + MAX_USER_ID_CHARS > 63 {
+                return Err(format!(
+                    "per-user home_volume name {name:?} is too long: at most {} characters",
+                    63 - 1 - MAX_USER_ID_CHARS
+                ));
+            }
+        } else if self.max_concurrent_sessions != Some(1) {
             return Err("home_volume requires max_concurrent_sessions to be 1: the volume can be attached to one sandbox at a time".into());
         }
         if self.warm_pool_size > 0 {
@@ -237,6 +321,10 @@ pub struct CreateSessionRequest {
     /// child still uses its own egress allowlist and credential grants.
     #[serde(default)]
     pub parent_session_id: Option<Uuid>,
+    /// The user this session runs for. Required when the agent's home volume is
+    /// per user. The caller (an operator-authenticated API client) asserts it.
+    #[serde(default)]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -305,6 +393,8 @@ pub struct SessionRecord {
     pub error: Option<String>,
     #[serde(default)]
     pub parent_session_id: Option<Uuid>,
+    #[serde(default)]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -326,6 +416,7 @@ pub struct SessionView {
     pub sandbox_released: bool,
     pub error: Option<String>,
     pub parent_session_id: Option<Uuid>,
+    pub user_id: Option<String>,
 }
 
 impl From<SessionRecord> for SessionView {
@@ -348,6 +439,7 @@ impl From<SessionRecord> for SessionView {
             sandbox_released: v.sandbox_released,
             error: v.error,
             parent_session_id: v.parent_session_id,
+            user_id: v.user_id,
         }
     }
 }
@@ -528,6 +620,8 @@ pub struct ScheduleRecord {
     pub last_result: Option<Value>,
     #[serde(default)]
     pub stopped_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -538,6 +632,8 @@ pub struct CreateScheduleRequest {
     pub input: Value,
     #[serde(default)]
     pub bounds: LoopBounds,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -557,6 +653,8 @@ pub struct WebhookRecord {
     pub runs: u32,
     #[serde(default)]
     pub stopped_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -591,6 +689,8 @@ pub struct CreateWebhookRequest {
     pub input: Value,
     #[serde(default)]
     pub bounds: LoopBounds,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -625,6 +725,8 @@ pub struct LoopRecord {
     pub stopped_reason: Option<String>,
     #[serde(default)]
     pub next_attempt_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -633,6 +735,8 @@ pub struct CreateLoopRequest {
     #[serde(default)]
     pub input: Value,
     pub bounds: LoopBounds,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -741,6 +845,7 @@ mod home_volume_tests {
 
     fn manifest(home: Option<HomeVolume>) -> AgentManifest {
         AgentManifest {
+            resources: None,
             template: "qemu-node".into(),
             credentials: vec![],
             egress_allow_hosts: vec![],
@@ -763,6 +868,7 @@ mod home_volume_tests {
         Some(HomeVolume {
             name: name.map(str::to_string),
             guest_path: path.into(),
+            per_user: false,
         })
     }
 
@@ -830,5 +936,109 @@ mod home_volume_tests {
             .validate_home_volume("a")
             .unwrap_err()
             .contains("hibernate"));
+    }
+
+    fn per_user() -> Option<HomeVolume> {
+        Some(HomeVolume {
+            name: Some("home".into()),
+            guest_path: "/home/agent".into(),
+            per_user: true,
+        })
+    }
+
+    #[test]
+    fn per_user_volume_is_named_per_user_and_drops_the_single_session_rule() {
+        let mut m = manifest(per_user());
+        m.max_concurrent_sessions = None;
+        assert!(m.validate_home_volume("a").is_ok());
+        assert_eq!(
+            m.home_volume_for("a", Some("alice")).as_deref(),
+            Some("home-alice")
+        );
+        assert_eq!(
+            m.home_volume_for("a", Some("bob")).as_deref(),
+            Some("home-bob")
+        );
+        // A shared volume ignores the user.
+        let shared = manifest(home(Some("home"), "/home/agent"));
+        assert_eq!(
+            shared.home_volume_for("a", Some("alice")).as_deref(),
+            Some("home")
+        );
+        // A per-user volume still cannot use warm pools or hibernation.
+        m.warm_pool_size = 1;
+        assert!(m.validate_home_volume("a").is_err());
+    }
+
+    #[test]
+    fn per_user_volume_name_must_leave_room_for_the_user() {
+        let long = "x".repeat(40);
+        let m = manifest(Some(HomeVolume {
+            name: Some(long),
+            guest_path: "/home/agent".into(),
+            per_user: true,
+        }));
+        assert!(m
+            .validate_home_volume("a")
+            .unwrap_err()
+            .contains("too long"));
+    }
+
+    #[test]
+    fn per_user_flag_is_omitted_when_off_and_kept_when_on() {
+        let off = serde_json::to_value(manifest(home(None, "/home/agent"))).unwrap();
+        assert!(off["home_volume"].get("per_user").is_none());
+        let on = serde_json::to_value(manifest(per_user())).unwrap();
+        assert_eq!(on["home_volume"]["per_user"], true);
+    }
+
+    #[test]
+    fn user_ids_follow_the_volume_name_rules() {
+        assert!(validate_user_id("alice-01").is_ok());
+        assert!(validate_user_id("a.b_c").is_ok());
+        for bad in ["", "Alice", "a b", "../x", "a/b", "-x", &"x".repeat(33)] {
+            assert!(validate_user_id(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn resources_are_checked_against_operator_ceilings() {
+        let mut m = manifest(None);
+        assert!(m.validate_resources(Some(1), Some(1)).is_ok());
+        m.resources = Some(Resources {
+            vcpus: 2,
+            memory_mib: 7900,
+        });
+        assert!(m.validate_resources(None, None).is_ok());
+        assert!(m.validate_resources(Some(2), Some(8192)).is_ok());
+        assert!(m.validate_resources(Some(1), None).is_err());
+        assert!(m.validate_resources(None, Some(4096)).is_err());
+        m.resources = Some(Resources {
+            vcpus: 0,
+            memory_mib: 7900,
+        });
+        assert!(m.validate_resources(None, None).is_err());
+        m.resources = Some(Resources {
+            vcpus: 1,
+            memory_mib: 64,
+        });
+        assert!(m.validate_resources(None, None).is_err());
+    }
+
+    #[test]
+    fn manifest_without_resources_serializes_unchanged() {
+        let value = serde_json::to_value(manifest(None)).unwrap();
+        assert!(value.get("resources").is_none());
+        let sized = AgentManifest {
+            resources: Some(Resources {
+                vcpus: 2,
+                memory_mib: 7900,
+            }),
+            ..manifest(None)
+        };
+        assert_eq!(
+            serde_json::to_value(sized).unwrap()["resources"]["vcpus"],
+            2
+        );
     }
 }

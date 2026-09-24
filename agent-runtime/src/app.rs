@@ -27,7 +27,7 @@ use axum::{
 use chrono::Utc;
 use reqwest::Method;
 use serde_json::{json, Value};
-use std::{convert::Infallible, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::Infallible, sync::Arc, time::Duration};
 use uuid::Uuid;
 
 pub(crate) const WORKER: &[u8] = include_bytes!("worker.mjs");
@@ -52,10 +52,34 @@ const HEALTH_CHECK_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
 /// Create a fresh sandbox for a session, attaching the agent's home volume if
 /// it has one. A volume that is still attached elsewhere is a conflict (the
 /// caller can retry once the other session ends), not a gateway failure.
+/// A `user_id` must be well formed, and is mandatory when the agent's home
+/// volume is per user (otherwise every user would share one volume).
+pub(crate) fn check_session_user(
+    agent: &crate::model::AgentRecord,
+    user_id: Option<&str>,
+) -> ApiResult<()> {
+    if let Some(user) = user_id {
+        crate::model::validate_user_id(user).map_err(ApiError::bad_request)?;
+    }
+    if agent
+        .manifest
+        .home_volume
+        .as_ref()
+        .is_some_and(|v| v.per_user)
+        && user_id.is_none()
+    {
+        return Err(ApiError::bad_request(
+            "this agent's home volume is per user: user_id is required",
+        ));
+    }
+    Ok(())
+}
+
 async fn create_cold_sandbox(
     state: &AppState,
     agent: &crate::model::AgentRecord,
     session_id: Uuid,
+    user_id: Option<&str>,
 ) -> ApiResult<crate::fluxvm::SandboxRecord> {
     let name = format!("agent-{}", &session_id.simple().to_string()[..12]);
     let volumes: Vec<crate::fluxvm::SandboxVolume> = agent
@@ -64,7 +88,7 @@ async fn create_cold_sandbox(
         .iter()
         .filter_map(|v| {
             Some(crate::fluxvm::SandboxVolume {
-                name: agent.manifest.home_volume_name(&agent.name)?,
+                name: agent.manifest.home_volume_for(&agent.name, user_id)?,
                 guest_path: v.guest_path.clone(),
             })
         })
@@ -75,6 +99,7 @@ async fn create_cold_sandbox(
         None,
         agent.manifest.runtime_port,
         &volumes,
+        agent.manifest.resources,
     ))
     .await
     .map_err(|error| {
@@ -279,6 +304,12 @@ async fn deploy_agent(
             )));
         }
     }
+    if let Err(message) = req
+        .manifest
+        .validate_resources(state.config.max_vcpus, state.config.max_memory_mib)
+    {
+        return Err(ApiError::bad_request(message));
+    }
     if let Err(message) = req.manifest.validate_home_volume(&req.name) {
         return Err(ApiError::bad_request(message));
     }
@@ -384,6 +415,7 @@ pub(crate) async fn create_session(
     if let Some(value) = request_id.as_deref() {
         validate_request_id(value)?;
     }
+    check_session_user(&agent, req.user_id.as_deref())?;
     let ttl = req.ttl_seconds.or(agent.manifest.ttl_seconds);
     let start_policy = req.start_policy;
     let expires_at = match ttl {
@@ -445,6 +477,20 @@ pub(crate) async fn create_session(
             }
         }
 
+        if let Some(user) = req.user_id.as_deref() {
+            if state
+                .store
+                .count_non_terminal_for_user(&agent.name, user)
+                .await
+                > 0
+            {
+                return Err(ApiError::conflict(format!(
+                    "user '{user}' already has an active session for agent '{}'",
+                    agent.name
+                )));
+            }
+        }
+
         let id = Uuid::new_v4();
         // Reserve the per-session operation lock before the record becomes
         // visible. Sync/expiry/control requests can discover Creating state,
@@ -497,12 +543,13 @@ pub(crate) async fn create_session(
                             "claimed warm sandbox could not resume; retry after pool replenishment",
                         ));
                     }
-                    let sandbox = create_cold_sandbox(&state, &agent, id).await?;
+                    let sandbox =
+                        create_cold_sandbox(&state, &agent, id, req.user_id.as_deref()).await?;
                     (sandbox.id, SessionStartMode::Cold, false)
                 }
             }
         } else {
-            let sandbox = create_cold_sandbox(&state, &agent, id).await?;
+            let sandbox = create_cold_sandbox(&state, &agent, id, req.user_id.as_deref()).await?;
             (sandbox.id, SessionStartMode::Cold, false)
         };
 
@@ -526,6 +573,7 @@ pub(crate) async fn create_session(
             capability_token: random_capability(),
             error: None,
             parent_session_id: req.parent_session_id,
+            user_id: req.user_id.clone(),
         };
         if let Err(error) = state.store.save_session(record.clone()).await {
             if prewarmed {
@@ -835,10 +883,24 @@ async fn provision_guest(
         format_host(&host),
         state.config.egress_listen.port()
     );
+    // Basic credentials for the CONNECT proxy: the same session id and
+    // capability the JSON broker takes, so the guest gains no new secret.
+    let proxy = state.config.proxy_listen.map(|addr| {
+        format!(
+            "http://{}:{}@{}:{}",
+            session.id,
+            session.capability_token,
+            format_host(&host),
+            addr.port()
+        )
+    });
+    let proxy_env = proxy
+        .map(|url| format!("ZYVOR_EGRESS_PROXY={} ", shell_quote(&url)))
+        .unwrap_or_default();
     let credentials =
         serde_json::to_string(&agent.manifest.credentials).unwrap_or_else(|_| "[]".into());
     let command = format!(
-        "mkdir -p /opt/zyvor/agent; ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
+        "mkdir -p /opt/zyvor/agent; {proxy_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()),
         shell_quote(&session.capability_token),
         shell_quote(&broker),
@@ -895,12 +957,17 @@ async fn provision_guest(
     Ok(())
 }
 
-async fn list_sessions(State(state): State<Arc<AppState>>) -> Json<Value> {
+async fn list_sessions(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Json<Value> {
+    let user = query.get("user_id");
     let items: Vec<SessionView> = state
         .store
         .list_sessions()
         .await
         .into_iter()
+        .filter(|s| user.is_none_or(|u| s.user_id.as_deref() == Some(u.as_str())))
         .map(Into::into)
         .collect();
     Json(json!({"items": items}))
@@ -1517,6 +1584,11 @@ fn spawn_delegation(state: &Arc<AppState>, parent: Uuid, data: &Value) {
     let input = data.get("input").cloned().unwrap_or(Value::Null);
     let state = Arc::clone(state);
     tokio::spawn(async move {
+        let user_id = state
+            .store
+            .get_session(parent)
+            .await
+            .and_then(|p| p.user_id);
         let request = CreateSessionRequest {
             agent: target.clone(),
             input,
@@ -1524,6 +1596,7 @@ fn spawn_delegation(state: &Arc<AppState>, parent: Uuid, data: &Value) {
             request_id: Some(format!("delegate:{parent}:{}", Uuid::new_v4().simple())),
             start_policy: SessionStartPolicy::PreferWarm,
             parent_session_id: Some(parent),
+            user_id,
         };
         match create_session(State(state.clone()), Json(request)).await {
             Ok((_, Json(view))) => {
@@ -1634,6 +1707,7 @@ async fn delegate_session(
             request_id: Some(format!("delegate:{id}:{}", Uuid::new_v4().simple())),
             start_policy: SessionStartPolicy::PreferWarm,
             parent_session_id: Some(id),
+            user_id: parent.user_id.clone(),
         }),
     )
     .await?;

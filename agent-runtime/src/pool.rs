@@ -311,6 +311,7 @@ async fn create_warm_sandbox(
             agent.manifest.runtime_port,
             // Deploy validation forbids warm pools together with a home volume.
             &[],
+            agent.manifest.resources,
         )
         .await?;
 

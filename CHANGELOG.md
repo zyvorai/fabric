@@ -3,6 +3,16 @@
 ## 0.3.0
 
 ### Added
+- **Per-user agent VMs.** `home_volume.per_user` gives each `user_id` its own volume
+  and its own one-at-a-time session slot, so one deployed agent serves many users;
+  `resources` sets vCPUs and memory per sandbox (FluxVM `feat/sandbox-resources`,
+  operator ceilings `ZYVOR_AGENT_MAX_VCPUS`/`_MAX_MEMORY_MIB`). Volumes still have no
+  size quota.
+- **HTTPS CONNECT proxy for browsers.** Sandbox browsers reach the internet through
+  the same allowlist, `ask`/`sentinel` review, private-network gate and journal as
+  brokered requests (`ZYVOR_AGENT_PROXY_LISTEN`, default `:18083`), and
+  `agent-runtime/templates/browser-agent` is a Debian + Node + Chromium template
+  recipe. Only effective for guests with no direct route out.
 - **Sentinel egress review.** `egress_mode: "sentinel"` has an operator-configured
   reviewer model (`ZYVOR_AGENT_SENTINEL_URL`, `_MODEL`) screen requests to unlisted
   hosts before an operator is asked. It can deny, or escalate to the existing

@@ -319,7 +319,7 @@ async fn proxy_inner(
 /// connect only to this exact address for this request -- resolving `host`
 /// again later would reopen the DNS-rebinding gap this function exists to
 /// close.
-async fn resolve_and_validate_destination(
+pub(crate) async fn resolve_and_validate_destination(
     host: &str,
     port: u16,
     allow_private_networks: bool,
@@ -391,7 +391,7 @@ fn is_hop_or_secret_header(name: &str) -> bool {
     )
 }
 
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -483,7 +483,7 @@ const APPROVAL_POLL: std::time::Duration = std::time::Duration::from_millis(250)
 /// while an operator approves or denies it. An approval only lifts the
 /// allowlist check: DNS pinning and the private-network gate still run after
 /// this returns, so approving a host never permits SSRF into internal ranges.
-async fn authorize_unlisted_host(
+pub(crate) async fn authorize_unlisted_host(
     state: &AppState,
     session: &SessionRecord,
     manifest: &AgentManifest,
@@ -622,7 +622,7 @@ async fn authorize_unlisted_host(
 }
 
 #[cfg(test)]
-mod ask_tests {
+pub(crate) mod ask_tests {
     use super::*;
     use crate::{
         audit::AuditPhase,
@@ -635,11 +635,17 @@ mod ask_tests {
         state_and_session_with(None).await
     }
 
-    async fn state_and_session_with(
+    pub(crate) async fn state_and_session_with(
         sentinel: Option<crate::sentinel::SentinelConfig>,
     ) -> (Arc<AppState>, SessionRecord) {
+        state_and_session_cfg(|config| config.sentinel = sentinel).await
+    }
+
+    pub(crate) async fn state_and_session_cfg(
+        tweak: impl FnOnce(&mut Config),
+    ) -> (Arc<AppState>, SessionRecord) {
         let root = std::env::temp_dir().join(format!("zyvor-egress-ask-{}", uuid::Uuid::new_v4()));
-        let config = Config {
+        let mut config = Config {
             listen: "127.0.0.1:0".parse().unwrap(),
             egress_listen: "127.0.0.1:0".parse().unwrap(),
             state_dir: root.join("state"),
@@ -649,7 +655,11 @@ mod ask_tests {
             api_token: None,
             credentials_file: None,
             skill_scopes_file: None,
-            sentinel,
+            sentinel: None,
+            proxy_listen: None,
+            proxy_connect_ports: vec![443],
+            max_vcpus: None,
+            max_memory_mib: None,
             egress_advertise_host: None,
             sync_interval_ms: 300,
             guest_start_timeout_secs: 30,
@@ -659,6 +669,7 @@ mod ask_tests {
             warm_pool_claim_stale_secs: 300,
             expiry_scan_interval_ms: 1000,
         };
+        tweak(&mut config);
         let state = AppState::from_config(config).await.unwrap();
         let now = chrono::Utc::now();
         let session = SessionRecord {
@@ -681,13 +692,15 @@ mod ask_tests {
             capability_token: "cap".into(),
             error: None,
             parent_session_id: None,
+            user_id: None,
         };
         state.store.save_session(session.clone()).await.unwrap();
         (state, session)
     }
 
-    fn manifest(mode: EgressMode, timeout: Option<u64>) -> AgentManifest {
+    pub(crate) fn manifest(mode: EgressMode, timeout: Option<u64>) -> AgentManifest {
         AgentManifest {
+            resources: None,
             template: "t".into(),
             credentials: vec![],
             egress_allow_hosts: vec![],

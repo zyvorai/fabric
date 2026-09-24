@@ -1,6 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::model::Resources;
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use reqwest::{Method, Url};
@@ -33,6 +34,10 @@ struct SandboxCreate<'a> {
     http_proxy_port: u16,
     #[serde(skip_serializing_if = "<[SandboxVolume]>::is_empty")]
     volumes: &'a [SandboxVolume],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vcpus: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    memory_mib: Option<u64>,
 }
 
 /// A FluxVM sandbox volume (`POST /v1/sandboxes` `volumes`).
@@ -98,6 +103,7 @@ impl FluxVm {
         ttl_seconds: Option<u64>,
         runtime_port: u16,
         volumes: &[SandboxVolume],
+        resources: Option<Resources>,
     ) -> Result<SandboxRecord> {
         let response = self
             .auth(self.http.post(self.url("/v1/sandboxes")?))
@@ -107,6 +113,8 @@ impl FluxVm {
                 ttl_seconds,
                 http_proxy_port: runtime_port,
                 volumes,
+                vcpus: resources.map(|r| r.vcpus),
+                memory_mib: resources.map(|r| r.memory_mib),
             })
             .send()
             .await?;
@@ -247,9 +255,12 @@ mod tests {
             ttl_seconds: None,
             http_proxy_port: 8080,
             volumes: &[],
+            vcpus: None,
+            memory_mib: None,
         })
         .unwrap();
         assert!(none.get("volumes").is_none());
+        assert!(none.get("vcpus").is_none() && none.get("memory_mib").is_none());
 
         let volumes = [SandboxVolume {
             name: "home".into(),
@@ -261,9 +272,15 @@ mod tests {
             ttl_seconds: None,
             http_proxy_port: 8080,
             volumes: &volumes,
+            vcpus: Some(2),
+            memory_mib: Some(7900),
         })
         .unwrap();
         assert_eq!(some["volumes"][0]["name"], "home");
         assert_eq!(some["volumes"][0]["guest_path"], "/home/agent");
+        assert_eq!(
+            (some["vcpus"].as_u64(), some["memory_mib"].as_u64()),
+            (Some(2), Some(7900))
+        );
     }
 }

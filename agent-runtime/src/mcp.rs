@@ -176,6 +176,7 @@ async fn chat(state: &Arc<AppState>, args: &Value) -> Result<Value, (i32, String
             request_id: None,
             start_policy: Default::default(),
             parent_session_id: None,
+            user_id: None,
         }),
     )
     .await

@@ -9,6 +9,10 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 pub struct Config {
     pub listen: SocketAddr,
     pub egress_listen: SocketAddr,
+    /// HTTPS CONNECT proxy for browsers in the sandbox. `None` turns it off.
+    pub proxy_listen: Option<SocketAddr>,
+    /// Ports a CONNECT tunnel may target.
+    pub proxy_connect_ports: Vec<u16>,
     pub state_dir: PathBuf,
     pub snapshot_dir: PathBuf,
     pub fluxvm_url: String,
@@ -20,6 +24,9 @@ pub struct Config {
     /// Reviewer model for `egress_mode: "sentinel"`. Absent means sentinel
     /// agents fall back to asking an operator.
     pub sentinel: Option<SentinelConfig>,
+    /// Ceilings for a manifest's `resources`. Absent means FluxVM's own limits decide.
+    pub max_vcpus: Option<u8>,
+    pub max_memory_mib: Option<u64>,
     pub egress_advertise_host: Option<String>,
     pub sync_interval_ms: u64,
     pub guest_start_timeout_secs: u64,
@@ -40,6 +47,15 @@ impl Config {
         Ok(Self {
             listen: env_parse("ZYVOR_AGENT_LISTEN", "127.0.0.1:9096")?,
             egress_listen: env_parse("ZYVOR_AGENT_EGRESS_LISTEN", "0.0.0.0:18082")?,
+            proxy_listen: proxy_listen_from_env()?,
+            proxy_connect_ports: env_or("ZYVOR_AGENT_PROXY_CONNECT_PORTS", "443")
+                .split(',')
+                .map(|p| {
+                    p.trim()
+                        .parse()
+                        .context("invalid ZYVOR_AGENT_PROXY_CONNECT_PORTS")
+                })
+                .collect::<Result<_>>()?,
             state_dir: PathBuf::from(env_or(
                 "ZYVOR_AGENT_STATE_DIR",
                 "/var/lib/zyvor-fabric-agent",
@@ -54,6 +70,12 @@ impl Config {
             credentials_file: env_opt("ZYVOR_AGENT_CREDENTIALS_FILE").map(PathBuf::from),
             skill_scopes_file: env_opt("ZYVOR_AGENT_SKILL_SCOPES_FILE").map(PathBuf::from),
             sentinel: sentinel_from_env()?,
+            max_vcpus: env_opt("ZYVOR_AGENT_MAX_VCPUS")
+                .map(|v| v.parse().context("invalid ZYVOR_AGENT_MAX_VCPUS"))
+                .transpose()?,
+            max_memory_mib: env_opt("ZYVOR_AGENT_MAX_MEMORY_MIB")
+                .map(|v| v.parse().context("invalid ZYVOR_AGENT_MAX_MEMORY_MIB"))
+                .transpose()?,
             egress_advertise_host: env_opt("ZYVOR_AGENT_EGRESS_ADVERTISE_HOST"),
             sync_interval_ms: env_parse("ZYVOR_AGENT_SYNC_INTERVAL_MS", "300")?,
             guest_start_timeout_secs: env_parse("ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS", "30")?,
@@ -85,6 +107,18 @@ fn validate_auth(api_token: Option<&str>, allow_no_auth: Option<&str>) -> Result
         );
     }
     Ok(())
+}
+
+/// `ZYVOR_AGENT_PROXY_LISTEN`: an address, or `off` to disable the proxy.
+fn proxy_listen_from_env() -> Result<Option<SocketAddr>> {
+    let value = env_or("ZYVOR_AGENT_PROXY_LISTEN", "0.0.0.0:18083");
+    if value.eq_ignore_ascii_case("off") {
+        return Ok(None);
+    }
+    value
+        .parse()
+        .map(Some)
+        .context("invalid ZYVOR_AGENT_PROXY_LISTEN")
 }
 
 fn sentinel_from_env() -> Result<Option<SentinelConfig>> {
