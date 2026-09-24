@@ -23,6 +23,10 @@ pub struct SandboxRecord {
     pub guest_ip: Option<String>,
     #[serde(default)]
     pub status: Option<String>,
+    /// Present when the create request asked for `confidential`. An older FluxVM
+    /// ignores the request and omits this.
+    #[serde(default)]
+    pub confidential: Option<crate::model::ConfidentialStatus>,
 }
 
 #[derive(Debug, Serialize)]
@@ -38,6 +42,8 @@ struct SandboxCreate<'a> {
     vcpus: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     memory_mib: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    confidential: Option<&'static str>,
 }
 
 /// A FluxVM sandbox volume (`POST /v1/sandboxes` `volumes`).
@@ -45,6 +51,14 @@ struct SandboxCreate<'a> {
 pub struct SandboxVolume {
     pub name: String,
     pub guest_path: String,
+}
+
+/// What a sandbox gets beyond its template: volumes, size, confidential launch.
+#[derive(Debug, Default)]
+pub struct SandboxOptions<'a> {
+    pub volumes: &'a [SandboxVolume],
+    pub resources: Option<Resources>,
+    pub confidential: crate::model::Confidential,
 }
 
 impl FluxVm {
@@ -102,8 +116,7 @@ impl FluxVm {
         template: &str,
         ttl_seconds: Option<u64>,
         runtime_port: u16,
-        volumes: &[SandboxVolume],
-        resources: Option<Resources>,
+        options: &SandboxOptions<'_>,
     ) -> Result<SandboxRecord> {
         let response = self
             .auth(self.http.post(self.url("/v1/sandboxes")?))
@@ -112,9 +125,11 @@ impl FluxVm {
                 template,
                 ttl_seconds,
                 http_proxy_port: runtime_port,
-                volumes,
-                vcpus: resources.map(|r| r.vcpus),
-                memory_mib: resources.map(|r| r.memory_mib),
+                volumes: options.volumes,
+                vcpus: options.resources.map(|r| r.vcpus),
+                memory_mib: options.resources.map(|r| r.memory_mib),
+                confidential: (!options.confidential.is_off())
+                    .then_some(options.confidential.as_str()),
             })
             .send()
             .await?;
@@ -326,10 +341,12 @@ mod tests {
             volumes: &[],
             vcpus: None,
             memory_mib: None,
+            confidential: None,
         })
         .unwrap();
         assert!(none.get("volumes").is_none());
         assert!(none.get("vcpus").is_none() && none.get("memory_mib").is_none());
+        assert!(none.get("confidential").is_none());
 
         let volumes = [SandboxVolume {
             name: "home".into(),
@@ -343,6 +360,7 @@ mod tests {
             volumes: &volumes,
             vcpus: Some(2),
             memory_mib: Some(7900),
+            confidential: Some("auto"),
         })
         .unwrap();
         assert_eq!(some["volumes"][0]["name"], "home");

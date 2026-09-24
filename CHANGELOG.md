@@ -3,6 +3,11 @@
 ## 0.3.0
 
 ### Added
+- **Confidential VMs when the host has them.** `confidential: auto|required` asks
+  FluxVM (`feat/sandbox-resources`, `GET /v1/host/confidential`) for a
+  hardware-encrypted sandbox and falls back to a normal VM (`auto`) or refuses
+  (`required`), recording the outcome on the session. Launch on SEV-SNP/TDX hardware
+  is not implemented yet, so today `auto` always falls back.
 - **Agent containment.** `confinement: strict` drops all sandbox traffic except to
   the egress broker and proxy (FluxVM eBPF policy, fails closed); approvals are
   pushed to `ZYVOR_AGENT_APPROVAL_WEBHOOK` (HMAC-signed) so a person sees them,

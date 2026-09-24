@@ -66,3 +66,10 @@ test("rule specs", () => {
   assert.throws(() => parseRule(":GET"), /host is required/);
   assert.throws(() => parseRule("h:GET::0"), /positive integer/);
 });
+
+test("confidential modes", () => {
+  assert.equal("confidential" in buildManifest({ ...base(), confidential: "off" }, "node"), false);
+  assert.equal(buildManifest({ ...base(), confidential: "auto" }, "node").confidential, "auto");
+  assert.equal(buildManifest({ ...base(), confidential: "required" }, "node").confidential, "required");
+  assert.throws(() => buildManifest({ ...base(), confidential: "yes" }, "node"), /--confidential/);
+});

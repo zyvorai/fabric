@@ -173,6 +173,12 @@ Set `ZYVOR_AGENT_APPROVAL_WEBHOOK` and `ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET` and
 
 A credential descriptor can require a decision per request: `"requires_approval": ["POST"]` (methods, or `"*"`) and `"approval_kind": "send"` (default) or `"purchase"`. The broker then holds the request after every other check and opens an approval showing the method, the URL without its query string, the credential name, and the body's length and SHA-256, never the body or a header. Each request needs its own decision; nothing is remembered.
 
+### Confidential VMs, when the host has them
+
+`"confidential": "auto"` asks FluxVM for a hardware-encrypted VM (AMD SEV-SNP or Intel TDX) and quietly runs a normal VM when the host cannot, recording why on the session (`confidential: {active, tech, reason}`, also in the `session.created` event). `"required"` refuses to run without one: FluxVM refuses the launch, and the runtime also deletes any sandbox that comes back without an active confidential status, including from a FluxVM too old to report one. Deploy rejects the combinations that would leak guest memory or disk: `warm_pool_size` and `idle_hibernate_seconds` (a snapshot copies memory out), and, for `required`, `home_volume` (a virtiofs share is readable by the host). `GET /v1/host/confidential` on FluxVM shows what a host offers.
+
+**Not yet real on hardware.** FluxVM detects SEV-SNP and TDX but does not launch confidential guests yet (`LAUNCH_SUPPORTED` is false and guarded by a test): the QEMU arguments for them interact with FluxVM's memory-hotplug and CPU settings and cannot be checked without the hardware. So today `auto` always falls back and `required` always refuses, with an accurate reason. This is TEE isolation only: a user-held key that the operator cannot use is the key-broker work in `docs/design/confidential-agent-vms.md`, not done.
+
 ### Request rules, secret scanning and taint
 
 - `egress_rules`: `[{"host": "api.example.com", "methods": ["POST"], "path_prefixes": ["/v1/messages"], "max_body_bytes": 65536}]`. A host with any rule needs a matching one; hosts without rules are unrestricted beyond the allowlist. Checked first, so a request the agent may never send never reaches an operator. The CONNECT proxy refuses a host that has rules, because a TLS tunnel hides the method and path.

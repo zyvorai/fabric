@@ -1,8 +1,9 @@
 # Confidential agent VMs (design spec, not implemented)
 
-Status: proposal. Nothing here exists in code yet, and FluxVM has no
-confidential-computing support today, so this is a spec to review before any
-implementation starts. Modelled on the "Confidential VM with a user-held key"
+Status: partly implemented. The manifest's `confidential: auto|required`, FluxVM's
+host detection (`GET /v1/host/confidential`), fail-closed `required`, and status
+reporting exist; the QEMU launch for SEV-SNP/TDX, block-device volumes, and the
+attested key release below do not, and none of it has run on confidential hardware. Modelled on the "Confidential VM with a user-held key"
 that Meta announced for Muse; the public details are thin, so the requirements
 below are ours rather than a copy of theirs.
 

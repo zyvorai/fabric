@@ -80,6 +80,12 @@ export function buildManifest(flags, runtime) {
     }
     if (flags.confinement === "strict") manifest.confinement = "strict";
   }
+  if (flags.confidential !== undefined) {
+    if (!["off", "auto", "required"].includes(flags.confidential)) {
+      throw new Error("--confidential must be off, auto, or required");
+    }
+    if (flags.confidential !== "off") manifest.confidential = flags.confidential;
+  }
   if (flags.dlp) manifest.dlp = true;
   if (flags.taintTrust.length > 0 || flags.taint) {
     manifest.taint = { trusted_hosts: flags.taintTrust };

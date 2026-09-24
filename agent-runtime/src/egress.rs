@@ -941,6 +941,7 @@ pub(crate) mod ask_tests {
             parent_session_id: None,
             user_id: None,
             tainted_by: vec![],
+            confidential: None,
         };
         state.store.save_session(session.clone()).await.unwrap();
         (state, session)
@@ -953,6 +954,7 @@ pub(crate) mod ask_tests {
             taint: None,
             confinement: Default::default(),
             resources: None,
+            confidential: Default::default(),
             template: "t".into(),
             credentials: vec![],
             egress_allow_hosts: vec![],

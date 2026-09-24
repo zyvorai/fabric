@@ -867,6 +867,7 @@ mod tests {
                 taint: None,
                 confinement: Default::default(),
                 resources: None,
+                confidential: Default::default(),
                 template: "node22".into(),
                 credentials: vec!["openai".into()],
                 egress_allow_hosts: vec!["api.openai.com".into()],
@@ -911,6 +912,7 @@ mod tests {
                     taint: None,
                     confinement: Default::default(),
                     resources: None,
+                    confidential: Default::default(),
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.openai.com".into()],
@@ -940,6 +942,7 @@ mod tests {
                     taint: None,
                     confinement: Default::default(),
                     resources: None,
+                    confidential: Default::default(),
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.anthropic.com".into()],
@@ -1001,6 +1004,7 @@ mod tests {
                 parent_session_id: None,
                 user_id: None,
                 tainted_by: vec![],
+                confidential: None,
             })
             .await
             .unwrap();

@@ -93,13 +93,16 @@ async fn create_cold_sandbox(
             })
         })
         .collect();
-    with_start_timeout(state.fluxvm.create_sandbox(
+    let sandbox = with_start_timeout(state.fluxvm.create_sandbox(
         name,
         &agent.manifest.template,
         None,
         agent.manifest.runtime_port,
-        &volumes,
-        agent.manifest.resources,
+        &crate::fluxvm::SandboxOptions {
+            volumes: &volumes,
+            resources: agent.manifest.resources,
+            confidential: agent.manifest.confidential,
+        },
     ))
     .await
     .map_err(|error| {
@@ -108,7 +111,36 @@ async fn create_cold_sandbox(
         } else {
             ApiError::bad_gateway(error)
         }
-    })
+    })?;
+    check_confidential(state, agent, &sandbox).await?;
+    Ok(sandbox)
+}
+
+/// Enforce `confidential: required` on a freshly created sandbox. FluxVM refuses
+/// a required launch it cannot do; this also refuses when an older FluxVM ignored
+/// the request and reported nothing, and deletes the sandbox so it never runs
+/// unprotected. `auto` accepts whatever happened and the outcome is recorded.
+async fn check_confidential(
+    state: &AppState,
+    agent: &crate::model::AgentRecord,
+    sandbox: &crate::fluxvm::SandboxRecord,
+) -> ApiResult<()> {
+    if agent.manifest.confidential != crate::model::Confidential::Required {
+        return Ok(());
+    }
+    let active = sandbox.confidential.as_ref().is_some_and(|c| c.active);
+    if active {
+        return Ok(());
+    }
+    let reason = sandbox
+        .confidential
+        .as_ref()
+        .map(|c| c.reason.clone())
+        .unwrap_or_else(|| "FluxVM did not report a confidential status (too old?)".into());
+    let _ = state.fluxvm.delete(sandbox.id).await;
+    Err(ApiError::unavailable(format!(
+        "confidential VM required but not active: {reason}"
+    )))
 }
 
 async fn with_start_timeout<T>(
@@ -304,6 +336,9 @@ async fn deploy_agent(
                 "egress_approval_timeout_seconds must be between {MIN_EGRESS_APPROVAL_SECONDS} and {MAX_EGRESS_APPROVAL_SECONDS}"
             )));
         }
+    }
+    if let Err(message) = req.manifest.validate_confidential() {
+        return Err(ApiError::bad_request(message));
     }
     if let Err(message) = req.manifest.validate_egress_policy() {
         return Err(ApiError::bad_request(message));
@@ -525,6 +560,7 @@ pub(crate) async fn create_session(
             )));
         }
 
+        let mut confidential: Option<crate::model::ConfidentialStatus> = None;
         let (sandbox_id, start_mode, prewarmed) = if let Some(warm) = warm {
             match with_start_timeout(state.fluxvm.resume(warm.sandbox_id)).await {
                 Ok(()) => (warm.sandbox_id, SessionStartMode::Warm, true),
@@ -549,11 +585,13 @@ pub(crate) async fn create_session(
                     }
                     let sandbox =
                         create_cold_sandbox(&state, &agent, id, req.user_id.as_deref()).await?;
+                    confidential = sandbox.confidential.clone();
                     (sandbox.id, SessionStartMode::Cold, false)
                 }
             }
         } else {
             let sandbox = create_cold_sandbox(&state, &agent, id, req.user_id.as_deref()).await?;
+            confidential = sandbox.confidential.clone();
             (sandbox.id, SessionStartMode::Cold, false)
         };
 
@@ -579,6 +617,7 @@ pub(crate) async fn create_session(
             parent_session_id: req.parent_session_id,
             user_id: req.user_id.clone(),
             tainted_by: vec![],
+            confidential: confidential.clone(),
         };
         if let Err(error) = state.store.save_session(record.clone()).await {
             if prewarmed {
@@ -615,6 +654,7 @@ pub(crate) async fn create_session(
                     "start_mode": start_mode,
                     "expires_at": record.expires_at.as_ref(),
                     "parent_session_id": record.parent_session_id,
+                    "confidential": record.confidential,
                 }),
             )
             .await
@@ -2080,5 +2120,105 @@ mod tests {
         let failing = async { Err::<(), _>(anyhow::anyhow!("boom")) };
         let result = with_timeout(Duration::from_secs(5), failing).await;
         assert_eq!(result.unwrap_err().to_string(), "boom");
+    }
+
+    // ---- confidential: auto / required ----
+
+    async fn fluxvm_that_counts_deletes() -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+        let deleted = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = deleted.clone();
+        let app = Router::new().route(
+            "/v1/vms/{id}",
+            axum::routing::delete(move || {
+                let counter = counter.clone();
+                async move {
+                    counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    StatusCode::NO_CONTENT
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (url, deleted)
+    }
+
+    fn agent_with(mode: crate::model::Confidential) -> crate::model::AgentRecord {
+        let mut manifest = crate::egress::ask_tests::manifest(crate::model::EgressMode::Deny, None);
+        manifest.confidential = mode;
+        crate::model::AgentRecord {
+            name: "a".into(),
+            version: "v".into(),
+            digest_sha256: String::new(),
+            manifest,
+            created_at: Utc::now(),
+        }
+    }
+
+    fn sandbox(status: Option<crate::model::ConfidentialStatus>) -> crate::fluxvm::SandboxRecord {
+        crate::fluxvm::SandboxRecord {
+            id: Uuid::new_v4(),
+            guest_ip: None,
+            status: None,
+            confidential: status,
+        }
+    }
+
+    fn status(active: bool, reason: &str) -> Option<crate::model::ConfidentialStatus> {
+        Some(crate::model::ConfidentialStatus {
+            active,
+            tech: active.then(|| "sev-snp".to_string()),
+            reason: reason.into(),
+        })
+    }
+
+    #[tokio::test]
+    async fn required_confidential_refuses_and_deletes_a_sandbox_that_is_not_confidential() {
+        let (url, deleted) = fluxvm_that_counts_deletes().await;
+        let (state, _session) =
+            crate::egress::ask_tests::state_and_session_cfg(|c| c.fluxvm_url = url).await;
+        let agent = agent_with(crate::model::Confidential::Required);
+        let count = || deleted.load(std::sync::atomic::Ordering::SeqCst);
+
+        let inactive = check_confidential(
+            &state,
+            &agent,
+            &sandbox(status(false, "no SEV-SNP or TDX on this host")),
+        )
+        .await;
+        let message = inactive.unwrap_err().message().to_string();
+        assert!(message.contains("no SEV-SNP or TDX"), "{message}");
+        assert_eq!(count(), 1);
+
+        // An older FluxVM that ignores the request reports nothing: also refused.
+        let silent = check_confidential(&state, &agent, &sandbox(None)).await;
+        assert!(silent.unwrap_err().message().contains("did not report"));
+        assert_eq!(count(), 2);
+
+        // An active confidential sandbox is kept.
+        check_confidential(&state, &agent, &sandbox(status(true, "")))
+            .await
+            .unwrap();
+        assert_eq!(count(), 2);
+    }
+
+    #[tokio::test]
+    async fn auto_confidential_falls_back_to_a_normal_vm() {
+        let (url, deleted) = fluxvm_that_counts_deletes().await;
+        let (state, _session) =
+            crate::egress::ask_tests::state_and_session_cfg(|c| c.fluxvm_url = url).await;
+        for mode in [
+            crate::model::Confidential::Auto,
+            crate::model::Confidential::Off,
+        ] {
+            let agent = agent_with(mode);
+            check_confidential(&state, &agent, &sandbox(status(false, "no hardware")))
+                .await
+                .unwrap();
+            check_confidential(&state, &agent, &sandbox(None))
+                .await
+                .unwrap();
+        }
+        assert_eq!(deleted.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 }

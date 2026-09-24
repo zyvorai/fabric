@@ -309,9 +309,12 @@ async fn create_warm_sandbox(
             &agent.manifest.template,
             None,
             agent.manifest.runtime_port,
-            // Deploy validation forbids warm pools together with a home volume.
-            &[],
-            agent.manifest.resources,
+            // Deploy validation forbids warm pools together with a home volume
+            // or a confidential launch.
+            &crate::fluxvm::SandboxOptions {
+                resources: agent.manifest.resources,
+                ..Default::default()
+            },
         )
         .await?;
 

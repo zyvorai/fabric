@@ -30,6 +30,7 @@ Options (deploy):
   --per-user-home           one volume per session user_id, so one agent serves many users
   --vcpus <n> --memory-mib <n>  sandbox size (give both)
   --confinement <mode>      strict drops all sandbox traffic except to the egress broker/proxy
+  --confidential <mode>     auto (use a hardware-encrypted VM if the host has one), or required
   --dlp                     hold requests carrying key/token-shaped strings for approval
   --taint                   taint the session when it reads from an untrusted host
   --trust-host <host>       repeatable host that does not taint (implies --taint)
@@ -165,6 +166,7 @@ function parseFlags(argv) {
       case "--vcpus": out.vcpus = value; break;
       case "--memory-mib": out.memoryMib = value; break;
       case "--confinement": out.confinement = value; break;
+      case "--confidential": out.confidential = value; break;
       case "--trust-host": out.taintTrust.push(value); break;
       case "--rule": out.rule.push(value); break;
       case "--skill": out.skill.push(value); break;

@@ -47,6 +47,10 @@ pub struct AgentManifest {
     /// Taint the session when it reads content from a host outside `trusted_hosts`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taint: Option<TaintPolicy>,
+    /// Run in a hardware-encrypted VM when the host can (`auto`), or only then
+    /// (`required`). Not a substitute for key custody: see the design spec.
+    #[serde(default, skip_serializing_if = "Confidential::is_off")]
+    pub confidential: Confidential,
     /// `strict` drops all sandbox traffic except to the egress broker and proxy.
     #[serde(default, skip_serializing_if = "Confinement::is_off")]
     pub confinement: Confinement,
@@ -184,6 +188,24 @@ impl AgentManifest {
         Ok(())
     }
 
+    /// Deploy-time checks for `confidential`. Guest memory must not be copied out
+    /// by a snapshot, and every sandbox must be launched for its own session.
+    pub fn validate_confidential(&self) -> Result<(), String> {
+        if self.confidential.is_off() {
+            return Ok(());
+        }
+        if self.warm_pool_size > 0 {
+            return Err("confidential cannot be combined with warm_pool_size: warm sandboxes are launched before a session owns them".into());
+        }
+        if self.idle_hibernate_seconds.is_some() {
+            return Err("confidential cannot be combined with idle_hibernate_seconds: a snapshot copies guest memory out of the enclave".into());
+        }
+        if self.confidential == Confidential::Required && self.home_volume.is_some() {
+            return Err("confidential: required cannot be combined with home_volume: a virtiofs share is readable by the host".into());
+        }
+        Ok(())
+    }
+
     /// Deploy-time checks for `resources` against the operator's ceilings.
     pub fn validate_resources(
         &self,
@@ -288,6 +310,42 @@ pub struct EgressRule {
 pub struct TaintPolicy {
     #[serde(default)]
     pub trusted_hosts: Vec<String>,
+}
+
+/// Whether the sandbox should run as a hardware-encrypted confidential VM.
+/// `auto` uses one when the host has the hardware and otherwise runs a normal
+/// VM (the outcome is recorded on the session); `required` refuses to run
+/// without one.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum Confidential {
+    #[default]
+    Off,
+    Auto,
+    Required,
+}
+
+impl Confidential {
+    pub fn is_off(&self) -> bool {
+        *self == Self::Off
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Auto => "auto",
+            Self::Required => "required",
+        }
+    }
+}
+
+/// What FluxVM reports about a sandbox's confidential launch.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ConfidentialStatus {
+    pub active: bool,
+    #[serde(default)]
+    pub tech: Option<String>,
+    #[serde(default)]
+    pub reason: String,
 }
 
 /// Whether the sandbox network is confined to the broker and proxy.
@@ -476,6 +534,9 @@ pub struct SessionRecord {
     /// [`TaintPolicy`]. Cleared only by an operator.
     #[serde(default)]
     pub tainted_by: Vec<String>,
+    /// How the sandbox was launched, when the agent asked for `confidential`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidential: Option<ConfidentialStatus>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -499,6 +560,7 @@ pub struct SessionView {
     pub parent_session_id: Option<Uuid>,
     pub user_id: Option<String>,
     pub tainted_by: Vec<String>,
+    pub confidential: Option<ConfidentialStatus>,
 }
 
 impl From<SessionRecord> for SessionView {
@@ -523,6 +585,7 @@ impl From<SessionRecord> for SessionView {
             parent_session_id: v.parent_session_id,
             user_id: v.user_id,
             tainted_by: v.tainted_by,
+            confidential: v.confidential,
         }
     }
 }
@@ -937,6 +1000,7 @@ mod home_volume_tests {
             taint: None,
             confinement: Default::default(),
             resources: None,
+            confidential: Default::default(),
             template: "qemu-node".into(),
             credentials: vec![],
             egress_allow_hosts: vec![],
@@ -1147,5 +1211,51 @@ mod home_volume_tests {
         );
         let parsed: Confinement = serde_json::from_str("\"strict\"").unwrap();
         assert_eq!(parsed, Confinement::Strict);
+    }
+
+    #[test]
+    fn confidential_is_omitted_when_off_and_lowercase_otherwise() {
+        assert!(serde_json::to_value(manifest(None))
+            .unwrap()
+            .get("confidential")
+            .is_none());
+        for (mode, text) in [
+            (Confidential::Auto, "auto"),
+            (Confidential::Required, "required"),
+        ] {
+            let m = AgentManifest {
+                confidential: mode,
+                ..manifest(None)
+            };
+            assert_eq!(serde_json::to_value(m).unwrap()["confidential"], text);
+        }
+    }
+
+    #[test]
+    fn confidential_rejects_what_would_leak_guest_memory_or_disk() {
+        let mut m = AgentManifest {
+            confidential: Confidential::Auto,
+            ..manifest(None)
+        };
+        assert!(m.validate_confidential().is_ok());
+        m.warm_pool_size = 1;
+        assert!(m
+            .validate_confidential()
+            .unwrap_err()
+            .contains("warm_pool_size"));
+        m.warm_pool_size = 0;
+        m.idle_hibernate_seconds = Some(60);
+        assert!(m.validate_confidential().unwrap_err().contains("snapshot"));
+        m.idle_hibernate_seconds = None;
+        // A host-readable share is tolerated under auto (it may fall back anyway)
+        // but not under required.
+        m.home_volume = home(None, "/home/agent");
+        assert!(m.validate_confidential().is_ok());
+        m.confidential = Confidential::Required;
+        assert!(m.validate_confidential().unwrap_err().contains("virtiofs"));
+        // Off checks nothing.
+        m.confidential = Confidential::Off;
+        m.warm_pool_size = 5;
+        assert!(m.validate_confidential().is_ok());
     }
 }
