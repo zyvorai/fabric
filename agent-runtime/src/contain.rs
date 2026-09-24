@@ -65,7 +65,7 @@ mod tests {
         // needs, linked in. A real bwrap or setpriv elsewhere on the machine must
         // not be visible, or the "missing tool" cases would depend on the host.
         for tool in ["id", "mkdir", "chown"] {
-            let real = ["/usr/bin", "/bin"]
+            let real = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
                 .iter()
                 .map(|d| Path::new(d).join(tool))
                 .find(|p| p.exists())
@@ -73,7 +73,7 @@ mod tests {
             std::os::unix::fs::symlink(real, bin.join(tool)).unwrap();
         }
         let path = bin.display().to_string();
-        let output = Command::new("sh")
+        let output = Command::new("/bin/sh")
             .arg(&script)
             .args(args)
             .env("PATH", path)
