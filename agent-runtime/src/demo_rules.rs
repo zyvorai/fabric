@@ -43,6 +43,8 @@ pub enum Extractor {
     Docx,
     /// Cells of the first sheet of an Excel `.xlsx`, as CSV (up to 5000 rows).
     Xlsx,
+    /// Slide text and speaker notes of a PowerPoint `.pptx`, in presentation order.
+    Pptx,
 }
 
 /// The fixed Node scripts the guest runs for the non-PDF extractors. They are part
@@ -63,6 +65,10 @@ const XLSX_SCRIPT: &str = concat!(
     include_str!("extractors/common.mjs"),
     include_str!("extractors/xlsx.mjs")
 );
+const PPTX_SCRIPT: &str = concat!(
+    include_str!("extractors/common.mjs"),
+    include_str!("extractors/pptx.mjs")
+);
 
 impl Extractor {
     /// Fixed file name inside the guest. Never derived from the upload.
@@ -74,6 +80,7 @@ impl Extractor {
             Extractor::Eml => "input.eml",
             Extractor::Docx => "input.docx",
             Extractor::Xlsx => "input.xlsx",
+            Extractor::Pptx => "input.pptx",
         }
     }
 
@@ -84,6 +91,7 @@ impl Extractor {
             Extractor::Eml => Some(EML_SCRIPT),
             Extractor::Docx => Some(DOCX_SCRIPT),
             Extractor::Xlsx => Some(XLSX_SCRIPT),
+            Extractor::Pptx => Some(PPTX_SCRIPT),
             Extractor::Pdftotext | Extractor::Text => None,
         }
     }
@@ -94,7 +102,9 @@ impl Extractor {
             Extractor::Pdftotext => (PDF_DEFAULT, PDF_MAX),
             Extractor::Text => (TEXT_DEFAULT, TEXT_MAX),
             Extractor::Html | Extractor::Eml => (2 * 1024 * 1024, 8 * 1024 * 1024),
-            Extractor::Docx | Extractor::Xlsx => (4 * 1024 * 1024, 16 * 1024 * 1024),
+            Extractor::Docx | Extractor::Xlsx | Extractor::Pptx => {
+                (4 * 1024 * 1024, 16 * 1024 * 1024)
+            }
         }
     }
 
@@ -107,6 +117,7 @@ impl Extractor {
             Extractor::Eml => Some(&["eml", "mbox"]),
             Extractor::Docx => Some(&["docx"]),
             Extractor::Xlsx => Some(&["xlsx"]),
+            Extractor::Pptx => Some(&["pptx"]),
         }
     }
 
@@ -397,7 +408,7 @@ impl CustomDemoSpec {
                 }
             }
             None => {
-                const BINARY: [&str; 6] = ["pdf", "docx", "xlsx", "zip", "png", "jpg"];
+                const BINARY: [&str; 7] = ["pdf", "docx", "xlsx", "pptx", "zip", "png", "jpg"];
                 if let Some(bad) = self.accepts.iter().find(|e| BINARY.contains(&e.as_str())) {
                     return Err(format!(
                         "the text extractor cannot read .{bad}; use the extractor made for it"
@@ -1021,6 +1032,7 @@ mod tests {
             ("eml", "mbox", "csv"),
             ("docx", "docx", "doc"),
             ("xlsx", "xlsx", "csv"),
+            ("pptx", "pptx", "ppt"),
         ] {
             assert!(
                 spec_with(extract, &[ok], stats.clone())
@@ -1034,7 +1046,7 @@ mod tests {
             assert!(err.contains(&format!(".{bad}")), "{extract}: {err}");
         }
         // The plain text extractor must not be pointed at a binary format.
-        for bin in ["docx", "xlsx", "zip"] {
+        for bin in ["docx", "xlsx", "pptx", "zip"] {
             assert!(
                 spec_with("text", &[bin], stats.clone())
                     .validate(&[])
@@ -1047,12 +1059,14 @@ mod tests {
     #[test]
     fn script_extractors_have_fixed_guest_files_and_scripts() {
         assert_eq!(Extractor::Docx.guest_file(), "input.docx");
+        assert_eq!(Extractor::Pptx.guest_file(), "input.pptx");
         assert_eq!(Extractor::Eml.guest_file(), "input.eml");
         for e in [
             Extractor::Html,
             Extractor::Eml,
             Extractor::Docx,
             Extractor::Xlsx,
+            Extractor::Pptx,
         ] {
             assert!(e.script().unwrap().contains("process.argv[2]"));
         }
@@ -1235,6 +1249,91 @@ mod tests {
 
         let (_, ok) = run(Extractor::Docx, "bad.docx", b"this is not a zip");
         assert!(!ok, "a damaged docx must fail, not print garbage");
+
+        // A small pptx built in place: two slides listed in presentation order (slide2 first),
+        // one with speaker notes, and a slide-number field that must not appear.
+        let deck = stored_zip(&[
+            (
+                "ppt/presentation.xml",
+                r#"<p:presentation xmlns:r="r"><p:sldIdLst><p:sldId id="256" r:id="rId2"/><p:sldId id="257" r:id="rId1"/></p:sldIdLst></p:presentation>"#,
+            ),
+            (
+                "ppt/_rels/presentation.xml.rels",
+                r#"<Relationships><Relationship Id="rId1" Type="x/slide" Target="slides/slide1.xml"/><Relationship Target="slides/slide2.xml" Type="x/slide" Id="rId2"/></Relationships>"#,
+            ),
+            (
+                "ppt/slides/slide1.xml",
+                r#"<p:sld><a:p><a:r><a:t>Budget &amp; plan</a:t></a:r></a:p><a:p><a:r><a:t>Spend 50,000</a:t></a:r><a:br/><a:r><a:t>by Friday</a:t></a:r></a:p><a:p><a:fld type="slidenum"><a:t>2</a:t></a:fld></a:p></p:sld>"#,
+            ),
+            (
+                "ppt/slides/_rels/slide1.xml.rels",
+                r#"<Relationships><Relationship Id="rId9" Type="x/notesSlide" Target="../notesSlides/notesSlide1.xml"/></Relationships>"#,
+            ),
+            (
+                "ppt/notesSlides/notesSlide1.xml",
+                r#"<p:notes><a:p><a:r><a:t>Say the number twice</a:t></a:r></a:p></p:notes>"#,
+            ),
+            (
+                "ppt/slides/slide2.xml",
+                r#"<p:sld><a:p><a:r><a:t>Welcome</a:t></a:r></a:p></p:sld>"#,
+            ),
+        ]);
+        let (pptx, ok) = run(Extractor::Pptx, "deck.pptx", &deck);
+        assert!(ok, "{pptx}");
+        assert!(pptx.starts_with("# Deck: 2 slides"), "{pptx}");
+        let welcome = pptx.find("Welcome").expect("slide 1 text");
+        let budget = pptx.find("Budget & plan").expect("slide 2 text");
+        assert!(
+            welcome < budget,
+            "presentation order, not file order: {pptx}"
+        );
+        assert!(pptx.contains("Spend 50,000\nby Friday"), "{pptx}");
+        assert!(pptx.contains("Notes: Say the number twice"), "{pptx}");
+        assert!(
+            !pptx.contains("\n2\n"),
+            "the slide-number field must be dropped: {pptx}"
+        );
+        let (_, ok) = run(Extractor::Pptx, "bad.pptx", b"this is not a zip");
+        assert!(!ok, "a damaged pptx must fail, not print garbage");
+    }
+
+    /// A zip with stored (uncompressed) entries. The guest reader does not check CRCs.
+    fn stored_zip(files: &[(&str, &str)]) -> Vec<u8> {
+        let mut out = Vec::new();
+        let mut central = Vec::new();
+        for (name, data) in files {
+            let offset = out.len() as u32;
+            let (n, d) = (name.as_bytes(), data.as_bytes());
+            out.extend_from_slice(&0x04034b50u32.to_le_bytes());
+            out.extend_from_slice(&[20, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // version, flags, method 0, time, date
+            out.extend_from_slice(&0u32.to_le_bytes()); // crc
+            out.extend_from_slice(&(d.len() as u32).to_le_bytes());
+            out.extend_from_slice(&(d.len() as u32).to_le_bytes());
+            out.extend_from_slice(&(n.len() as u16).to_le_bytes());
+            out.extend_from_slice(&0u16.to_le_bytes());
+            out.extend_from_slice(n);
+            out.extend_from_slice(d);
+            central.extend_from_slice(&0x02014b50u32.to_le_bytes());
+            central.extend_from_slice(&[20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+            central.extend_from_slice(&0u32.to_le_bytes());
+            central.extend_from_slice(&(d.len() as u32).to_le_bytes());
+            central.extend_from_slice(&(d.len() as u32).to_le_bytes());
+            central.extend_from_slice(&(n.len() as u16).to_le_bytes());
+            central.extend_from_slice(&[0u8; 8]); // extra len, comment len, disk, internal attrs
+            central.extend_from_slice(&0u32.to_le_bytes()); // external attrs
+            central.extend_from_slice(&offset.to_le_bytes());
+            central.extend_from_slice(n);
+        }
+        let dir_offset = out.len() as u32;
+        out.extend_from_slice(&central);
+        out.extend_from_slice(&0x06054b50u32.to_le_bytes());
+        out.extend_from_slice(&[0, 0, 0, 0]);
+        out.extend_from_slice(&(files.len() as u16).to_le_bytes());
+        out.extend_from_slice(&(files.len() as u16).to_le_bytes());
+        out.extend_from_slice(&(central.len() as u32).to_le_bytes());
+        out.extend_from_slice(&dir_offset.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out
     }
 }
 

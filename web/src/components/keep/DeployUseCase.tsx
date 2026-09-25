@@ -132,6 +132,7 @@ export default function DeployUseCase({ onDeployed, onError }: Props) {
                 <option value="pdftotext">PDF (text layer)</option>
                 <option value="docx">Word (.docx)</option>
                 <option value="xlsx">Excel (.xlsx, first sheet)</option>
+                <option value="pptx">PowerPoint (.pptx, slides and notes)</option>
                 <option value="html">HTML page</option>
                 <option value="eml">Email (.eml / .mbox)</option>
               </select>

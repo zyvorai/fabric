@@ -46,14 +46,15 @@ Extractors:
 
 | `extract` | Reads | Upload limit (default / largest) | Notes |
 |---|---|---|---|
-| `text` | Any text file | 200 KB / 300 KB | Not `pdf`, `docx`, `xlsx` or `zip` |
+| `text` | Any text file | 200 KB / 300 KB | Not `pdf`, `docx`, `xlsx`, `pptx` or `zip` |
 | `pdftotext` | `.pdf` | 8 MiB / 32 MiB | Needs poppler in the template. A scan has no text layer and is refused: Keep does no OCR |
 | `docx` | `.docx` | 4 MiB / 16 MiB | Paragraph and table text |
 | `xlsx` | `.xlsx` | 4 MiB / 16 MiB | First sheet only, as CSV (up to 5000 rows), so `csv_columns` and `table` read it |
+| `pptx` | `.pptx` | 4 MiB / 16 MiB | Slide text in presentation order (`## Slide N`) and each slide's speaker notes (`Notes: ...`); slide-number fields dropped. The legacy binary `.ppt` is not read |
 | `html` | `.html`, `.htm` | 2 MiB / 8 MiB | Visible text; scripts and styles are dropped |
 | `eml` | `.eml`, `.mbox` | 2 MiB / 8 MiB | From, Date, Subject and the text body of up to 500 messages |
 
-`docx`, `xlsx`, `html` and `eml` run a fixed Node script that Keep writes into the cell; it needs
+`docx`, `xlsx`, `pptx`, `html` and `eml` run a fixed Node script that Keep writes into the cell; it needs
 `node` in the template (the agent templates have it). A damaged file is refused with a 400, never
 summarised. A **zip** upload is a container for any use case: the files inside it that the use case
 accepts each run in their own cell, as a batch (see [TRIGGERS.md](TRIGGERS.md)).

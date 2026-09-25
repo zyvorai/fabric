@@ -17,7 +17,7 @@
 | Your own use cases | Declarative `pack.json` (no code) deployed from the console or `keepctl deploy`; TypeScript agent packs signed with Node and deployed in one command | [`PACKS.md`](PACKS.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) · [Tutorial 20: mail export digest](../tutorials/20-sort-a-mail-export.md) |
 | Run history | Artifact TTL, per-use-case history, line diff between runs, `run.finished` / `run.failed` webhook, console `/app/keep/history`, `keepctl run\|list\|artifacts\|diff\|audit\|approvals` | [`keepctl/README.md`](keepctl/README.md) |
 | Triggers and batch | Multi-file runs (one cell each), signed webhook and watched-folder triggers, `keepctl trigger` | [`TRIGGERS.md`](TRIGGERS.md) |
-| More file types | `docx`, `xlsx`, `html`, `eml`/`mbox` extractors, zip fan-out, `regex_extract` / `json_path` / `table` rules | [`PACKS.md`](PACKS.md) |
+| More file types | `docx`, `xlsx`, `pptx`, `html`, `eml`/`mbox` extractors, zip fan-out, `regex_extract` / `json_path` / `table` rules | [`PACKS.md`](PACKS.md) |
 | Model-assisted use cases | Opt-in host-side model step: vault-gated endpoint, first-use approval, audited calls, sanitised reply, `keepctl grants` | [`MODEL.md`](MODEL.md) |
 | Scenarios and the cell template | Seven scenario packs; `node22-agent` template and `keep-bake-node22-agent.sh` | [`SCENARIOS.md`](SCENARIOS.md) |
 | Many users | User tokens, per-user isolation, quotas, usage, revocation | [`TENANCY.md`](TENANCY.md) |

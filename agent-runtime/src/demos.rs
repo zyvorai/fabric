@@ -285,7 +285,11 @@ impl Resolved {
         let (extract_cmd, empty_msg) = match spec.extract {
             Extractor::Pdftotext => (PDF_CMD.to_string(), PDF_EMPTY),
             Extractor::Text => (format!("head -c {max_bytes} {{path}}"), "The file is empty"),
-            Extractor::Html | Extractor::Eml | Extractor::Docx | Extractor::Xlsx => (
+            Extractor::Html
+            | Extractor::Eml
+            | Extractor::Docx
+            | Extractor::Xlsx
+            | Extractor::Pptx => (
                 format!("node {GUEST_EXTRACT_SCRIPT} {{path}}"),
                 "No text could be extracted: the file is empty, damaged, or not what its extension says",
             ),
@@ -886,7 +890,13 @@ async fn run_demo_inner(
     // found, which is always the case before the guest has booted: the cell then ran with FluxVM's
     // default-allow policy.
     let policy = crate::confine::deny_all_policy(Some(&id.to_string()), Some(&spec.id));
-    if let Err(e) = state.fluxvm.set_network_policy(sandbox.id, &policy).await {
+    // Retried a couple of times: FluxVM's eBPF load occasionally fails once on a busy host. A cell that
+    // still cannot be confined is never used.
+    if let Err(e) = crate::confine::with_retries(3, std::time::Duration::from_millis(600), || {
+        state.fluxvm.set_network_policy(sandbox.id, &policy)
+    })
+    .await
+    {
         let _ = state.fluxvm.delete(sandbox.id).await;
         return Err(ApiError::bad_gateway(format!(
             "could not confine the cell, so it was not used: {e:#}"
