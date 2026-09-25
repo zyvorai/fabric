@@ -7,6 +7,6 @@ main((buf) => {
   s = s.replace(/<(br|hr)\b[^>]*>/gi, '\n')
   s = s.replace(/<\/t[dh]\s*>/gi, ' | ')
   s = s.replace(/<tr\b[^>]*>/gi, '\n')
-  s = s.replace(/<[^>]*>/g, ' ')
+  s = stripTags(s, ' ')
   emit(tidy(decodeEntities(s)))
 })

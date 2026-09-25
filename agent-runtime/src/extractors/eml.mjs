@@ -29,7 +29,7 @@ function decodeBody(body, encoding) {
 }
 
 function stripHtml(s) {
-  return decodeEntities(s.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, ' ').replace(/<br\s*\/?>|<\/p>|<\/div>/gi, '\n').replace(/<[^>]*>/g, ' '))
+  return decodeEntities(stripTags(s.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, ' ').replace(/<br\s*\/?>|<\/p>|<\/div>/gi, '\n'), ' '))
 }
 
 function split(raw) {
