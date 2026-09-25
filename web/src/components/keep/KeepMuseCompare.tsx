@@ -1,52 +1,14 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
+import marketing from '../../../../docs/keep/marketing.json'
+
 /**
- * Meta Muse vs Keep (+ Fabric / FluxVM) — marketing only. Every row is stated in
- * docs/keep/KEEP.md; rows with no source for the Muse side are left out.
+ * Meta Muse vs Keep (+ Fabric / FluxVM) — marketing only. Rows live in
+ * docs/keep/marketing.json, shared with the Keep README and the docs site; every
+ * row is stated in docs/keep/KEEP.md.
  */
-const ROWS: { label: string; muse: string; keep: string }[] = [
-  {
-    label: 'Where it runs',
-    muse: 'Meta’s cloud only.',
-    keep: 'Your laptop, mini-PC or FluxVM host.',
-  },
-  {
-    label: 'Policy',
-    muse: 'A closed policy engine.',
-    keep: 'A signed keep.policy.yaml you can diff in git.',
-  },
-  {
-    label: 'The cell',
-    muse: 'A container-style cell that shares a kernel with its policy engine.',
-    keep: 'A Firecracker/KVM microVM on FluxVM, with its own kernel.',
-  },
-  {
-    label: 'Model',
-    muse: 'Tied to Muse Spark.',
-    keep: 'Bring your own model socket.',
-  },
-  {
-    label: 'Training',
-    muse: 'Trajectories may train after sanitization.',
-    keep: 'Off by default. Export needs a scoped token.',
-  },
-  {
-    label: 'Secrets',
-    muse: 'Surrogates swapped in at egress.',
-    keep: 'The same idea: the vault injects on the host, and the agent never sees a real secret.',
-  },
-  {
-    label: 'Browser',
-    muse: 'A measured, accessibility-style appliance.',
-    keep: 'The same idea: the agent sees structure, you see pixels.',
-  },
-  {
-    label: 'Honesty',
-    muse: 'A footnote.',
-    keep: 'Up front: measured means software-test until verified hardware.',
-  },
-]
+const ROWS: { label: string; muse: string; keep: string }[] = marketing.compare
 
 export default function KeepMuseCompare() {
   return (

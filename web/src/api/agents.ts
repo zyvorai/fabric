@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { apiDelete, apiFetch, apiGet, apiPost } from './client'
+import type { UseCaseSpec } from '../lib/useCaseSpec'
 import { formatHttpErrorBody } from '../utils/apiError'
 import { parseJsonResponse } from '../utils/parseJsonResponse'
 
@@ -173,12 +174,26 @@ export interface KeepCockpit {
   }
 }
 
-export interface PdfBriefDemoResult {
+export interface DemoInfo {
+  id: string
+  title: string
+  description: string
+  /** Lower-case file extensions without the dot. */
+  accepts: string[]
+  max_bytes: number
+  /** False for a use case a user deployed. */
+  builtin?: boolean
+  has_sample?: boolean
+}
+
+export interface DemoResult {
+  demo?: string
   session_id: string
   agent?: string
   goal_id?: string
   artifact_id?: string
   artifact_title?: string
+  artifacts?: Array<{ id: string; title: string; kind: string }>
   egress_connects?: number
   honesty?: string
   filename?: string
@@ -186,13 +201,67 @@ export interface PdfBriefDemoResult {
   error?: string
 }
 
-/** One-click PDF → brief.md (multipart). Omit file to use the lab sample. */
-export async function demoPdfBrief(file?: File | null): Promise<PdfBriefDemoResult> {
+/** Kept for existing imports; the PDF brief is one demo among several. */
+export type PdfBriefDemoResult = DemoResult
+
+/** The one-click Keep demos this runtime can run. */
+export async function listDemos(): Promise<DemoInfo[]> {
+  const out = await apiGet<{ demos: DemoInfo[] }>('/api/demos')
+  return out.demos ?? []
+}
+
+/** Create or replace a user-defined use case (declarative: no code). */
+export async function saveDemo(
+  spec: UseCaseSpec,
+): Promise<{ id: string; builtin: boolean; replaced: boolean }> {
+  return apiPost('/api/demos', spec)
+}
+
+/** Remove a user-defined use case. Built-ins are refused by the runtime. */
+export async function deleteDemo(id: string): Promise<void> {
+  return apiDelete(`/api/demos/${encodeURIComponent(id)}`)
+}
+
+export interface KeepStatus {
+  keep_mode: boolean
+  signature_required: boolean
+  trusted_signers: number
+  fluxvm: { ready: boolean; error?: string | null }
+  demo_template: string
+  demos: { builtin: number; custom: number }
+}
+
+/** Keep readiness: Keep mode, trusted signers, FluxVM, demo counts. */
+export function keepStatus(): Promise<KeepStatus> {
+  return apiGet<KeepStatus>('/api/keep/status')
+}
+
+/**
+ * Deploy a signed `.keeppack.json` (admin). The file text is sent untouched:
+ * its `deploy_json` is the exact string that was signed.
+ */
+export async function deployPackFile(
+  text: string,
+): Promise<{ name: string; policy: string | null; signed: boolean }> {
+  const res = await apiFetch('/api/packs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: text,
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+  }
+  return parseJsonResponse(res)
+}
+
+/** Run one demo (multipart `file`). Omit the file to use the demo's built-in sample. */
+export async function runDemo(id: string, file?: File | null): Promise<DemoResult> {
   const fd = new FormData()
   if (file) {
-    fd.append('pdf', file, file.name || 'input.pdf')
+    fd.append('file', file, file.name || 'input')
   }
-  const res = await apiFetch('/api/demos/pdf-brief', {
+  const res = await apiFetch(`/api/demos/${encodeURIComponent(id)}`, {
     method: 'POST',
     body: fd,
   })
@@ -200,7 +269,12 @@ export async function demoPdfBrief(file?: File | null): Promise<PdfBriefDemoResu
     const body = await res.text().catch(() => '')
     throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
   }
-  return parseJsonResponse<PdfBriefDemoResult>(res)
+  return parseJsonResponse<DemoResult>(res)
+}
+
+/** One-click PDF → brief.md (multipart). Omit file to use the lab sample. */
+export function demoPdfBrief(file?: File | null): Promise<DemoResult> {
+  return runDemo('pdf-brief', file)
 }
 
 export interface BrowserView {

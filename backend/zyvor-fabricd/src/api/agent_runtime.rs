@@ -478,17 +478,235 @@ pub async fn session_cockpit(
     .await
 }
 
-/// One-click PDF → brief.md demo (multipart passthrough to agent-runtime).
-pub async fn demo_pdf_brief(
-    RequireWrite(_claims): RequireWrite,
+/// The one-click Keep demos the console can offer (`pdf-brief`, `csv-clean`, ...).
+pub async fn demo_list(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/demos", None, None, None).await
+}
+
+/// Keep readiness for the console and `keepctl doctor`: Keep mode, signers,
+/// FluxVM readiness and demo counts.
+pub async fn keep_status(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/keep/status", None, None, None).await
+}
+
+/// A signed pack made by `fabric-agent pack bundle` / `keepctl bundle`.
+///
+/// `deploy_json` is the exact string that was signed. It is forwarded as raw
+/// bytes, never parsed and re-serialised, so the Ed25519 signature still
+/// matches in Keep mode. The signer seed never leaves the author's machine:
+/// the console only uploads the result.
+#[derive(Debug)]
+struct KeepPack {
+    name: String,
+    deploy_json: String,
+    signature: Option<String>,
+    policy: Option<String>,
+    policy_signature: Option<String>,
+}
+
+fn parse_keep_pack(bytes: &[u8]) -> Result<KeepPack, String> {
+    let v: Value = serde_json::from_slice(bytes).map_err(|e| format!("not valid JSON: {e}"))?;
+    if v.get("format").and_then(Value::as_str) != Some("keeppack/1") {
+        return Err("not a keeppack/1 file".into());
+    }
+    let text = |k: &str| v.get(k).and_then(Value::as_str).map(str::to_string);
+    let name = text("name").ok_or("missing name")?;
+    let deploy_json = text("deploy_json").ok_or("missing deploy_json")?;
+    // The name is used in an upstream path and must match what is being signed.
+    if !valid_demo_id(&name) {
+        return Err("invalid pack name".into());
+    }
+    let deployed_name = serde_json::from_str::<Value>(&deploy_json)
+        .map_err(|e| format!("deploy_json is not valid JSON: {e}"))?
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    if deployed_name.as_deref() != Some(name.as_str()) {
+        return Err("pack name does not match the name inside deploy_json".into());
+    }
+    Ok(KeepPack {
+        name,
+        deploy_json,
+        signature: text("signature").filter(|s| !s.is_empty()),
+        policy: text("policy").filter(|s| !s.trim().is_empty()),
+        policy_signature: text("policy_signature").filter(|s| !s.is_empty()),
+    })
+}
+
+/// Deploy a signed pack (agent + optional policy) from the console. Admin only,
+/// like every other console agent deploy, and the name is not re-scoped because
+/// that would change the signed bytes.
+pub async fn pack_deploy(
+    RequireAdmin(_claims): RequireAdmin,
     State(state): State<Arc<AppState>>,
     request: axum::http::Request<Body>,
 ) -> Response {
+    let bytes = match axum::body::to_bytes(request.into_body(), 32 * 1024 * 1024).await {
+        Ok(b) => b,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("read body: {e}") })),
+            )
+                .into_response();
+        }
+    };
+    let pack = match parse_keep_pack(&bytes) {
+        Ok(p) => p,
+        Err(e) => {
+            return (StatusCode::BAD_REQUEST, Json(json!({ "error": e }))).into_response();
+        }
+    };
     let (base, token) = match upstream(&state) {
         Ok(v) => v,
         Err(resp) => return resp,
     };
-    let url = format!("{base}/v1/demos/pdf-brief");
+
+    let mut req = state
+        .http_client
+        .post(format!("{base}/v1/agents"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(pack.deploy_json.clone().into_bytes());
+    if let Some(tok) = &token {
+        req = req.header(header::AUTHORIZATION, format!("Bearer {tok}"));
+    }
+    if let Some(sig) = &pack.signature {
+        req = req.header("x-keep-manifest-signature", sig);
+    }
+    let resp = match req.send().await {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": format!("agent-runtime unreachable: {e}") })),
+            )
+                .into_response();
+        }
+    };
+    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let deployed: Value = resp.json().await.unwrap_or(Value::Null);
+    if !status.is_success() {
+        return json_response(
+            status,
+            json!({ "error": deployed.get("error").cloned().unwrap_or(deployed), "step": "deploy" }),
+        );
+    }
+
+    let mut policy_state = Value::Null;
+    if let Some(yaml) = &pack.policy {
+        let mut req = state
+            .http_client
+            .put(format!("{base}/v1/agents/{}/policy", pack.name))
+            .header(header::CONTENT_TYPE, "application/yaml")
+            .body(yaml.clone().into_bytes());
+        if let Some(tok) = &token {
+            req = req.header(header::AUTHORIZATION, format!("Bearer {tok}"));
+        }
+        if let Some(sig) = &pack.policy_signature {
+            req = req.header("x-keep-policy-signature", sig);
+        }
+        match req.send().await {
+            Ok(r) if r.status().is_success() => policy_state = json!("applied"),
+            Ok(r) => {
+                let code =
+                    StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+                let body: Value = r.json().await.unwrap_or(Value::Null);
+                return json_response(
+                    code,
+                    json!({
+                        "error": body.get("error").cloned().unwrap_or(body),
+                        "step": "policy",
+                        "deployed": deployed,
+                    }),
+                );
+            }
+            Err(e) => {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(json!({ "error": format!("agent-runtime unreachable: {e}"), "step": "policy", "deployed": deployed })),
+                )
+                    .into_response();
+            }
+        }
+    }
+    json_response(
+        StatusCode::CREATED,
+        json!({ "name": pack.name, "deployed": deployed, "policy": policy_state, "signed": pack.signature.is_some() }),
+    )
+}
+
+/// A demo id becomes part of the upstream path, so accept slug characters only.
+fn valid_demo_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 48
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+fn bad_demo_id() -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "error": "invalid demo id" })),
+    )
+        .into_response()
+}
+
+/// Create or replace a user-defined use case (a declarative spec: an extractor
+/// enum plus bounded rules, so it carries no code).
+pub async fn demo_save(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> Response {
+    match proxy_json(&state, Method::POST, "/v1/demos", None, Some(body)).await {
+        Ok((status, value)) => json_response(status, value),
+        Err(resp) => resp,
+    }
+}
+
+/// Remove a user-defined use case. Built-ins are refused by agent-runtime.
+pub async fn demo_delete(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(demo_id): Path<String>,
+) -> Response {
+    if !valid_demo_id(&demo_id) {
+        return bad_demo_id();
+    }
+    proxy(
+        &state,
+        Method::DELETE,
+        &format!("/v1/demos/{demo_id}"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
+/// Run one Keep demo: multipart file passthrough to agent-runtime `/v1/demos/{id}`.
+/// `pdf-brief` is one id among several, so the original route keeps working.
+pub async fn demo_run(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(demo_id): Path<String>,
+    request: axum::http::Request<Body>,
+) -> Response {
+    if !valid_demo_id(&demo_id) {
+        return bad_demo_id();
+    }
+    let (base, token) = match upstream(&state) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
+    let url = format!("{base}/v1/demos/{demo_id}");
     let ct = request.headers().get(header::CONTENT_TYPE).cloned();
     let body = match axum::body::to_bytes(request.into_body(), 32 * 1024 * 1024).await {
         Ok(b) => b,
@@ -976,5 +1194,50 @@ mod tests {
         assert!(uid.len() <= 32);
         assert!(uid.chars().next().unwrap().is_ascii_alphanumeric());
         assert_eq!(&uid, "8bb0203c-1798-4884-8602-b80ca2c0");
+    }
+}
+
+#[cfg(test)]
+mod keep_pack_tests {
+    use super::*;
+
+    fn pack(extra: &str) -> Vec<u8> {
+        format!(
+            r#"{{"format":"keeppack/1","name":"my-agent","deploy_json":"{{\"name\":\"my-agent\",\"bundle_base64\":\"AA==\"}}"{extra}}}"#
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn a_pack_keeps_the_signed_bytes_and_optional_parts() {
+        let p = parse_keep_pack(&pack(
+            r#","signature":"ab","policy":"version: 1\n","policy_signature":"cd""#,
+        ))
+        .unwrap();
+        assert_eq!(p.name, "my-agent");
+        // Byte-for-byte what was signed, not re-serialised.
+        assert_eq!(
+            p.deploy_json,
+            r#"{"name":"my-agent","bundle_base64":"AA=="}"#
+        );
+        assert_eq!(p.signature.as_deref(), Some("ab"));
+        assert_eq!(p.policy.as_deref(), Some("version: 1\n"));
+        assert_eq!(p.policy_signature.as_deref(), Some("cd"));
+        let bare = parse_keep_pack(&pack("")).unwrap();
+        assert!(bare.signature.is_none() && bare.policy.is_none());
+    }
+
+    #[test]
+    fn a_bad_pack_is_refused() {
+        assert!(parse_keep_pack(b"nope").is_err());
+        assert!(parse_keep_pack(br#"{"format":"other"}"#).is_err());
+        // Name in the envelope must match the signed deploy body.
+        let mismatched = br#"{"format":"keeppack/1","name":"a","deploy_json":"{\"name\":\"b\"}"}"#;
+        assert!(parse_keep_pack(mismatched)
+            .unwrap_err()
+            .contains("does not match"));
+        // Path-shaped names never reach the upstream URL.
+        let evil = br#"{"format":"keeppack/1","name":"../x","deploy_json":"{\"name\":\"../x\"}"}"#;
+        assert!(parse_keep_pack(evil).is_err());
     }
 }

@@ -348,7 +348,15 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
         .route("/v1/goals/{id}/browse", post(crate::goals::goal_browse))
-        .route("/v1/demos/pdf-brief", post(crate::demos::demo_pdf_brief))
+        .route("/v1/keep/status", get(crate::demos::keep_status))
+        .route(
+            "/v1/demos",
+            get(crate::demos::demo_list).post(crate::demos::demo_save),
+        )
+        .route(
+            "/v1/demos/{id}",
+            post(crate::demos::demo_run).delete(crate::demos::demo_delete),
+        )
         .route(
             "/v1/artifacts",
             get(crate::goals::list_artifacts).post(crate::goals::create_artifact),
@@ -904,7 +912,7 @@ pub(crate) async fn create_session(
 /// command, or `guest_start_timeout_secs` elapses. Only meaningful right
 /// after a cold `create_sandbox()`; a resumed/prewarmed sandbox's channel is
 /// already up.
-async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Result<()> {
+pub(crate) async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Result<()> {
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
     loop {

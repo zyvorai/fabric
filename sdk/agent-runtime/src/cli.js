@@ -2,15 +2,18 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-import { build } from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, dirname, extname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, extname, resolve } from "node:path";
 import { buildManifest } from "./manifest.js";
+import { buildBundle } from "./bundle.js";
+import { runPackCommand } from "./pack-cli.js";
 
 function usage(exitCode = 0) {
   console.log(`fabric-agent deploy <agent.ts> --name <name> --template <fluxvm-template> [options]
 fabric-agent build <agent.ts> [--out <file>]
+fabric-agent pack deploy <dir> [--run] [--test] [--dry-run]   deploy a pack.json use case or agent
+fabric-agent pack bundle <dir> [--out <file>]                 write a signed <name>.keeppack.json for the console
+fabric-agent pack keys                                        print the signer public key for KEEP_POLICY_SEED
 
 Options (deploy):
   --allow-host <host>       repeatable egress allow host
@@ -55,6 +58,10 @@ locally.`);
 
 const args = process.argv.slice(2);
 const command = args[0];
+if (command === "pack") {
+  await runPackCommand(args.slice(1));
+  process.exit(0);
+}
 if ((command !== "deploy" && command !== "build") || !args[1]) usage(1);
 const entry = resolve(args[1]);
 const flags = parseFlags(args.slice(2));
@@ -102,26 +109,6 @@ if (command === "deploy") {
   const outPath = resolve(flags.out || defaultOut);
   await writeFile(outPath, bundle);
   console.log(`Built ${outPath} (${bundle.length} bytes)`);
-}
-
-async function buildBundle(entryPath) {
-  await readFile(entryPath); // fail with a clear local path error before invoking esbuild
-  const output = await build({
-    entryPoints: [entryPath],
-    bundle: true,
-    write: false,
-    platform: "node",
-    format: "esm",
-    target: "node20",
-    sourcemap: "inline",
-    legalComments: "inline",
-    // Resolve the SDK by its published package name against this local
-    // checkout's own source -- the deployed bundle only ever needs the
-    // ctx helpers inlined, and requiring a real npm publish before anyone
-    // can deploy an agent would make the documented workflow unusable.
-    alias: { "@zyvor/fabric-agent": resolve(dirname(fileURLToPath(import.meta.url)), "index.js") },
-  });
-  return { entry: entryPath, bundle: output.outputFiles[0].contents };
 }
 
 function parseFlags(argv) {

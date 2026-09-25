@@ -1,5 +1,7 @@
 # Keep
 
+> New here? Start with the [Keep README](https://github.com/zyvorai/fabric/blob/main/docs/keep/README.md). This page is the full spec.
+
 **Pitch:** *the agent gets a real computer; you keep the keys, the policy, and the right to leave.*
 
 Keep is a personal workstation for an untrusted agent. Muse got the threat model right; Keep ships the open version Meta cannot: **you run it, you read it, you take it with you.**
@@ -33,6 +35,7 @@ BIN=agent-runtime/target/release/zyvor-fabric-agent-runtime \
 
 GitHub Actions: [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml)  
 Hands-on: [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17 — PDF brief](../tutorials/17-keep-pdf-brief.md)  
+Evidence and status: [Security profiles](SECURITY-PROFILES.md) · [Roadmap](ROADMAP.md)  
 Production checklist: [PRODUCTION.md](PRODUCTION.md)  
 FluxVM measured profiles (sibling repo): `./scripts/test-security-profiles.sh`
 
@@ -108,7 +111,7 @@ Security profiles (FluxVM Phase 6):
 | `measured` | `software-test` | **never** |
 | `confidential-snp` / `confidential-tdx` | `sev-snp` / `tdx` only after verified hardware run | gated |
 
-## Keep 0.1 — six-pack (shipped)
+## Keep 0.1 — shipped
 
 1. **BYO model socket** — Grok / local GGUF / vLLM / Muse-class API; cell unchanged.
 2. **Signed YAML Sentinel** — Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) fail-closed; `sentinel/keep.policy.yaml`.
@@ -116,7 +119,7 @@ Security profiles (FluxVM Phase 6):
 4. **Phone-only high-risk approvals** — buy / send / delete via webhook / `/v1/approvals`, never in chat.
 5. **Pack / unpack** — `keepctl pack` → USB or S3 → `keepctl unpack` on another FluxVM node.
 6. **Cockpit + browser live view** — visible taint, last decisions, tab listing (`/keep/browser`), screenshot + read-only screencast; input takeover not implemented.
-7. **PDF brief one-click** — `/app/keep` + `keep-demo-pdf.sh`; expect `egress_connects: 0` ([demos/pdf-brief.md](demos/pdf-brief.md)).
+7. **One-click use cases** — `/app/keep` + `keep-demo.sh <id>`: PDF brief, contract clauses, security questionnaire, meeting actions, log triage, SBOM summary, CSV cleanup; each expects `egress_connects: 0` ([demos/README.md](demos/README.md)).
 8. **Host eBPF pin (FluxVM)** — `deny_udp` + gateway-only ports; no PacketWolf required ([confine.md](confine.md)).
 
 Lab gate: `./scripts/keep-live-lab.sh`. Guest boot needs a FluxVM template (Tutorial 11).
@@ -144,7 +147,7 @@ fabric/docs/keep/
   KEEP-0.2.md       # hardware gate
   STATUS.md
   confine.md        # FluxVM host eBPF (deny_udp)
-  demos/            # pdf-brief stage demo
+  demos/            # one-click use cases (pdf-brief, contract-clauses, log-triage, ...)
   sentinel/         # keep.policy.yaml example
   vault/ cell/ browser/ approve/ cockpit/
 fabric/scripts/keepctl

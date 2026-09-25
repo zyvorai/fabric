@@ -7,8 +7,8 @@ One-click Keep demo: **PDF in → `brief.md` out.** No browser. Expect **0 CONNE
 | Surface | Path |
 |---|---|
 | Console | `/app/keep` → **Brief this PDF** |
-| Script | `./scripts/keep-demo-pdf.sh [file.pdf]` |
-| Runtime API | `POST /v1/demos/pdf-brief` (multipart field `pdf`, optional) |
+| Script | `./scripts/keep-demo.sh pdf-brief [file.pdf]` (`keep-demo-pdf.sh` still works) |
+| Runtime API | `POST /v1/demos/pdf-brief` (multipart field `file`, or `pdf`; optional) |
 | fabricd proxy | `POST /api/demos/pdf-brief` (JWT) |
 | Pack | [`examples/keep-agents/pdf-brief/`](../../examples/keep-agents/pdf-brief/) |
 
@@ -31,4 +31,5 @@ PacketWolf is optional. Zero CONNECT is a **Keep audit** claim (plus FluxVM
 `drop_reasons` when the dataplane is attached). Do not claim wire product
 surfaces you did not attach.
 
-Hands-on: [Tutorial 17](../../tutorials/17-keep-pdf-brief.md).
+Hands-on: [Tutorial 17](../../tutorials/17-keep-pdf-brief.md). More use cases of the same
+shape: [demos/README.md](README.md).

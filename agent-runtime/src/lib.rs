@@ -10,6 +10,8 @@ pub mod config;
 pub mod confine;
 pub mod contain;
 pub mod credentials;
+pub mod demo_builders;
+pub mod demo_rules;
 pub mod demos;
 pub mod egress;
 pub mod export_tokens;

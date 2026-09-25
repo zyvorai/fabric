@@ -5,6 +5,10 @@
 # keepctl — Keep product CLI (Fabric). Talks to agent-runtime REST; FluxVM is
 # the cell backend. Same verbs as the API. Not a separate repo.
 #
+#   keepctl deploy <pack-dir> [--run] [--test] [--dry-run]
+#                                   # one command: build, sign (KEEP_POLICY_SEED), deploy a pack.json
+#   keepctl bundle <pack-dir>        # write <name>.keeppack.json for the console's Deploy a pack
+#   keepctl doctor [--smoke]         # runtime, Keep mode, signers, FluxVM, demos (+ a live CSV cleanup)
 #   keepctl create -f agent.json --signature agent.json.sig
 #                                   # deploy with signed full manifest in Keep mode
 #   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
@@ -36,7 +40,7 @@ else
   AUTH_TOKEN=""
 fi
 usage() {
-  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -80,6 +84,54 @@ case "$cmd" in
       api POST /v1/agents -H 'Content-Type: application/json' "${SIG_ARGS[@]}" --data-binary @-
     fi
     echo
+    ;;
+
+  deploy|bundle)
+    [[ $# -ge 1 ]] || usage 1
+    sdk="$(cd "$(dirname "$0")/.." && pwd)/sdk/agent-runtime"
+    if [[ ! -d "$sdk/node_modules/esbuild" ]]; then
+      echo "install the SDK first: (cd $sdk && npm ci)" >&2
+      exit 1
+    fi
+    if [[ -n "$AUTH_TOKEN" ]]; then
+      exec node "$sdk/src/cli.js" pack "$cmd" "$@" --url "$BASE" --token "$AUTH_TOKEN"
+    fi
+    exec node "$sdk/src/cli.js" pack "$cmd" "$@" --url "$BASE"
+    ;;
+
+  doctor)
+    smoke=0
+    [[ "${1:-}" == "--smoke" ]] && smoke=1
+    echo "runtime  $BASE"
+    api GET /healthz >/dev/null 2>&1 || { echo "  ✗ /healthz failed: is agent-runtime running and KEEP_API/KEEP_TOKEN right?" >&2; exit 1; }
+    echo "  ✓ reachable"
+    status=$(api GET /v1/keep/status 2>/dev/null || true)
+    if [[ -z "$status" ]]; then
+      echo "  ! /v1/keep/status missing: this runtime predates keepctl doctor; upgrade it" >&2
+      exit 1
+    fi
+    rc=0
+    echo "$status" | python3 -c '
+import json, sys
+s = json.load(sys.stdin)
+bad = 0
+def line(ok, text):
+    global bad
+    print(("  ✓ " if ok else "  ✗ ") + text)
+    bad += 0 if ok else 1
+line(s["fluxvm"]["ready"], "FluxVM ready" if s["fluxvm"]["ready"] else "FluxVM not ready: %s" % s["fluxvm"].get("error"))
+mode = "Keep mode (signed deploys required)" if s["keep_mode"] else "dev mode (signatures optional)"
+line(True, mode)
+if s["signature_required"]:
+    line(s["trusted_signers"] > 0, "%d trusted signer(s)" % s["trusted_signers"] if s["trusted_signers"] else "no trusted signers: set ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS (pubkey from: fabric-agent pack keys)")
+print("  · demo template: %s" % s["demo_template"])
+print("  · use cases: %d built-in, %d custom" % (s["demos"]["builtin"], s["demos"]["custom"]))
+sys.exit(1 if bad else 0)' || rc=$?
+    if [[ "$smoke" == "1" && $rc -eq 0 ]]; then
+      echo "==> smoke test: csv-clean on its sample"
+      "$(dirname "$0")/keep-demo.sh" csv-clean >/dev/null && echo "  ✓ csv-clean ran, 0 CONNECT" || { echo "  ✗ smoke test failed" >&2; rc=1; }
+    fi
+    exit $rc
     ;;
 
   pack)
