@@ -372,7 +372,6 @@ mod tests {
     use crate::model::ApprovalKind;
     use chrono::Duration;
     use ed25519_dalek::Signer as _;
-    use p256::ecdsa::signature::Signer as _;
     use p256::pkcs8::EncodePublicKey;
     use uuid::Uuid;
 
@@ -737,7 +736,7 @@ mod tests {
                 );
             }
             // The other decision's signature must not verify this payload.
-            let flipped = payload.iter().copied().collect::<Vec<u8>>();
+            let flipped = payload.to_vec();
             let text = String::from_utf8(flipped)
                 .unwrap()
                 .replace("decision: approved", "decision: denied");
