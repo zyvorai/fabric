@@ -30,6 +30,7 @@ fn to_policy(p: client::VmNetworkPolicy) -> VmNetworkPolicy {
         allow_fqdns: p.allow_fqdns,
         entities: p.entities,
         audit_mode: p.audit_mode,
+        deny_udp: p.deny_udp,
     }
 }
 
@@ -48,6 +49,7 @@ fn from_policy(p: &VmNetworkPolicy) -> client::VmNetworkPolicy {
         allow_fqdns: p.allow_fqdns.clone(),
         entities: p.entities.clone(),
         audit_mode: p.audit_mode,
+        deny_udp: p.deny_udp,
     }
 }
 
@@ -112,7 +114,21 @@ mod mapping_tests {
             allow_fqdns: vec![],
             entities: vec![],
             audit_mode: false,
+            deny_udp: false,
         }
+    }
+
+    #[test]
+    fn deny_udp_survives_both_mappings() {
+        let mut client_policy = sample_policy();
+        client_policy.deny_udp = true;
+        let driver_policy = to_policy(client_policy);
+        assert!(driver_policy.deny_udp);
+        assert!(from_policy(&driver_policy).deny_udp);
+
+        let off = to_policy(sample_policy());
+        assert!(!off.deny_udp);
+        assert!(!from_policy(&off).deny_udp);
     }
 
     #[test]

@@ -152,6 +152,7 @@ When a running sample VM exists with eBPF attached, detail looks like
   "allow_fqdns": [],
   "entities": [],
   "audit_mode": false,
+  "deny_udp": false,
   "max_egress_mbps": 100,
   "max_egress_pps": 10000,
   "sample_rate": 1

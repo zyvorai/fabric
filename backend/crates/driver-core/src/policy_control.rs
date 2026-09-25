@@ -229,6 +229,7 @@ pub fn policy_fingerprint(p: &VmNetworkPolicy) -> u64 {
     p.deny_cidrs.hash(&mut s);
     p.allow_ports.hash(&mut s);
     p.sample_rate.hash(&mut s);
+    p.deny_udp.hash(&mut s);
     s.finish()
 }
 
@@ -676,6 +677,14 @@ mod tests {
         assert!(timer_expired(&t, 11));
         assert!(!timer_expired(&t, 9));
         assert_ne!(policy_fingerprint(&pol()), 0);
+    }
+
+    #[test]
+    fn fingerprint_changes_when_deny_udp_flips() {
+        let off = pol();
+        let mut on = off.clone();
+        on.deny_udp = true;
+        assert_ne!(policy_fingerprint(&off), policy_fingerprint(&on));
     }
 
     #[test]

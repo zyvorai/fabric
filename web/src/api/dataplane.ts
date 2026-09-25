@@ -17,6 +17,8 @@ export interface VmNetworkPolicy {
   allow_fqdns?: string[]
   entities?: string[]
   audit_mode?: boolean
+  /** Drop UDP/SCTP (except DHCP) at the host — blocks QUIC, WebRTC and STUN. */
+  deny_udp?: boolean
 }
 
 export interface DataplaneStatus {
@@ -138,6 +140,7 @@ export function emptyPolicy(): VmNetworkPolicy {
     allow_fqdns: [],
     entities: [],
     audit_mode: false,
+    deny_udp: false,
   }
 }
 
