@@ -24,7 +24,13 @@
     {
       "kind": "regex_extract",
       "title": "Dates",
-      "pattern": "\\b[0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}\\b|\\b[0-9]{4}-[0-9]{2}-[0-9]{2}\\b|\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* [0-9]{1,2}\\b|\\b[0-9]{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\b",
+      "pattern": "\\b[0-9]{1,2}[/.-][0-9]{1,2}[/.-][0-9]{2,4}\\b|\\b[0-9]{4}-[0-9]{2}-[0-9]{2}\\b",
+      "max_matches": 12
+    },
+    {
+      "kind": "regex_extract",
+      "title": "Dates written with a month name",
+      "pattern": "\\b(?:[0-9]{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* [0-9]{1,2})\\b",
       "max_matches": 12
     },
     {

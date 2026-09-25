@@ -875,6 +875,64 @@ fn json_scalar(v: &serde_json::Value) -> String {
 mod tests {
     use super::*;
 
+    /// Every declarative pack shipped in `examples/keep-agents` must pass the same validation the deploy path applies,
+    /// so a limit (a 200-character pattern, an 80-character title) is caught here and not by a red CI job on main.
+    #[test]
+    fn every_shipped_usecase_pack_validates() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/keep-agents");
+        let pack_only = [
+            "kind",
+            "name",
+            "manifest",
+            "goal",
+            "entry",
+            "sample_file",
+            "$schema",
+        ];
+        let mut checked = 0;
+        let mut entries: Vec<_> = std::fs::read_dir(&dir)
+            .expect("examples/keep-agents")
+            .flatten()
+            .collect();
+        entries.sort_by_key(|e| e.file_name());
+        for entry in entries {
+            let root = entry.path();
+            let Ok(raw) = std::fs::read_to_string(root.join("pack.json")) else {
+                continue;
+            };
+            let pack: serde_json::Value = serde_json::from_str(&raw)
+                .unwrap_or_else(|e| panic!("{}: pack.json is not JSON: {e}", root.display()));
+            if pack["kind"] != "usecase" {
+                continue;
+            }
+            let name = pack["name"].as_str().unwrap_or_default().to_string();
+            let mut spec = serde_json::Map::new();
+            for (k, v) in pack.as_object().unwrap() {
+                if !pack_only.contains(&k.as_str()) {
+                    spec.insert(k.clone(), v.clone());
+                }
+            }
+            spec.insert("id".into(), name.clone().into());
+            if let Some(file) = pack["sample_file"].as_str() {
+                let text = std::fs::read_to_string(root.join(file))
+                    .unwrap_or_else(|e| panic!("{name}: sample_file {file}: {e}"));
+                let filename = file.rsplit('/').next().unwrap_or(file);
+                spec.insert(
+                    "sample".into(),
+                    serde_json::json!({"filename": filename, "text": text}),
+                );
+            }
+            let spec: CustomDemoSpec = serde_json::from_value(serde_json::Value::Object(spec))
+                .unwrap_or_else(|e| panic!("{name}: not a use-case spec: {e}"));
+            spec.validate(&[]).unwrap_or_else(|e| panic!("{name}: {e}"));
+            checked += 1;
+        }
+        assert!(
+            checked >= 40,
+            "expected the shipped use-case packs, found {checked}"
+        );
+    }
+
     fn spec() -> CustomDemoSpec {
         serde_json::from_value(serde_json::json!({
             "id": "invoice-check",
