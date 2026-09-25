@@ -3,6 +3,7 @@ import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import {QUICKSTARTS} from './data';
+import type {Quick} from './data';
 import styles from './Quickstart.module.css';
 
 async function copyText(text: string): Promise<boolean> {
@@ -29,11 +30,12 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export default function Quickstart(): ReactNode {
-  const [id, setId] = useState(QUICKSTARTS[0].id);
+/** Tabbed copy-to-clipboard terminal. Defaults to the homepage recipes; /keep passes its own. */
+export default function Quickstart({items = QUICKSTARTS}: {items?: Quick[]}): ReactNode {
+  const [id, setId] = useState(items[0].id);
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const timer = useRef<number | undefined>(undefined);
-  const q = QUICKSTARTS.find((x) => x.id === id) ?? QUICKSTARTS[0];
+  const q = items.find((x) => x.id === id) ?? items[0];
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -47,7 +49,7 @@ export default function Quickstart(): ReactNode {
   return (
     <div className={styles.wrap}>
       <div className={styles.tabs} role="group" aria-label="Quickstart">
-        {QUICKSTARTS.map((x) => (
+        {items.map((x) => (
           <button
             key={x.id}
             type="button"
@@ -78,17 +80,23 @@ export default function Quickstart(): ReactNode {
             <code>{q.code}</code>
           </pre>
         </div>
-        <p className={styles.expect}>
-          <b>Expect</b> <code>{q.expect}</code>
-        </p>
-        <ul className={styles.needs} aria-label="Prerequisites">
-          {q.needs.map((n) => (
-            <li key={n}>{n}</li>
-          ))}
-        </ul>
-        <Link className={styles.link} to={q.href}>
-          {q.cta} ›
-        </Link>
+        {q.expect && (
+          <p className={styles.expect}>
+            <b>Expect</b> <code>{q.expect}</code>
+          </p>
+        )}
+        {q.needs && (
+          <ul className={styles.needs} aria-label="Prerequisites">
+            {q.needs.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        )}
+        {q.href && q.cta && (
+          <Link className={styles.link} to={q.href}>
+            {q.cta} ›
+          </Link>
+        )}
       </div>
     </div>
   );

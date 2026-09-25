@@ -330,10 +330,10 @@ export type Quick = {
   label: string;
   blurb: string;
   code: string;
-  expect: string;
-  needs: string[];
-  href: string;
-  cta: string;
+  expect?: string;
+  needs?: string[];
+  href?: string;
+  cta?: string;
 };
 
 export const QUICKSTARTS: Quick[] = [

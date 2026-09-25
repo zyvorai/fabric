@@ -1,23 +1,36 @@
 import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
-import Heading from '@theme/Heading';
 import Head from '@docusaurus/Head';
-import CodeBlock from '@theme/CodeBlock';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import marketing from '../../../docs/keep/marketing.json';
 import Reveal from '../components/Reveal';
 import KeepStory from '../components/KeepStory';
+import CockpitMock from '../components/compare/CockpitMock';
+import ProfileLadder from '../components/compare/ProfileLadder';
+import Quickstart from '../components/compare/Quickstart';
+import type {Quick} from '../components/compare/data';
+import {CtaBand, HeroShell, HonestyBand, Page, Section, useHashScroll} from '../components/marketing/Shell';
+import shell from '../components/marketing/Shell.module.css';
 import styles from './keep.module.css';
 
 const COMPARE_ROWS = ['Where it runs', 'Policy', 'The cell', 'Model'];
 
+/** The install tabs in marketing.json, shaped for the homepage's terminal component. */
+const INSTALL: Quick[] = marketing.install.map((tab, i) => ({
+  id: tab.label,
+  label: tab.label,
+  blurb: tab.note,
+  code: tab.commands.join('\n'),
+  ...(i === 0 ? {href: '/docs/tutorials/keep-pdf-brief', cta: 'Then brief a PDF'} : {}),
+}));
+
 export default function KeepPage(): ReactNode {
+  useHashScroll();
   const card = useBaseUrl('/img/social-card.png', {absolute: true});
-  const cockpit = useBaseUrl('/keep/cockpit-window.svg');
   const compare = marketing.compare.filter((r) => COMPARE_ROWS.includes(r.label));
+  // "Your agent gets a real computer. You keep the keys." → headline + gradient line.
+  const [headline, ...accent] = marketing.tagline.split(/(?<=\.)\s+/);
 
   return (
     <Layout
@@ -27,95 +40,132 @@ export default function KeepPage(): ReactNode {
         <meta property="og:image" content={card} />
         <meta name="twitter:card" content="summary_large_image" />
       </Head>
-      <main className={styles.page}>
-        <header className={styles.hero}>
-          <div className={styles.heroInner}>
-            <p className={styles.brand}>Keep</p>
-            <Heading as="h1" className={styles.headline}>
-              {marketing.tagline}
-            </Heading>
-            <p className={styles.lede}>{marketing.lede}</p>
-            <div className={styles.btnrow}>
+      <Page>
+        <HeroShell
+          eyebrow="Zyvor Keep"
+          title={headline}
+          accent={accent.join(' ')}
+          sub={marketing.lede}
+          buttons={
+            <>
               <a className="button button--primary button--lg" href="#try">
                 Try it in 60 seconds
               </a>
-              <Link className={`button button--lg ${styles.ghost}`} to="/docs/keep/KEEP">
+              <Link className="button button--outline button--lg button--secondary" to="/docs/keep/">
                 Read the docs
               </Link>
-            </div>
-          </div>
-          <img
-            className={styles.cockpit}
-            src={cockpit}
-            width="1000"
-            height="600"
-            alt="The Keep cockpit: a sealed cell, zero outbound connections, an approval waiting for you, and split-sight between the agent and you."
-          />
-        </header>
-
-        <section className={styles.band}>
-          <Reveal>
-            <p className={styles.eyebrow}>How it works</p>
-            <Heading as="h2" className={styles.title}>
-              A real computer for an agent you can’t fully trust.
-            </Heading>
+            </>
+          }
+          stats={[
+            ['0', 'egress connects, on stage'],
+            ['1', 'signed policy you can diff'],
+            ['3', 'open layers, one stack'],
+          ]}
+          cueHref="#how"
+          cueLabel="Scroll to how it works"
+        />
+        <main>
+          <Section
+            id="how"
+            eyebrow="How it works"
+            title="A real computer for an agent you can’t fully trust."
+            lede="A sealed cell, keys you hold, approvals only you can give, and a counter that proves it."
+            wide>
             <KeepStory />
-          </Reveal>
-        </section>
+          </Section>
 
-        <section className={styles.values}>
-          <Reveal className={styles.valueGrid}>
-            {marketing.values.map((v) => (
-              <div key={v.title}>
-                <h3>{v.title}</h3>
-                <p>{v.body}</p>
-              </div>
-            ))}
-          </Reveal>
-        </section>
+          <Section
+            id="cockpit"
+            eyebrow="The cockpit"
+            title="What you watch while it works."
+            lede="A goal, its plan, the decisions the policy made, and the egress counter — with the honesty badge always on."
+            tint
+            wide>
+            <CockpitMock />
+          </Section>
 
-        <section id="try" className={styles.try}>
-          <Reveal>
-            <p className={styles.eyebrow}>Try it</p>
-            <Heading as="h2" className={styles.title}>
-              Run it in 60 seconds.
-            </Heading>
-            <Tabs>
-              {marketing.install.map((tab) => (
-                <TabItem key={tab.label} value={tab.label} label={tab.label}>
-                  <p className={styles.note}>{tab.note}</p>
-                  <CodeBlock language="bash">{tab.commands.join('\n')}</CodeBlock>
-                </TabItem>
+          <Section
+            id="why"
+            eyebrow="Why Keep"
+            title="You run it. You read it. You take it with you."
+            wide>
+            <ul className={shell.cards}>
+              {marketing.values.map((v, i) => (
+                <li key={v.title}>
+                  <Reveal delay={i * 100} className={shell.fill}>
+                    <div className={shell.card}>
+                      <h3>{v.title}</h3>
+                      <p className={styles.cardBody}>{v.body}</p>
+                    </div>
+                  </Reveal>
+                </li>
               ))}
-            </Tabs>
-            <p className={styles.crumb}>
-              <Link to="/docs/tutorials/keep-pdf-brief">Then brief a PDF →</Link>
-            </p>
-          </Reveal>
-        </section>
+            </ul>
+            <ul className={styles.features}>
+              {marketing.features.map((f, i) => (
+                <li key={f.title}>
+                  <Reveal delay={(i % 4) * 80} className={shell.tile}>
+                    <b>{f.title}</b>
+                    <span>{f.body}</span>
+                  </Reveal>
+                </li>
+              ))}
+            </ul>
+          </Section>
 
-        <section className={styles.contrast}>
-          <Reveal>
-            <p className={styles.eyebrow}>Meta Muse vs Keep</p>
-            <Heading as="h2" className={styles.title}>
-              Same threat model. Different owner.
-            </Heading>
+          <Section
+            id="profiles"
+            eyebrow="Security profiles"
+            title="Three rungs. One says what it can’t prove."
+            lede="Keep labels every cell with the evidence it actually has. Measured is software-test; hardware attestation stays gated until a verified run."
+            tint
+            wide>
+            <ProfileLadder />
+          </Section>
+
+          <Section id="try" eyebrow="Try it" title="Run it in 60 seconds.">
+            <Quickstart items={INSTALL} />
+          </Section>
+
+          <Section
+            id="muse"
+            eyebrow="Meta Muse vs Keep"
+            title="Same threat model. Different owner."
+            tint>
             <div className={styles.rows}>
-              {compare.map((r) => (
-                <div key={r.label} className={styles.row}>
+              {compare.map((r, i) => (
+                <Reveal key={r.label} delay={i * 80} className={styles.row}>
                   <span className={styles.rowLabel}>{r.label}</span>
                   <span className={styles.rowMuse}>{r.muse}</span>
                   <span className={styles.rowKeep}>{r.keep}</span>
-                </div>
+                </Reveal>
               ))}
             </div>
-            <p className={styles.crumb}>
-              <Link to="/?t=stack#matrix">The full comparison →</Link>
-            </p>
-            <p className={styles.honesty}>Honest about the limits: {marketing.honesty}</p>
-          </Reveal>
-        </section>
-      </main>
+            <Link className={styles.more} to="/?t=stack#matrix">
+              The full comparison ›
+            </Link>
+          </Section>
+
+          <HonestyBand
+            items={[
+              marketing.honesty,
+              <>
+                Muse details here are as publicly described; public detail is thin.{' '}
+                <a href="https://github.com/zyvorai/fabric/issues">Corrections welcome.</a>
+              </>,
+            ]}
+          />
+
+          <CtaBand title="Run the open version.">
+            <Link className="button button--primary button--lg" to="/docs/getting-started/Quick-Start">
+              Quick start
+            </Link>
+            <Link className="button button--outline button--lg button--secondary" to="/">
+              Fabric vs the field
+            </Link>
+          </CtaBand>
+        </main>
+      </Page>
     </Layout>
   );
 }

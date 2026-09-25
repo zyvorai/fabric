@@ -6,6 +6,8 @@ import {PageMetadata} from '@docusaurus/theme-common';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 import Reveal from '@site/src/components/Reveal';
+import {CtaBand, HeroShell, HonestyBand, Page, Section, useHashScroll} from '@site/src/components/marketing/Shell';
+import shell from '@site/src/components/marketing/Shell.module.css';
 import CockpitMock from '@site/src/components/compare/CockpitMock';
 import ProfileLadder from '@site/src/components/compare/ProfileLadder';
 import Quickstart from '@site/src/components/compare/Quickstart';
@@ -414,110 +416,31 @@ function useInView<T extends Element>(threshold = 0.12): [RefObject<T | null>, b
   return [ref, seen];
 }
 
-/** Writes 0→1 scroll progress of the hero into a CSS variable. */
-function useHeroProgress(ref: RefObject<HTMLElement | null>) {
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return;
-    }
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      const p = Math.min(1, Math.max(0, window.scrollY / (node.offsetHeight * 0.75)));
-      node.style.setProperty('--p', p.toFixed(3));
-    };
-    const onScroll = () => {
-      if (!raf) {
-        raf = requestAnimationFrame(update);
-      }
-    };
-    update();
-    window.addEventListener('scroll', onScroll, {passive: true});
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (raf) {
-        cancelAnimationFrame(raf);
-      }
-    };
-  }, [ref]);
-}
-
-function Section({
-  eyebrow,
-  title,
-  lede,
-  children,
-  tint,
-  wide,
-}: {
-  eyebrow: string;
-  title: string;
-  lede?: string;
-  children: ReactNode;
-  tint?: boolean;
-  wide?: boolean;
-}): ReactNode {
-  return (
-    <section className={clsx(styles.section, tint && styles.sectionTint)}>
-      <div className={clsx(styles.wrap, wide && styles.wrapWide)}>
-        <Reveal className={clsx(!lede && styles.headGap)}>
-          <p className={styles.eyebrow}>{eyebrow}</p>
-          <Heading as="h2" className={styles.title}>
-            {title}
-          </Heading>
-          {lede && <p className={styles.lede}>{lede}</p>}
-        </Reveal>
-        {children}
-      </div>
-    </section>
-  );
-}
-
 function Hero(): ReactNode {
-  const ref = useRef<HTMLElement>(null);
-  useHeroProgress(ref);
   return (
-    <header className={styles.hero} ref={ref}>
-      <div className={styles.heroGlow} aria-hidden />
-      <div className={styles.heroInner}>
-        <p className={clsx(styles.heroEyebrow, styles.rise)}>Zyvor Fabric</p>
-        <Heading as="h1" className={clsx(styles.heroTitle, styles.rise, styles.rise2)}>
-          Private cloud control plane for Linux.
-          <br />
-          <span className={styles.heroAccent}>See how it stacks up.</span>
-        </Heading>
-        <p className={clsx(styles.heroSub, styles.rise, styles.rise3)}>
-          Fabric vs Proxmox, OpenStack and libvirt — then Keep and FluxVM for the agent stack you
-          run yourself.
-        </p>
-        <div className={clsx(styles.heroBtns, styles.rise, styles.rise4)}>
+    <HeroShell
+      eyebrow="Zyvor Fabric"
+      title="Private cloud control plane for Linux."
+      accent="See how it stacks up."
+      sub="Fabric vs Proxmox, OpenStack and libvirt — then Keep and FluxVM for the agent stack you run yourself."
+      buttons={
+        <>
           <a className="button button--primary button--lg" href="#matrix">
             See the matrix
           </a>
           <Link className="button button--outline button--lg button--secondary" to="/docs/getting-started/Quick-Start">
             Get started
           </Link>
-        </div>
-        <ul className={clsx(styles.heroStats, styles.rise, styles.rise5)}>
-          <li>
-            <b>1</b>
-            <span>~15 MB Rust daemon</span>
-          </li>
-          <li>
-            <b>3</b>
-            <span>open layers, one stack</span>
-          </li>
-          <li>
-            <b>0</b>
-            <span>egress connects, on stage</span>
-          </li>
-        </ul>
-      </div>
-      <a className={styles.scrollCue} href="#matrix" aria-label="Scroll to the matrix">
-        <span />
-      </a>
-    </header>
+        </>
+      }
+      stats={[
+        ['1', '~15 MB Rust daemon'],
+        ['3', 'open layers, one stack'],
+        ['0', 'egress connects, on stage'],
+      ]}
+      cueHref="#matrix"
+      cueLabel="Scroll to the matrix"
+    />
   );
 }
 
@@ -806,7 +729,7 @@ function UseCases(): ReactNode {
         <p className={styles.ucOut}>
           <b>Produces</b> {uc.out}
         </p>
-        <Link className={styles.cardLink} to={uc.href}>
+        <Link className={shell.cardLink} to={uc.href}>
           {uc.cta} ›
         </Link>
       </article>
@@ -816,21 +739,21 @@ function UseCases(): ReactNode {
 
 function Proof(): ReactNode {
   return (
-    <section className={clsx(styles.section, styles.proof)}>
-      <div className={clsx(styles.wrap, styles.proofGrid)}>
+    <section className={clsx(shell.section, shell.black)}>
+      <div className={clsx(shell.wrap, styles.proofGrid)}>
         <Reveal>
-          <p className={styles.eyebrow}>Proof on stage</p>
-          <Heading as="h2" className={clsx(styles.title, styles.onDark)}>
+          <p className={shell.eyebrow}>Proof on stage</p>
+          <Heading as="h2" className={clsx(shell.title, shell.onDark)}>
             Don’t trust the story.
             <br />
             Read the counter.
           </Heading>
-          <p className={clsx(styles.lede, styles.onDarkMuted)}>
+          <p className={clsx(shell.lede, shell.onDarkMuted)}>
             The PDF-brief demo runs an agent through a vendor SOW behind a host-side eBPF pin —{' '}
             <code>deny_udp</code> plus gateway-only ports. It expects <code>egress_connects: 0</code>,
             read from Keep’s journal and FluxVM’s <code>drop_reasons</code>.
           </p>
-          <div className={styles.btnrow}>
+          <div className={shell.btnrow}>
             <Link className="button button--primary button--lg" to="/docs/tutorials/keep-pdf-brief">
               Run Tutorial 17
             </Link>
@@ -882,19 +805,6 @@ const CARDS = [
 ] as const;
 
 /** Scrolls to the URL hash after mount (native hash scroll misses late-laid-out sections). */
-function useHashScroll() {
-  useEffect(() => {
-    const id = window.location.hash.slice(1);
-    if (!id) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({block: 'start'});
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, []);
-}
-
 export default function ComparePage(): ReactNode {
   useHashScroll();
   return (
@@ -902,11 +812,11 @@ export default function ComparePage(): ReactNode {
       title="Zyvor Fabric — private cloud control plane"
       description="Fabric vs the field: compare Zyvor Fabric with Proxmox, OpenStack and libvirt — then Keep, FluxVM, proof, and a runnable quickstart.">
       <PageMetadata image="/img/compare-social.png" />
-      <div className={styles.page}>
+      <Page>
         <Hero />
         <main>
-          <div id="matrix" className={styles.anchor} />
           <Section
+            id="matrix"
             eyebrow="The matrix"
             title="Side by side."
             lede="Start with Fabric vs the field. Switch tabs for Muse vs the Keep stack, or FluxVM vs libvirt."
@@ -919,10 +829,10 @@ export default function ComparePage(): ReactNode {
             title="Same threat model. Credit where due."
             lede="Muse’s public story gets the shape right. Keep starts from the same five ideas."
             tint>
-            <ul className={styles.tiles}>
+            <ul className={shell.tiles}>
               {GOT_RIGHT.map(([h, b], i) => (
                 <li key={h}>
-                  <Reveal delay={i * 80} className={styles.tile}>
+                  <Reveal delay={i * 80} className={shell.tile}>
                     <b>{h}</b>
                     <span>{b}</span>
                   </Reveal>
@@ -931,16 +841,16 @@ export default function ComparePage(): ReactNode {
             </ul>
           </Section>
 
-          <div id="stack" className={styles.anchor} />
           <Section
+            id="stack"
             eyebrow="The stack"
             title="One outsider. Three layers you own."
             lede="Keep, Fabric and FluxVM aren’t rivals — they’re one stack. Muse is the reference point outside it.">
             <StackScene />
           </Section>
 
-          <div id="profiles" className={styles.anchor} />
           <Section
+            id="profiles"
             eyebrow="Security profiles"
             title="Three rungs. One says what it can’t prove."
             lede="Keep labels every cell with the evidence it actually has. Measured is software-test; hardware attestation stays gated until a verified run."
@@ -951,8 +861,8 @@ export default function ComparePage(): ReactNode {
 
           <Proof />
 
-          <div id="cockpit" className={styles.anchor} />
           <Section
+            id="cockpit"
             eyebrow="The cockpit"
             title="What you watch while it works."
             lede="A goal, its plan, the decisions the policy made, and the egress counter — with the honesty badge always on."
@@ -960,8 +870,8 @@ export default function ComparePage(): ReactNode {
             <CockpitMock />
           </Section>
 
-          <div id="use-cases" className={styles.anchor} />
           <Section
+            id="use-cases"
             eyebrow="Use cases"
             title="Not just a PDF."
             lede="Five packaged agents, three brokered-browser workflows and three workstation moves — every one under the same signed policy, in the same microVM cell."
@@ -974,8 +884,8 @@ export default function ComparePage(): ReactNode {
             </p>
           </Section>
 
-          <div id="receipts" className={styles.anchor} />
           <Section
+            id="receipts"
             eyebrow="Receipts"
             title="Run, archived, in the repo."
             lede="The pilot gate has passed on a real FluxVM host — happy path and deny path — with logs archived under docs/keep/pilot-runs/."
@@ -983,8 +893,8 @@ export default function ComparePage(): ReactNode {
             <Receipts />
           </Section>
 
-          <div id="roadmap" className={styles.anchor} />
           <Section
+            id="roadmap"
             eyebrow="Roadmap"
             title="Shipped, gated, next."
             lede="What is done, what waits on hardware, and what comes after — straight from STATUS.md and the Keep 0.2 notes."
@@ -993,8 +903,8 @@ export default function ComparePage(): ReactNode {
             <Roadmap />
           </Section>
 
-          <div id="quickstart" className={styles.anchor} />
           <Section
+            id="quickstart"
             eyebrow="Try it"
             title="Copy, paste, run."
             lede="Three commands from the repo. You need a FluxVM host; nothing here runs in Meta’s cloud.">
@@ -1002,19 +912,19 @@ export default function ComparePage(): ReactNode {
           </Section>
 
           <Section eyebrow="Pick your layer" title="Use one. Use all three." tint>
-            <ul className={styles.cards}>
+            <ul className={shell.cards}>
               {CARDS.map((card, i) => (
                 <li key={card.name}>
-                  <Reveal delay={i * 100} className={styles.fill}>
-                    <div className={styles.card}>
-                      <span className={styles.cardRole}>{card.role}</span>
+                  <Reveal delay={i * 100} className={shell.fill}>
+                    <div className={shell.card}>
+                      <span className={shell.cardRole}>{card.role}</span>
                       <Heading as="h3">{card.name}</Heading>
                       <ul>
                         {card.points.map((p) => (
                           <li key={p}>{p}</li>
                         ))}
                       </ul>
-                      <Link className={styles.cardLink} to={card.to}>
+                      <Link className={shell.cardLink} to={card.to}>
                         {card.cta} ›
                       </Link>
                     </div>
@@ -1024,48 +934,31 @@ export default function ComparePage(): ReactNode {
             </ul>
           </Section>
 
-          <section className={styles.honesty}>
-            <div className={styles.wrap}>
-              <Reveal>
-                <p className={styles.eyebrow}>Honesty</p>
-                <Heading as="h2" className={clsx(styles.title, styles.onDark)}>
-                  What we don’t claim yet.
-                </Heading>
-                <ul className={styles.honestyList}>
-                  <li>
-                    Until Keep 0.2 runs on real SNP/TDX with a user-held key, evidence stays{' '}
-                    <code>software-test</code> — never “the operator cannot read this.” Muse’s Secure
-                    VM has the same limit today.
-                  </li>
-                  <li>
-                    FluxVM’s multi-tenant controls are opt-in and are not a public-cloud boundary.
-                  </li>
-                  <li>
-                    Muse details here are as publicly described; public detail is thin.{' '}
-                    <a href="https://github.com/zyvorai/fabric/issues">Corrections welcome.</a>
-                  </li>
-                </ul>
-              </Reveal>
-            </div>
-          </section>
+          <HonestyBand
+            items={[
+              <>
+                Until Keep 0.2 runs on real SNP/TDX with a user-held key, evidence stays{' '}
+                <code>software-test</code> — never “the operator cannot read this.” Muse’s Secure VM
+                has the same limit today.
+              </>,
+              <>FluxVM’s multi-tenant controls are opt-in and are not a public-cloud boundary.</>,
+              <>
+                Muse details here are as publicly described; public detail is thin.{' '}
+                <a href="https://github.com/zyvorai/fabric/issues">Corrections welcome.</a>
+              </>,
+            ]}
+          />
 
-          <section className={styles.cta}>
-            <Reveal>
-              <Heading as="h2" className={styles.ctaTitle}>
-                Run the open version.
-              </Heading>
-              <div className={clsx(styles.btnrow, styles.center)}>
-                <Link className="button button--primary button--lg" to="/docs/getting-started/Quick-Start">
-                  Quick start
-                </Link>
-                <Link className="button button--outline button--lg button--secondary" to="/keep">
-                  Meet Keep
-                </Link>
-              </div>
-            </Reveal>
-          </section>
+          <CtaBand title="Run the open version.">
+            <Link className="button button--primary button--lg" to="/docs/getting-started/Quick-Start">
+              Quick start
+            </Link>
+            <Link className="button button--outline button--lg button--secondary" to="/keep">
+              Meet Keep
+            </Link>
+          </CtaBand>
         </main>
-      </div>
+      </Page>
     </Layout>
   );
 }
