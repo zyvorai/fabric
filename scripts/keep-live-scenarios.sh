@@ -84,7 +84,9 @@ run() { api -X POST -F "file=@$2" "$KEEP_API/v1/demos/$1"; }
 for p in status-page-watch mailbox-triage api-facts; do CREATED+=("$p"); done
 CREATED+=(expense-sheet nda-review invoice-model-brief meeting-notes-model)
 
-for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is overdue" "api-facts:KB-01; MS-07"; do
+PHONE_PACKS=(chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder receipt-pdf)
+for p in "${PHONE_PACKS[@]}"; do CREATED+=("$p"); done
+for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is overdue" "api-facts:KB-01; MS-07" "chat-export-digest:4× Ana" "bank-sms-ledger:was declined" "card-statement:Dining (3)" "calendar-week:2× Team standup" "contacts-audit:2× Ana Example" "travel-itinerary:2× K7QP2M" "subscription-finder:1× EUR 39.00"; do
   p="${pair%%:*}"; want="${pair#*:}"
   if deploy "$p"; then
     r=$(api -X POST -F note=none "$KEEP_API/v1/demos/$p")
@@ -92,6 +94,27 @@ for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is o
   else bad "$p: deploy failed: $(head -c 300 "$WORK/deploy-$p.out")"; fi
   [[ "$QUICK" == 1 ]] && break
 done
+
+# receipt-pdf has no bundled sample: build a small PDF with a text layer and read it with the cell's poppler
+python3 - "$WORK/receipt.pdf" <<'PY'
+import sys
+lines = ["Green Grocer  Receipt", "Order 7731  Date 2025-03-12", "Item  Oat milk  qty 2  4.50", "Subtotal 9.00", "VAT 1.80", "Total EUR 10.80", "Warranty: 2 years, returns accepted within 14 days."]
+esc = lambda s: s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+stream = "BT /F1 12 Tf 50 780 Td 16 TL " + " ".join("(%s) Tj T*" % esc(l) for l in lines) + " ET"
+objs = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        "<< /Length %d >>\nstream\n%s\nendstream" % (len(stream), stream), "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+out = "%PDF-1.4\n"; offs = []
+for i, o in enumerate(objs, 1):
+    offs.append(len(out)); out += "%d 0 obj\n%s\nendobj\n" % (i, o)
+x = len(out)
+out += "xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + "".join("%010d 00000 n \n" % o for o in offs)
+out += "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, x)
+open(sys.argv[1], "w").write(out)
+PY
+if [[ "$QUICK" == 0 ]]; then
+  deploy receipt-pdf && { r=$(run receipt-pdf "$WORK/receipt.pdf"); has "receipt-pdf: real PDF read (poppler in the cell)" "$(body_of "$r" 2>/dev/null)" "Total EUR 10.80"; } || bad "receipt-pdf deploy"
+fi
 
 deploy expense-sheet && { r=$(run expense-sheet "$WORK/exp.xlsx"); has "expense-sheet: real xlsx read (Node in the cell)" "$(body_of "$r" 2>/dev/null)" "Travel (2)"; } || bad "expense-sheet deploy"
 deploy nda-review && { r=$(run nda-review "$WORK/nda.docx"); has "nda-review: real docx read" "$(body_of "$r" 2>/dev/null)" "governed by the laws of Portugal"; } || bad "nda-review deploy"

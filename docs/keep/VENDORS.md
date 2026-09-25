@@ -71,6 +71,18 @@ Wire format and the signed text are in [mobile/README.md](mobile/README.md).
 | Vendor push adapters (FCM, Mi Push, HMS, OPPO, vivo) | **Placeholders**: each needs the vendor's own credentials | gateway README |
 | Console strings in Simplified Chinese | **Partial**: navigation, headings, buttons and status of the three Keep pages, with a language switch. The long explanations and the honesty notes stay in English, on purpose. Not viewed in a browser here | `web/src/i18n/keep.ts` |
 
+## What users can do with it
+
+Keep ships ready-made use cases for the files people keep on a phone: exported chats, bank and card alerts, statements,
+calendars, contacts, booking and billing mail, receipts. Your app shares the file to the gateway, which posts it to
+`POST /v1/demos/{use_case}` with the user's token; the summary comes back as an artifact. The list, with what each one
+reads and returns, is under [Phone-user packs](SCENARIOS.md#phone-user-packs). They are declarative, so a vendor can
+copy one and change the words for its market's language.
+
+They are extractive (no model reads the file), and none reads photos or screenshots. They handle sensitive files, so
+the caveat under [What you can and cannot claim](#what-you-can-and-cannot-claim) applies in full: the cell has no
+network, but the host's operator can still read its memory.
+
 ## Sizing: measure, do not guess
 
 A cell is a microVM. Its memory is the template's (`node22-agent`: 2 GiB), so the ceiling on **concurrent cells** per
