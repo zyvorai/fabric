@@ -644,6 +644,27 @@ pub(crate) async fn demo_run(
                 .trim()
                 .to_string();
             if stdout.is_empty() {
+                // pdftotext prints nothing both for a scan and when poppler is not
+                // installed (its stderr is discarded), so tell the two apart.
+                if spec.extract_cmd.starts_with("pdftotext") {
+                    let probe = state
+                        .fluxvm
+                        .process(sandbox.id, "command -v pdftotext", Some(10))
+                        .await
+                        .ok()
+                        .and_then(|v| {
+                            v.get("stdout")
+                                .and_then(Value::as_str)
+                                .map(|s| s.trim().to_string())
+                        })
+                        .unwrap_or_default();
+                    if probe.is_empty() {
+                        return Err(ApiError::bad_request(
+                            "The template has no pdftotext. Use a template with poppler-utils \
+                             (set ZYVOR_DEMO_TEMPLATE) or bake one: see Tutorial 17",
+                        ));
+                    }
+                }
                 return Err(ApiError::bad_request(spec.empty_msg.clone()));
             }
             stdout
