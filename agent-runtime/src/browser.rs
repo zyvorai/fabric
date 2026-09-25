@@ -107,12 +107,22 @@ async fn session_agent(
 }
 
 /// Call the guest a11y driver (`POST /v1/tool` on DRIVER_PORT).
-pub async fn driver_call(
-    state: &AppState,
-    session_id: Uuid,
-    body: Value,
-) -> ApiResult<Value> {
+pub async fn driver_call(state: &AppState, session_id: Uuid, body: Value) -> ApiResult<Value> {
     let (session, agent) = session_agent(state, session_id).await?;
+    if let Some(reason) = session.agent_paused_reason {
+        return Err(ApiError::conflict(format!(
+            "agent paused ({})",
+            reason.as_str()
+        )));
+    }
+    if matches!(
+        session.browse.cookie_jar,
+        crate::browse_ifc::CookieJarKind::Operator
+    ) {
+        return Err(ApiError::forbidden(
+            "operator cookie jar active — agent cannot snapshot or act",
+        ));
+    }
     if let Some(msg) = crate::attestation::host_channel_forbidden(session.confidential.as_ref()) {
         return Err(ApiError::forbidden(msg));
     }
@@ -122,6 +132,20 @@ pub async fn driver_call(
         .manifest
         .browser_port
         .ok_or_else(|| ApiError::not_found("agent has no browser_port"))?;
+
+    // Dead-man: too many taint events → browser tools 403 until policy reset.
+    if session.browse.limits.taint_events >= 8 {
+        return Err(ApiError::forbidden(
+            "browser tools locked after repeated taint events — keepctl policy / untaint",
+        ));
+    }
+
+    let tool = body
+        .get("tool")
+        .or_else(|| body.get("op"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
     if let Some(url) = body.get("url").and_then(|v| v.as_str()) {
         if url.starts_with("file:")
             && agent
@@ -130,17 +154,27 @@ pub async fn driver_call(
                 .as_ref()
                 .is_none_or(|b| b.block_file_url)
         {
-            return Err(ApiError::forbidden("file:// URLs are denied by browser policy"));
+            return Err(ApiError::forbidden(
+                "file:// URLs are denied by browser policy",
+            ));
         }
         if let Ok(parsed) = url::Url::parse(url) {
             if let Some(host) = parsed.host_str() {
+                // Goal-bound tabs: host must be ⊆ goal.allow_hosts when bound.
+                if let Some(gid) = session.browse.goal_id {
+                    if let Some(goal) = state.store.get_goal(gid).await {
+                        if !goal.allow_hosts.is_empty()
+                            && !crate::policy::host_matches_list(host, &goal.allow_hosts)
+                        {
+                            return Err(ApiError::forbidden("host outside goal.allow_hosts"));
+                        }
+                    }
+                }
                 if let Some(bp) = agent.manifest.browser.as_ref() {
                     if !bp.allow_hosts.is_empty()
                         && !crate::policy::host_matches_list(host, &bp.allow_hosts)
                     {
-                        return Err(ApiError::forbidden(
-                            "host not in browser.allow_hosts",
-                        ));
+                        return Err(ApiError::forbidden("host not in browser.allow_hosts"));
                     }
                     if crate::policy::host_matches_list(host, &bp.high_risk_hosts) {
                         return Err(ApiError::forbidden(
@@ -175,7 +209,82 @@ pub async fn driver_call(
             }
         }
     }
-    state
+
+    // IFC: paste/type that carries clipboard into a tab.
+    if tool == "act" {
+        let op = body.get("op").and_then(|v| v.as_str()).unwrap_or("");
+        if matches!(op, "fill" | "type")
+            && body.get("from_clipboard").and_then(|v| v.as_bool()) == Some(true)
+        {
+            let tab_id = session
+                .browse
+                .active_tab
+                .clone()
+                .unwrap_or_else(|| "default".into());
+            let dst = session
+                .browse
+                .tabs
+                .get(&tab_id)
+                .cloned()
+                .unwrap_or_default();
+            match crate::browse_ifc::check_cross_origin_flow(&session.browse.clipboard, &dst) {
+                crate::browse_ifc::IfcVerdict::Allow => {}
+                crate::browse_ifc::IfcVerdict::Deny(msg) => {
+                    return Err(ApiError::forbidden(msg));
+                }
+                crate::browse_ifc::IfcVerdict::Ask(msg) => {
+                    return Err(ApiError::forbidden(format!(
+                        "{msg} — open approval kind: send"
+                    )));
+                }
+            }
+        }
+        // Witness vote on risky clicks (semantic Sentinel scaffold).
+        if op == "click" {
+            let ref_name = body.get("name").and_then(|v| v.as_str());
+            let snap = body
+                .get("snapshot_text")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if let crate::browse_ifc::WitnessVote::Deny(msg) =
+                crate::browse_ifc::witness_vote(op, ref_name, snap)
+            {
+                return Err(ApiError::forbidden(msg));
+            }
+            // Overlay / clickjack: a11y name vs optional pixel_label from operator crop.
+            if let (Some(a11y), Some(pix)) = (
+                body.get("name").and_then(|v| v.as_str()),
+                body.get("pixel_label").and_then(|v| v.as_str()),
+            ) {
+                if crate::browse_ifc::overlay_mismatch(a11y, Some(pix)) {
+                    let _ = state
+                        .store
+                        .update_session(session_id, |s| {
+                            s.browse.limits.taint_events =
+                                s.browse.limits.taint_events.saturating_add(1);
+                            s.agent_paused_reason = Some(crate::model::AgentPausedReason::Taint);
+                        })
+                        .await;
+                    let _ = state
+                        .store
+                        .audit
+                        .append(
+                            Some(session_id),
+                            crate::audit::AuditPhase::Denied,
+                            "browser.overlay_mismatch",
+                            None,
+                            json!({ "a11y": a11y, "pixel_label": pix }),
+                        )
+                        .await;
+                    return Err(ApiError::forbidden(
+                        "overlay mismatch — agent paused (taint)",
+                    ));
+                }
+            }
+        }
+    }
+
+    let result = state
         .fluxvm
         .guest_request(
             session.sandbox_id,
@@ -185,7 +294,145 @@ pub async fn driver_call(
             Some(&body),
         )
         .await
-        .map_err(ApiError::bad_gateway)
+        .map_err(ApiError::bad_gateway)?;
+
+    // Update IFC + trajectory after successful tools (ignore driver soft errors).
+    if result.get("error").is_none() {
+        after_browser_tool(state, session_id, &agent, &body, &result).await?;
+    }
+    Ok(result)
+}
+
+async fn after_browser_tool(
+    state: &AppState,
+    session_id: Uuid,
+    agent: &crate::model::AgentRecord,
+    body: &Value,
+    result: &Value,
+) -> ApiResult<()> {
+    let tool = body
+        .get("tool")
+        .or_else(|| body.get("op"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let session = state
+        .store
+        .update_session(session_id, |s| {
+            if s.browse.network_identity.is_none() {
+                let tenant = s.user_id.as_deref().unwrap_or(&s.agent);
+                s.browse.network_identity = Some(crate::browse_ifc::browser_network_identity(
+                    tenant, session_id,
+                ));
+            }
+            if s.browse.limits.max_origins_per_hour == 0 {
+                s.browse.limits = crate::browse_ifc::BrowseLimits::with_defaults();
+            }
+            match tool.as_str() {
+                "open" => {
+                    if let Some(url) = body.get("url").and_then(|v| v.as_str()) {
+                        if let Some(host) = crate::browse_ifc::host_from_url(url) {
+                            let tab = result
+                                .get("tab")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("default")
+                                .to_string();
+                            s.browse.active_tab = Some(tab.clone());
+                            s.browse
+                                .tabs
+                                .insert(tab, crate::browse_ifc::OriginSet::singleton(&host));
+                            s.browse.limits.origins_seen.insert(host);
+                        }
+                    }
+                }
+                "snapshot" => {
+                    // Reading a page can taint clipboard-capable buffer with tab origin.
+                    if let Some(tab) = s.browse.active_tab.clone() {
+                        if let Some(origins) = s.browse.tabs.get(&tab).cloned() {
+                            s.browse.clipboard = s.browse.clipboard.union(&origins);
+                        }
+                    }
+                }
+                _ => {}
+            }
+            if matches!(tool.as_str(), "open" | "act") && result.get("error").is_none() {
+                let seq = s.browse.steps.last().map(|x| x.seq + 1).unwrap_or(1);
+                s.browse.steps.push(crate::browse_ifc::BrowseStep {
+                    seq,
+                    tool: tool.clone(),
+                    op: body.get("op").and_then(|v| v.as_str()).map(str::to_string),
+                    url: body.get("url").and_then(|v| v.as_str()).map(str::to_string),
+                    ref_id: body.get("ref").and_then(|v| v.as_str()).map(str::to_string),
+                    role: body
+                        .get("role")
+                        .or_else(|| result.get("role"))
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    name: body
+                        .get("name")
+                        .or_else(|| result.get("name"))
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    snapshot_hash: result
+                        .get("snapshot_hash")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    screenshot_hash: None,
+                    policy_hash: None,
+                    at: now.clone(),
+                });
+            }
+        })
+        .await
+        .map_err(ApiError::internal)?;
+
+    // Upsert browse-script artifact for trajectory-as-code.
+    if matches!(tool.as_str(), "open" | "act") {
+        let script = crate::browse_ifc::render_browse_script(session_id, &session.browse.steps);
+        upsert_browse_script_artifact(state, session_id, &agent.name, script).await?;
+    }
+    Ok(())
+}
+
+async fn upsert_browse_script_artifact(
+    state: &AppState,
+    session_id: Uuid,
+    agent: &str,
+    body: String,
+) -> ApiResult<()> {
+    use crate::goals::ArtifactRecord;
+    let existing = state
+        .store
+        .list_artifacts()
+        .await
+        .into_iter()
+        .find(|a| a.session_id == Some(session_id) && a.kind == "browse-script");
+    let now = chrono::Utc::now();
+    let record = if let Some(mut a) = existing {
+        a.body = body;
+        a.metadata = json!({ "steps": true, "format": "playwright-core" });
+        a
+    } else {
+        ArtifactRecord {
+            id: Uuid::new_v4(),
+            kind: "browse-script".into(),
+            title: "browse.spec.mjs".into(),
+            body,
+            content_type: Some("text/javascript".into()),
+            goal_id: None,
+            session_id: Some(session_id),
+            agent: Some(agent.to_string()),
+            metadata: json!({ "format": "playwright-core" }),
+            created_at: now,
+        }
+    };
+    state
+        .store
+        .save_artifact(record)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(())
 }
 
 fn rate_limit_screenshot(state: &AppState, id: Uuid) -> ApiResult<()> {
@@ -643,10 +890,39 @@ pub(crate) async fn browser_fill_secret(
             },
         )
         .map_err(ApiError::forbidden)?;
+    // Split-sight: pause the agent while vault fills.
+    let _ = state
+        .store
+        .update_session(id, |s| {
+            s.agent_paused_reason = Some(crate::model::AgentPausedReason::VaultFill);
+        })
+        .await;
+    let _ = state
+        .store
+        .audit
+        .append(
+            Some(id),
+            crate::audit::AuditPhase::Performed,
+            "session.agent_paused",
+            None,
+            json!({ "reason": "vault_fill", "host": req.host }),
+        )
+        .await;
     let path = first_page_debugger(&state, session.sandbox_id, port).await?;
     cdp_insert_text(&state, session.sandbox_id, port, &path, &secret)
         .await
         .map_err(ApiError::bad_gateway)?;
+    let _ = state
+        .store
+        .update_session(id, |s| {
+            if matches!(
+                s.agent_paused_reason,
+                Some(crate::model::AgentPausedReason::VaultFill)
+            ) {
+                s.agent_paused_reason = None;
+            }
+        })
+        .await;
     let _ = state
         .store
         .audit
@@ -659,11 +935,13 @@ pub(crate) async fn browser_fill_secret(
                 "credential": req.credential,
                 "host": req.host,
                 "filled": true,
+                "source": format!("vault:{}", req.credential),
             }),
         )
         .await;
     Ok(Json(json!({
         "filled": true,
+        "source": format!("vault:{}", req.credential),
         "honesty": "Secret typed via host CDP; value never returned to the model.",
     })))
 }
@@ -702,21 +980,265 @@ pub async fn browser_capability(state: &AppState, session_id: Uuid) -> Value {
             "evidence_class": "software-test",
         });
     };
-    let confined = matches!(agent.manifest.confinement, crate::model::Confinement::Strict);
+    let confined = matches!(
+        agent.manifest.confinement,
+        crate::model::Confinement::Strict
+    );
     let cdp = agent.manifest.browser_port.is_some();
     let enabled = agent.manifest.browser.as_ref().is_none_or(|b| b.enabled);
-    let tools_ok = browser_tools_allowed(agent.manifest.confinement, agent.manifest.browser.as_ref()).is_ok();
+    let tools_ok =
+        browser_tools_allowed(agent.manifest.confinement, agent.manifest.browser.as_ref()).is_ok()
+            && session.agent_paused_reason.is_none();
+    let (snp, tdx) = state.launch_verified_flags().await;
+    let evidence = if snp || tdx {
+        "launch-verified"
+    } else {
+        "software-test"
+    };
+    let host_recover = if session.confidential.as_ref().is_some_and(|c| c.active) {
+        "forbidden"
+    } else {
+        "allowed"
+    };
+    let identity = session.browse.network_identity.clone().unwrap_or_else(|| {
+        let tenant = session.user_id.as_deref().unwrap_or(&session.agent);
+        crate::browse_ifc::browser_network_identity(tenant, session_id)
+    });
+    let badge = crate::browse_ifc::honesty_badge(
+        evidence,
+        true,
+        host_recover,
+        confined,
+        session.agent_paused_reason.as_ref(),
+        Some(&identity),
+    );
     json!({
-        "ready": cdp && confined && enabled,
+        "ready": cdp && confined && enabled && session.agent_paused_reason.is_none(),
         "cdp": cdp,
         "driver_port": DRIVER_PORT,
         "confined": confined,
         "enabled": enabled,
         "tools_allowed": tools_ok,
         "tainted_by": session.tainted_by,
-        "evidence_class": "software-test",
-        "honesty": "software-test: host can still see the guest until Keep 0.2 hardware",
+        "agent_paused_reason": session.agent_paused_reason,
+        "cookie_jar": session.browse.cookie_jar,
+        "goal_id": session.browse.goal_id,
+        "browse_steps": session.browse.steps.len(),
+        "origins": session.browse.limits.origins_seen,
+        "network_identity": identity,
+        "hubble_browser_flows": format!(
+            "/api/dataplane/flows?identity={}",
+            urlencoding_identity(&identity)
+        ),
+        "evidence_class": evidence,
+        "badge": badge,
+        "honesty": badge.get("honesty").cloned().unwrap_or(json!("software-test")),
     })
+}
+
+fn urlencoding_identity(s: &str) -> String {
+    s.replace('/', "%2F")
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AgentPauseRequest {
+    pub reason: String,
+}
+
+/// Split-sight: pause agent tools (`vault_fill` | `operator_watch` | `taint`).
+pub(crate) async fn agent_pause(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<AgentPauseRequest>,
+) -> ApiResult<Json<Value>> {
+    let reason = crate::model::AgentPausedReason::parse(&req.reason)
+        .ok_or_else(|| ApiError::bad_request("reason must be vault_fill|operator_watch|taint"))?;
+    let session = state
+        .store
+        .update_session(id, |s| {
+            s.agent_paused_reason = Some(reason);
+            if matches!(reason, crate::model::AgentPausedReason::OperatorWatch) {
+                s.browse.cookie_jar = crate::browse_ifc::CookieJarKind::Operator;
+            }
+        })
+        .await
+        .map_err(|_| ApiError::not_found("session not found"))?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            Some(id),
+            crate::audit::AuditPhase::Performed,
+            "session.agent_paused",
+            None,
+            json!({ "reason": reason.as_str() }),
+        )
+        .await;
+    Ok(Json(json!({
+        "session_id": id,
+        "agent_paused_reason": session.agent_paused_reason,
+        "cookie_jar": session.browse.cookie_jar,
+    })))
+}
+
+/// Resume agent tools after split-sight pause.
+pub(crate) async fn agent_resume(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<Value>> {
+    let session = state
+        .store
+        .update_session(id, |s| {
+            s.agent_paused_reason = None;
+            s.browse.cookie_jar = crate::browse_ifc::CookieJarKind::Agent;
+        })
+        .await
+        .map_err(|_| ApiError::not_found("session not found"))?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            Some(id),
+            crate::audit::AuditPhase::Performed,
+            "session.agent_resumed",
+            None,
+            json!({}),
+        )
+        .await;
+    Ok(Json(json!({
+        "session_id": id,
+        "agent_paused_reason": session.agent_paused_reason,
+        "cookie_jar": session.browse.cookie_jar,
+    })))
+}
+
+/// Time-machine checkout of a browse step (a11y metadata, not live site).
+pub(crate) async fn browse_checkout(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<BrowseCheckoutQuery>,
+) -> ApiResult<Json<Value>> {
+    let session = state
+        .store
+        .get_session(id)
+        .await
+        .ok_or_else(|| ApiError::not_found("session not found"))?;
+    let step = session
+        .browse
+        .steps
+        .iter()
+        .find(|s| s.seq == q.seq)
+        .ok_or_else(|| ApiError::not_found("browse step not found"))?;
+    Ok(Json(json!({
+        "session_id": id,
+        "step": step,
+        "honesty": "Restored trajectory metadata for this seq — not the live page.",
+    })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct BrowseCheckoutQuery {
+    pub seq: u64,
+}
+
+/// Return the latest browse-script artifact body (trajectory-as-code).
+pub(crate) async fn browse_script(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<impl IntoResponse> {
+    let art = state
+        .store
+        .list_artifacts()
+        .await
+        .into_iter()
+        .find(|a| a.session_id == Some(id) && a.kind == "browse-script")
+        .ok_or_else(|| ApiError::not_found("no browse-script artifact yet"))?;
+    Ok((
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/javascript; charset=utf-8",
+        )],
+        art.body,
+    ))
+}
+
+/// GuestKit-style profile inspect (cookie *hosts*, flags — never cookie values).
+pub(crate) async fn profile_inspect(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<Value>> {
+    let (session, agent) = session_agent(&state, id).await?;
+    let confined = matches!(
+        agent.manifest.confinement,
+        crate::model::Confinement::Strict
+    );
+    let mut cookie_hosts: Vec<String> = session
+        .browse
+        .tabs
+        .values()
+        .flat_map(|o| o.hosts.iter().cloned())
+        .collect();
+    cookie_hosts.sort();
+    cookie_hosts.dedup();
+    // Best-effort CDP version probe (proves loopback CDP, not DOM).
+    let cdp_version = if let Some(port) = agent.manifest.browser_port {
+        state
+            .fluxvm
+            .guest_request(
+                session.sandbox_id,
+                port,
+                Method::GET,
+                "json/version",
+                None::<&Value>,
+            )
+            .await
+            .ok()
+    } else {
+        None
+    };
+    Ok(Json(json!({
+        "session_id": id,
+        "profile": {
+            "home_volume": agent.manifest.home_volume,
+            "cdp_bound_loopback": true,
+            "confinement_strict": confined,
+            "cookie_hosts": cookie_hosts,
+            "extensions_declared": [],
+            "network_identity": session.browse.network_identity,
+            "cdp_version": cdp_version,
+        },
+        "honesty": "Hosts only — cookie values redacted. Offline assurance via GuestKit on browser-home.qcow2 when packed.",
+    })))
+}
+
+/// Confinement / browser doctor (SNI-identity + proxy gate readiness).
+pub(crate) async fn browser_doctor(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<Value>> {
+    let (session, agent) = session_agent(&state, id).await?;
+    let confined = matches!(
+        agent.manifest.confinement,
+        crate::model::Confinement::Strict
+    );
+    let mut warnings = Vec::new();
+    if !confined {
+        warnings.push("confinement is not strict — guest can bypass HTTPS_PROXY");
+    }
+    if agent.manifest.browser_port.is_none() {
+        warnings.push("browser_port unset");
+    }
+    if session.browse.network_identity.is_none() {
+        warnings.push("network_identity not yet assigned (assigned on first browse tool)");
+    }
+    let ok = warnings.is_empty() && confined;
+    Ok(Json(json!({
+        "ok": ok,
+        "confinement": agent.manifest.confinement,
+        "network_identity": session.browse.network_identity,
+        "warnings": warnings,
+        "advice": "FluxVM veth should carry identity keep-browser/tenant/session; Service Fabric may CONNECT only to egress_allow_hosts.",
+    })))
 }
 
 /// Minimal HTML that polls tab listing + optional screenshot for operators.

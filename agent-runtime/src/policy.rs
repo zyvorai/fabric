@@ -253,10 +253,7 @@ impl KeepPolicy {
             trusted_hosts: t.trusted_hosts.clone(),
             on_untrusted_page: Some("block_egress_until_ask".into()),
         });
-        let browser = m
-            .browser
-            .as_ref()
-            .map(KeepBrowser::from_manifest_policy);
+        let browser = m.browser.as_ref().map(KeepBrowser::from_manifest_policy);
         Self {
             version: 1,
             default_egress: "deny".into(),
@@ -434,11 +431,11 @@ browser:
 
     #[test]
     fn host_matches_list_suffix() {
-        assert!(host_matches_list(
-            "api.github.com",
+        assert!(host_matches_list("api.github.com", &["github.com".into()]));
+        assert!(!host_matches_list(
+            "github.com.evil",
             &["github.com".into()]
         ));
-        assert!(!host_matches_list("github.com.evil", &["github.com".into()]));
     }
 
     #[test]

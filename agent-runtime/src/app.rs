@@ -253,6 +253,14 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/sessions/{id}/untaint", post(untaint_session))
         .route("/v1/sessions/{id}/host-recover", post(host_recover_session))
         .route(
+            "/v1/sessions/{id}/agent-pause",
+            post(crate::browser::agent_pause),
+        )
+        .route(
+            "/v1/sessions/{id}/agent-resume",
+            post(crate::browser::agent_resume),
+        )
+        .route(
             "/v1/sessions/{id}/browser/view",
             get(crate::browser::browser_view),
         )
@@ -271,6 +279,22 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/sessions/{id}/browser/fill-secret",
             post(crate::browser::browser_fill_secret),
+        )
+        .route(
+            "/v1/sessions/{id}/browser/script",
+            get(crate::browser::browse_script),
+        )
+        .route(
+            "/v1/sessions/{id}/browser/checkout",
+            get(crate::browser::browse_checkout),
+        )
+        .route(
+            "/v1/sessions/{id}/browser/profile",
+            get(crate::browser::profile_inspect),
+        )
+        .route(
+            "/v1/sessions/{id}/browser/doctor",
+            get(crate::browser::browser_doctor),
         )
         .route(
             "/v1/sessions/{id}/browser/{*path}",
@@ -323,6 +347,8 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             get(crate::goals::get_goal).patch(crate::goals::patch_goal),
         )
         .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
+        .route("/v1/goals/{id}/browse", post(crate::goals::goal_browse))
+        .route("/v1/demos/pdf-brief", post(crate::demos::demo_pdf_brief))
         .route(
             "/v1/artifacts",
             get(crate::goals::list_artifacts).post(crate::goals::create_artifact),
@@ -711,6 +737,17 @@ pub(crate) async fn create_session(
             user_id: req.user_id.clone(),
             tainted_by: vec![],
             confidential: confidential.clone(),
+            agent_paused_reason: None,
+            browse: {
+                let mut b = crate::browse_ifc::BrowseState::default();
+                if agent.manifest.browser_port.is_some() {
+                    let tenant = req.user_id.as_deref().unwrap_or(agent.name.as_str());
+                    b.network_identity =
+                        Some(crate::browse_ifc::browser_network_identity(tenant, id));
+                    b.limits = crate::browse_ifc::BrowseLimits::with_defaults();
+                }
+                b
+            },
         };
         if let Err(error) = state.store.save_session(record.clone()).await {
             if prewarmed {
@@ -1004,10 +1041,19 @@ async fn provision_guest(
     // the session rather than run it unconfined.
     if state.config.confine_all || agent.manifest.confinement == crate::model::Confinement::Strict {
         let gateway = crate::confine::parse_gateway(&host)?;
+        let mut fqdns = agent.manifest.egress_allow_hosts.clone();
+        if let Some(b) = &agent.manifest.browser {
+            fqdns.extend(b.allow_hosts.iter().cloned());
+        }
+        fqdns.sort();
+        fqdns.dedup();
         let policy = crate::confine::strict_policy(
             gateway,
             state.config.egress_listen.port(),
             state.config.proxy_listen.map(|addr| addr.port()),
+            &fqdns,
+            Some(&session.id.to_string()),
+            Some(&agent.name),
         );
         with_timeout(
             HEALTH_CHECK_ATTEMPT_TIMEOUT,
@@ -2219,12 +2265,22 @@ async fn session_cockpit(
         snp,
         tdx,
     );
+    let browser_cap = crate::browser::browser_capability(&state, id).await;
+    let badge = browser_cap.get("badge").cloned();
+    let egress_connects = crate::demos::session_egress_connects(&state, id).await;
+    let drop_reasons = state
+        .fluxvm
+        .drop_reasons(session.sandbox_id, Some(20))
+        .await
+        .unwrap_or_else(|_| json!({ "items": [] }));
     Ok(Json(json!({
         "session_id": id,
         "agent": session.agent,
         "status": session.status,
         "tainted_by": session.tainted_by,
         "taint_visible": !session.tainted_by.is_empty(),
+        "egress_connects": egress_connects,
+        "drop_reasons": drop_reasons,
         "pending_approvals": pending,
         "last_decisions": decisions,
         "upcoming_cron": upcoming,
@@ -2234,6 +2290,7 @@ async fn session_cockpit(
             "status": g.status,
             "href": format!("/v1/goals/{}", g.id),
             "plan": g.plan,
+            "allow_hosts": g.allow_hosts,
         })),
         "recent_artifacts": recent_artifacts,
         "model_socket": state.store.get_agent(&session.agent).await.map(|a| a.manifest.model_socket),
@@ -2242,7 +2299,16 @@ async fn session_cockpit(
         "browser_screenshot": format!("/v1/sessions/{id}/browser/screenshot"),
         "browser_screencast": format!("/v1/sessions/{id}/browser/screencast"),
         "browser_page": format!("/keep/browser?session={id}"),
-        "browser": crate::browser::browser_capability(&state, id).await,
+        "browser": browser_cap,
+        "agent_paused_reason": session.agent_paused_reason,
+        "browse": {
+            "goal_id": session.browse.goal_id,
+            "steps": session.browse.steps.len(),
+            "network_identity": session.browse.network_identity,
+            "cookie_jar": session.browse.cookie_jar,
+            "origins": session.browse.limits.origins_seen,
+        },
+        "badge": badge,
         "security_profile": receipt.security_profile,
         "evidence_class": receipt.evidence_class,
         "honesty": receipt.honesty,

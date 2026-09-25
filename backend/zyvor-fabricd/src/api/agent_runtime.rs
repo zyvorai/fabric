@@ -28,8 +28,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::{
-    client::IntoClientRequest,
-    http::header::AUTHORIZATION as WS_AUTHORIZATION,
+    client::IntoClientRequest, http::header::AUTHORIZATION as WS_AUTHORIZATION,
     Message as TungsteniteMessage,
 };
 
@@ -479,6 +478,65 @@ pub async fn session_cockpit(
     .await
 }
 
+/// One-click PDF → brief.md demo (multipart passthrough to agent-runtime).
+pub async fn demo_pdf_brief(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    request: axum::http::Request<Body>,
+) -> Response {
+    let (base, token) = match upstream(&state) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
+    let url = format!("{base}/v1/demos/pdf-brief");
+    let ct = request.headers().get(header::CONTENT_TYPE).cloned();
+    let body = match axum::body::to_bytes(request.into_body(), 32 * 1024 * 1024).await {
+        Ok(b) => b,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("read body: {e}") })),
+            )
+                .into_response();
+        }
+    };
+    let mut req = state.http_client.post(&url).body(body);
+    if let Some(tok) = token {
+        req = req.header(header::AUTHORIZATION, format!("Bearer {tok}"));
+    }
+    if let Some(c) = ct {
+        req = req.header(header::CONTENT_TYPE, c);
+    }
+    match req.send().await {
+        Ok(resp) => {
+            let status =
+                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let mut headers = axum::http::HeaderMap::new();
+            if let Some(ct) = resp.headers().get(header::CONTENT_TYPE) {
+                headers.insert(header::CONTENT_TYPE, ct.clone());
+            }
+            match resp.bytes().await {
+                Ok(bytes) => {
+                    let mut out = Response::new(Body::from(bytes));
+                    *out.status_mut() = status;
+                    *out.headers_mut() = headers;
+                    out
+                }
+                Err(e) => (
+                    StatusCode::BAD_GATEWAY,
+                    Json(json!({ "error": format!("agent-runtime body: {e}") })),
+                )
+                    .into_response(),
+            }
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": format!("agent-runtime unreachable: {e}") })),
+        )
+            .into_response(),
+    }
+}
+
 /// Keep browser live listing (tabs only; no CDP WebSocket to the operator).
 pub async fn session_browser_view(
     RequireRead(claims): RequireRead,
@@ -537,11 +595,7 @@ pub async fn session_browser_screencast(
     let ws_base = match http_base_to_ws(&base) {
         Ok(u) => u,
         Err(msg) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": msg })),
-            )
-                .into_response();
+            return (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response();
         }
     };
     let url = format!("{ws_base}/v1/sessions/{id}/browser/screencast");

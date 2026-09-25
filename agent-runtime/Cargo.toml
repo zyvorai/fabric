@@ -12,7 +12,7 @@ description = "Durable TypeScript agent sessions backed by Zyvor FluxVM sandboxe
 [dependencies]
 anyhow = "1.0"
 async-stream = "0.3"
-axum = { version = "0.8", features = ["json", "http1", "tokio", "ws"] }
+axum = { version = "0.8", features = ["json", "http1", "tokio", "ws", "multipart"] }
 base64 = "0.23"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }

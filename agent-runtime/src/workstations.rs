@@ -244,6 +244,8 @@ mod tests {
             user_id: Some("alice".into()),
             tainted_by: vec![],
             confidential: None,
+            agent_paused_reason: None,
+            browse: Default::default(),
         }
     }
 

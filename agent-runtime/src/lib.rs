@@ -4,11 +4,13 @@
 pub mod app;
 pub mod attestation;
 pub mod audit;
+pub mod browse_ifc;
 pub mod browser;
 pub mod config;
 pub mod confine;
 pub mod contain;
 pub mod credentials;
+pub mod demos;
 pub mod egress;
 pub mod export_tokens;
 pub mod fluxvm;

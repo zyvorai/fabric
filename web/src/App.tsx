@@ -35,6 +35,7 @@ const ContainerGroups = lazy(() => import('./pages/ContainerGroups'))
 const Agents = lazy(() => import('./pages/Agents'))
 const AiWorkloads = lazy(() => import('./pages/AiWorkloads'))
 const Sessions = lazy(() => import('./pages/Sessions'))
+const KeepHome = lazy(() => import('./pages/KeepHome'))
 const KeepSession = lazy(() => import('./pages/KeepSession'))
 const Schedules = lazy(() => import('./pages/Schedules'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
@@ -149,6 +150,7 @@ function ConsoleRoutes() {
             <Route path="agents" element={<Agents />} />
             <Route path="sessions" element={<Sessions />} />
             <Route path="sessions/:id" element={<Sessions />} />
+            <Route path="keep" element={<KeepHome />} />
             <Route path="keep/:sessionId" element={<KeepSession />} />
             <Route path="schedules" element={<Schedules />} />
             <Route path="autoscale" element={<AutoscalePage />} />

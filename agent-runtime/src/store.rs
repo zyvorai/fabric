@@ -1020,7 +1020,7 @@ mod tests {
                     inner_container: Default::default(),
                     persistent: false,
                     browser_port: None,
-                browser: None,
+                    browser: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.openai.com".into()],
@@ -1056,7 +1056,7 @@ mod tests {
                     inner_container: Default::default(),
                     persistent: false,
                     browser_port: None,
-                browser: None,
+                    browser: None,
                     template: "node22".into(),
                     credentials: vec![],
                     egress_allow_hosts: vec!["api.anthropic.com".into()],
@@ -1121,6 +1121,8 @@ mod tests {
                 user_id: None,
                 tainted_by: vec![],
                 confidential: None,
+                agent_paused_reason: None,
+                browse: Default::default(),
             })
             .await
             .unwrap();
