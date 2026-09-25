@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import MarketingLayout from '../../components/MarketingLayout'
 import KeepDemoStoryboard from '../../components/keep/KeepDemoStoryboard'
 import KeepSplitSight from '../../components/keep/KeepSplitSight'
+import KeepMuseCompare from '../../components/keep/KeepMuseCompare'
 
 export default function Keep() {
   const { isAuthenticated } = useAuth()
@@ -92,25 +93,14 @@ export default function Keep() {
         </section>
 
         <section className="keep-mkt-section">
-          <p className="keep-mkt-eyebrow">Why Keep</p>
-          <h2>Muse got the threat model right. You keep the host.</h2>
-          <dl className="keep-mkt-compare">
-            <div>
-              <dt>Muse</dt>
-              <dd>Meta cloud only. Closed Sentinel. Trajectories may train. Married to their model.</dd>
-            </div>
-            <div>
-              <dt>Keep</dt>
-              <dd>
-                Your FluxVM. Signed keep.policy.yaml. Training default off. BYO model socket. Host
-                eBPF you can show.
-              </dd>
-            </div>
-          </dl>
+          <p className="keep-mkt-eyebrow">Muse · Keep · Fabric · FluxVM</p>
+          <h2>Same threat model. You keep the host.</h2>
+          <KeepMuseCompare />
           <p className="keep-mkt-honesty">
             Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class stays{' '}
             <code className="font-mono text-[13px]">software-test</code> — never marketed as “the
-            operator cannot read this.”
+            operator cannot read this.” Muse Secure VM has the same limit today; they put it in a
+            footnote. We put it here.
           </p>
         </section>
 

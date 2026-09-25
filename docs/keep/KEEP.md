@@ -56,15 +56,22 @@ Treat the model as compromised the moment it reads a webpage.
 
 ## Why Keep beats Muse on purpose
 
-| Muse | Keep |
-|---|---|
-| Meta cloud only | Laptop, mini-PC, FluxVM host, rented SNP/TDX — same API |
-| Closed Sentinel | Signed `keep.policy.yaml` you can diff in git |
-| Operator may open the VM | Confidential = no host recover; measured says so honestly |
-| Trajectories may train after sanitization | Training default **off**; export needs a scoped token |
-| `systemd-nspawn` (shared kernel with Sentinel) | Firecracker/KVM microVM cell |
-| Married to Muse Spark | BYO model socket |
-| Fat client helper surface | vsock admin; no SSH to the agent |
+| | Muse | Keep |
+|---|---|---|
+| Where it runs | Meta cloud only | Laptop, mini-PC, FluxVM host, rented SNP/TDX — same API |
+| Policy | Closed Sentinel | Signed `keep.policy.yaml` you can diff in git |
+| Cell | Often nspawn — shared kernel with Sentinel | Firecracker / KVM microVM via FluxVM |
+| Model | Married to Muse Spark | BYO model socket |
+| Training | Trajectories may train after sanitization | Training default **off**; export needs a scoped token |
+| Host eBPF | Not a tenant-owned pin you can show | FluxVM TC: `deny_udp` + gateway-only ports; cockpit CONNECT 0 |
+| Proof on stage | Trust Meta’s story | Keep audit journal + FluxVM `drop_reasons` (PacketWolf optional) |
+| Operator / confidential | Operator may open the VM | Confidential = no host recover; measured says so honestly |
+| Leave | Hard | `keepctl pack` / `unpack` onto another FluxVM |
+| Client surface | Fat client helper surface | vsock admin; no SSH to the agent |
+
+**Stack:** Muse (closed cloud agent) → **Keep** (product) → **Fabric** (control plane) → **FluxVM** (cell + host eBPF).
+
+Muse: agent computer in Meta’s cloud. Keep: same idea on *your* FluxVM — signed policy, and CONNECT 0 from Keep’s journal + FluxVM’s pin.
 
 ## Architecture
 

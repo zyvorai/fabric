@@ -69,7 +69,7 @@ zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 | Bare-metal remote host | `./scripts/deploy remote USER@HOST` |
 | **Kubernetes (k3s lab / Helm)** | [`./scripts/deploy k8s USER@HOST`](#run-on-kubernetes) → [docs/KUBERNETES.md](docs/KUBERNETES.md) |
 | **AI inference (Beta)** | [Tutorial 15](docs/tutorials/15-ai-workloads.md) · [docs/ai-workloads.md](docs/ai-workloads.md) · console `/app/ai` |
-| **Keep** (open agent workstation) | [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [docs/keep/KEEP.md](docs/keep/KEEP.md) · `./scripts/keep-live-lab.sh` · console `/keep` · `./scripts/keepctl` |
+| **Keep** (open agent workstation) | [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [Tutorial 17](docs/tutorials/17-keep-pdf-brief.md) · [docs/keep/KEEP.md](docs/keep/KEEP.md) · `./scripts/keep-live-lab.sh` · console `/keep` · [Pages](https://zyvorai.github.io/fabric/keep) · `./scripts/keepctl` |
 | Declarative VMs | `zyvorctl apply -f config.yaml` |
 | Terraform | [terraform-provider/](terraform-provider/) |
 | K8s operator (CRDs → API) | [operator/](operator/) |
@@ -103,6 +103,42 @@ curl -sf http://127.0.0.1:7788/readyz | jq .
 | Guest images ship without your tooling | Offline image customization via [GuestKit](https://github.com/zyvorai/guestkit) |
 
 Full capability tour and metrics: **[docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md)**. Every feature, exhaustively: **[FEATURES.md](FEATURES.md)**.
+
+---
+
+## Keep — open agent workstation
+
+Muse got the threat model right. Keep ships the open version Meta cannot — on Fabric and FluxVM, not a third VMM.
+
+| Layer | Role |
+|-------|------|
+| **Muse** | Closed personal agent on Meta’s cloud |
+| **Keep** | Product layer — policy, vault, approvals, browser, demos |
+| **Fabric** | Control plane — console, JWT, Agents / Sessions |
+| **FluxVM** | Hypervisor — the cell + host TC/eBPF pin |
+
+| | Muse | Keep |
+|---|---|---|
+| Where it runs | Meta cloud only | Your laptop, mini-PC, FluxVM host, or rented SNP/TDX — same API |
+| Policy | Closed Sentinel | Signed `keep.policy.yaml` you can diff in git |
+| Cell | Often nspawn — shared kernel with Sentinel | Firecracker / KVM microVM via FluxVM |
+| Model | Married to Muse Spark | BYO model socket |
+| Training | Trajectories may train after sanitize | Default off — export needs a scoped token |
+| Host eBPF | Not a tenant-owned pin you can show | FluxVM TC: `deny_udp` + gateway-only ports; cockpit CONNECT 0 |
+| Proof on stage | Trust Meta’s story | Keep audit journal + FluxVM `drop_reasons` (PacketWolf optional) |
+| Leave | Hard | `keepctl pack` / `unpack` onto another FluxVM |
+
+**Stage line:** Muse = agent computer in Meta’s cloud. Keep = same idea on *your* FluxVM — signed policy, and CONNECT 0 from Keep’s journal + FluxVM’s pin.
+
+Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class stays `software-test` — never marketed as “the operator cannot read this.”
+
+| Start here | |
+|---|---|
+| Pitch + architecture | [docs/keep/KEEP.md](docs/keep/KEEP.md) |
+| Tutorial 16 — workstation | [docs/tutorials/16-keep-workstation.md](docs/tutorials/16-keep-workstation.md) |
+| Tutorial 17 — PDF brief (CONNECT 0) | [docs/tutorials/17-keep-pdf-brief.md](docs/tutorials/17-keep-pdf-brief.md) |
+| Marketing page | console `/keep` · [GitHub Pages](https://zyvorai.github.io/fabric/keep) |
+| Lab / CLI | `./scripts/keep-live-lab.sh` · `./scripts/keepctl` |
 
 ---
 
@@ -316,7 +352,7 @@ All figures above are counted directly from source (route definitions, router co
 | Product overview + metrics | [docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) | | | Service Fabric v6 (Maglev VIP LB) | [docs/ebpf-service-fabric.md](docs/ebpf-service-fabric.md) |
 | Comparison matrix | [docs/guides/decision-support/comparison-matrix.md](docs/guides/decision-support/comparison-matrix.md) | | | **AI Workloads (Beta)** | [docs/ai-workloads.md](docs/ai-workloads.md) · [Tutorial 15](docs/tutorials/15-ai-workloads.md) |
 | FAQ | [docs/quick-reference/faq.md](docs/quick-reference/faq.md) | | | Agent Runtime | [agent-runtime/README.md](agent-runtime/README.md) · [Tutorials 11–14](docs/tutorials/README.md) |
-| | | | | **Keep** (open agent workstation) | [docs/keep/KEEP.md](docs/keep/KEEP.md) · [PRODUCTION.md](docs/keep/PRODUCTION.md) · [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [CI](.github/workflows/keep.yml) · [`scripts/keep-live-lab.sh`](scripts/keep-live-lab.sh) · console `/keep` |
+| | | | | **Keep** (open agent workstation) | [docs/keep/KEEP.md](docs/keep/KEEP.md) · [PRODUCTION.md](docs/keep/PRODUCTION.md) · [Tutorials 16–17](docs/tutorials/README.md) · [marketing `/keep`](https://zyvorai.github.io/fabric/keep) · [CI](.github/workflows/keep.yml) · [`scripts/keep-live-lab.sh`](scripts/keep-live-lab.sh) · console `/keep` |
 | | | | | Web UX | [docs/web-ui.md](docs/web-ui.md) |
 | | | | | User stories | [docs/USER_STORIES.md](docs/USER_STORIES.md) |
 | | | | | OpenStack compatibility | [docs/openstack-compat.md](docs/openstack-compat.md) · [Tutorial](docs/tutorials/08-openstack-clients.md) |

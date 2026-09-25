@@ -330,3 +330,133 @@
   opacity: 0.85;
   max-width: 36rem;
 }
+
+.stackLede {
+  font-size: 1.15rem;
+  line-height: 1.5;
+  margin: 0 0 1.5rem;
+  max-width: 38rem;
+  opacity: 0.85;
+}
+
+.stack {
+  list-style: none;
+  margin: 0 0 2.25rem;
+  padding: 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.stack li {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+@media (max-width: 520px) {
+  .stack li {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}
+
+.stackName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stackRole {
+  font-size: 1.05rem;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  opacity: 0.85;
+}
+
+.versusHead {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 1fr;
+  gap: 1rem;
+  padding: 0 0 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.versusRows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.versusRows li {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 1fr;
+  gap: 1rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  align-items: start;
+}
+
+.versusLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+  padding-top: 0.15rem;
+}
+
+.versusMuse {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  opacity: 0.8;
+}
+
+.versusKeep {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .versusHead {
+    display: none;
+  }
+  .versusRows li {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+  .versusMuse::before {
+    content: 'Muse · ';
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.55;
+  }
+  .versusKeep::before {
+    content: 'Keep · ';
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.55;
+  }
+}
+
+.stageLine {
+  margin-top: 2rem;
+  font-size: 1.2rem;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  max-width: 36rem;
+}
+
+.stageLine em {
+  font-style: normal;
+  font-weight: 600;
+}
