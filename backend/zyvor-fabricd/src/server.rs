@@ -1223,6 +1223,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/sessions/{id}/cockpit",
             get(api::agent_runtime::session_cockpit),
         )
+        .route("/keep/status", get(api::agent_runtime::keep_status))
+        .route("/packs", post(api::agent_runtime::pack_deploy))
         .route(
             "/demos",
             get(api::agent_runtime::demo_list).post(api::agent_runtime::demo_save),

@@ -348,6 +348,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
         .route("/v1/goals/{id}/browse", post(crate::goals::goal_browse))
+        .route("/v1/keep/status", get(crate::demos::keep_status))
         .route(
             "/v1/demos",
             get(crate::demos::demo_list).post(crate::demos::demo_save),

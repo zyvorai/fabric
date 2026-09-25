@@ -222,6 +222,39 @@ export async function deleteDemo(id: string): Promise<void> {
   return apiDelete(`/api/demos/${encodeURIComponent(id)}`)
 }
 
+export interface KeepStatus {
+  keep_mode: boolean
+  signature_required: boolean
+  trusted_signers: number
+  fluxvm: { ready: boolean; error?: string | null }
+  demo_template: string
+  demos: { builtin: number; custom: number }
+}
+
+/** Keep readiness: Keep mode, trusted signers, FluxVM, demo counts. */
+export function keepStatus(): Promise<KeepStatus> {
+  return apiGet<KeepStatus>('/api/keep/status')
+}
+
+/**
+ * Deploy a signed `.keeppack.json` (admin). The file text is sent untouched:
+ * its `deploy_json` is the exact string that was signed.
+ */
+export async function deployPackFile(
+  text: string,
+): Promise<{ name: string; policy: string | null; signed: boolean }> {
+  const res = await apiFetch('/api/packs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: text,
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+  }
+  return parseJsonResponse(res)
+}
+
 /** Run one demo (multipart `file`). Omit the file to use the demo's built-in sample. */
 export async function runDemo(id: string, file?: File | null): Promise<DemoResult> {
   const fd = new FormData()

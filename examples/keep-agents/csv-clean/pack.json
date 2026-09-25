@@ -1,4 +1,5 @@
 {
+  "kind": "builtin",
   "name": "csv-clean",
   "manifest": {
     "template": "node22-agent",

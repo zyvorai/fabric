@@ -353,6 +353,27 @@ pub(crate) async fn demo_list(State(state): State<Arc<AppState>>) -> Json<Value>
     Json(json!({ "demos": demos }))
 }
 
+/// `GET /v1/keep/status` — what `keepctl doctor` and the console check before
+/// a first deploy: Keep mode, trusted signers, FluxVM readiness, demo counts.
+pub(crate) async fn keep_status(State(state): State<Arc<AppState>>) -> Json<Value> {
+    let fluxvm = state.fluxvm.security_capabilities().await;
+    let trust = &state.policy_trust;
+    Json(json!({
+        "keep_mode": trust.keep_mode,
+        "signature_required": trust.keep_mode || trust.require_signature,
+        "trusted_signers": trust.trusted_signers.len(),
+        "fluxvm": {
+            "ready": fluxvm.is_ok(),
+            "error": fluxvm.err().map(|e| format!("{e:#}")),
+        },
+        "demo_template": std::env::var("ZYVOR_DEMO_TEMPLATE").unwrap_or_else(|_| "node22-agent".into()),
+        "demos": {
+            "builtin": DEMOS.len(),
+            "custom": state.store.list_demo_specs().await.len(),
+        },
+    }))
+}
+
 /// `POST /v1/demos` — create or replace a user-defined use case. A spec is
 /// data (an extractor enum plus bounded rules), so it cannot widen what the
 /// host does; every run is still strictly confined and 0-CONNECT checked.
@@ -1035,6 +1056,18 @@ mod tests {
             "sample": {"filename": "sample.txt", "text": "Total: 10\nTotal: 20\n"}
         }))
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn keep_status_reports_mode_signers_fluxvm_and_demo_counts() {
+        let state = crate::goals::tests::test_state().await;
+        let Json(v) = keep_status(State(state)).await;
+        assert_eq!(v["keep_mode"], false);
+        assert_eq!(v["trusted_signers"], 0);
+        assert_eq!(v["fluxvm"]["ready"], false, "FluxVM is down in tests");
+        assert!(v["fluxvm"]["error"].is_string());
+        assert_eq!(v["demos"]["builtin"], DEMOS.len());
+        assert_eq!(v["demos"]["custom"], 0);
     }
 
     #[tokio::test]

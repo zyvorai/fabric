@@ -4,7 +4,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { FileText, Shield, Trash2 } from 'lucide-react'
-import { deleteDemo, DemoInfo, DemoResult, listDemos, runDemo } from '../api/agents'
+import {
+  deleteDemo,
+  DemoInfo,
+  DemoResult,
+  keepStatus,
+  KeepStatus,
+  listDemos,
+  runDemo,
+} from '../api/agents'
+import DeployPack from '../components/keep/DeployPack'
 import DeployUseCase from '../components/keep/DeployUseCase'
 import { PageHeader, Card } from '../components/ui'
 import { useToastContext } from '../contexts/ToastContext'
@@ -37,6 +46,8 @@ export default function KeepHome() {
   const [result, setResult] = useState<DemoResult | null>(null)
 
   const [showDeploy, setShowDeploy] = useState(false)
+  const [showPack, setShowPack] = useState(false)
+  const [status, setStatus] = useState<KeepStatus | null>(null)
 
   const refresh = () =>
     listDemos()
@@ -51,6 +62,9 @@ export default function KeepHome() {
 
   useEffect(() => {
     void refresh()
+    keepStatus()
+      .then(setStatus)
+      .catch(() => setStatus(null))
   }, [])
 
   const demo = demos.find((d) => d.id === demoId) ?? demos[0]
@@ -277,6 +291,38 @@ export default function KeepHome() {
             <DeployUseCase
               onDeployed={(id) => void onDeployed(id)}
               onError={(msg) => toastFailure(toast, 'Deploy failed', new Error(msg))}
+            />
+          )}
+        </Card>
+
+        <Card className="p-5 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--zf-ink)]">Deploy an agent pack</h2>
+              <p className="text-sm text-[var(--zf-muted)] mt-1">
+                For a TypeScript agent that needs its own code. Bundle it on your machine with{' '}
+                <code className="font-mono text-[12px]">fabric-agent pack bundle &lt;dir&gt;</code>,
+                then upload the file. It is signed with your key, which never reaches the browser.
+                {status?.keep_mode ? ' This runtime is in Keep mode: only signed packs deploy.' : ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="zf-btn zf-btn-secondary zf-btn-sm shrink-0"
+              aria-expanded={showPack}
+              onClick={() => setShowPack((v) => !v)}
+            >
+              {showPack ? 'Close' : 'Deploy a pack'}
+            </button>
+          </div>
+          {showPack && (
+            <DeployPack
+              status={status}
+              onDeployed={(name) => {
+                setShowPack(false)
+                toast.success(`Agent "${name}" deployed. Start a session from Agents.`)
+              }}
+              onError={(msg) => toastFailure(toast, 'Pack deploy failed', new Error(msg))}
             />
           )}
         </Card>

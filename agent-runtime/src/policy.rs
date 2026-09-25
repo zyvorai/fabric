@@ -454,6 +454,26 @@ browser:
         assert!(trust.verify_yaml(yaml, None).is_err());
     }
 
+    /// Ed25519 is deterministic, so a signature made by the Node SDK
+    /// (`fabric-agent pack`, sdk/agent-runtime/src/sign.js) must equal the one
+    /// `keep_sign_policy` makes for the same seed and bytes. This fixture was
+    /// produced by the Node signer; if it ever drifts, Node-signed deploys would
+    /// be rejected in Keep mode.
+    #[test]
+    fn node_sdk_signature_matches_the_rust_signer() {
+        let seed = [7u8; 32];
+        let yaml = b"version: 1\ndefault_egress: deny\n";
+        assert_eq!(
+            sign_policy_yaml(yaml, &seed),
+            "5665d748703e5d6db9c7a2b7f9bf1623c33dc4d77767527ea4a4b530a01e36429a30f5a0b6998e3ca286cab2f1103f2f4a5540add46c04fa3d82686748492508"
+        );
+        let pk = SigningKey::from_bytes(&seed).verifying_key().to_bytes();
+        assert_eq!(
+            hex::encode(pk),
+            "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+        );
+    }
+
     #[test]
     fn keep_mode_refuses_unsigned_even_if_require_flag_would_be_off() {
         let seed = [9u8; 32];
