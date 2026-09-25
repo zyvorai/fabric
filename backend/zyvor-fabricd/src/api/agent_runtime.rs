@@ -991,9 +991,42 @@ pub async fn list_approvals(
     RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    // Approvals remain operator-visible; non-admins still need write to decide.
-    let _ = claims;
-    proxy(&state, Method::GET, "/v1/approvals", None, None, None).await
+    if claims.role == Role::Admin {
+        return proxy(&state, Method::GET, "/v1/approvals", None, None, None).await;
+    }
+    // Everyone else sees only approvals whose session they own.
+    let (status, mut value) =
+        match proxy_json(&state, Method::GET, "/v1/approvals", None, None).await {
+            Ok(v) => v,
+            Err(resp) => return resp,
+        };
+    if !status.is_success() {
+        return json_response(status, value);
+    }
+    let mut owned: HashMap<String, bool> = HashMap::new();
+    let mut keep: Vec<Value> = Vec::new();
+    for item in value["items"].as_array().cloned().unwrap_or_default() {
+        let Some(sid) = item["session_id"].as_str().map(str::to_string) else {
+            continue;
+        };
+        // The id goes into an upstream path, so it must be a UUID.
+        if uuid::Uuid::parse_str(&sid).is_err() {
+            continue;
+        }
+        let ok = match owned.get(&sid) {
+            Some(v) => *v,
+            None => {
+                let v = session_owned(&state, &claims, &sid).await.is_ok();
+                owned.insert(sid.clone(), v);
+                v
+            }
+        };
+        if ok {
+            keep.push(item);
+        }
+    }
+    value["items"] = Value::Array(keep);
+    json_response(StatusCode::OK, value)
 }
 
 pub async fn create_approval(
@@ -1015,7 +1048,7 @@ pub async fn create_approval(
 /// Approve or deny a pending approval. The id is validated as a UUID because
 /// it is interpolated into the upstream path.
 pub async fn decide_approval(
-    RequireWrite(_claims): RequireWrite,
+    RequireWrite(claims): RequireWrite,
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(body): Json<Value>,
@@ -1026,6 +1059,33 @@ pub async fn decide_approval(
             Json(json!({ "error": "approval id must be a UUID" })),
         )
             .into_response();
+    }
+    // A non-admin may decide only an approval that belongs to one of their own sessions.
+    if claims.role != Role::Admin {
+        let (status, value) =
+            match proxy_json(&state, Method::GET, "/v1/approvals", None, None).await {
+                Ok(v) => v,
+                Err(resp) => return resp,
+            };
+        if !status.is_success() {
+            return json_response(status, value);
+        }
+        let session = value["items"]
+            .as_array()
+            .and_then(|items| items.iter().find(|a| a["id"].as_str() == Some(id.as_str())))
+            .and_then(|a| a["session_id"].as_str())
+            .filter(|sid| uuid::Uuid::parse_str(sid).is_ok())
+            .map(str::to_string);
+        let owned = match session {
+            Some(sid) => session_owned(&state, &claims, &sid).await.is_ok(),
+            None => false,
+        };
+        if !owned {
+            return json_response(
+                StatusCode::NOT_FOUND,
+                json!({ "error": "approval not found" }),
+            );
+        }
     }
     proxy(
         &state,
@@ -1040,11 +1100,53 @@ pub async fn decide_approval(
 
 /// Hash-chained journal of planned, approved, denied and performed agent actions.
 pub async fn list_audit(
-    RequireRead(_): RequireRead,
+    RequireRead(claims): RequireRead,
     State(state): State<Arc<AppState>>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    // The journal is one chain for every user. A non-admin reads it one owned session at a time.
+    if claims.role != Role::Admin {
+        let Some(sid) = query.get("session_id") else {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                json!({ "error": "session_id is required" }),
+            );
+        };
+        if uuid::Uuid::parse_str(sid).is_err() {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                json!({ "error": "session_id must be a UUID" }),
+            );
+        }
+        if let Err(resp) = session_owned(&state, &claims, sid).await {
+            return resp;
+        }
+    }
     proxy(&state, Method::GET, "/v1/audit", Some(&query), None, None).await
+}
+
+/// A runtime user token for the logged-in user, for a phone or another client that talks to the
+/// runtime directly. The user id is always the caller's own; scopes and lifetime are optional.
+pub async fn mint_my_token(
+    RequireWrite(claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> Response {
+    let mut req = json!({ "user_id": session_user_id(&claims) });
+    for key in ["scopes", "ttl_seconds"] {
+        if let Some(v) = body.get(key) {
+            req[key] = v.clone();
+        }
+    }
+    proxy(
+        &state,
+        Method::POST,
+        "/v1/user-tokens",
+        None,
+        Some(req),
+        None,
+    )
+    .await
 }
 
 /// Run history: artifacts across sessions. Admin only, because bodies are

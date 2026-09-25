@@ -314,6 +314,7 @@ async fn scan_folder(state: &Arc<AppState>, mut t: TriggerRecord) -> anyhow::Res
             Some(p.name.clone()),
             Some(bytes),
             None,
+            None,
         )
         .await;
         t.last_run_at = Some(Utc::now());
@@ -528,6 +529,7 @@ pub(crate) async fn trigger_hook(
         t.use_case.clone(),
         filename,
         Some(body.to_vec()),
+        None,
         None,
     )
     .await;

@@ -9,11 +9,12 @@
 use crate::{
     app::{ApiError, ApiResult},
     audit::AuditPhase,
+    authz::{self, Principal},
     model::{ApprovalKind, ApprovalRecord, ApprovalStatus},
     AppState,
 };
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -475,9 +476,15 @@ pub(crate) async fn advance_step(
 
 pub(crate) async fn list_artifacts(
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
     Query(q): Query<ListQuery>,
 ) -> Json<Value> {
     let mut items = state.store.list_artifacts().await;
+    // A user sees only artifacts made in their own sessions.
+    if let Some(uid) = principal.user() {
+        let mine = authz::session_ids_of(&state, uid).await;
+        items.retain(|a| a.session_id.is_some_and(|sid| mine.contains(&sid)));
+    }
     if let Some(gid) = q.goal_id {
         items.retain(|a| a.goal_id == Some(gid));
     }
@@ -723,6 +730,7 @@ pub(crate) mod tests {
 
         let Json(listed) = list_artifacts(
             State(state.clone()),
+            Extension(Principal::Operator),
             Query(ListQuery {
                 agent: None,
                 goal_id: Some(goal.id),
@@ -926,12 +934,21 @@ pub(crate) mod tests {
             use_case: use_case.map(String::from),
             since,
         };
-        let Json(l) =
-            list_artifacts(State(state.clone()), Query(q(Some("log-triage"), None))).await;
+        let Json(l) = list_artifacts(
+            State(state.clone()),
+            Extension(Principal::Operator),
+            Query(q(Some("log-triage"), None)),
+        )
+        .await;
         assert_eq!(l["items"].as_array().unwrap().len(), 1);
         assert_eq!(l["items"][0]["title"], "b");
         let future = Utc::now() + chrono::Duration::seconds(60);
-        let Json(l) = list_artifacts(State(state), Query(q(None, Some(future)))).await;
+        let Json(l) = list_artifacts(
+            State(state),
+            Extension(Principal::Operator),
+            Query(q(None, Some(future))),
+        )
+        .await;
         assert!(l["items"].as_array().unwrap().is_empty());
     }
 

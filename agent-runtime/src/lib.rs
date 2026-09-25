@@ -5,6 +5,7 @@ pub mod app;
 pub mod artifact_diff;
 pub mod attestation;
 pub mod audit;
+pub mod authz;
 pub mod browse_ifc;
 pub mod browser;
 pub mod config;
@@ -31,8 +32,11 @@ pub mod schedules;
 pub mod sentinel;
 pub mod skills;
 pub mod store;
+#[cfg(test)]
+mod tenancy_tests;
 pub mod triggers;
 pub mod unwrap_tokens;
+pub mod usage;
 pub mod workstations;
 
 use crate::{

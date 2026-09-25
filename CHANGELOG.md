@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **Many users on one Keep shard.** Operator-minted, per-user, stateless **user tokens**
+  (`POST /v1/user-tokens`, scopes `read` / `run` / `approve`, revocable per user) reach only that
+  user's sessions, approvals, artifacts and audit rows; everything else is 403 by default and
+  another user's objects are 404. Per-user quotas (429) and `GET /v1/usage`, `GET /v1/inbox`.
+  fabricd now filters approvals and audit by session ownership for non-admins and adds
+  `POST /api/agent-tokens`. Docs: [TENANCY.md](docs/keep/TENANCY.md).
 - **`scripts/keep-live-scenarios.sh`** runs the built-ins, the scenario packs, batch, zip, a webhook trigger and
   history against a live runtime in real cells (18 checks).
 - **The cell template and seven scenario packs, in the repo.** `agent-runtime/templates/node22-agent/`

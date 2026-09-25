@@ -46,6 +46,8 @@ pub struct Store {
     triggers: RwLock<HashMap<Uuid, TriggerRecord>>,
     /// Approved (use case, endpoint, model, credential) combinations for model-assisted use cases.
     model_grants: RwLock<HashMap<String, ModelGrant>>,
+    /// Per user: tokens issued before this instant are refused (a phone was lost, say).
+    token_floors: RwLock<HashMap<String, chrono::DateTime<chrono::Utc>>>,
     /// Tamper-evident record of planned, approved, denied and performed actions.
     pub audit: AuditLog,
     /// Immutable, content-addressed skill bundles agents can mount.
@@ -77,6 +79,7 @@ impl Store {
             demo_specs: RwLock::new(HashMap::new()),
             triggers: RwLock::new(HashMap::new()),
             model_grants: RwLock::new(HashMap::new()),
+            token_floors: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -133,6 +136,13 @@ impl Store {
         *self.goals.write().await = read_id_map(&self.root.join("goals.json")).await?;
         *self.artifacts.write().await = read_id_map(&self.root.join("artifacts.json")).await?;
         *self.triggers.write().await = read_id_map(&self.root.join("triggers.json")).await?;
+        *self.token_floors.write().await = match fs::read(self.root.join("user_token_floors.json"))
+            .await
+        {
+            Ok(raw) => serde_json::from_slice(&raw).context("decoding user_token_floors.json")?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
+            Err(e) => return Err(e.into()),
+        };
         let grants = match fs::read(self.root.join("model_grants.json")).await {
             Ok(raw) => serde_json::from_slice::<Vec<ModelGrant>>(&raw)
                 .context("decoding model_grants.json")?,
@@ -802,6 +812,25 @@ impl Store {
             .await?;
         }
         Ok(existed)
+    }
+
+    pub async fn token_floor(&self, user: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.token_floors.read().await.get(user).copied()
+    }
+
+    /// Refuse every token issued to `user` before `floor`.
+    pub async fn set_token_floor(
+        &self,
+        user: &str,
+        floor: chrono::DateTime<chrono::Utc>,
+    ) -> Result<()> {
+        let mut map = self.token_floors.write().await;
+        map.insert(user.to_string(), floor);
+        atomic_write(
+            &self.root.join("user_token_floors.json"),
+            &serde_json::to_vec_pretty(&*map)?,
+        )
+        .await
     }
 
     pub async fn list_model_grants(&self) -> Vec<ModelGrant> {

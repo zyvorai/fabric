@@ -452,7 +452,7 @@ echo "demos-ci: signed pack deploy in Keep mode"
 SEED=$(python3 -c 'print("07"*32)')
 PUB=$(S=$SEED node --input-type=module -e "import('$ROOT/sdk/agent-runtime/src/sign.js').then(m=>console.log(m.publicKeyHex(process.env.S)))")
 start_runtime keep-runtime "$KEEP_PORT" "$KEEP_EGRESS" \
-  ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
+  ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE" ZYVOR_AGENT_USER_MAX_RUNS_PER_DAY=3
 wait_http "$KEEP_BASE/healthz" || fail "keep-mode runtime did not start"
 export KEEP_TOKEN="$KEEP_TOKEN_VALUE"
 PACK="$WORK/my-agent"; mkdir -p "$PACK"
@@ -495,5 +495,38 @@ post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Beare
 [[ "$(post "$WORK/deploy.bytes")" == "201" ]] || fail "exact signed bytes should deploy (201)"
 [[ "$(post "$WORK/deploy.tampered")" =~ ^40[13]$ ]] || fail "tampered bytes must be refused"
 ok "bundle bytes verify; a one-byte change is refused"
+
+echo "demos-ci: two users on one shard (user tokens, isolation, quota, revocation)"
+mint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":600}" "$KEEP_BASE/v1/user-tokens" | json token; }
+as() { local tok=$1; shift; curl -s -H "Authorization: Bearer $tok" "$@"; }
+ANA=$(mint ana); BEN=$(mint ben)
+[[ "$ANA" == kut1.* && "$BEN" == kut1.* ]] || fail "user tokens were not minted"
+printf 'name,qty\nAna,1\n' > "$WORK/ua.csv"; printf 'name,qty\nBen,2\n' > "$WORK/ub.csv"
+ra=$(as "$ANA" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean"); rb=$(as "$BEN" -X POST -F "file=@$WORK/ub.csv" "$KEEP_BASE/v1/demos/csv-clean")
+SA=$(echo "$ra" | json session_id); SB=$(echo "$rb" | json session_id)
+AA=$(echo "$ra" | json artifacts.0.id); AB=$(echo "$rb" | json artifacts.0.id)
+[[ "$(echo "$ra" | json egress_connects)" == "0" && "$(echo "$rb" | json egress_connects)" == "0" ]] || fail "user runs must keep 0 CONNECT: $ra"
+ok "each user ran csv-clean with their own token, 0 CONNECT"
+[[ "$(as "$ANA" "$KEEP_BASE/v1/sessions" | python3 -c 'import json,sys; print(",".join(s["id"] for s in json.load(sys.stdin)["items"]))')" == "$SA" ]] || fail "ana should list only her own session"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB")" == "404" ]] || fail "ana must not read ben's session"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB/cockpit")" == "404" ]] || fail "ana must not read ben's cockpit"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/artifacts/$AB")" == "404" ]] || fail "ana must not read ben's artifact"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/artifacts/$AA/diff/$AB")" == "404" ]] || fail "ana must not diff against ben's artifact"
+as "$ANA" "$KEEP_BASE/v1/artifacts" | python3 -c 'import json,sys; ids=[a["id"] for a in json.load(sys.stdin)["items"]]; assert "'"$AA"'" in ids and "'"$AB"'" not in ids, ids' || fail "ana's artifact list is wrong"
+as "$ANA" "$KEEP_BASE/v1/audit?limit=500" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=json.dumps(d["items"]); assert "'"$SA"'" in t and "'"$SB"'" not in t and "entries" not in d["chain"], d["chain"]' || fail "ana's audit slice is wrong"
+ok "ana sees only her session, artifacts and audit rows; ben's are 404 or absent"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/keep/status")" == "403" && "$(as "$ANA" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"user_id":"ben"}' "$KEEP_BASE/v1/user-tokens")" == "403" ]] || fail "operator routes must be closed to user tokens"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions?token=$ANA")" == "401" ]] || fail "a user token in a query string must be refused"
+ok "operator routes are 403 for a user token; a token in the URL is 401"
+[[ "$(as "$ANA" "$KEEP_BASE/v1/usage" | json usage.runs)" == "1" ]] || fail "usage should show 1 run for ana"
+as "$ANA" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean" | json egress_connects >/dev/null || fail "ana's second run"
+as "$ANA" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean" | json egress_connects >/dev/null || fail "ana's third run"
+code=$(as "$ANA" -o "$WORK/quota.out" -w '%{http_code}' -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean")
+[[ "$code" == "429" ]] && grep -q "quota reached" "$WORK/quota.out" || fail "the 4th run should hit the quota (429), got $code $(cat "$WORK/quota.out")"
+[[ "$(as "$BEN" -X POST -F "file=@$WORK/ub.csv" "$KEEP_BASE/v1/demos/csv-clean" | json egress_connects)" == "0" ]] || fail "ben must not be limited by ana's usage"
+ok "ana hits her run quota (429) after 3; ben is unaffected; usage reports the runs"
+curl -s -o /dev/null -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$KEEP_BASE/v1/users/ana/revoke-tokens"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions")" == "401" && "$(as "$BEN" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions")" == "200" ]] || fail "revoking ana must cut off ana only"
+ok "revoking a user's tokens cuts off that user only"
 
 echo "demos-ci: $PASSED checks passed"
