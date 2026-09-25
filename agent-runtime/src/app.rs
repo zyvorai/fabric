@@ -364,6 +364,11 @@ pub fn public_router(state: Arc<AppState>) -> Router {
                 ))
                 .delete(crate::demos::demo_delete),
         )
+        .route("/v1/model-grants", get(crate::model_call::list_grants))
+        .route(
+            "/v1/model-grants/{key}",
+            axum::routing::delete(crate::model_call::revoke_grant),
+        )
         .route(
             "/v1/triggers",
             get(crate::triggers::list_triggers).post(crate::triggers::create_trigger),

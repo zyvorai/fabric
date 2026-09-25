@@ -39,6 +39,15 @@ export interface UseCaseSpec {
   summary: Rule[]
   artifact_title?: string
   sample?: { filename: string; text: string }
+  /** Optional model step: the host sends the extracted text to one endpoint. JSON editor only. */
+  model?: {
+    credential: string
+    base_url: string
+    model: string
+    instruction: string
+    max_input_chars?: number
+    max_output_tokens?: number
+  }
 }
 
 /** Editable form state; every field is a plain string so inputs stay simple. */

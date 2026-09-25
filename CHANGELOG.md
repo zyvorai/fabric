@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **Model-assisted use cases.** A use case can declare one `model` step: after the cell
+  extracts the text, the host sends it to a single OpenAI-compatible endpoint and adds the
+  reply to the artifact. The cell stays offline (0 CONNECT); the vault decides whether the
+  endpoint is reachable, the first use needs an out-of-band approval, every call is audited
+  (sizes and a digest, never the text or the key), and the reply is sanitised. New
+  `GET/DELETE /v1/model-grants`, `keepctl grants`. Docs: [MODEL.md](docs/keep/MODEL.md).
 - **More Keep file types and rules.** Use cases can read `.docx`, `.xlsx` (first sheet),
   `.html`, and `.eml` / `.mbox` (fixed Node scripts run in the cell), and a zip upload fans
   out to one cell per accepted file. New rules: `regex_extract` (linear-time `regex`),

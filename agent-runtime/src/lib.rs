@@ -22,6 +22,7 @@ pub mod l7;
 pub mod mcp;
 pub mod mitm;
 pub mod model;
+pub mod model_call;
 pub mod notify;
 pub mod policy;
 pub mod pool;

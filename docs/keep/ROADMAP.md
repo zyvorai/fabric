@@ -18,12 +18,12 @@ Where each piece stands. Sources: [STATUS.md](STATUS.md), [KEEP-0.2.md](KEEP-0.2
 
 ## Planned product surface
 
-Phased, in this order. Phases 1 to 3 are done; phase 4 is not started.
+Phased, in this order. All four phases are done.
 
 1. **Run history and visibility** (shipped in this branch): artifact TTL and diff, run notifications, console and `keepctl` views.
 2. **Triggers and batch** (done): signed webhook and watched-folder triggers, multi-file upload. See [TRIGGERS.md](TRIGGERS.md).
 3. **More file types** (done, except OCR): docx, xlsx, html, eml/mbox, zip fan-out, and regex / JSON-path / table rules. OCR needs tesseract baked into the cell template and is not built.
-4. **Model-assisted use cases:** a pack that declares one allowlisted model host, with a proof of "exactly N connections, all to that host" instead of zero.
+4. **Model-assisted use cases** (done): a pack declares one model endpoint; the host makes the call, so the cell stays at 0 connections. See [MODEL.md](MODEL.md).
 
 ## Gated on hardware
 

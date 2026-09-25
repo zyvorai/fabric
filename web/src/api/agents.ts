@@ -184,6 +184,8 @@ export interface DemoInfo {
   /** False for a use case a user deployed. */
   builtin?: boolean
   has_sample?: boolean
+  /** Set when the use case sends the extracted text to a model endpoint. */
+  model?: { host: string; model: string } | null
 }
 
 export interface DemoResult {
@@ -196,6 +198,9 @@ export interface DemoResult {
   artifacts?: Array<{ id: string; title: string; kind: string }>
   egress_connects?: number
   honesty?: string
+  /** 0 or 1: extracted text sent to a model by the host (the cell itself stays offline). */
+  model_calls?: number
+  model?: { host: string; model: string; first_use_approved: boolean } | null
   filename?: string
   extract_chars?: number
   error?: string

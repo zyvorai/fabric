@@ -9,6 +9,7 @@ use crate::model::{
     LoopRecord, ScheduleRecord, SessionEvent, SessionRecord, SessionStatus, WarmSandboxRecord,
     WarmSandboxState, WebhookRecord, WorkstationRecord,
 };
+use crate::model_call::ModelGrant;
 use crate::skills::SkillStore;
 use crate::triggers::TriggerRecord;
 use anyhow::{bail, Context, Result};
@@ -43,6 +44,8 @@ pub struct Store {
     demo_specs: RwLock<HashMap<String, CustomDemoRecord>>,
     /// What starts a use case without an upload: signed webhooks and watched folders.
     triggers: RwLock<HashMap<Uuid, TriggerRecord>>,
+    /// Approved (use case, endpoint, model, credential) combinations for model-assisted use cases.
+    model_grants: RwLock<HashMap<String, ModelGrant>>,
     /// Tamper-evident record of planned, approved, denied and performed actions.
     pub audit: AuditLog,
     /// Immutable, content-addressed skill bundles agents can mount.
@@ -73,6 +76,7 @@ impl Store {
             artifacts: RwLock::new(HashMap::new()),
             demo_specs: RwLock::new(HashMap::new()),
             triggers: RwLock::new(HashMap::new()),
+            model_grants: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -129,6 +133,13 @@ impl Store {
         *self.goals.write().await = read_id_map(&self.root.join("goals.json")).await?;
         *self.artifacts.write().await = read_id_map(&self.root.join("artifacts.json")).await?;
         *self.triggers.write().await = read_id_map(&self.root.join("triggers.json")).await?;
+        let grants = match fs::read(self.root.join("model_grants.json")).await {
+            Ok(raw) => serde_json::from_slice::<Vec<ModelGrant>>(&raw)
+                .context("decoding model_grants.json")?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(e.into()),
+        };
+        *self.model_grants.write().await = grants.into_iter().map(|g| (g.key.clone(), g)).collect();
         let specs = match fs::read(self.root.join("demo_specs.json")).await {
             Ok(raw) => serde_json::from_slice::<Vec<CustomDemoRecord>>(&raw)
                 .context("decoding demo_specs.json")?,
@@ -786,6 +797,39 @@ impl Store {
         if existed {
             self.persist_vec(
                 "demo_specs.json",
+                &map.values().cloned().collect::<Vec<_>>(),
+            )
+            .await?;
+        }
+        Ok(existed)
+    }
+
+    pub async fn list_model_grants(&self) -> Vec<ModelGrant> {
+        let mut out: Vec<_> = self.model_grants.read().await.values().cloned().collect();
+        out.sort_by_key(|g| g.approved_at);
+        out
+    }
+
+    pub async fn has_model_grant(&self, key: &str) -> bool {
+        self.model_grants.read().await.contains_key(key)
+    }
+
+    pub async fn save_model_grant(&self, grant: ModelGrant) -> Result<()> {
+        let mut map = self.model_grants.write().await;
+        map.insert(grant.key.clone(), grant);
+        self.persist_vec(
+            "model_grants.json",
+            &map.values().cloned().collect::<Vec<_>>(),
+        )
+        .await
+    }
+
+    pub async fn revoke_model_grant(&self, key: &str) -> Result<bool> {
+        let mut map = self.model_grants.write().await;
+        let existed = map.remove(key).is_some();
+        if existed {
+            self.persist_vec(
+                "model_grants.json",
                 &map.values().cloned().collect::<Vec<_>>(),
             )
             .await?;

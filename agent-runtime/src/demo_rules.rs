@@ -165,6 +165,125 @@ pub enum Rule {
     },
 }
 
+/// An optional model-assisted step. After the cell has extracted the text, the **host** sends that
+/// text to one declared endpoint and appends the reply to the artifact. The cell still has no
+/// network at all, so the cell's connection count stays 0.
+///
+/// The pack names the endpoint; the operator's vault decides whether it may be used. `credential`
+/// must exist in the vault, and its host, method, path and port limits apply unchanged. The first
+/// use of an endpoint by a use case also needs an out-of-band approval, and every call is audited.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModelSpec {
+    /// Vault credential that holds the API key. It pins the host this call may reach.
+    pub credential: String,
+    /// OpenAI-compatible base URL, e.g. `https://api.example.com/v1`. The call goes to
+    /// `<base_url>/chat/completions`. `https`, or `http` for a loopback address.
+    pub base_url: String,
+    /// Model id the provider expects.
+    pub model: String,
+    /// What to do with the text. The document text is sent as untrusted data, not as instructions.
+    pub instruction: String,
+    /// Characters of extracted text to send (1000..=100000, default 24000). The rest is dropped.
+    #[serde(default)]
+    pub max_input_chars: Option<usize>,
+    /// Upper bound on the reply (50..=4000 tokens, default 800).
+    #[serde(default)]
+    pub max_output_tokens: Option<u32>,
+}
+
+impl ModelSpec {
+    pub fn input_cap(&self) -> usize {
+        self.max_input_chars.unwrap_or(24_000)
+    }
+
+    pub fn output_cap(&self) -> u32 {
+        self.max_output_tokens.unwrap_or(800)
+    }
+
+    /// The parsed `base_url`, checked: no credentials, query or fragment in it, and
+    /// TLS unless the host is a loopback address.
+    pub fn base(&self) -> Result<url::Url, String> {
+        let u = url::Url::parse(&self.base_url).map_err(|e| format!("base_url: {e}"))?;
+        if !u.username().is_empty()
+            || u.password().is_some()
+            || u.query().is_some()
+            || u.fragment().is_some()
+        {
+            return Err("base_url must not carry credentials, a query or a fragment".into());
+        }
+        let loopback = match u.host() {
+            Some(url::Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
+            Some(url::Host::Ipv4(a)) => a.is_loopback(),
+            Some(url::Host::Ipv6(a)) => a.is_loopback(),
+            None => return Err("base_url needs a host".into()),
+        };
+        match u.scheme() {
+            "https" => {}
+            "http" if loopback => {}
+            _ => return Err("base_url must be https (http only for localhost)".into()),
+        }
+        if u.path().len() > 100 {
+            return Err("base_url path is too long".into());
+        }
+        Ok(u)
+    }
+
+    /// The URL the host will POST to.
+    pub fn endpoint(&self) -> Result<url::Url, String> {
+        let mut u = self.base()?;
+        let path = format!("{}/chat/completions", u.path().trim_end_matches('/'));
+        u.set_path(&path);
+        Ok(u)
+    }
+
+    pub fn host(&self) -> String {
+        self.base()
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+            .unwrap_or_default()
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        let cred_ok = !self.credential.is_empty()
+            && self.credential.len() <= 64
+            && self
+                .credential
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'));
+        if !cred_ok {
+            return Err("model.credential must be 1-64 letters, digits, '-', '_' or '.'".into());
+        }
+        self.base()?;
+        if !plain(&self.model, 80) {
+            return Err("model.model must be 1-80 plain characters".into());
+        }
+        let n = self.instruction.chars().count();
+        if n == 0
+            || n > 1000
+            || self
+                .instruction
+                .chars()
+                .any(|c| c.is_control() && c != '\n')
+        {
+            return Err("model.instruction must be 1-1000 characters".into());
+        }
+        if self
+            .max_input_chars
+            .is_some_and(|n| !(1000..=100_000).contains(&n))
+        {
+            return Err("model.max_input_chars must be 1000..=100000".into());
+        }
+        if self
+            .max_output_tokens
+            .is_some_and(|n| !(50..=4000).contains(&n))
+        {
+            return Err("model.max_output_tokens must be 50..=4000".into());
+        }
+        Ok(())
+    }
+}
+
 /// Built-in sample text shipped with a spec (text extractors only).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -191,6 +310,9 @@ pub struct CustomDemoSpec {
     pub artifact_title: Option<String>,
     #[serde(default)]
     pub sample: Option<SampleSpec>,
+    /// Optional model-assisted step (see [`ModelSpec`]). Off unless declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelSpec>,
 }
 
 /// A stored custom spec.
@@ -394,6 +516,9 @@ impl CustomDemoSpec {
                     }
                 }
             }
+        }
+        if let Some(m) = &self.model {
+            m.validate()?;
         }
         if let Some(s) = &self.sample {
             if !self.extract.allows_sample() {
@@ -1103,5 +1228,84 @@ mod tests {
 
         let (_, ok) = run(Extractor::Docx, "bad.docx", b"this is not a zip");
         assert!(!ok, "a damaged docx must fail, not print garbage");
+    }
+}
+
+#[cfg(test)]
+mod model_spec_tests {
+    use super::*;
+
+    fn with_model(model: serde_json::Value) -> Result<(), String> {
+        let s: CustomDemoSpec = serde_json::from_value(serde_json::json!({
+            "id": "m", "title": "M", "accepts": ["txt"], "extract": "text",
+            "summary": [{"kind": "stats"}], "model": model
+        }))
+        .map_err(|e| e.to_string())?;
+        s.validate(&[])
+    }
+
+    fn ok_model() -> serde_json::Value {
+        serde_json::json!({
+            "credential": "llm", "base_url": "https://api.example.com/v1",
+            "model": "m-1", "instruction": "Summarise."
+        })
+    }
+
+    #[test]
+    fn a_model_step_validates_and_names_its_endpoint() {
+        assert!(with_model(ok_model()).is_ok());
+        let m: ModelSpec = serde_json::from_value(ok_model()).unwrap();
+        assert_eq!(m.host(), "api.example.com");
+        assert_eq!(
+            m.endpoint().unwrap().as_str(),
+            "https://api.example.com/v1/chat/completions"
+        );
+        assert_eq!(m.input_cap(), 24_000);
+        assert_eq!(m.output_cap(), 800);
+    }
+
+    #[test]
+    fn the_endpoint_must_be_tls_or_loopback_and_carry_nothing_extra() {
+        let with = |url: &str| {
+            let mut m = ok_model();
+            m["base_url"] = url.into();
+            with_model(m)
+        };
+        assert!(with("http://127.0.0.1:8080/v1").is_ok());
+        assert!(with("http://localhost:8080/v1").is_ok());
+        for bad in [
+            "http://api.example.com/v1",
+            "http://192.168.1.5/v1",
+            "https://user:pw@api.example.com/v1",
+            "https://api.example.com/v1?key=abc",
+            "https://api.example.com/v1#frag",
+            "ftp://api.example.com/v1",
+            "not a url",
+        ] {
+            assert!(with(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn model_fields_are_bounded_and_unknown_fields_rejected() {
+        let tweak = |k: &str, v: serde_json::Value| {
+            let mut m = ok_model();
+            m[k] = v;
+            with_model(m)
+        };
+        assert!(tweak("credential", "".into()).is_err());
+        assert!(tweak("credential", "a b".into()).is_err());
+        assert!(tweak("model", "".into()).is_err());
+        assert!(tweak("instruction", "".into()).is_err());
+        assert!(tweak("instruction", "x".repeat(1001).into()).is_err());
+        assert!(tweak("max_input_chars", 10.into()).is_err());
+        assert!(tweak("max_input_chars", 200_000.into()).is_err());
+        assert!(tweak("max_output_tokens", 10.into()).is_err());
+        assert!(tweak("max_output_tokens", 9_000.into()).is_err());
+        assert!(tweak("max_output_tokens", 500.into()).is_ok());
+        assert!(
+            tweak("api_key", "sk-live".into()).is_err(),
+            "no place to put a key in a pack"
+        );
     }
 }

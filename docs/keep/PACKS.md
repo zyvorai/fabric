@@ -39,6 +39,7 @@ A `pack.json` with no `kind` (the older `name` + `manifest` + `goal` shape) is a
 | `max_bytes` | Upload limit, per extractor (table below). |
 | `summary` | 1-20 rules (below). |
 | `artifact_title` | Ends in `.md`; default `summary.md`. |
+| `model` | Optional model step: the host sends the extracted text to one endpoint. See [MODEL.md](MODEL.md). |
 | `sample` / `sample_file` | Optional sample text (`text`, `html` and `eml` only, up to 200 KB) so the use case runs in one click. |
 
 Extractors:

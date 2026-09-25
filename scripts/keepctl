@@ -24,6 +24,7 @@
 #   keepctl list                     # the use cases this runtime can run
 #   keepctl run <use-case> <file>...  # run one or a batch (one cell per file); exits 2 on any outbound connection
 #   keepctl trigger list|add-webhook|add-folder|rm|fire …   # start a use case without an upload
+#   keepctl grants list|revoke <key>   # model endpoints a use case may send text to (approved once)
 #   keepctl artifacts [--use-case <id>] [--since <rfc3339>] [--limit <n>]
 #   keepctl diff <older-artifact-id> <newer-artifact-id>   # line diff of two runs
 #   keepctl audit [<session-id>] [--limit <n>]             # journal + hash-chain check
@@ -47,7 +48,7 @@ else
   AUTH_TOKEN=""
 fi
 usage() {
-  sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -410,6 +411,23 @@ for d in json.load(sys.stdin)["demos"]:
       echo "some files failed (see results above)" >&2
       exit 3
     fi
+    ;;
+
+  grants)
+    sub="${1:-}"
+    case "$sub" in
+      list)
+        api GET "/v1/model-grants" | python3 -c '
+import json, sys
+for g in json.load(sys.stdin)["items"]:
+    print("%s  %-20s %-24s model=%s credential=%s approved=%s" % (g["key"], g["use_case"], g["host"], g["model"], g["credential"], g["approved_at"][:19]))'
+        ;;
+      revoke)
+        [[ -n "${2:-}" ]] || { echo "usage: keepctl grants revoke <key>" >&2; exit 1; }
+        api DELETE "/v1/model-grants/${2}"
+        ;;
+      *) echo "usage: keepctl grants list|revoke <key>" >&2; exit 1 ;;
+    esac
     ;;
 
   trigger)

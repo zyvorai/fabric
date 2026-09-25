@@ -199,6 +199,18 @@ export default function KeepHome() {
               <p className="text-sm text-[var(--zf-muted)] mt-1">
                 {demo.description} No browser. Cockpit must show <strong>0 CONNECT</strong>.
               </p>
+              {demo.model && (
+                <p className="text-sm mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-2">
+                  <strong>Sends text out.</strong> After the cell extracts the text, this host sends it to{' '}
+                  <code className="font-mono text-xs">{demo.model.host}</code> (model{' '}
+                  <code className="font-mono text-xs">{demo.model.model}</code>). The cell itself stays
+                  offline. The first run waits for your approval. It is listed under{' '}
+                  <Link to="/app/keep/history" className="underline">
+                    History → Approvals
+                  </Link>
+                  , and you decide it from that run&apos;s cockpit.
+                </p>
+              )}
             </div>
           </div>
 
@@ -306,7 +318,13 @@ export default function KeepHome() {
           {result && !error && (
             <div className="text-sm space-y-2 border-t border-[var(--zf-hairline)] pt-3">
               <div>
-                CONNECT: <code className="font-mono">{result.egress_connects ?? 0}</code>
+                CONNECT from the cell: <code className="font-mono">{result.egress_connects ?? 0}</code>
+                {result.model ? (
+                  <span>
+                    {' '}
+                    · text sent to <code className="font-mono">{result.model.host}</code>
+                  </span>
+                ) : null}
                 {result.honesty ? (
                   <span className="text-[var(--zf-muted)]"> · {result.honesty}</span>
                 ) : null}
@@ -386,7 +404,8 @@ export default function KeepHome() {
         <Card className="p-4 text-sm text-[var(--zf-muted)] flex gap-3">
           <Shield className="w-4 h-4 mt-0.5 shrink-0" />
           <p>
-            Summaries are extractive: no model is called and nothing found in the file is run. Proof
+            Built-in summaries are extractive: no model is called and nothing found in the file is run.
+            A use case that has a model step says so above. Proof
             without PacketWolf: Keep audit journal + FluxVM host{' '}
             <code className="font-mono text-[12px]">deny_udp</code> / gateway-only L4. Evidence class
             stays <code className="font-mono text-[12px]">software-test</code>.
