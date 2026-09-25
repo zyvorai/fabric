@@ -173,12 +173,23 @@ export interface KeepCockpit {
   }
 }
 
-export interface PdfBriefDemoResult {
+export interface DemoInfo {
+  id: string
+  title: string
+  description: string
+  /** Lower-case file extensions without the dot. */
+  accepts: string[]
+  max_bytes: number
+}
+
+export interface DemoResult {
+  demo?: string
   session_id: string
   agent?: string
   goal_id?: string
   artifact_id?: string
   artifact_title?: string
+  artifacts?: Array<{ id: string; title: string; kind: string }>
   egress_connects?: number
   honesty?: string
   filename?: string
@@ -186,13 +197,22 @@ export interface PdfBriefDemoResult {
   error?: string
 }
 
-/** One-click PDF → brief.md (multipart). Omit file to use the lab sample. */
-export async function demoPdfBrief(file?: File | null): Promise<PdfBriefDemoResult> {
+/** Kept for existing imports; the PDF brief is one demo among several. */
+export type PdfBriefDemoResult = DemoResult
+
+/** The one-click Keep demos this runtime can run. */
+export async function listDemos(): Promise<DemoInfo[]> {
+  const out = await apiGet<{ demos: DemoInfo[] }>('/api/demos')
+  return out.demos ?? []
+}
+
+/** Run one demo (multipart `file`). Omit the file to use the demo's built-in sample. */
+export async function runDemo(id: string, file?: File | null): Promise<DemoResult> {
   const fd = new FormData()
   if (file) {
-    fd.append('pdf', file, file.name || 'input.pdf')
+    fd.append('file', file, file.name || 'input')
   }
-  const res = await apiFetch('/api/demos/pdf-brief', {
+  const res = await apiFetch(`/api/demos/${encodeURIComponent(id)}`, {
     method: 'POST',
     body: fd,
   })
@@ -200,7 +220,12 @@ export async function demoPdfBrief(file?: File | null): Promise<PdfBriefDemoResu
     const body = await res.text().catch(() => '')
     throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
   }
-  return parseJsonResponse<PdfBriefDemoResult>(res)
+  return parseJsonResponse<DemoResult>(res)
+}
+
+/** One-click PDF → brief.md (multipart). Omit file to use the lab sample. */
+export function demoPdfBrief(file?: File | null): Promise<DemoResult> {
+  return runDemo('pdf-brief', file)
 }
 
 export interface BrowserView {
