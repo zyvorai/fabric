@@ -4,7 +4,18 @@ Keep treats the guest as untrusted the moment it reads a page (or a PDF).
 **Enforcement is on the host** — FluxVM TC/eBPF on the sandbox veth — never
 inside guest Chromium. PacketWolf / netevd are optional observers, not required.
 
-## Policy Keep posts
+## Use-case cells: deny everything
+
+A one-click use case needs no IP networking (the host reaches the cell over vsock), so its cell gets
+`confine::deny_all_policy`: `default_allow: false` and nothing allowed, applied by the host before any guest work. It
+needs no gateway, so it does not depend on the guest having booted or having a route. If the policy cannot be applied
+the run fails closed (502) and the cell is deleted. Before this, the policy was skipped silently whenever the gateway
+could not be found, and the cell ran under FluxVM's default-allow policy.
+
+The `egress_connects: 0` a run reports counts connections that went **through the egress broker**. It shows the cell
+did not use the broker; the host policy above is what stops it using anything else.
+
+## Policy Keep posts (agent sessions)
 
 Agent-runtime `confine::strict_policy` → `POST /v1/vms/{id}/network/policy`:
 

@@ -13,6 +13,34 @@ use anyhow::{bail, Result};
 use serde_json::{json, Value};
 use std::net::IpAddr;
 
+/// The policy for a cell that needs **no IP networking at all**: a use-case run, which the host reaches over
+/// vsock and which never calls out. Everything is denied, so nothing depends on finding a gateway inside the
+/// guest (which is not there before the guest has booted, and may not be there at all).
+pub fn deny_all_policy(session_id: Option<&str>, agent: Option<&str>) -> Value {
+    let mut labels = vec![
+        "keep.zyvor.dev/proxy=strict".to_string(),
+        "keep.zyvor.dev/egress=none".to_string(),
+    ];
+    if let Some(sid) = session_id {
+        labels.push(format!("keep.zyvor.dev/session={sid}"));
+    }
+    if let Some(a) = agent {
+        labels.push(format!("keep.zyvor.dev/agent={a}"));
+    }
+    json!({
+        "default_allow": false,
+        "allow_cidrs": [],
+        "allow_ports": [],
+        "deny_udp": true,
+        "allow_icmp": false,
+        "deny_cidrs": [],
+        "allow_fqdns": [],
+        "labels": labels,
+        "sample_rate": 0,
+        "audit_mode": false,
+    })
+}
+
 /// Build a FluxVM `VmNetworkPolicy` for a Keep / confined cell.
 pub fn strict_policy(
     gateway: IpAddr,
@@ -85,6 +113,23 @@ pub fn parse_gateway(host: &str) -> Result<IpAddr> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_use_case_cell_is_denied_everything_and_needs_no_gateway() {
+        let p = deny_all_policy(Some("sess-1"), Some("csv-clean"));
+        assert_eq!(p["default_allow"], false);
+        assert_eq!(p["allow_cidrs"], json!([]));
+        assert_eq!(p["allow_ports"], json!([]));
+        assert_eq!(p["allow_fqdns"], json!([]));
+        assert_eq!(p["deny_udp"], true);
+        assert_eq!(p["allow_icmp"], false);
+        let labels: Vec<String> = serde_json::from_value(p["labels"].clone()).unwrap();
+        assert!(labels.contains(&"keep.zyvor.dev/egress=none".to_string()));
+        assert!(labels.contains(&"keep.zyvor.dev/session=sess-1".to_string()));
+        // Nothing is allowed, unlike the broker-only policy an agent session gets.
+        let strict = strict_policy("10.0.0.1".parse().unwrap(), 9097, None, &[], None, None);
+        assert_ne!(p["allow_cidrs"], strict["allow_cidrs"]);
+    }
+
     use super::*;
 
     #[test]

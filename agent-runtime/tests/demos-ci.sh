@@ -555,6 +555,33 @@ for _ in $(seq 1 50); do [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sta
 for _ in $(seq 1 50); do [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sandbox_released)" == "True" ]] && break; sleep 0.2; done
 [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sandbox_released)" == "True" ]] || fail "the finished run's cell should have been released"
 ok "a finished use-case run completes its session and releases its cell"
+# The cell is confined on the host before any guest work: deny-all, needing no gateway (the host reaches it over vsock).
+sbx=$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sandbox_id)
+python3 - "$WORK/sandboxes/policies.jsonl" "$sbx" <<'PY' || fail "a use-case cell must be given a deny-all policy on the host before it is used"
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])]
+mine = [r for r in rows if r["vm"] == sys.argv[2]]
+assert len(mine) == 1, mine
+p = mine[0]["policy"]
+assert p["default_allow"] is False and p["allow_cidrs"] == [] and p["allow_ports"] == [] and p["deny_udp"] is True, p
+PY
+ok "a use-case cell gets a deny-all host policy (no gateway needed) before it is used"
+# Fail closed: if the host policy cannot be applied, the cell is deleted and nothing runs.
+curl -sf -X POST -H 'content-type: application/json' -d '{"id":"noconfine-check","title":"No confine","accepts":["txt"],"extract":"text","summary":[{"kind":"stats"}]}' "$BASE/v1/demos" >/dev/null || fail "deploy the noconfine test use case"
+printf 'hello\n' > "$WORK/nc.txt"
+code=$(curl -s -o "$WORK/nc.out" -w '%{http_code}' -X POST -F "file=@$WORK/nc.txt" "$BASE/v1/demos/noconfine-check")
+[[ "$code" == "502" ]] && grep -q "could not confine the cell" "$WORK/nc.out" || fail "a cell that cannot be confined must fail the run (502): $code $(cat "$WORK/nc.out")"
+python3 - "$WORK/sandboxes" <<'PY' || fail "the unconfined cell must be deleted"
+import json, sys
+d = sys.argv[1]
+created = [json.loads(l) for l in open(d + "/created.jsonl")]
+deleted = {json.loads(l)["vm"] for l in open(d + "/deleted.jsonl")}
+vms = [c["vm"] for c in created if c["name"].startswith("noconfine-check")]
+assert vms and all(v in deleted for v in vms), (vms, deleted)
+PY
+[[ -z "$(curl -sf "$BASE/v1/sessions" | python3 -c 'import json,sys; print([s["id"] for s in json.load(sys.stdin)["items"] if s["agent"]=="noconfine-check"])' | grep -v '^\[\]$')" ]] || fail "a run that could not be confined must not leave a session"
+curl -s -o /dev/null -X DELETE "$BASE/v1/demos/noconfine-check"
+ok "a cell that cannot be confined is deleted and the run fails closed (502)"
 [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions" | python3 -c 'import json,sys; print(",".join(s["id"] for s in json.load(sys.stdin)["items"]))')" == "$SA" ]] || fail "ana should list only her own session"
 [[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB")" == "404" ]] || fail "ana must not read ben's session"
 [[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB/cockpit")" == "404" ]] || fail "ana must not read ben's cockpit"

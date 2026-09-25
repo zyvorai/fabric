@@ -880,19 +880,17 @@ async fn run_demo_inner(
         .await
         .map_err(|e| ApiError::bad_gateway(format!("sandbox create: {e:#}")))?;
 
-    // Proxy-or-die on the host before any guest work.
-    if let Ok(gw) = state.fluxvm.default_gateway(sandbox.id).await {
-        if let Ok(gateway) = crate::confine::parse_gateway(&gw) {
-            let policy = crate::confine::strict_policy(
-                gateway,
-                state.config.egress_listen.port(),
-                state.config.proxy_listen.map(|a| a.port()),
-                &[],
-                Some(&id.to_string()),
-                Some(&spec.id),
-            );
-            let _ = state.fluxvm.set_network_policy(sandbox.id, &policy).await;
-        }
+    // Confine the cell on the host before any guest work, and fail closed. A use-case cell needs no IP
+    // networking (the host reaches it over vsock), so the policy denies everything and needs no gateway.
+    // This used to look for the guest's default gateway and skip the policy, silently, when it was not
+    // found, which is always the case before the guest has booted: the cell then ran with FluxVM's
+    // default-allow policy.
+    let policy = crate::confine::deny_all_policy(Some(&id.to_string()), Some(&spec.id));
+    if let Err(e) = state.fluxvm.set_network_policy(sandbox.id, &policy).await {
+        let _ = state.fluxvm.delete(sandbox.id).await;
+        return Err(ApiError::bad_gateway(format!(
+            "could not confine the cell, so it was not used: {e:#}"
+        )));
     }
 
     let now = Utc::now();
