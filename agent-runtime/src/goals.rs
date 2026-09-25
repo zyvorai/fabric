@@ -560,12 +560,12 @@ pub(crate) async fn get_artifact(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{config::Config, AppState};
     use axum::extract::{Path, Query, State};
 
-    async fn test_state() -> Arc<AppState> {
+    pub(crate) async fn test_state() -> Arc<AppState> {
         let root = std::env::temp_dir().join(format!("zyvor-goals-{}", Uuid::new_v4()));
         let config = Config {
             listen: "127.0.0.1:0".parse().unwrap(),

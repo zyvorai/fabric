@@ -478,17 +478,40 @@ pub async fn session_cockpit(
     .await
 }
 
-/// One-click PDF → brief.md demo (multipart passthrough to agent-runtime).
-pub async fn demo_pdf_brief(
+/// The one-click Keep demos the console can offer (`pdf-brief`, `csv-clean`, ...).
+pub async fn demo_list(
+    RequireRead(_claims): RequireRead,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/demos", None, None, None).await
+}
+
+/// Run one Keep demo: multipart file passthrough to agent-runtime `/v1/demos/{id}`.
+/// `pdf-brief` is one id among several, so the original route keeps working.
+pub async fn demo_run(
     RequireWrite(_claims): RequireWrite,
     State(state): State<Arc<AppState>>,
+    Path(demo_id): Path<String>,
     request: axum::http::Request<Body>,
 ) -> Response {
+    // The id becomes part of the upstream path, so accept slug characters only.
+    if demo_id.is_empty()
+        || demo_id.len() > 48
+        || !demo_id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid demo id" })),
+        )
+            .into_response();
+    }
     let (base, token) = match upstream(&state) {
         Ok(v) => v,
         Err(resp) => return resp,
     };
-    let url = format!("{base}/v1/demos/pdf-brief");
+    let url = format!("{base}/v1/demos/{demo_id}");
     let ct = request.headers().get(header::CONTENT_TYPE).cloned();
     let body = match axum::body::to_bytes(request.into_body(), 32 * 1024 * 1024).await {
         Ok(b) => b,
