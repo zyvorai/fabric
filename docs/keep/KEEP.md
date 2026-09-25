@@ -32,7 +32,7 @@ BIN=agent-runtime/target/release/zyvor-fabric-agent-runtime \
 ```
 
 GitHub Actions: [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml)  
-Hands-on: [Tutorial 16](../tutorials/16-keep-workstation.md)  
+Hands-on: [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17 — PDF brief](../tutorials/17-keep-pdf-brief.md)  
 Production checklist: [PRODUCTION.md](PRODUCTION.md)  
 FluxVM measured profiles (sibling repo): `./scripts/test-security-profiles.sh`
 
@@ -75,7 +75,7 @@ You (phone / laptop / YubiKey)
 +------------------------------------------------------------------+
 | HOST (Linux + KVM) — FluxVM node you control                     |
 |                                                                  |
-|  [Keep Sentinel]  eBPF L4/L7 + action policy + taint             |
+|  [Keep Sentinel]  signed policy + egress ask/sentinel + host TC/eBPF (`deny_udp`) |
 |       ^ sole egress + connector authority                        |
 |       |                                                          |
 |  [Vault / authd]  secrets sealed to your key or vTPM             |
@@ -109,6 +109,8 @@ Security profiles (FluxVM Phase 6):
 4. **Phone-only high-risk approvals** — buy / send / delete via webhook / `/v1/approvals`, never in chat.
 5. **Pack / unpack** — `keepctl pack` → USB or S3 → `keepctl unpack` on another FluxVM node.
 6. **Cockpit + browser live view** — visible taint, last decisions, tab listing (`/keep/browser`), screenshot + read-only screencast; input takeover not implemented.
+7. **PDF brief one-click** — `/app/keep` + `keep-demo-pdf.sh`; expect `egress_connects: 0` ([demos/pdf-brief.md](demos/pdf-brief.md)).
+8. **Host eBPF pin (FluxVM)** — `deny_udp` + gateway-only ports; no PacketWolf required ([confine.md](confine.md)).
 
 Lab gate: `./scripts/keep-live-lab.sh`. Guest boot needs a FluxVM template (Tutorial 11).
 
@@ -134,10 +136,13 @@ fabric/docs/keep/
   KEEP.md           # pitch, Muse deltas, honesty clause
   KEEP-0.2.md       # hardware gate
   STATUS.md
+  confine.md        # FluxVM host eBPF (deny_udp)
+  demos/            # pdf-brief stage demo
   sentinel/         # keep.policy.yaml example
   vault/ cell/ browser/ approve/ cockpit/
 fabric/scripts/keepctl
-fabric/agent-runtime/   # policy, model_socket, cockpit API, export-token
+fabric/scripts/keep-demo-pdf.sh
+fabric/agent-runtime/   # policy, model_socket, cockpit API, export-token, demos
 ```
 
 ## Related code

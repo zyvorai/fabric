@@ -252,6 +252,7 @@ Keep ships Fabric-facing packs under [`examples/keep-agents/`](../../examples/ke
 | `migration-op` | `/api/migrations/*`, GuestKit inspect | create/cancel/rescue | wave plan + checklist |
 | `deploy-op` | `/readyz`, `/health` | none by default | FABRIC_DOCTOR readiness |
 | `browser-research` | allowlisted browse via a11y driver | none by default | research markdown |
+| `pdf-brief` | local PDF only | none | `brief.md` (0 CONNECT) |
 
 Shared `_fabric` connector + `fabric-api` credential recipe. Goals/artifacts API:
 [`docs/keep/goals/README.md`](../keep/goals/README.md).
@@ -261,7 +262,11 @@ Shared `_fabric` connector + `fabric-api` credential recipe. Goals/artifacts API
 ./scripts/keep-pack-demo.sh infra-ops
 # Stub bundle without fabric-agent:
 KEEP_PACK_DRY=1 ./scripts/keep-pack-demo.sh deploy-op
+# Stage demo (no browser):
+./scripts/keep-demo-pdf.sh
 ```
 
 Loop: create goal → session work → `POST /v1/artifacts` → advance `requires_approval` step →
 `/v1/approvals` → audit. Cockpit exposes `active_goal` / `recent_artifacts`.
+
+PDF demo deep-dive: [Tutorial 17](17-keep-pdf-brief.md) · [demos/pdf-brief.md](../keep/demos/pdf-brief.md).

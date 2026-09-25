@@ -9,9 +9,11 @@
 - **Keep host eBPF via FluxVM (no PacketWolf).** Confinement posts
   `deny_udp` + gateway-only ports + deny metadata/DNS CIDRs; cockpit shows
   `egress_connects` + FluxVM `drop_reasons`; `ebpf_deny` freezes the cell.
+  Docs: [confine.md](docs/keep/confine.md).
 - **One-click PDF → brief demo.** Pack `examples/keep-agents/pdf-brief/`,
   `POST /v1/demos/pdf-brief`, fabricd `/api/demos/pdf-brief`, console
   `/app/keep` **Brief this PDF**, `./scripts/keep-demo-pdf.sh`. Expect 0 CONNECT.
+  Tutorial: [17-keep-pdf-brief.md](docs/tutorials/17-keep-pdf-brief.md).
 - **Brokered Keep browser (Chromium + Playwright a11y).** Guest `browser-agent`
   template with loopback CDP `:9222` + driver `:9230`; MCP `browser_*` tools;
   `POST …/browser/fill-secret`; `keepctl browser tabs|shot`; policy `browser:`

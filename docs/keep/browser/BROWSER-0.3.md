@@ -25,8 +25,11 @@ webhook. Training default off.
 
 ## Next (0.4 / 0.5)
 
-- PacketWolf enforce identity on CONNECT 5-tuple
+- PacketWolf *optional* observe of CONNECT 5-tuple (not required for Keep proof)
 - Signed site adapters (`adapters/vcenter.yaml`)
 - Confidential cells: CDP only via attested vsock
+
+Host eBPF pin (shipped without PacketWolf): [confine.md](../confine.md).
+PDF stage demo: [demos/pdf-brief.md](../demos/pdf-brief.md).
 
 See [DRIVER.md](DRIVER.md) for tool contract.

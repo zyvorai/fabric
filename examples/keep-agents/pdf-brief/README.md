@@ -10,3 +10,7 @@ One-click Keep demo: PDF in → `brief.md` out. **No browser. Zero CONNECT.**
 
 Requires FluxVM + `node22-agent` with `pdftotext` (poppler). Host eBPF
 (`deny_udp` + gateway-only ports) is applied by agent-runtime confinement.
+
+Docs: [Tutorial 17](../../../docs/tutorials/17-keep-pdf-brief.md) ·
+[demos/pdf-brief.md](../../../docs/keep/demos/pdf-brief.md) ·
+[confine.md](../../../docs/keep/confine.md).

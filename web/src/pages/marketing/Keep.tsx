@@ -20,13 +20,13 @@ export default function Keep() {
           You keep the keys.
         </h1>
         <p className="lede mkt-reveal-delay">
-          Keep is a personal workstation for an untrusted agent — a FluxVM cell with its own browser,
-          a Sentinel that gates every egress, and a policy you can read in git.
+          Keep is a personal workstation for an untrusted agent — a FluxVM cell, signed policy you
+          can diff in git, and host eBPF that makes “zero CONNECT” a claim you can show on stage.
         </p>
         <div className="mkt-cta-row mkt-reveal-delay-2">
           {isAuthenticated ? (
             <Link to="/app/keep" className="zf-btn zf-btn-primary">
-              Open Keep
+              Brief a PDF
             </Link>
           ) : (
             <Link to="/sign-in" className="zf-btn zf-btn-primary">
@@ -50,10 +50,10 @@ export default function Keep() {
               Keep cell
             </div>
             <div className="text-3xl sm:text-4xl font-semibold tracking-[-0.04em] text-center">
-              Browser · Shell · Policy
+              PDF in · brief.md out · CONNECT 0
             </div>
             <div className="mt-8 grid grid-cols-3 gap-3 w-full max-w-lg opacity-90">
-              {['Sentinel', 'Vault', 'Audit'].map((label) => (
+              {['Cell', 'Extract', 'Audit'].map((label) => (
                 <div
                   key={label}
                   className="rounded-xl bg-white/8 border border-white/10 p-4 text-center"
@@ -71,29 +71,40 @@ export default function Keep() {
 
       <section className="mkt-section space-y-14">
         <div>
-          <h2>How it works</h2>
+          <h2>One click the audience understands</h2>
           <p>
-            Share a goal. Keep helps turn it into a plan, then advances the work inside a dedicated
-            Linux cell — opening a browser, filling forms, and coming back when it needs your approval.
-            Sessions keep running after you close the console.
+            Open Keep, drop a vendor PDF, click <strong>Brief this PDF</strong>. Three chips flip —
+            cell up, extract, brief.md — and the cockpit shows <strong>0 CONNECT</strong>. No
+            browser. No hope-based firewall.
           </p>
           <p className="mt-4 text-[14px] text-[var(--zf-muted)]">
-            First packs talk to Fabric APIs you already own — infrastructure ops, migrations, and
-            deploy readiness — via signed policy and ask-before-mutate. See{' '}
-            <code className="font-mono text-[13px]">examples/keep-agents/</code> and Tutorial 16.
+            Same path from the shell:{' '}
+            <code className="font-mono text-[13px]">./scripts/keep-demo-pdf.sh</code>. Tutorial 17
+            walks the proof.
           </p>
         </div>
         <div>
-          <h2>A secure computer for the agent</h2>
+          <h2>Host eBPF — the layer Muse cannot give a tenant</h2>
           <p>
-            Each Keep runs on FluxVM with a host-side Sentinel: nothing reaches the internet unless
-            policy allows it, and sensitive actions ask you first. Credentials stay in a vault —
-            the agent sees surrogates, not real secrets. Every decision lands in an audit trail.
+            Policy lives on the FluxVM veth: gateway-only ports, <code className="font-mono text-[13px]">deny_udp</code>{' '}
+            for QUIC/WebRTC, metadata and public DNS on the deny list. The guest never gets to be the
+            enforcer. PacketWolf is optional; Keep’s own journal already proves the model never left
+            the box.
           </p>
           <p className="mt-4 text-[14px] text-[var(--zf-muted)]">
             Until Keep 0.2 on real SNP/TDX with a user-held wrapping key, the host can still see a
             measured VM. Evidence class <code className="font-mono text-[13px]">software-test</code>{' '}
             is never marketed as “the operator cannot read this.”
+          </p>
+        </div>
+        <div>
+          <h2>How it works day to day</h2>
+          <p>
+            Share a goal. Keep advances work inside a dedicated Linux cell — shell, files, optional
+            brokered browser — and pauses when it needs your approval. Sessions keep running after
+            you close the console. Packs under{' '}
+            <code className="font-mono text-[13px]">examples/keep-agents/</code> talk to Fabric APIs
+            you already own.
           </p>
         </div>
         <div>
@@ -107,10 +118,9 @@ export default function Keep() {
       </section>
 
       <section className="mkt-band">
-        <h2>Deploy a Keep from the console</h2>
+        <h2>Run the stage demo</h2>
         <p>
-          Build a bundle, deploy under your tenant, and start a session — multi-user home disks and
-          JWT-scoped agents are already wired in Fabric. Lab live proof:{' '}
+          Sign in, open Keep, brief a PDF — or follow Tutorial 17 on a FluxVM lab host. Live gate:{' '}
           <code className="font-mono text-[13px]">./scripts/keep-live-lab.sh</code>.
         </p>
         <div className="flex flex-wrap gap-3 mt-6">
@@ -124,12 +134,20 @@ export default function Keep() {
             </Link>
           )}
           <a
-            href="https://github.com/zyvorai/fabric/blob/main/docs/tutorials/16-keep-workstation.md"
+            href="https://github.com/zyvorai/fabric/blob/main/docs/tutorials/17-keep-pdf-brief.md"
             className="zf-btn zf-btn-secondary"
             target="_blank"
             rel="noreferrer"
           >
-            Tutorial 16 →
+            Tutorial 17 →
+          </a>
+          <a
+            href="https://github.com/zyvorai/fabric/blob/main/docs/tutorials/16-keep-workstation.md"
+            className="zf-btn zf-btn-ghost"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Tutorial 16
           </a>
         </div>
       </section>

@@ -26,6 +26,13 @@ export default function Product() {
           <h2>Storage &amp; resilience</h2>
           <p>Pools and volumes, Ceph, backups, replication, fault tolerance, and site recovery — without assembling an OpenStack.</p>
         </div>
+        <div>
+          <h2>Keep — agent workstation</h2>
+          <p>
+            Give an untrusted agent a FluxVM cell with signed policy, vaulted credentials, and host
+            eBPF that proves zero CONNECT on a PDF brief — without copying consumer browser chrome.
+          </p>
+        </div>
         <div className="pt-4 flex flex-wrap gap-3">
           <Link to="/sign-in" className="zf-btn zf-btn-primary">
             Sign in to console

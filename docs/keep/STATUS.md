@@ -15,7 +15,7 @@
 | Host eBPF (FluxVM only) | `deny_udp` + gateway pin; audit `egress_connects`; freeze on deny | FluxVM TC + agent-runtime confine |
 | PDF brief demo | One-click no-browser brief; expect 0 CONNECT | `examples/keep-agents/pdf-brief/` · `keep-demo-pdf.sh` |
 | CI | Keep workflow (stub e2e) | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
-| Tutorial | Hands-on + pack appendix | [Tutorial 16](../tutorials/16-keep-workstation.md) |
+| Tutorial | Hands-on + pack appendix + PDF demo | [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17](../tutorials/17-keep-pdf-brief.md) |
 
 ## Packaged agents
 
@@ -24,6 +24,7 @@
 | infra-ops | alerts, VMs, lifecycle; restart/remediation behind ask |
 | migration-op | `/api/migrations` + GuestKit inspect/rescue (no Transiva in-repo) |
 | deploy-op | `/readyz` + `/health` → readiness artifact |
+| pdf-brief | PDF → `brief.md`; no browser; 0 CONNECT |
 
 ## How to test
 
@@ -36,6 +37,7 @@ KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-live-lab.sh
 # Full pilot (happy + deny, archived logs):
 ./scripts/keep-pilot-gate.sh
 ./scripts/keep-pack-demo.sh infra-ops
+./scripts/keep-demo-pdf.sh
 ```
 
 ## Honesty

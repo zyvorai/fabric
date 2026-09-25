@@ -78,7 +78,7 @@ export default function Agents() {
         <EmptyState
           icon={<Bot className="w-8 h-8" />}
           title="No agents deployed"
-          description="Start from a Keep pack (infra-ops, migration-op, deploy-op) under examples/keep-agents/, or open Keep on a session at /app/keep/:sessionId. Requires [agent_runtime] in zyvor-fabricd.toml."
+          description="Start from a Keep pack (infra-ops, migration-op, deploy-op, pdf-brief) under examples/keep-agents/, or open Keep at /app/keep for the one-click PDF demo. Requires [agent_runtime] in zyvor-fabricd.toml."
           action={
             canDeploy ? (
               <button type="button" className="zf-btn zf-btn-primary" onClick={() => setShowDeploy(true)}>
