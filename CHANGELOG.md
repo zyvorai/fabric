@@ -15,6 +15,15 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **Four office use cases.** `receivables-ageing` and `reimbursement-claims` (from a mail export), `po-line-items` (a PO as
+  text) and `employee-ledger` (a CSV), for the paperwork around invoices, POs, staff and claims. Extractive; they list and
+  count, and are not books of account, tax validation or payroll.
+- **Eight Mac and Windows use cases.** Packs for files exported from those machines: `mac-system-report`,
+  `homebrew-audit`, `mac-log-triage`, `mac-update-history`, `windows-systeminfo`, `windows-hotfixes`,
+  `windows-installed-software` and `windows-event-log`, each with a README and a sample. Declarative, extractive, no runtime
+  change; run live in real cells with `0` outbound connections. The macOS samples follow real command output; the Windows
+  samples follow the commands' documented layouts and are not verified against a real Windows export. Serial numbers, host
+  names and IP addresses are not echoed. Keep does not connect to or drive the machine.
 - **Eight phone-user use cases.** Packs for what a person exports from a phone: `chat-export-digest`,
   `bank-sms-ledger`, `card-statement`, `calendar-week`, `contacts-audit`, `travel-itinerary`, `subscription-finder`
   and `receipt-pdf`, each with a README and (except the PDF one) a sample. Declarative, so no runtime change; they are

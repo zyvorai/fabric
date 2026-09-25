@@ -84,9 +84,9 @@ run() { api -X POST -F "file=@$2" "$KEEP_API/v1/demos/$1"; }
 for p in status-page-watch mailbox-triage api-facts; do CREATED+=("$p"); done
 CREATED+=(expense-sheet nda-review invoice-model-brief meeting-notes-model)
 
-PHONE_PACKS=(chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder receipt-pdf)
-for p in "${PHONE_PACKS[@]}"; do CREATED+=("$p"); done
-for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is overdue" "api-facts:KB-01; MS-07" "chat-export-digest:4× Ana" "bank-sms-ledger:was declined" "card-statement:Dining (3)" "calendar-week:2× Team standup" "contacts-audit:2× Ana Example" "travel-itinerary:2× K7QP2M" "subscription-finder:1× EUR 39.00"; do
+EXTRA_PACKS=(chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder receipt-pdf mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims)
+for p in "${EXTRA_PACKS[@]}"; do CREATED+=("$p"); done
+for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is overdue" "api-facts:KB-01; MS-07" "chat-export-digest:4× Ana" "bank-sms-ledger:was declined" "card-statement:Dining (3)" "calendar-week:2× Team standup" "contacts-audit:2× Ana Example" "travel-itinerary:2× K7QP2M" "subscription-finder:1× EUR 39.00" "mac-system-report:1× Apple M4" "homebrew-audit:1× openjdk" "mac-log-triage:2× analyticsd" "mac-update-history:5× 26.0" "windows-systeminfo:1× KB5034441" "windows-hotfixes:Security Update (3)" "windows-installed-software:Example Software Inc. (2)" "windows-event-log:Error (2)" "receivables-ageing:4× INV-2026-0142" "po-line-items:1× PO-7781/2026" "employee-ledger:E001 (2)" "reimbursement-claims:2× Rs 4,200"; do
   p="${pair%%:*}"; want="${pair#*:}"
   if deploy "$p"; then
     r=$(api -X POST -F note=none "$KEEP_API/v1/demos/$p")

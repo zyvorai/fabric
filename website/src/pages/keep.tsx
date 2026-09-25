@@ -9,6 +9,7 @@ import KeepStory from '../components/KeepStory';
 import CockpitMock from '../components/compare/CockpitMock';
 import ProfileLadder from '../components/compare/ProfileLadder';
 import Quickstart from '../components/compare/Quickstart';
+import {DESKTOP_PACKS} from '../data/desktopPacks';
 import type {Quick} from '../components/compare/data';
 import {CtaBand, HeroShell, HonestyBand, Page, Section, useHashScroll} from '../components/marketing/Shell';
 import shell from '../components/marketing/Shell.module.css';
@@ -145,6 +146,39 @@ export default function KeepPage(): ReactNode {
             <Link className={styles.more} to="/keep/phones">
               Keep for phone makers ›
             </Link>
+          </Section>
+
+          <Section
+            id="desktop"
+            eyebrow="Mac, Windows and office files"
+            title="Files from a Mac or a PC, read in a sealed cell."
+            lede="Ready-made use cases for what people export from their machines and for the paperwork around invoices, purchase orders, staff and claims. Keep reads the file you give it; it does not connect to the computer or drive its desktop, and it is not your books of account."
+            tint
+            wide>
+            <ul className={styles.features}>
+              {DESKTOP_PACKS.map((p, i) => (
+                <li key={p.id}>
+                  <Reveal delay={(i % 4) * 80} className={shell.tile}>
+                    <b>
+                      {p.os} · {p.title}
+                    </b>
+                    <span>
+                      <strong>Drop in:</strong> {p.drop}
+                    </span>
+                    <span>{p.get}</span>
+                  </Reveal>
+                </li>
+              ))}
+            </ul>
+            <p className={styles.cardBody} style={{marginTop: '1rem'}}>
+              Extractive: no model reads the file, and the office packs list and count rather than add up. The Windows samples follow the commands’ documented layouts and are
+              not yet checked against a real Windows export. The output can name hosts, accounts and software, and the
+              evidence class is software-test.{' '}
+              <a href="https://github.com/zyvorai/fabric/blob/main/docs/keep/SCENARIOS.md#mac-and-windows-packs">
+                Details and commands
+              </a>
+              .
+            </p>
           </Section>
 
           <Section

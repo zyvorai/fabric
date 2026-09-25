@@ -388,6 +388,51 @@ b=$(pack_test subscription-finder subscriptions.md)
 echo "$b" | grep -qF "1× \$2.99" && echo "$b" | grep -qF "1× EUR 39.00" && echo "$b" | grep -qF "free trial" || fail "subscription-finder: trials or amounts missing: $b"
 ok "subscription-finder: renewals, trials and amounts read from an mbox, 0 CONNECT"
 
+# Mac and Windows packs: each sample runs, and identifying lines are not echoed
+b=$(pack_test mac-system-report mac-system-report.md)
+echo "$b" | grep -qF "1× Apple M4" && echo "$b" | grep -qF "1× macOS 26.7.1 (25G313)" || fail "mac-system-report: chip or macOS missing: $b"
+echo "$b" | grep -qF "XXXXXXXXXX" && fail "mac-system-report: the serial number leaked: $b"
+echo "$b" | grep -qF "Example Mac" && fail "mac-system-report: the computer name leaked: $b"
+ok "mac-system-report: model, chip and macOS read, serial and names not echoed, 0 CONNECT"
+b=$(pack_test homebrew-audit homebrew-audit.md)
+echo "$b" | grep -qF "1× openjdk" && echo "$b" | grep -qF "1× python@3.13" || fail "homebrew-audit: multi-version packages missing: $b"
+ok "homebrew-audit: packages with more than one version found, 0 CONNECT"
+b=$(pack_test mac-log-triage mac-log-triage.md)
+echo "$b" | grep -qF "2× analyticsd" && echo "$b" | grep -qF "deny(1)" || fail "mac-log-triage: repeated errors or sandbox denial missing: $b"
+ok "mac-log-triage: error processes, repeats and a sandbox denial found, 0 CONNECT"
+b=$(pack_test mac-update-history mac-update-history.md)
+echo "$b" | grep -qF "2× macOS Tahoe 26" && echo "$b" | grep -qF "5× 26.0" || fail "mac-update-history: updates or versions missing: $b"
+ok "mac-update-history: updates, versions and betas read, 0 CONNECT"
+b=$(pack_test windows-systeminfo windows-systeminfo.md)
+echo "$b" | grep -qF "1× Microsoft Windows 11 Pro" && echo "$b" | grep -qF "1× KB5034441" || fail "windows-systeminfo: OS or hotfixes missing: $b"
+echo "$b" | grep -qF "EXAMPLE-PC" && fail "windows-systeminfo: the host name leaked: $b"
+echo "$b" | grep -qF "192.0.2.10" && fail "windows-systeminfo: an IP address leaked: $b"
+ok "windows-systeminfo: OS, build and hotfixes read, host name and IP not echoed, 0 CONNECT"
+b=$(pack_test windows-hotfixes windows-hotfixes.md)
+echo "$b" | grep -qF "Security Update (3)" && echo "$b" | grep -qF "KB5037771" || fail "windows-hotfixes: updates missing: $b"
+ok "windows-hotfixes: KB numbers and kinds counted, 0 CONNECT"
+b=$(pack_test windows-installed-software windows-software.md)
+echo "$b" | grep -qF "Example Software Inc. (2)" || fail "windows-installed-software: publishers not counted: $b"
+ok "windows-installed-software: publishers counted, 0 CONNECT"
+b=$(pack_test windows-event-log windows-events.md)
+echo "$b" | grep -qF "Error (2)" && echo "$b" | grep -qF "Example Disk Driver (2)" || fail "windows-event-log: levels or providers missing: $b"
+ok "windows-event-log: levels, providers and error rows read, 0 CONNECT"
+
+# office packs: receivables, purchase order, employee ledger, reimbursements
+b=$(pack_test receivables-ageing receivables.md)
+echo "$b" | grep -qF "4× INV-2026-0142" && echo "$b" | grep -qF "1× INR 48,500.00" || fail "receivables-ageing: invoice numbers or amounts missing: $b"
+echo "$b" | grep -qF "Payment received" || fail "receivables-ageing: payment line missing: $b"
+ok "receivables-ageing: invoices counted, overdue and paid lines found, 0 CONNECT"
+b=$(pack_test po-line-items po-lines.md)
+echo "$b" | grep -qF "1× PO-7781/2026" && echo "$b" | grep -qF "1× 27ABCDE1234F1Z5" && echo "$b" | grep -qF "1× 8479" || fail "po-line-items: PO number, GSTIN or HSN missing: $b"
+ok "po-line-items: PO number, GSTINs, HSN codes and amount lines read, 0 CONNECT"
+b=$(pack_test employee-ledger employee-ledger.md)
+echo "$b" | grep -qF "E001 (2)" && echo "$b" | grep -qF "2026-09 (3)" || fail "employee-ledger: rows per employee or month missing: $b"
+ok "employee-ledger: rows counted per employee and month, 0 CONNECT"
+b=$(pack_test reimbursement-claims reimbursements.md)
+echo "$b" | grep -qF "2× Rs 4,200" && echo "$b" | grep -qF "Approved: Rs 4,200" || fail "reimbursement-claims: amounts or approval missing: $b"
+ok "reimbursement-claims: claimants, amounts and approvals read, 0 CONNECT"
+
 for p in expense-sheet nda-review receipt-pdf invoice-model-brief meeting-notes-model; do
   (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "examples/keep-agents/$p") > "$WORK/pack-$p.out" 2>&1 || fail "$p: pack deploy failed: $(cat "$WORK/pack-$p.out")"
 done
@@ -421,7 +466,7 @@ code=$(curl -s -o "$WORK/mb.out" -w '%{http_code}' -X POST -F "file=@$WORK/inv.p
 code=$(curl -s -o "$WORK/mn.out" -w '%{http_code}' -X POST -F note=none "$BASE/v1/demos/meeting-notes-model")
 [[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mn.out" || fail "meeting-notes-model must be refused by the vault out of the box (403): $code $(cat "$WORK/mn.out")"
 ok "both model packs are refused (403) until an operator allows their endpoint"
-for p in status-page-watch mailbox-triage api-facts chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder expense-sheet nda-review receipt-pdf invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
+for p in status-page-watch mailbox-triage api-facts chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims expense-sheet nda-review receipt-pdf invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
 
 echo "demos-ci: an agent uses the model socket"
 MA="$WORK/model-agent"; cp -R "$ROOT/examples/keep-agents/model-agent" "$MA"

@@ -25,6 +25,14 @@ Phased, in this order. All four phases are done.
 3. **More file types** (done, except OCR): docx, xlsx, html, eml/mbox, zip fan-out, and regex / JSON-path / table rules. OCR needs tesseract baked into the cell template and is not built.
 4. **Model-assisted use cases** (done): a pack declares one model endpoint; the host makes the call, so the cell stays at 0 connections. See [MODEL.md](MODEL.md).
 
+## Not planned here
+
+- **A Mac or Windows desktop as the cell.** Keep cells are Linux microVMs on FluxVM. macOS guests are only permitted on
+  Apple hardware and a Windows cell would need its own template, licensing and a desktop-control layer, so an agent that
+  operates a Mac or Windows session is a separate project, not a use case. The [Mac and Windows packs](SCENARIOS.md#mac-and-windows-packs)
+  read files exported from those machines instead.
+- **Keep running on a Mac or Windows host.** FluxVM needs Linux/KVM.
+
 ## Gated on hardware
 
 **Keep 0.2.** The soft scaffolding is complete (attestation receipt, no host recover on
