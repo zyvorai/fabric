@@ -15,6 +15,14 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **Solvor**, the Mac app, (`integrations/macos-keep`): a native SwiftUI client. `KeepKit` (API client, Keychain token store, Secure Enclave approval
+  signing checked against the runtime's test vectors, secret scan, folder rules, pack catalogue; 33 unit tests, 4 live tests passed against a real
+  host) and the app (use cases, runs and compare, approvals, watch folders, menu bar, Services entry, Shortcuts intent, `keep://`). Ad-hoc signed,
+  local build only. Verified: connect and list, the client against real cells, and a watched folder running a file end to end; the Shortcuts/Siri
+  intent, Services entry, menu bar and URL scheme are built but not exercised. Redesigned with the Zyvor mark, a generated app icon, Liquid Glass on
+  macOS 26 and system-accent buttons. **Read an email from the browser** (on click, with a redaction preview; the `.eml` pipeline and routed packs ran in
+  real cells; the Apple Events reader is not verified against a real webmail page) and **Talk to Solvor** plus Siri App Shortcuts (voice can never approve,
+  deny, send or delete; microphone, Speech, Translation and Siri not run here). 54 unit tests. `docs/keep/MACOS-APP.md`.
 - **Eighteen developer-tool, browser and desktop-app use cases**, plus **recipes** for calling Keep from Siri Shortcuts, macOS,
   Windows and other agents. Packs: `github-prs`, `github-issues`, `github-actions-log`, `dependabot-alerts`, `git-log-digest`,
   `xcodebuild-log`, `xcode-crash-log`, `vscode-extensions`, `vscode-settings-audit`, `bookmarks-digest`, `browser-history-takeout`,
