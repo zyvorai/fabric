@@ -48,6 +48,52 @@ exports whose layout changes between versions (location history, health, screen 
 These packs read personal data. The cell is sealed and reports `0` outbound connections, but the evidence class is
 `software-test`: the host's operator could still read a cell's memory ([VENDORS.md](VENDORS.md)).
 
+### Mac and Windows packs
+
+For files a person exports from a Mac or a Windows PC, run by the person or by an IT team. Keep does **not** connect to
+the machine or drive its desktop: the cell is a sealed Linux microVM, and the pack reads a file you export. All are
+extractive (no model), and the cell reports `0` outbound connections.
+
+| Pack | You run, then drop in | You get | Sample |
+|---|---|---|---|
+| [`mac-system-report`](../../examples/keep-agents/mac-system-report/README.md) | `system_profiler SPHardwareDataType SPSoftwareDataType > report.txt` | model, chip, cores, memory, macOS and kernel version, firmware, System Integrity Protection, uptime. Serial number, UUID and names are not listed | real layout |
+| [`homebrew-audit`](../../examples/keep-agents/homebrew-audit/README.md) | `brew list --versions` or `brew outdated --verbose` | package count, packages keeping old versions, outdated packages, toolchains present | documented layout |
+| [`mac-log-triage`](../../examples/keep-agents/mac-log-triage/README.md) | `/usr/bin/log show --last 5m --style compact \| head -c 190000` | processes with errors or faults, most repeated errors, sandbox denials, kernel and thermal trouble | real layout |
+| [`mac-update-history`](../../examples/keep-agents/mac-update-history/README.md) | `softwareupdate --history` | what was installed, versions, dates, betas, Command Line Tools | real output |
+| [`windows-systeminfo`](../../examples/keep-agents/windows-systeminfo/README.md) | `systeminfo > si.txt` | OS and build, install date, last boot, model, BIOS, memory, domain, hotfix KBs. Host name and IP addresses are not listed | documented layout |
+| [`windows-hotfixes`](../../examples/keep-agents/windows-hotfixes/README.md) | `Get-HotFix \| Export-Csv -NoTypeInformation` | KB numbers, kinds of update, who installed them, dates | documented layout |
+| [`windows-installed-software`](../../examples/keep-agents/windows-installed-software/README.md) | an installed-programs CSV (registry `Uninstall` keys) | top publishers and programs, first rows | documented layout |
+| [`windows-event-log`](../../examples/keep-agents/windows-event-log/README.md) | `Get-WinEvent ... \| Export-Csv -NoTypeInformation` | counts by level, provider and event id; the error and warning rows | documented layout |
+
+**About the samples.** The macOS samples follow output captured from a real Mac (with placeholder names and identifiers);
+`brew` was not run because of a local toolchain licence prompt, so its sample follows Homebrew's documented layout. **The
+Windows samples were written from the commands' documented layouts and have not been checked against an export from a
+real Windows machine.** Try a pack on your own export before relying on it, and adjust the patterns in `pack.json` if your
+Windows language or version words a label differently.
+
+Not covered: a live desktop (an agent clicking through a Mac or Windows session), `.evtx` and `.reg` files (binary or
+UTF-16), and Keep running on a Mac or Windows host: FluxVM needs Linux/KVM, and macOS guests are only permitted on Apple
+hardware. The output describes a real machine and can name hosts, accounts and software, and the evidence class is
+`software-test`, so treat it as sensitive ([VENDORS.md](VENDORS.md)).
+
+### Office packs
+
+For the paperwork around invoices, purchase orders, staff and claims. They read a file you export or save, on a Mac or a
+PC alike, and they summarise it: they are **not** your books of account. They do not validate a GSTIN, work out tax, post to
+an accounting or payroll system, add or compare figures, or send mail. The official invoice, ledger or return stays in your
+own systems. Amounts recognise `₹`, `Rs`, `INR`, `USD`, `EUR`, `GBP`, `$`, `€` and `£`, including `1,25,000` grouping.
+
+| Pack | You drop in | You get | Sample |
+|---|---|---|---|
+| [`receivables-ageing`](../../examples/keep-agents/receivables-ageing/README.md) | a mail export (`.mbox`, `.eml`) | invoice numbers (most mentioned first), overdue and unpaid lines, payments received, due dates, amounts, who is writing | yes |
+| [`po-line-items`](../../examples/keep-agents/po-line-items/README.md) | a purchase order as text (`.txt`) | PO number, GSTINs by format, HSN or SAC codes, lines with amounts, open points | yes |
+| [`employee-ledger`](../../examples/keep-agents/employee-ledger/README.md) | a monthly ledger CSV | rows per employee and month, the first rows | yes |
+| [`reimbursement-claims`](../../examples/keep-agents/reimbursement-claims/README.md) | a mail export (`.mbox`, `.eml`) | who is claiming, amounts, approved or paid, pending or declined, categories | yes |
+
+Samples use made-up ids and figures. These files carry business and personal data (amounts, tax ids, salaries), so keep
+Aadhaar, full bank numbers and PAN out of them, and note the evidence class is `software-test`: the host's operator could
+still read a cell's memory ([VENDORS.md](VENDORS.md)).
+
 The two model packs send the extracted text to an endpoint **you** allow, after **you** approve it once. Out of the
 box they are refused, because the vault has no such credential. See [MODEL.md](MODEL.md).
 
