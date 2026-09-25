@@ -67,7 +67,10 @@ export default function Home() {
 
       <section className="mkt-band">
         <h2>From bare metal to fleet.</h2>
-        <p>Web console, CLI, Kubernetes operator, and Terraform — one API underneath.</p>
+        <p>
+          Web console, CLI, Kubernetes operator, and Terraform — one API underneath. Keep gives an
+          untrusted agent a real computer; you keep the keys and the CONNECT proof.
+        </p>
         <div className="flex flex-wrap gap-3 mt-6">
           <Link to="/platform" className="zf-btn mkt-band-cta">
             See the platform
