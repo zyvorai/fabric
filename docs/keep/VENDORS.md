@@ -69,28 +69,33 @@ each is active, which only your own traffic can tell you.
 `scripts/keep-bench.sh` measures cold cell runs end to end and how they hold up as more run at once. Run it on your
 own hardware; the figure below is one lab host and is **not a promise**.
 
-Measured on one lab host (Ubuntu 26.04, 12 vCPU, 31 GiB RAM with about 12.5 GiB already in use by other services),
-`node22-agent` template (2 GiB per cell), `csv-clean` on a tiny file, six runs per level, 2026-09-25:
+Measured on one lab host (Ubuntu 26.04, 12 vCPU, 31 GiB RAM, about 7.7 GiB in use by other services),
+`node22-agent` template (2 GiB per cell), `csv-clean` on a tiny file, eight runs per level, 2026-09-25, after the
+runtime was fixed to release a finished run's cell:
 
-| Concurrent runs | ok | failed | p50 | worst of 6 | runs per minute |
-|---|---|---|---|---|---|
-| 1 | 6 | 0 | 16.8 s | 28.2 s | 3.2 |
-| 2 | 6 | 0 | 18.0 s | 18.6 s | 6.6 |
+| Concurrent runs | ok | failed | p50 | worst of 8 | runs per minute | lowest free memory | drop from 23.0 GiB |
+|---|---|---|---|---|---|---|---|
+| 1 | 8 | 0 | 12.7 s | 14.5 s | 4.7 | 22.0 GiB | 1.0 GiB |
+| 2 | 8 | 0 | 15.9 s | 16.9 s | 7.8 | 20.3 GiB | 2.8 GiB |
+| 4 | 8 | 0 | 21.1 s | 24.0 s | 11.0 | 18.5 GiB | 4.5 GiB |
 
 What that says, and does not say:
 
-- A **cold** run (boot a fresh cell, extract, produce the artifact) took roughly **17 to 18 seconds** here, and two at
-  once did not slow each other much (throughput about doubled). It is not an interactive latency; it is fine for jobs,
-  not for a chat that must answer at once (that is what a warm pool is for, and it is **not measured**).
-- **Memory per cell is not established.** The script also recorded the host's free memory, but those runs were made
-  *before* a bug was fixed: a use-case run left its cell alive for the sandbox's 30-minute lifetime, so cells piled up
-  during the measurement and the free-memory readings cannot be turned into a per-cell figure. Running about 25 such
-  runs in 35 minutes on that host later made it stop answering SSH. The fix (a finished run now ends its session, and the
-  cleanup loop deletes the cell at once) is in the runtime; **re-run `keep-bench.sh` on your own hardware to size memory**.
-- Concurrency 4 was **skipped** by the script's own safety limit. Six runs per level is a small sample: the "worst of 6"
-  is not a real p95.
-- One host, one workload, a tiny file. Real documents take longer to extract. Treat this as a method and a first data
-  point.
+- A **cold** run (boot a fresh cell, extract, produce the artifact) took **13 to 21 seconds** here, slower as more run
+  at once, and throughput rose from 4.7 to 11 runs a minute at four at a time. It is not an interactive latency: it is
+  fine for jobs, not for a chat that must answer at once (that is what a warm pool is for, and it is **not measured**).
+- The host's free memory fell by about **1.0 to 1.4 GiB per concurrent cell** at its peak, for a 2 GiB template. The
+  template's memory is the guest's allowance; how much the host really pays depends on how much the guest touches, plus
+  the VMM and page cache, so measure it on your hardware with your templates and files.
+- A finished run's cell is released by a cleanup loop, and it can lag: after four cells finished together, one was
+  still unreleased a minute later and all were gone a little after. Plan for that headroom.
+- A **first attempt** at this benchmark, run within minutes of the host booting, had 8 of 16 runs fail at concurrency 2
+  and 4 (all eight succeeded on a second attempt, and in a by-hand repeat of the same pattern). Seven `failed` VM entries
+  were left in FluxVM, which points at sandbox creation failing, but I did not capture the error and have no cause. A
+  failed sandbox creation leaves a failed VM entry that the runtime has no handle to delete, so clear them from
+  FluxVM. Do not benchmark a host in its first minutes.
+- One host, one workload, a tiny file, eight runs per level. Real documents take longer to extract. Treat this as a
+  method and a data point.
 
 Things that limit density today, none of them hidden:
 

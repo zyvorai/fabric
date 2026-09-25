@@ -27,6 +27,12 @@ ROOT = os.environ.get("SANDBOX_STUB_ROOT") or tempfile.mkdtemp(prefix="zyvor-san
 os.makedirs(ROOT, exist_ok=True)
 LOCK = threading.Lock()
 SANDBOXES: dict[str, dict] = {}
+
+
+def record(kind: str, row: dict) -> None:
+    """Append one JSON line to <ROOT>/<kind>.jsonl, so an e2e can check what the runtime asked FluxVM to do."""
+    with open(os.path.join(ROOT, f"{kind}.jsonl"), "a") as handle:
+        handle.write(json.dumps(row) + "\n")
 ENV_QUOTED = re.compile(r"\b([A-Z][A-Z0-9_]*)='([^']*)'")
 ENV_PLAIN = re.compile(r"\b([A-Z][A-Z0-9_]*)=([^\s']+)")
 
@@ -106,7 +112,9 @@ class Handler(BaseHTTPRequestHandler):
                 SANDBOXES[sandbox_id] = {
                     "port": body.get("http_proxy_port"),
                     "proc": None,
+                    "name": body.get("name", ""),
                 }
+            record("created", {"vm": sandbox_id, "name": body.get("name", "")})
             self._send(
                 200,
                 {"id": sandbox_id, "guest_ip": "127.0.0.1", "status": "running"},
@@ -138,6 +146,7 @@ class Handler(BaseHTTPRequestHandler):
 
         vm = re.fullmatch(r"/v1/vms/([^/]+)", path)
         if vm and method == "DELETE":
+            record("deleted", {"vm": vm.group(1)})
             self._delete(vm.group(1))
             self._send(200, {"ok": True})
             return
@@ -164,7 +173,14 @@ class Handler(BaseHTTPRequestHandler):
         if method in {"POST", "PUT"} and policy:
             body = self._read_json()
             with LOCK:
+                name = SANDBOXES.get(policy.group(1), {}).get("name", "")
+            # Test hook: a sandbox whose name contains "noconfine" cannot be given a policy.
+            if "noconfine" in name:
+                self._send(500, {"error": "policy refused (test hook)"})
+                return
+            with LOCK:
                 SANDBOXES.setdefault(policy.group(1), {})["policy"] = body
+            record("policies", {"vm": policy.group(1), "name": name, "policy": body})
             self._send(200, {"ok": True})
             return
         freeze = re.fullmatch(r"/v1/vms/([^/]+)/(freeze|thaw)", path)

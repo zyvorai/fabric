@@ -53,8 +53,8 @@ HAVE_MEM=0; [[ -r /proc/meminfo ]] && HAVE_MEM=1
 echo "==> keep bench: $USE_CASE x $RUNS runs per level, levels: $LEVELS"
 echo "    shard: $KEEP_API   cell memory: ${CELL_MIB} MiB (template)   host stats: $([[ $HAVE_MEM == 1 ]] && echo yes || echo 'no (run on the host for memory figures)')"
 
-one_run() { # writes "<seconds> <http>" to $1
-  curl -s -o /dev/null -w '%{time_total} %{http_code}\n' "${AUTH[@]}" -X POST -F "file=@$WORK/in.csv" "$KEEP_API/v1/demos/$USE_CASE" > "$1"
+one_run() { # writes "<seconds> <http>" to $1, and the response body to $1.body
+  curl -s -o "$1.body" -w '%{time_total} %{http_code}\n' "${AUTH[@]}" -X POST -F "file=@$WORK/in.csv" "$KEEP_API/v1/demos/$USE_CASE" > "$1"
 }
 
 RESULTS="$WORK/results.jsonl"
@@ -83,11 +83,18 @@ for c in $LEVELS; do
   python3 - "$WORK" "$c" "$start" "$end" "${low:-0}" "$CELL_MIB" "$HAVE_MEM" >> "$RESULTS" <<'PY'
 import glob, json, sys
 work, c, start, end, low, cell, have_mem = sys.argv[1], int(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]), int(sys.argv[5] or 0), int(sys.argv[6]), sys.argv[7] == "1"
-times, bad = [], 0
+times, bad, codes, sample = [], 0, {}, None
 for f in glob.glob(work + "/r.*"):
+    if f.endswith(".body"): continue
     parts = open(f).read().split()
     if len(parts) == 2 and parts[1] == "201": times.append(float(parts[0]))
-    else: bad += 1
+    else:
+        bad += 1
+        code = parts[1] if len(parts) == 2 else "no-reply"
+        codes[code] = codes.get(code, 0) + 1
+        if sample is None:
+            try: sample = open(f + ".body").read()[:200].replace("\n", " ")
+            except OSError: sample = ""
 times.sort()
 def pct(p):
     if not times: return None
@@ -95,6 +102,7 @@ def pct(p):
 wall = end - start
 out = {"concurrency": c, "ok": len(times), "failed": bad, "p50_s": pct(50), "p95_s": pct(95), "max_s": times[-1] if times else None,
        "wall_s": round(wall, 1), "runs_per_minute": round(len(times) / wall * 60, 1) if wall else None}
+if bad: out["failure_codes"] = codes; out["sample_error"] = sample
 if have_mem: out["lowest_available_mib"] = low
 print(json.dumps(out))
 PY
@@ -112,6 +120,9 @@ print("| concurrency | ok | failed | p50 s | p95 s | max s | runs/min | lowest f
 print("|---|---|---|---|---|---|---|---|")
 for r in rows:
     print("| %d | %d | %d | %s | %s | %s | %s | %s |" % (r["concurrency"], r["ok"], r["failed"], f(r["p50_s"]), f(r["p95_s"]), f(r["max_s"]), f(r["runs_per_minute"]), r.get("lowest_available_mib", "-")))
+for r in rows:
+    if r.get("failure_codes"):
+        print("  concurrency %d failures: %s. First error: %s" % (r["concurrency"], r["failure_codes"], r.get("sample_error") or "(no body)"))
 print()
 print("Each run is a cold cell boot + extract. The template gives a cell %d MiB; the host pays something different (the VMM and page cache):" % cell)
 print("compare 'lowest free MiB' between levels to see what one more concurrent cell really costs on this host.")

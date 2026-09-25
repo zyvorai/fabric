@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Fixed
+- **Use-case cells were not confined on the host.** The runtime looked for the guest's default gateway right after
+  creating the cell, before the guest had booted, and skipped the network policy without saying so when it found none,
+  so the cell ran with FluxVM's default-allow policy (seen on a lab host: `default_allow: true` for a running cell).
+  A use-case cell needs no IP networking, so it now gets a deny-all policy applied by the host, needing no gateway,
+  and the run fails closed and deletes the cell if the policy cannot be applied. The "0 CONNECT" a run reports counts
+  connections through the egress broker; it is not, by itself, evidence that the cell had no network.
 - **A use-case run left its cell alive for 30 minutes.** The run's session stayed "Running" and its cell held
   memory until the sandbox's own lifetime ended, so a busy host filled with idle cells (a lab host stopped answering
   after about 25 runs in 35 minutes). A finished run now ends its session and the terminal-session cleanup loop
