@@ -77,6 +77,18 @@ const config: Config = {
           routeBasePath: 'docs',
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/zyvorai/fabric/tree/main/docs/',
+          // docs/keep/README.md is the GitHub landing page for Keep. The site
+          // already has /keep and docs/keep/KEEP.md (the folder index), so
+          // keep the README out of the docs build to avoid a duplicate route.
+          exclude: [
+            '**/_*.{js,jsx,ts,tsx,md,mdx}',
+            '**/_*/**',
+            '**/*.test.{js,jsx,ts,tsx}',
+            '**/__tests__/**',
+            'keep/README.md',
+            // GitHub-only long-form overview (the repo README's old body); it links to files outside docs/.
+            'PROJECT-OVERVIEW.md',
+          ],
         },
         blog: false,
         theme: {

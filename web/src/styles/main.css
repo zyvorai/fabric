@@ -1486,3 +1486,124 @@ html[data-theme='dark'] {
     background-color: var(--zf-surface) !important;
   }
 }
+
+/* Keep marketing: install strip, demo frame, value cards, feature grid */
+.keep-mkt-install {
+  margin: 24px 0 0;
+  max-width: 44rem;
+  scroll-margin-top: 80px;
+}
+.keep-mkt-install-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--zf-hairline);
+}
+.keep-mkt-install-tabs button {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--zf-muted);
+  cursor: pointer;
+}
+.keep-mkt-install-tabs button.is-on {
+  color: var(--zf-ink);
+  border-bottom-color: var(--keep-accent, #6ee7b7);
+}
+.keep-mkt-install-code {
+  position: relative;
+  margin-top: 12px;
+  border: 1px solid var(--zf-hairline);
+  border-radius: var(--zf-radius-sm);
+  background: rgba(26, 35, 48, 0.06);
+}
+.keep-mkt-install-code pre {
+  margin: 0;
+  padding: 14px 76px 14px 16px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--zf-ink);
+}
+.keep-mkt-install-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 1px solid var(--zf-hairline);
+  border-radius: 6px;
+  background: var(--zf-canvas);
+  color: var(--zf-ink);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.keep-mkt-section p.keep-mkt-install-note {
+  font-size: 0.9rem;
+  margin: 8px 0 0;
+}
+
+.keep-mkt-demo {
+  margin: 28px 0 8px;
+  max-width: 47.5rem;
+}
+.keep-mkt-demo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.55);
+}
+.keep-mkt-demo figcaption {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--zf-muted);
+}
+
+.keep-mkt-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.keep-mkt-value {
+  padding: 20px;
+  border: 1px solid var(--zf-hairline);
+  border-radius: var(--zf-radius);
+  background: var(--zf-surface);
+}
+.keep-mkt-value h3 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  color: var(--zf-ink);
+}
+.keep-mkt-section .keep-mkt-value p {
+  font-size: 0.98rem;
+  margin: 0;
+}
+.keep-mkt-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 4px 24px;
+}
+.keep-mkt-features li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-top: 1px solid var(--zf-hairline);
+  color: var(--zf-ink);
+}
+.keep-mkt-features span {
+  color: var(--zf-muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}

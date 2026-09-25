@@ -31,6 +31,8 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Keep marketing copy is shared from ../docs/keep/marketing.json.
+    fs: { allow: ['..'] },
     proxy: {
       '/api': {
         target: 'http://localhost:9095',
