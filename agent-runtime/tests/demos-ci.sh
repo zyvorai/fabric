@@ -362,10 +362,36 @@ b=$(pack_test api-facts facts.md)
 echo "$b" | grep -qF "order.id\`: A-1042" && echo "$b" | grep -qF "KB-01; MS-07" || fail "api-facts: json paths not read: $b"
 ok "api-facts: json_path read keys, indexes and wildcards, 0 CONNECT"
 
-for p in expense-sheet nda-review invoice-model-brief meeting-notes-model; do
+# phone-user packs: each sample runs, and the summary carries what the pack promises
+b=$(pack_test chat-export-digest chat-digest.md)
+echo "$b" | grep -qF "4× Ana" && echo "$b" | grep -qF "4× Ben" || fail "chat-export-digest: speakers not counted: $b"
+echo "$b" | grep -qF "https://example.com/luma/booking/8841" && echo "$b" | grep -qF "1× \$12" || fail "chat-export-digest: links or money missing: $b"
+ok "chat-export-digest: speakers, plans, money and links, 0 CONNECT"
+b=$(pack_test bank-sms-ledger sms-ledger.md)
+echo "$b" | grep -qF "1× Rs 1,250.00" && echo "$b" | grep -qF "2× STREAMCO" || fail "bank-sms-ledger: amounts or merchants missing: $b"
+echo "$b" | grep -qF "was declined" || fail "bank-sms-ledger: declined line missing: $b"
+echo "$b" | grep -qF "482913" && fail "bank-sms-ledger: an OTP leaked into the summary: $b"
+ok "bank-sms-ledger: amounts and merchants read, the OTP is not echoed, 0 CONNECT"
+b=$(pack_test card-statement statement.md)
+echo "$b" | grep -qF "Dining (3)" && echo "$b" | grep -qF "Luma Cafe (3)" || fail "card-statement: categories or merchants not counted: $b"
+ok "card-statement: csv categories and merchants counted, 0 CONNECT"
+b=$(pack_test calendar-week calendar-week.md)
+echo "$b" | grep -qF "2× Team standup" && echo "$b" | grep -qF "2× ben@example.com" && echo "$b" | grep -qF "20250318T143000Z" || fail "calendar-week: events, attendees or times missing: $b"
+ok "calendar-week: ics events, times and attendees read, 0 CONNECT"
+b=$(pack_test contacts-audit contacts-audit.md)
+echo "$b" | grep -qF "2× Ana Example" && echo "$b" | grep -qF "4× BEGIN:VCARD" || fail "contacts-audit: duplicate name or card count missing: $b"
+ok "contacts-audit: vcf names counted, the duplicate listed, 0 CONNECT"
+b=$(pack_test travel-itinerary itinerary.md)
+echo "$b" | grep -qF "2× K7QP2M" && echo "$b" | grep -qF "1× HS-88231" && echo "$b" | grep -qF "EUR 212.40" || fail "travel-itinerary: references or amount missing: $b"
+ok "travel-itinerary: booking references and amount read from an eml, 0 CONNECT"
+b=$(pack_test subscription-finder subscriptions.md)
+echo "$b" | grep -qF "1× \$2.99" && echo "$b" | grep -qF "1× EUR 39.00" && echo "$b" | grep -qF "free trial" || fail "subscription-finder: trials or amounts missing: $b"
+ok "subscription-finder: renewals, trials and amounts read from an mbox, 0 CONNECT"
+
+for p in expense-sheet nda-review receipt-pdf invoice-model-brief meeting-notes-model; do
   (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "examples/keep-agents/$p") > "$WORK/pack-$p.out" 2>&1 || fail "$p: pack deploy failed: $(cat "$WORK/pack-$p.out")"
 done
-ok "expense-sheet, nda-review and both model packs deploy (specs validate on the server)"
+ok "expense-sheet, nda-review, receipt-pdf and both model packs deploy (specs validate on the server)"
 python3 - "$WORK" <<'PY'
 import sys, zipfile
 w = sys.argv[1]
@@ -395,7 +421,7 @@ code=$(curl -s -o "$WORK/mb.out" -w '%{http_code}' -X POST -F "file=@$WORK/inv.p
 code=$(curl -s -o "$WORK/mn.out" -w '%{http_code}' -X POST -F note=none "$BASE/v1/demos/meeting-notes-model")
 [[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mn.out" || fail "meeting-notes-model must be refused by the vault out of the box (403): $code $(cat "$WORK/mn.out")"
 ok "both model packs are refused (403) until an operator allows their endpoint"
-for p in status-page-watch mailbox-triage api-facts expense-sheet nda-review invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
+for p in status-page-watch mailbox-triage api-facts chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder expense-sheet nda-review receipt-pdf invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
 
 echo "demos-ci: an agent uses the model socket"
 MA="$WORK/model-agent"; cp -R "$ROOT/examples/keep-agents/model-agent" "$MA"

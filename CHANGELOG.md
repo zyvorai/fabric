@@ -15,6 +15,12 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **Eight phone-user use cases.** Packs for what a person exports from a phone: `chat-export-digest`,
+  `bank-sms-ledger`, `card-statement`, `calendar-week`, `contacts-audit`, `travel-itinerary`, `subscription-finder`
+  and `receipt-pdf`, each with a README and (except the PDF one) a sample. Declarative, so no runtime change; they are
+  extractive, and one-time codes are not echoed. Run live in real cells with `0` outbound connections. They are listed
+  in `docs/keep/SCENARIOS.md` and on the phone-makers page of the GitHub Pages site. Photos and screenshots are not
+  covered (no OCR).
 - **Keep for phone makers, pictured.** A `/keep/phones` page on the GitHub Pages site (architecture, a user's day
   with a phone mock-up, the phone-signed approval handshake, per-user isolation, the measured benchmark, and a
   built / reference / not-built status list) and five diagrams in `docs/assets/keep/` that the docs embed too.

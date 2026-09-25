@@ -8,7 +8,7 @@ import Reveal from '../../components/Reveal';
 import Figure from '../../components/PhoneVendor/Figure';
 import DayStepper from '../../components/PhoneVendor/DayStepper';
 import {CtaBand, HeroShell, HonestyBand, Page, Section, useHashScroll} from '../../components/marketing/Shell';
-import {CAN_SAY, CANNOT_SAY, MODELS, OWNS, STATUS} from '../../data/phoneVendor';
+import {CAN_SAY, CANNOT_SAY, MODELS, OWNS, STATUS, USE_CASES} from '../../data/phoneVendor';
 import styles from '../../components/PhoneVendor/styles.module.css';
 
 const BADGE = {built: 'Built and tested', reference: 'Reference code', gap: 'Not built'} as const;
@@ -151,11 +151,59 @@ export default function PhoneVendorPage(): ReactNode {
           </Section>
 
           <Section
+            id="usecases"
+            eyebrow="What users can do"
+            title="The files on a phone, turned into answers."
+            lede="Ready-made use cases for what people export: chats, bank alerts, statements, calendars, contacts, booking and billing mail, receipts."
+            tint
+            wide>
+            <p className={styles.ucFlow}>
+              <b>Share a file in the app</b>
+              <i aria-hidden>→</i>
+              <span>gateway posts it to <code>POST /v1/demos/&#123;use_case&#125;</code> with the user’s token</span>
+              <i aria-hidden>→</i>
+              <b>A sealed cell reads it</b>
+              <i aria-hidden>→</i>
+              <span>the summary comes back, with 0 outbound connections reported</span>
+            </p>
+            <ul className={styles.ucGrid}>
+              {USE_CASES.map((u, i) => (
+                <li key={u.id}>
+                  <Reveal delay={(i % 4) * 60} className={styles.fillReveal}>
+                    <div className={clsx(styles.uc, u.built && styles.ucBuiltIn)}>
+                      <span className={styles.ucLabel}>{u.built ? 'Built in' : 'Pack'}</span>
+                      <b>{u.title}</b>
+                      <span className={styles.ucFiles}>
+                        {u.files.map((f) => (
+                          <span className={styles.ucFile} key={f}>
+                            {f}
+                          </span>
+                        ))}
+                      </span>
+                      <span>
+                        <strong>You drop in:</strong> {u.drop}
+                      </span>
+                      <span>
+                        <strong>You get:</strong> {u.get}
+                      </span>
+                    </div>
+                  </Reveal>
+                </li>
+              ))}
+            </ul>
+            <p style={{marginTop: '1rem'}}>
+              These are extractive: no model reads the file, and none reads photos or screenshots (Keep does no OCR). They
+              handle sensitive files, and the evidence class is software-test, so the host’s operator could still read a
+              cell’s memory. Details and how to copy one for your language:{' '}
+              <Link to="/docs/keep/SCENARIOS#phone-user-packs">Phone-user packs</Link>.
+            </p>
+          </Section>
+
+          <Section
             id="models"
             eyebrow="Your model"
             title="Pick the model. The agent never holds the key."
             lede="Use any OpenAI-compatible endpoint. The host adds the credential after the vault says yes, so the cell never sees a real secret."
-            tint
             wide>
             <Reveal>
               <div className={styles.models}>
@@ -190,6 +238,7 @@ export default function PhoneVendorPage(): ReactNode {
             eyebrow="Numbers"
             title="Measured once, on one host. Measure yours."
             lede="Cold runs took 13 to 21 seconds and got slower as more ran at once. That suits jobs, not a chat that must answer at once."
+            tint
             wide>
             <Reveal>
               <Figure
@@ -210,8 +259,7 @@ export default function PhoneVendorPage(): ReactNode {
             id="status"
             eyebrow="What exists"
             title="Built, reference, and not built."
-            lede="Nothing here is drawn as working if it is not."
-            tint>
+            lede="Nothing here is drawn as working if it is not.">
             <ul className={styles.status}>
               {STATUS.map((s, i) => (
                 <li key={s.area}>
@@ -241,6 +289,7 @@ export default function PhoneVendorPage(): ReactNode {
             id="claims"
             eyebrow="What you can promise users"
             title="Say what is tested. Do not say what is not."
+            tint
             wide>
             <div className={styles.claims}>
               <Reveal>
@@ -266,7 +315,7 @@ export default function PhoneVendorPage(): ReactNode {
             </div>
           </Section>
 
-          <Section id="start" eyebrow="Start here" title="Read in this order." tint wide>
+          <Section id="start" eyebrow="Start here" title="Read in this order." wide>
             <ul className={styles.links}>
               <li>
                 <Link to="/docs/keep/VENDORS">

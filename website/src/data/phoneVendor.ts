@@ -98,3 +98,19 @@ export const CANNOT_SAY = [
   'Compliant with any national or industry rule. Keep makes no compliance claim, in China or anywhere else.',
   'Your data never leaves the country, unless the shard, the model endpoint and the push path all stay there.',
 ];
+
+export type UseCase = {id: string; title: string; files: string[]; drop: string; get: string; built?: boolean};
+
+/** Ready-made use cases a phone user can run. Mirrors docs/keep/SCENARIOS.md ("Phone-user packs"). */
+export const USE_CASES: UseCase[] = [
+  {id: 'chat-export-digest', title: 'Chat digest', files: ['.txt'], drop: 'An exported chat', get: 'Who talks most, plans and times, open questions, money, links'},
+  {id: 'bank-sms-ledger', title: 'Bank alerts ledger', files: ['.txt'], drop: 'Saved bank and card SMS alerts', get: 'Money out and in, amounts, merchants, declined lines. One-time codes are not listed'},
+  {id: 'card-statement', title: 'Card statement', files: ['.csv'], drop: 'A statement export', get: 'Most common categories and merchants, the first rows'},
+  {id: 'calendar-week', title: 'Calendar week', files: ['.ics'], drop: 'A calendar export', get: 'Events, start times, places, attendees'},
+  {id: 'contacts-audit', title: 'Contacts tidy-up', files: ['.vcf'], drop: 'A contacts export', get: 'Card count, names with duplicates first, numbers, emails'},
+  {id: 'travel-itinerary', title: 'Trip summary', files: ['.eml', '.mbox'], drop: 'A booking or boarding-pass email', get: 'Flights, stays, booking references, amounts'},
+  {id: 'subscription-finder', title: 'What am I paying for?', files: ['.mbox', '.eml'], drop: 'A month of billing mail', get: 'Renewals, trials ending, what will be charged, who charges'},
+  {id: 'receipt-pdf', title: 'Receipt and warranty', files: ['.pdf'], drop: 'A receipt or warranty PDF', get: 'Totals, dates, warranty and return terms'},
+  {id: 'pdf-brief', title: 'PDF brief', files: ['.pdf'], drop: 'Any text PDF', get: 'A one-page brief with headings and key lines', built: true},
+  {id: 'csv-clean', title: 'CSV clean-up', files: ['.csv'], drop: 'A messy CSV', get: 'A cleaned file and a change summary', built: true},
+];

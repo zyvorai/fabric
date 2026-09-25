@@ -569,3 +569,82 @@
 .fillReveal {
   height: 100%;
 }
+
+/* ------------------------------------------------------------ use cases */
+
+.ucFlow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.9rem;
+  margin: 0 0 1.5rem;
+  color: var(--c-muted);
+  font-size: 0.95rem;
+}
+
+.ucFlow b {
+  color: var(--c-ink);
+  font-weight: 600;
+}
+
+.ucFlow i {
+  color: var(--c-accent);
+  font-style: normal;
+}
+
+.ucGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
+  gap: 0.9rem;
+}
+
+.uc {
+  height: 100%;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  padding: 1.25rem;
+  border-radius: 18px;
+  border: 1px solid var(--c-line);
+  background: var(--c-bg);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--c-muted);
+}
+
+.uc b {
+  color: var(--c-ink);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.ucFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ucFile {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--c-line);
+  background: var(--c-surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.ucBuiltIn {
+  border-style: dashed;
+}
+
+.ucLabel {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}

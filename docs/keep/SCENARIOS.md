@@ -27,6 +27,27 @@ code, and the extractive ones call no model, so the cell reports `0` outbound co
 | [`invoice-model-brief`](../../examples/keep-agents/invoice-model-brief/README.md) | an invoice PDF | rule sections **plus a generated summary** | `pdftotext` + model | no |
 | [`meeting-notes-model`](../../examples/keep-agents/meeting-notes-model/README.md) | a transcript (`.txt`, `.vtt`) | decisions and actions **plus a generated summary** | `text` + model | yes |
 
+### Phone-user packs
+
+For what a person exports from their phone, and what a phone vendor's app can hand to Keep. All are extractive: no model
+reads the file, and the cell reports `0` outbound connections.
+
+| Pack | You drop in | You get | Reads with | Sample |
+|---|---|---|---|---|
+| [`chat-export-digest`](../../examples/keep-agents/chat-export-digest/README.md) | an exported chat (`.txt`) | who talks most, plans and times, open questions, money, links | `text` | yes |
+| [`bank-sms-ledger`](../../examples/keep-agents/bank-sms-ledger/README.md) | saved bank and card SMS alerts (`.txt`) | money out and in, every amount, merchants, declined or international lines. One-time codes are not listed | `text` | yes |
+| [`card-statement`](../../examples/keep-agents/card-statement/README.md) | a statement (`.csv`) | most common categories and merchants, the first rows | `text` + `csv_columns` | yes |
+| [`calendar-week`](../../examples/keep-agents/calendar-week/README.md) | a calendar export (`.ics`) | events, start times, places, attendees | `text` | yes |
+| [`contacts-audit`](../../examples/keep-agents/contacts-audit/README.md) | a contacts export (`.vcf`) | card count, names with duplicates first, numbers, emails | `text` | yes |
+| [`travel-itinerary`](../../examples/keep-agents/travel-itinerary/README.md) | a booking or boarding-pass email (`.eml`, `.mbox`) | flights, stays, booking references, amounts | `eml` | yes |
+| [`subscription-finder`](../../examples/keep-agents/subscription-finder/README.md) | a mail export (`.mbox`, `.eml`) | renewals, trials ending, what will be charged, amounts, who charges | `eml` | yes |
+| [`receipt-pdf`](../../examples/keep-agents/receipt-pdf/README.md) | a receipt or warranty PDF | totals, dates, warranty and return terms, amounts | `pdftotext` | no |
+
+Not covered: **photos and screenshots** (Keep does no OCR, and a scan has no text layer), and vendor-specific
+exports whose layout changes between versions (location history, health, screen time), where a pack would be guessing.
+These packs read personal data. The cell is sealed and reports `0` outbound connections, but the evidence class is
+`software-test`: the host's operator could still read a cell's memory ([VENDORS.md](VENDORS.md)).
+
 The two model packs send the extracted text to an endpoint **you** allow, after **you** approve it once. Out of the
 box they are refused, because the vault has no such credential. See [MODEL.md](MODEL.md).
 
@@ -54,6 +75,10 @@ All of it is described in [TRIGGERS.md](TRIGGERS.md).
 **Vendor contracts in bulk.** `keepctl run contract-clauses a.pdf b.pdf c.pdf` for PDFs, or deploy
 [`nda-review`](../../examples/keep-agents/nda-review/README.md) for Word files. Compare two versions of one contract
 in **Keep history**.
+
+**What am I paying for?** A user shares a month of billing mail (an `.mbox`) and runs `subscription-finder`: renewals,
+trials about to end, and every amount that will be charged. Run it again next month and compare the two runs in **Keep
+history**.
 
 **Daily status check.** A cron job fetches the vendor status page and posts it to a webhook trigger for
 `status-page-watch`. Keep does not fetch pages itself; you give it the file.
