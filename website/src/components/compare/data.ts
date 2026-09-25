@@ -1,5 +1,5 @@
 /*
- * Facts for the /compare page sections. Every entry cites the repo doc it
+ * Facts for the homepage matrix sections. Every entry cites the repo doc it
  * comes from; nothing here is invented. Muse text is "as publicly described".
  */
 
