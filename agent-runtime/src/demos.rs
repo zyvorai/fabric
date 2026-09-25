@@ -451,6 +451,52 @@ fn extension(filename: &str) -> String {
 pub(crate) async fn demo_run(
     State(state): State<Arc<AppState>>,
     Path(demo_id): Path<String>,
+    multipart: Multipart,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let result = run_demo(state.clone(), demo_id.clone(), multipart).await;
+    match &result {
+        Ok((_, Json(v))) => {
+            let artifacts = v["artifacts"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| {
+                            Some((
+                                x["id"].as_str()?.parse().ok()?,
+                                x["title"].as_str()?.to_string(),
+                            ))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            crate::notify::run_finished(
+                &state,
+                crate::notify::RunNotice {
+                    demo: demo_id,
+                    session_id: v["session_id"].as_str().and_then(|s| s.parse().ok()),
+                    outcome: Ok((artifacts, v["egress_connects"].as_u64().unwrap_or(0))),
+                },
+            );
+        }
+        // A rejected upload or unknown id is the caller's mistake, not a failed run.
+        Err(e) if !matches!(e.status(), StatusCode::BAD_REQUEST | StatusCode::NOT_FOUND) => {
+            crate::notify::run_finished(
+                &state,
+                crate::notify::RunNotice {
+                    demo: demo_id,
+                    session_id: None,
+                    outcome: Err(e.message().to_string()),
+                },
+            );
+        }
+        Err(_) => {}
+    }
+    result
+}
+
+async fn run_demo(
+    state: Arc<AppState>,
+    demo_id: String,
     mut multipart: Multipart,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     let spec = resolve(&state, &demo_id)
@@ -703,6 +749,7 @@ pub(crate) async fn demo_run(
                 "demo": spec.id,
             }),
             created_at: Utc::now(),
+            expires_at: None,
         };
         state
             .store

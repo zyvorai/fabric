@@ -16,6 +16,15 @@ Where each piece stands. Sources: [STATUS.md](STATUS.md), [KEEP-0.2.md](KEEP-0.2
 | Keep 0.1 | BYO model socket, signed Sentinel policy, measured cell, phone approvals, pack / unpack, cockpit, PDF brief, host eBPF pin |
 | Keep Browser 0.3 | Split-sight pause, trajectory-as-code, origin taint lattice, vault-typed fill, goal-bound tabs, honesty badge |
 
+## Planned product surface
+
+Phased, in this order. Phase 1 is in progress; the rest is not started.
+
+1. **Run history and visibility** (shipped in this branch): artifact TTL and diff, run notifications, console and `keepctl` views.
+2. **Triggers and batch:** connect `/v1/schedules` and `/v1/webhooks` to use cases, a watched folder, multi-file upload.
+3. **More file types:** docx, xlsx, html, eml/mbox, zip, OCR for scanned PDFs, regex / JSON-path / table rules.
+4. **Model-assisted use cases:** a pack that declares one allowlisted model host, with a proof of "exactly N connections, all to that host" instead of zero.
+
 ## Gated on hardware
 
 **Keep 0.2.** The soft scaffolding is complete (attestation receipt, no host recover on

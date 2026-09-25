@@ -21,6 +21,12 @@
 #   keepctl unpack <path>            # restore policy onto an agent
 #   keepctl export-token …           # scoped trajectory export (default: none)
 #   keepctl cockpit <session-id>     # taint + last decisions JSON
+#   keepctl list                     # the use cases this runtime can run
+#   keepctl run <use-case> <file>    # run one; exits 2 if the cell made an outbound connection
+#   keepctl artifacts [--use-case <id>] [--since <rfc3339>] [--limit <n>]
+#   keepctl diff <older-artifact-id> <newer-artifact-id>   # line diff of two runs
+#   keepctl audit [<session-id>] [--limit <n>]             # journal + hash-chain check
+#   keepctl approvals [pending|approved|denied]            # approval inbox and history
 #
 set -euo pipefail
 
@@ -40,7 +46,7 @@ else
   AUTH_TOKEN=""
 fi
 usage() {
-  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -364,6 +370,89 @@ PY
     }
     api GET "/v1/sessions/${id}/browser/script"
     echo
+    ;;
+
+  list)
+    api GET "/v1/demos" | python3 -c '
+import json, sys
+for d in json.load(sys.stdin)["demos"]:
+    print("%-24s .%s  %s" % (d["id"], "/.".join(d["accepts"]), d["description"]))'
+    ;;
+
+  run)
+    id="${1:-}"
+    file="${2:-}"
+    [[ "$id" =~ ^[a-z0-9-]+$ && -n "$file" && -f "$file" ]] || {
+      echo "usage: keepctl run <use-case> <file>" >&2
+      exit 1
+    }
+    out=$(api POST "/v1/demos/${id}" -F "file=@${file}")
+    echo "$out" | python3 -m json.tool
+    conn=$(echo "$out" | python3 -c "import json,sys; print(json.load(sys.stdin).get('egress_connects', -1))")
+    if [[ "$conn" != "0" ]]; then
+      echo "FAIL: egress_connects=$conn" >&2
+      exit 2
+    fi
+    ;;
+
+  artifacts)
+    qs=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --use-case) qs+=("use_case=$2"); shift 2 ;;
+        --since) qs+=("since=$2"); shift 2 ;;
+        --limit) qs+=("limit=$2"); shift 2 ;;
+        *) echo "unknown arg: $1" >&2; usage 1 ;;
+      esac
+    done
+    query=$(IFS='&'; echo "${qs[*]:-}")
+    api GET "/v1/artifacts${query:+?$query}" | python3 -c '
+import json, sys
+for a in json.load(sys.stdin)["items"]:
+    print("%s  %s  %-22s %s" % (a["id"], a["created_at"][:19], (a.get("metadata") or {}).get("demo", a["kind"]), a["title"]))'
+    ;;
+
+  diff)
+    a="${1:-}"; b="${2:-}"
+    [[ -n "$a" && -n "$b" ]] || { echo "usage: keepctl diff <older-artifact-id> <newer-artifact-id>" >&2; exit 1; }
+    api GET "/v1/artifacts/${a}/diff/${b}" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+s = d["summary"]
+print("--- %s  %s" % (d["a"]["title"], d["a"]["created_at"][:19]))
+print("+++ %s  %s" % (d["b"]["title"], d["b"]["created_at"][:19]))
+for l in d["lines"]:
+    print({"same": "  ", "add": "+ ", "del": "- "}[l["op"]] + l["line"])
+print("%d added, %d removed, %d unchanged" % (s["added"], s["removed"], s["unchanged"]))'
+    ;;
+
+  audit)
+    session=""
+    limit=50
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --limit) limit=$2; shift 2 ;;
+        -*) echo "unknown arg: $1" >&2; usage 1 ;;
+        *) session=$1; shift ;;
+      esac
+    done
+    api GET "/v1/audit?limit=${limit}${session:+&session_id=$session}" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+for e in d["items"]:
+    print(json.dumps(e, sort_keys=True))
+print("chain: " + json.dumps(d["chain"], sort_keys=True), file=sys.stderr)'
+    ;;
+
+  approvals)
+    want="${1:-}"
+    api GET "/v1/approvals" | WANT="$want" python3 -c '
+import json, os, sys
+want = os.environ.get("WANT", "")
+for a in json.load(sys.stdin)["items"]:
+    if want and a["status"] != want:
+        continue
+    print("%s  %-9s %-8s %s  %s" % (a["id"], a["status"], a["kind"], a["created_at"][:19], a.get("subject") or ""))'
     ;;
 
   *)

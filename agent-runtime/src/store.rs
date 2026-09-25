@@ -789,17 +789,34 @@ impl Store {
     }
 
     pub async fn list_artifacts(&self) -> Vec<ArtifactRecord> {
-        let mut out: Vec<_> = self.artifacts.read().await.values().cloned().collect();
+        let now = chrono::Utc::now();
+        let mut out: Vec<_> = self
+            .artifacts
+            .read()
+            .await
+            .values()
+            .filter(|a| !artifact_expired(a, now))
+            .cloned()
+            .collect();
         out.sort_by_key(|a| std::cmp::Reverse(a.created_at));
         out
     }
 
     pub async fn get_artifact(&self, id: Uuid) -> Option<ArtifactRecord> {
-        self.artifacts.read().await.get(&id).cloned()
+        let now = chrono::Utc::now();
+        self.artifacts
+            .read()
+            .await
+            .get(&id)
+            .filter(|a| !artifact_expired(a, now))
+            .cloned()
     }
 
     pub async fn save_artifact(&self, record: ArtifactRecord) -> Result<()> {
         let mut map = self.artifacts.write().await;
+        // Expired artifacts are already invisible; drop them on the next write.
+        let now = chrono::Utc::now();
+        map.retain(|_, a| !artifact_expired(a, now));
         map.insert(record.id, record);
         self.persist_vec("artifacts.json", &map.values().cloned().collect::<Vec<_>>())
             .await
@@ -953,6 +970,10 @@ impl Identified for ArtifactRecord {
     fn identified_id(&self) -> Uuid {
         self.id
     }
+}
+
+fn artifact_expired(a: &ArtifactRecord, now: chrono::DateTime<chrono::Utc>) -> bool {
+    a.expires_at.is_some_and(|t| t <= now)
 }
 
 pub(crate) async fn atomic_write(path: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {

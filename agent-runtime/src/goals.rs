@@ -102,6 +102,9 @@ pub struct ArtifactRecord {
     #[serde(default)]
     pub metadata: Value,
     pub created_at: DateTime<Utc>,
+    /// After this instant the artifact is hidden and swept. `None` keeps it until deleted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -169,6 +172,9 @@ pub struct CreateArtifactRequest {
     pub agent: Option<String>,
     #[serde(default)]
     pub metadata: Option<Value>,
+    /// Keep the artifact for this many seconds (1 s to 10 years).
+    #[serde(default)]
+    pub ttl_seconds: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -183,6 +189,12 @@ pub struct ListQuery {
     pub kind: Option<String>,
     #[serde(default)]
     pub limit: Option<usize>,
+    /// Artifacts produced by this use case (matches `metadata.demo`).
+    #[serde(default)]
+    pub use_case: Option<String>,
+    /// Only artifacts created at or after this instant (RFC 3339).
+    #[serde(default)]
+    pub since: Option<DateTime<Utc>>,
 }
 
 pub(crate) async fn list_goals(
@@ -478,6 +490,12 @@ pub(crate) async fn list_artifacts(
     if let Some(kind) = q.kind.as_deref() {
         items.retain(|a| a.kind == kind);
     }
+    if let Some(uc) = q.use_case.as_deref() {
+        items.retain(|a| a.metadata.get("demo").and_then(Value::as_str) == Some(uc));
+    }
+    if let Some(since) = q.since {
+        items.retain(|a| a.created_at >= since);
+    }
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
     items.truncate(limit);
     Json(json!({ "items": items }))
@@ -507,6 +525,17 @@ pub(crate) async fn create_artifact(
             ));
         }
     }
+    let expires_at = match req.ttl_seconds {
+        None => None,
+        Some(s) if (1..=315_360_000).contains(&s) => {
+            Some(Utc::now() + chrono::Duration::seconds(s))
+        }
+        Some(_) => {
+            return Err(ApiError::bad_request(
+                "ttl_seconds must be between 1 and 315360000",
+            ))
+        }
+    };
     let record = ArtifactRecord {
         id: Uuid::new_v4(),
         kind: req.kind,
@@ -518,6 +547,7 @@ pub(crate) async fn create_artifact(
         agent: req.agent,
         metadata: req.metadata.unwrap_or(Value::Null),
         created_at: Utc::now(),
+        expires_at,
     };
     state
         .store
@@ -557,6 +587,36 @@ pub(crate) async fn get_artifact(
         .await
         .map(Json)
         .ok_or_else(|| ApiError::not_found("artifact not found"))
+}
+
+/// Line diff of two artifacts' bodies: `a` is treated as the older side.
+pub(crate) async fn diff_artifacts(
+    State(state): State<Arc<AppState>>,
+    Path((a, b)): Path<(Uuid, Uuid)>,
+) -> ApiResult<Json<Value>> {
+    let left = state
+        .store
+        .get_artifact(a)
+        .await
+        .ok_or_else(|| ApiError::not_found("artifact not found"))?;
+    let right = state
+        .store
+        .get_artifact(b)
+        .await
+        .ok_or_else(|| ApiError::not_found("artifact not found"))?;
+    let lines = crate::artifact_diff::diff_lines(&left.body, &right.body).ok_or_else(|| {
+        ApiError::bad_request(format!(
+            "artifact too large to diff (over {} lines)",
+            crate::artifact_diff::MAX_DIFF_LINES
+        ))
+    })?;
+    let summary = crate::artifact_diff::summarize(&lines);
+    Ok(Json(json!({
+        "a": { "id": left.id, "title": left.title, "created_at": left.created_at },
+        "b": { "id": right.id, "title": right.title, "created_at": right.created_at },
+        "summary": summary,
+        "lines": lines,
+    })))
 }
 
 #[cfg(test)]
@@ -654,6 +714,7 @@ pub(crate) mod tests {
                 session_id: None,
                 agent: Some("infra-ops".into()),
                 metadata: None,
+                ttl_seconds: None,
             }),
         )
         .await
@@ -668,6 +729,8 @@ pub(crate) mod tests {
                 session_id: None,
                 kind: None,
                 limit: None,
+                use_case: None,
+                since: None,
             }),
         )
         .await;
@@ -769,10 +832,133 @@ pub(crate) mod tests {
                 session_id: None,
                 agent: None,
                 metadata: None,
+                ttl_seconds: None,
             }),
         )
         .await
         .unwrap_err();
         assert!(err.message().contains("secret"));
+    }
+
+    fn artifact_req(
+        title: &str,
+        body: &str,
+        demo: &str,
+        ttl: Option<i64>,
+    ) -> CreateArtifactRequest {
+        CreateArtifactRequest {
+            kind: "report".into(),
+            title: title.into(),
+            body: body.into(),
+            content_type: None,
+            goal_id: None,
+            session_id: None,
+            agent: None,
+            metadata: Some(json!({ "demo": demo })),
+            ttl_seconds: ttl,
+        }
+    }
+
+    #[tokio::test]
+    async fn artifact_ttl_out_of_range_is_refused() {
+        let state = test_state().await;
+        for bad in [0, -5, 315_360_001] {
+            let err = create_artifact(
+                State(state.clone()),
+                Json(artifact_req("t", "b", "d", Some(bad))),
+            )
+            .await
+            .unwrap_err();
+            assert!(err.message().contains("ttl_seconds"), "{bad}");
+        }
+    }
+
+    #[tokio::test]
+    async fn expired_artifact_is_hidden_and_swept() {
+        let state = test_state().await;
+        let (_, Json(live)) = create_artifact(
+            State(state.clone()),
+            Json(artifact_req("live", "x", "d", Some(3600))),
+        )
+        .await
+        .unwrap();
+        let (_, Json(mut gone)) = create_artifact(
+            State(state.clone()),
+            Json(artifact_req("gone", "y", "d", None)),
+        )
+        .await
+        .unwrap();
+        gone.expires_at = Some(Utc::now() - chrono::Duration::seconds(1));
+        state.store.save_artifact(gone.clone()).await.unwrap();
+
+        assert!(state.store.get_artifact(gone.id).await.is_none());
+        let ids: Vec<_> = state
+            .store
+            .list_artifacts()
+            .await
+            .iter()
+            .map(|a| a.id)
+            .collect();
+        assert_eq!(ids, vec![live.id]);
+    }
+
+    #[tokio::test]
+    async fn list_filters_by_use_case_and_since() {
+        let state = test_state().await;
+        let _ = create_artifact(
+            State(state.clone()),
+            Json(artifact_req("a", "1", "pdf-brief", None)),
+        )
+        .await
+        .unwrap();
+        let _ = create_artifact(
+            State(state.clone()),
+            Json(artifact_req("b", "2", "log-triage", None)),
+        )
+        .await
+        .unwrap();
+        let q = |use_case: Option<&str>, since| ListQuery {
+            agent: None,
+            goal_id: None,
+            session_id: None,
+            kind: None,
+            limit: None,
+            use_case: use_case.map(String::from),
+            since,
+        };
+        let Json(l) =
+            list_artifacts(State(state.clone()), Query(q(Some("log-triage"), None))).await;
+        assert_eq!(l["items"].as_array().unwrap().len(), 1);
+        assert_eq!(l["items"][0]["title"], "b");
+        let future = Utc::now() + chrono::Duration::seconds(60);
+        let Json(l) = list_artifacts(State(state), Query(q(None, Some(future)))).await;
+        assert!(l["items"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn diff_endpoint_compares_two_runs() {
+        let state = test_state().await;
+        let (_, Json(a)) = create_artifact(
+            State(state.clone()),
+            Json(artifact_req("r1", "a\nb", "d", None)),
+        )
+        .await
+        .unwrap();
+        let (_, Json(b)) = create_artifact(
+            State(state.clone()),
+            Json(artifact_req("r2", "a\nc", "d", None)),
+        )
+        .await
+        .unwrap();
+        let Json(d) = diff_artifacts(State(state.clone()), Path((a.id, b.id)))
+            .await
+            .unwrap();
+        assert_eq!(d["summary"]["added"], 1);
+        assert_eq!(d["summary"]["removed"], 1);
+        assert_eq!(d["summary"]["unchanged"], 1);
+        let err = diff_artifacts(State(state), Path((a.id, Uuid::new_v4())))
+            .await
+            .unwrap_err();
+        assert!(err.message().contains("not found"));
     }
 }

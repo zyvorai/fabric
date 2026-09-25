@@ -128,6 +128,37 @@ echo "$out" | grep -q "0 CONNECT" || fail "keep-demo.sh did not report 0 CONNECT
 "$DEMO" list | grep -q "^csv-clean" || fail "keep-demo.sh list missing csv-clean"
 ok "keep-demo.sh run and list"
 
+echo "demos-ci: run history, diff and keepctl verbs"
+printf 'name,qty\nAnn,1\nBob,2\n' > "$WORK/h1.csv"
+printf 'name,qty\nAnn,1\nBob,3\nCy,4\n' > "$WORK/h2.csv"
+"$KEEPCTL" run csv-clean "$WORK/h1.csv" >/dev/null || fail "keepctl run (first)"
+sleep 1
+"$KEEPCTL" run csv-clean "$WORK/h2.csv" >/dev/null || fail "keepctl run (second)"
+"$KEEPCTL" list | grep -q "^csv-clean" || fail "keepctl list missing csv-clean"
+ids=$("$KEEPCTL" artifacts --use-case csv-clean | grep " clean.csv" | awk '{print $1}')
+[[ "$(echo "$ids" | wc -l | tr -d ' ')" -ge 2 ]] || fail "expected at least 2 clean.csv artifacts for csv-clean: $ids"
+[[ -z "$("$KEEPCTL" artifacts --use-case no-such-use-case)" ]] || fail "use-case filter leaked other artifacts"
+[[ -z "$("$KEEPCTL" artifacts --since 2999-01-01T00:00:00Z)" ]] || fail "since filter returned artifacts from the past"
+ok "keepctl run/list/artifacts with use-case and since filters"
+newer=$(echo "$ids" | sed -n 1p); older=$(echo "$ids" | sed -n 2p)
+"$KEEPCTL" diff "$older" "$newer" | tee "$WORK/diff.out" >/dev/null
+grep -q "added" "$WORK/diff.out" && grep -q "^+ " "$WORK/diff.out" || fail "diff shows no added line: $(cat "$WORK/diff.out")"
+ok "keepctl diff compares two runs"
+"$KEEPCTL" audit --limit 5 2>"$WORK/chain.err" | grep -q . || fail "keepctl audit printed no rows"
+grep -q "chain:" "$WORK/chain.err" || fail "keepctl audit did not report the chain"
+"$KEEPCTL" approvals >/dev/null || fail "keepctl approvals failed"
+ok "keepctl audit (with chain check) and approvals"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' \
+  -d '{"kind":"note","title":"t","body":"x","ttl_seconds":0}' "$BASE/v1/artifacts")
+[[ "$code" == "400" ]] || fail "ttl_seconds=0 should be 400, got $code"
+tid=$(curl -sf -X POST -H 'content-type: application/json' \
+  -d '{"kind":"note","title":"short-lived","body":"x","ttl_seconds":1}' "$BASE/v1/artifacts" | json id)
+curl -sf "$BASE/v1/artifacts/$tid" >/dev/null || fail "artifact with a ttl should exist before it expires"
+sleep 2
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/artifacts/$tid")
+[[ "$code" == "404" ]] || fail "expired artifact should be 404, got $code"
+ok "artifact ttl: bad value refused, expired artifact is gone"
+
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")
 [[ "$code" == "400" ]] || fail "wrong extension should be 400, got $code"; ok "wrong file type refused (400)"

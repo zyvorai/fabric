@@ -1047,6 +1047,49 @@ pub async fn list_audit(
     proxy(&state, Method::GET, "/v1/audit", Some(&query), None, None).await
 }
 
+/// Run history: artifacts across sessions. Admin only, because bodies are
+/// derived from users' documents (a user sees their own via the session cockpit).
+pub async fn list_artifacts(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    proxy(
+        &state,
+        Method::GET,
+        "/v1/artifacts",
+        Some(&query),
+        None,
+        None,
+    )
+    .await
+}
+
+/// Line diff of two artifacts. Both ids are validated as UUIDs because they are
+/// interpolated into the upstream path.
+pub async fn diff_artifacts(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path((a, b)): Path<(String, String)>,
+) -> Response {
+    if uuid::Uuid::parse_str(&a).is_err() || uuid::Uuid::parse_str(&b).is_err() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "artifact ids must be UUIDs" })),
+        )
+            .into_response();
+    }
+    proxy(
+        &state,
+        Method::GET,
+        &format!("/v1/artifacts/{a}/diff/{b}"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
 /// Skill names go into the upstream path, so they are restricted to the
 /// characters the runtime itself accepts.
 fn valid_skill_name(name: &str) -> bool {

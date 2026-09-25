@@ -158,9 +158,14 @@ export default function KeepHome() {
         title="Keep"
         description="Personal workstation for an untrusted agent — FluxVM cell, Sentinel egress, audit you can read."
         actions={
-          <Link to="/app/agents" className="zf-btn zf-btn-ghost">
-            Agents
-          </Link>
+          <>
+            <Link to="/app/keep/history" className="zf-btn zf-btn-ghost">
+              History
+            </Link>
+            <Link to="/app/agents" className="zf-btn zf-btn-ghost">
+              Agents
+            </Link>
+          </>
         }
       />
 

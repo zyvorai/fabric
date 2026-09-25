@@ -3,6 +3,13 @@
 ## 0.3.0
 
 ### Added
+- **Keep run history.** Artifacts can carry `ttl_seconds` (hidden at once, swept on
+  the next write); `GET /v1/artifacts` filters by `use_case` and `since`;
+  `GET /v1/artifacts/{a}/diff/{b}` returns a line diff of two runs. The approval
+  webhook also sends `run.finished` / `run.failed`. New `keepctl`
+  `list | run | artifacts | diff | audit | approvals`, fabricd `GET /api/artifacts`
+  and `/api/artifacts/{a}/diff/{b}` (admin), and a console page at
+  `/app/keep/history` (Runs with diff, Audit with the hash-chain check, Approvals).
 - **Keep use cases you build yourself.** A declarative `pack.json` (an extractor
   plus bounded summary rules, no code) is deployed from the console
   (`/app/keep` → **Deploy your own use case**) or with `keepctl deploy`;

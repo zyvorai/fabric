@@ -16,6 +16,19 @@ keepctl export-token 'trajectory:read:7d' 3600
 keepctl cockpit <session-uuid>
 ```
 
+Run a use case and look back at what it produced:
+
+```bash
+keepctl list                                      # use cases this runtime can run
+keepctl run csv-clean ./orders.csv                # exits 2 if the cell made an outbound connection
+keepctl artifacts --use-case csv-clean --since 2026-09-01T00:00:00Z
+keepctl diff <older-artifact-id> <newer-artifact-id>   # what changed between two runs
+keepctl audit <session-uuid> --limit 20           # journal rows; the hash-chain check goes to stderr
+keepctl approvals pending                         # pending | approved | denied, or none for all
+```
+
+The console shows the same three views at `/app/keep/history` (Runs, Audit, Approvals).
+
 Lab live gate (stub + FluxVM proof):
 
 ```bash

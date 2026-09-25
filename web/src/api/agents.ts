@@ -336,3 +336,76 @@ export async function sessionAction(
 ): Promise<unknown> {
   return apiPost(`/api/sessions/${encodeURIComponent(id)}/${action}`, body ?? {})
 }
+
+export interface ArtifactItem {
+  id: string
+  kind: string
+  title: string
+  created_at: string
+  session_id?: string | null
+  agent?: string | null
+  expires_at?: string | null
+  metadata?: { demo?: string } | null
+}
+
+export type DiffLine = { op: 'same' | 'add' | 'del'; line: string }
+
+export interface ArtifactDiff {
+  a: { id: string; title: string; created_at: string }
+  b: { id: string; title: string; created_at: string }
+  summary: { added: number; removed: number; unchanged: number }
+  lines: DiffLine[]
+}
+
+/** Run history across sessions (admin). Newest first. */
+export async function listArtifacts(params: {
+  use_case?: string
+  since?: string
+  limit?: number
+} = {}): Promise<ArtifactItem[]> {
+  const qs = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
+  const suffix = qs.toString() ? `?${qs}` : ''
+  return (await apiGet<{ items: ArtifactItem[] }>(`/api/artifacts${suffix}`)).items
+}
+
+export async function diffArtifacts(older: string, newer: string): Promise<ArtifactDiff> {
+  return apiGet(`/api/artifacts/${encodeURIComponent(older)}/diff/${encodeURIComponent(newer)}`)
+}
+
+export interface ApprovalItem {
+  id: string
+  session_id: string
+  kind: string
+  subject?: string | null
+  prompt: string
+  status: 'pending' | 'approved' | 'denied' | string
+  created_at: string
+  decided_at?: string | null
+}
+
+export async function listApprovals(): Promise<ApprovalItem[]> {
+  return (await apiGet<{ items: ApprovalItem[] }>('/api/approvals')).items
+}
+
+export interface AuditRow {
+  seq: number
+  at: string
+  session_id?: string | null
+  phase: string
+  action: string
+  subject?: string | null
+  detail?: unknown
+  hash: string
+}
+
+export interface AuditPage {
+  items: AuditRow[]
+  chain: { entries: number; chain_ok: boolean; broken_at?: number | null }
+}
+
+export async function listAudit(limit = 100, sessionId?: string): Promise<AuditPage> {
+  const qs = new URLSearchParams({ limit: String(limit) })
+  if (sessionId) qs.set('session_id', sessionId)
+  return apiGet(`/api/audit/agent-actions?${qs}`)
+}
