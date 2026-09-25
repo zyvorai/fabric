@@ -14,6 +14,7 @@
   --c-on-black: #f5f5f7;
   --c-on-black-muted: #a1a1a6;
   --c-ok: #1a7f37;
+  --c-warn: #b36b00;
   background: var(--c-bg);
   color: var(--c-ink);
 }
@@ -27,6 +28,7 @@
   --c-accent: #0a84ff;
   --c-glow: rgba(10, 132, 255, 0.14);
   --c-ok: #30d158;
+  --c-warn: #ff9f0a;
 }
 
 .page code {
@@ -464,12 +466,12 @@
   color: var(--c-muted);
 }
 
-.matrix thead .hKeep {
+.matrix thead .hHl {
   color: var(--c-accent);
   box-shadow: inset 0 -2px 0 var(--c-accent);
 }
 
-.matrix thead .hMuse {
+.matrix thead .hDim {
   color: var(--c-muted);
 }
 
@@ -488,12 +490,12 @@
   border-bottom: 1px solid var(--c-line);
 }
 
-.matrix .col_Keep {
+.matrix .hl {
   background: var(--c-glow);
   font-weight: 500;
 }
 
-.matrix .col_Muse {
+.matrix .dim {
   color: var(--c-muted);
 }
 
@@ -512,7 +514,7 @@
 }
 
 .lvl_yes .glyph { color: var(--c-ok); }
-.col_Keep.lvl_yes .glyph { color: var(--c-accent); }
+.hl.lvl_yes .glyph { color: var(--c-accent); }
 .lvl_part .glyph { color: #c77c02; }
 [data-theme='dark'] .lvl_part .glyph { color: #ff9f0a; }
 
@@ -956,6 +958,61 @@
   }
 }
 
+
+.anchor {
+  scroll-margin-top: var(--ifm-navbar-height, 4.5rem);
+}
+
+/* Matrix tabs */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin: 0 0 1.25rem;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 980px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+}
+
+.tabBtn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--c-muted);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: 980px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.tabBtn:hover {
+  color: var(--c-ink);
+}
+
+.tabBtn:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
+}
+
+.tabOn {
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.tabNote {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--c-muted);
+  max-width: 44rem;
+}
+
 /* -------------------------------------------------------------- responsive */
 
 @media (max-width: 996px) {
@@ -1011,7 +1068,7 @@
     font-weight: 600;
   }
 
-  .matrix .col_Keep::before {
+  .matrix .hl::before {
     color: var(--c-accent);
   }
 

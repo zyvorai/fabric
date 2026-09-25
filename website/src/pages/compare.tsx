@@ -1,25 +1,32 @@
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
+import {PageMetadata} from '@docusaurus/theme-common';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 import Reveal from '@site/src/components/Reveal';
+import CockpitMock from '@site/src/components/compare/CockpitMock';
+import ProfileLadder from '@site/src/components/compare/ProfileLadder';
+import Quickstart from '@site/src/components/compare/Quickstart';
+import Receipts from '@site/src/components/compare/Receipts';
+import Roadmap from '@site/src/components/compare/Roadmap';
+import {FABRIC_COLS, FABRIC_GROUPS, FLUX_COLS, FLUX_GROUPS, cell as c} from '@site/src/components/compare/data';
+import type {Cell, Col, Level, TGroup} from '@site/src/components/compare/data';
 import styles from './compare.module.css';
 
-type Level = 'yes' | 'part' | 'no' | 'na';
-type Cell = {t: string; l: Level};
 type Tag = 'security' | 'ops' | 'portability';
 type Row = {label: string; muse: Cell; keep: Cell; fabric: Cell; flux: Cell};
 type Group = {title: string; tag: Tag; rows: Row[]};
 
-const c = (t: string, l: Level = 'yes'): Cell => ({t, l});
 const NA_FABRIC = c('Delegates to FluxVM', 'na');
 const NA = c('—', 'na');
+const UNDOC = c('Not documented publicly', 'na');
 
 /*
  * Muse cells are "as publicly described" — public detail is thin, see the
- * sourcing note on the page. Keep/Fabric/FluxVM cells trace to
+ * sourcing note on the page. Like the /keep page, only rows stated in
+ * docs/keep/KEEP.md keep a Muse claim; the rest read "Not documented publicly". Keep/Fabric/FluxVM cells trace to
  * docs/keep/KEEP.md, docs/PRODUCT_OVERVIEW.md and fluxvm/README.md.
  */
 const GROUPS: Group[] = [
@@ -36,7 +43,7 @@ const GROUPS: Group[] = [
       },
       {
         label: 'Control surface',
-        muse: c('Vendor client', 'part'),
+        muse: UNDOC,
         keep: c('keepctl, /app/keep console, vsock admin'),
         fabric: c('780+ REST endpoints, CLI, web console, K8s operator, Terraform'),
         flux: c('REST API + CLI with the same verbs'),
@@ -90,14 +97,14 @@ const GROUPS: Group[] = [
       },
       {
         label: 'Guest access',
-        muse: c('Fat client helper surface', 'part'),
+        muse: UNDOC,
         keep: c('vsock admin — no SSH to the agent'),
         fabric: NA_FABRIC,
         flux: c('vsock agent: exec, PTY, file copy — no SSH'),
       },
       {
         label: 'Confidential',
-        muse: c('Operator may open the VM', 'part'),
+        muse: UNDOC,
         keep: c('measured today (software-test); SNP/TDX gated on a verified run', 'part'),
         fabric: NA,
         flux: c('security_profile field; hardware evidence gated', 'part'),
@@ -110,14 +117,14 @@ const GROUPS: Group[] = [
     rows: [
       {
         label: 'Egress pin',
-        muse: c('Not a tenant-owned pin you can show', 'no'),
+        muse: UNDOC,
         keep: c('deny_udp + gateway-only ports; cockpit CONNECT 0'),
         fabric: c('Cilium-style network policies, WireGuard mesh'),
         flux: c('TC/eBPF Network Fabric (GA): L3/L4 policy, rate limits, live reconfigure'),
       },
       {
         label: 'Proof',
-        muse: c('Vendor-attested', 'part'),
+        muse: UNDOC,
         keep: c('Audit journal + FluxVM drop_reasons (PacketWolf optional)'),
         fabric: c('Audit logging'),
         flux: c('drop_reasons from the host pin'),
@@ -143,7 +150,7 @@ const GROUPS: Group[] = [
     rows: [
       {
         label: 'Leaving',
-        muse: c('No documented export', 'no'),
+        muse: UNDOC,
         keep: c('keepctl pack / unpack onto another FluxVM'),
         fabric: c('Live migration (disk-copy GA, native preview), VMDK/VDI import'),
         flux: c('qcow2 CoW clones, memory snapshots'),
@@ -555,9 +562,109 @@ function StackScene(): ReactNode {
   );
 }
 
-function CellView({cell, col}: {cell: Cell; col: string}): ReactNode {
+const MUSE_COLS: Col[] = [
+  {key: 'muse', label: 'Muse', sub: 'as publicly described', dim: true},
+  {key: 'keep', label: 'Keep', sub: 'product layer', hl: true},
+  {key: 'fabric', label: 'Fabric', sub: 'control plane'},
+  {key: 'flux', label: 'FluxVM', sub: 'hypervisor'},
+];
+
+const MUSE_GROUPS: (TGroup & {tag: Tag})[] = GROUPS.map((g) => ({
+  title: g.title,
+  tag: g.tag,
+  rows: g.rows.map((r) => ({label: r.label, cells: [r.muse, r.keep, r.fabric, r.flux]})),
+}));
+
+type TabId = 'stack' | 'fabric' | 'flux';
+
+const TABS: {
+  id: TabId;
+  label: string;
+  caption: string;
+  cols: Col[];
+  groups: (TGroup & {tag?: Tag})[];
+  note: ReactNode;
+}[] = [
+  {
+    id: 'stack',
+    label: 'Muse vs the Keep stack',
+    caption:
+      'Muse compared with Keep, Fabric and FluxVM across trust, isolation, network proof and portability.',
+    cols: MUSE_COLS,
+    groups: MUSE_GROUPS,
+    note: null,
+  },
+  {
+    id: 'fabric',
+    label: 'Fabric vs the field',
+    caption: 'Fabric compared with Proxmox VE, OpenStack and libvirt on capabilities.',
+    cols: FABRIC_COLS,
+    groups: FABRIC_GROUPS,
+    note: (
+      <>
+        Capability rows from the <Link to="/docs/PRODUCT_OVERVIEW">product overview</Link>. The
+        other columns are Zyvor’s reading of those projects — check their docs before you decide.
+      </>
+    ),
+  },
+  {
+    id: 'flux',
+    label: 'FluxVM vs libvirt',
+    caption: 'FluxVM commands mapped to their libvirt / virsh equivalents.',
+    cols: FLUX_COLS,
+    groups: FLUX_GROUPS,
+    note: (
+      <>
+        FluxVM is a host-local replacement for libvirt/virsh lifecycle and networking — not a
+        drop-in for KubeVirt or OpenShift.
+      </>
+    ),
+  },
+];
+
+const TAB_IDS = TABS.map((x) => x.id);
+const FILTER_IDS = FILTERS.map((f) => f.key);
+const UC_IDS = USE_CASES.map((u) => u.id);
+
+/**
+ * State that mirrors a query param (?f=security). The param is applied after
+ * mount so the static HTML and first client render always agree, and written
+ * with replaceState so Docusaurus doesn't treat it as a navigation.
+ */
+function useQueryState<T extends string>(
+  key: string,
+  allowed: readonly T[],
+  fallback: T,
+): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(fallback);
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get(key);
+    if (raw && (allowed as readonly string[]).includes(raw)) {
+      setValue(raw as T);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const set = useCallback(
+    (v: T) => {
+      setValue(v);
+      const url = new URL(window.location.href);
+      if (v === fallback) {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, v);
+      }
+      window.history.replaceState(window.history.state, '', url);
+    },
+    [key, fallback],
+  );
+  return [value, set];
+}
+
+function CellView({cell, col}: {cell: Cell; col: Col}): ReactNode {
   return (
-    <td className={clsx(styles[`col_${col}`], styles[`lvl_${cell.l}`])} data-col={col}>
+    <td
+      className={clsx(col.hl && styles.hl, col.dim && styles.dim, styles[`lvl_${cell.l}`])}
+      data-col={col.label}>
       <span className={styles.glyph} aria-hidden>
         {GLYPH[cell.l]}
       </span>
@@ -567,22 +674,21 @@ function CellView({cell, col}: {cell: Cell; col: string}): ReactNode {
   );
 }
 
-function GroupBody({group}: {group: Group}): ReactNode {
+function GroupBody({group, cols}: {group: TGroup; cols: Col[]}): ReactNode {
   const [ref, seen] = useInView<HTMLTableSectionElement>();
   return (
     <tbody ref={ref} className={clsx(styles.group, seen && styles.groupSeen)}>
       <tr className={styles.groupRow}>
-        <th colSpan={5} scope="colgroup">
+        <th colSpan={cols.length + 1} scope="colgroup">
           {group.title}
         </th>
       </tr>
       {group.rows.map((r) => (
         <tr key={r.label}>
           <th scope="row">{r.label}</th>
-          <CellView cell={r.muse} col="Muse" />
-          <CellView cell={r.keep} col="Keep" />
-          <CellView cell={r.fabric} col="Fabric" />
-          <CellView cell={r.flux} col="FluxVM" />
+          {r.cells.map((cl, i) => (
+            <CellView key={cols[i].key} cell={cl} col={cols[i]} />
+          ))}
         </tr>
       ))}
     </tbody>
@@ -590,64 +696,71 @@ function GroupBody({group}: {group: Group}): ReactNode {
 }
 
 function Matrix(): ReactNode {
-  const [filter, setFilter] = useState<'all' | Tag>('all');
-  const groups = GROUPS.filter((g) => filter === 'all' || g.tag === filter);
+  const [tabId, setTab] = useQueryState<TabId>('t', TAB_IDS, 'stack');
+  const [filter, setFilter] = useQueryState<'all' | Tag>('f', FILTER_IDS, 'all');
+  const tab = TABS.find((x) => x.id === tabId) ?? TABS[0];
+  const groups = tab.groups.filter((g) => !g.tag || filter === 'all' || g.tag === filter);
   return (
     <>
-      <div className={styles.filters} role="group" aria-label="Filter the comparison">
-        {FILTERS.map((f) => (
+      <div className={styles.tabs} role="group" aria-label="Choose a comparison">
+        {TABS.map((x) => (
           <button
-            key={f.key}
+            key={x.id}
             type="button"
-            className={clsx(styles.chip, filter === f.key && styles.chipOn)}
-            aria-pressed={filter === f.key}
-            onClick={() => setFilter(f.key)}>
-            {f.label}
+            className={clsx(styles.tabBtn, x.id === tab.id && styles.tabOn)}
+            aria-pressed={x.id === tab.id}
+            onClick={() => setTab(x.id)}>
+            {x.label}
           </button>
         ))}
       </div>
-      <table className={styles.matrix}>
-        <caption className={styles.srOnly}>
-          Muse compared with Keep, Fabric and FluxVM across trust, isolation, network proof and
-          portability.
-        </caption>
+      {tab.id === 'stack' && (
+        <div className={styles.filters} role="group" aria-label="Filter the comparison">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              className={clsx(styles.chip, filter === f.key && styles.chipOn)}
+              aria-pressed={filter === f.key}
+              onClick={() => setFilter(f.key)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <table className={styles.matrix} key={tab.id}>
+        <caption className={styles.srOnly}>{tab.caption}</caption>
         <thead>
           <tr>
             <td />
-            <th scope="col" className={styles.hMuse}>
-              Muse
-              <small>as publicly described</small>
-            </th>
-            <th scope="col" className={styles.hKeep}>
-              Keep
-              <small>product layer</small>
-            </th>
-            <th scope="col">
-              Fabric
-              <small>control plane</small>
-            </th>
-            <th scope="col">
-              FluxVM
-              <small>hypervisor</small>
-            </th>
+            {tab.cols.map((col) => (
+              <th
+                key={col.key}
+                scope="col"
+                className={clsx(col.hl && styles.hHl, col.dim && styles.hDim)}>
+                {col.label}
+                {col.sub && <small>{col.sub}</small>}
+              </th>
+            ))}
           </tr>
         </thead>
         {groups.map((g) => (
-          <GroupBody key={g.title} group={g} />
+          <GroupBody key={g.title} group={g} cols={tab.cols} />
         ))}
       </table>
       <p className={styles.legend} aria-hidden>
         <span>● supported</span>
         <span>◐ partial / caveat</span>
         <span>○ not offered</span>
-        <span>– n/a at this layer</span>
+        <span>– n/a</span>
       </p>
+      {tab.note && <p className={styles.tabNote}>{tab.note}</p>}
     </>
   );
 }
 
 function UseCases(): ReactNode {
-  const [id, setId] = useState(USE_CASES[0].id);
+  const [id, setId] = useQueryState('uc', UC_IDS, USE_CASES[0].id);
   const uc = USE_CASES.find((u) => u.id === id) ?? USE_CASES[0];
   return (
     <div className={styles.uc}>
@@ -768,11 +881,27 @@ const CARDS = [
   },
 ] as const;
 
+/** Scrolls to the URL hash after mount (native hash scroll misses late-laid-out sections). */
+function useHashScroll() {
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({block: 'start'});
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, []);
+}
+
 export default function Compare(): ReactNode {
+  useHashScroll();
   return (
     <Layout
       title="Muse vs Keep, Fabric and FluxVM"
       description="A side-by-side of Meta's Muse and the open Zyvor stack: Keep, Fabric and FluxVM — policy, isolation, network proof and portability.">
+      <PageMetadata image="/img/compare-social.png" />
       <div className={styles.page}>
         <Hero />
         <main>
@@ -793,7 +922,7 @@ export default function Compare(): ReactNode {
             </ul>
           </Section>
 
-          <div id="stack" />
+          <div id="stack" className={styles.anchor} />
           <Section
             eyebrow="The stack"
             title="One outsider. Three layers you own."
@@ -801,19 +930,37 @@ export default function Compare(): ReactNode {
             <StackScene />
           </Section>
 
-          <div id="matrix" />
+          <div id="profiles" className={styles.anchor} />
+          <Section
+            eyebrow="Security profiles"
+            title="Three rungs. One says what it can’t prove."
+            lede="Keep labels every cell with the evidence it actually has. Measured is software-test; hardware attestation stays gated until a verified run."
+            tint
+            wide>
+            <ProfileLadder />
+          </Section>
+
+          <div id="matrix" className={styles.anchor} />
           <Section
             eyebrow="The matrix"
             title="Side by side."
             lede="Muse cells describe the product as publicly documented; detail is thin, so read them as claims, not audits."
-            tint
             wide>
             <Matrix />
           </Section>
 
           <Proof />
 
-          <div id="use-cases" />
+          <div id="cockpit" className={styles.anchor} />
+          <Section
+            eyebrow="The cockpit"
+            title="What you watch while it works."
+            lede="A goal, its plan, the decisions the policy made, and the egress counter — with the honesty badge always on."
+            wide>
+            <CockpitMock />
+          </Section>
+
+          <div id="use-cases" className={styles.anchor} />
           <Section
             eyebrow="Use cases"
             title="Not just a PDF."
@@ -827,7 +974,34 @@ export default function Compare(): ReactNode {
             </p>
           </Section>
 
-          <Section eyebrow="Pick your layer" title="Use one. Use all three.">
+          <div id="receipts" className={styles.anchor} />
+          <Section
+            eyebrow="Receipts"
+            title="Run, archived, in the repo."
+            lede="The pilot gate has passed on a real FluxVM host — happy path and deny path — with logs archived under docs/keep/pilot-runs/."
+            wide>
+            <Receipts />
+          </Section>
+
+          <div id="roadmap" className={styles.anchor} />
+          <Section
+            eyebrow="Roadmap"
+            title="Shipped, gated, next."
+            lede="What is done, what waits on hardware, and what comes after — straight from STATUS.md and the Keep 0.2 notes."
+            tint
+            wide>
+            <Roadmap />
+          </Section>
+
+          <div id="quickstart" className={styles.anchor} />
+          <Section
+            eyebrow="Try it"
+            title="Copy, paste, run."
+            lede="Three commands from the repo. You need a FluxVM host; nothing here runs in Meta’s cloud.">
+            <Quickstart />
+          </Section>
+
+          <Section eyebrow="Pick your layer" title="Use one. Use all three." tint>
             <ul className={styles.cards}>
               {CARDS.map((card, i) => (
                 <li key={card.name}>
