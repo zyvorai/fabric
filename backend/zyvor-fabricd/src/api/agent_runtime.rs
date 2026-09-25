@@ -486,6 +486,56 @@ pub async fn demo_list(
     proxy(&state, Method::GET, "/v1/demos", None, None, None).await
 }
 
+/// A demo id becomes part of the upstream path, so accept slug characters only.
+fn valid_demo_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 48
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+fn bad_demo_id() -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "error": "invalid demo id" })),
+    )
+        .into_response()
+}
+
+/// Create or replace a user-defined use case (a declarative spec: an extractor
+/// enum plus bounded rules, so it carries no code).
+pub async fn demo_save(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> Response {
+    match proxy_json(&state, Method::POST, "/v1/demos", None, Some(body)).await {
+        Ok((status, value)) => json_response(status, value),
+        Err(resp) => resp,
+    }
+}
+
+/// Remove a user-defined use case. Built-ins are refused by agent-runtime.
+pub async fn demo_delete(
+    RequireWrite(_claims): RequireWrite,
+    State(state): State<Arc<AppState>>,
+    Path(demo_id): Path<String>,
+) -> Response {
+    if !valid_demo_id(&demo_id) {
+        return bad_demo_id();
+    }
+    proxy(
+        &state,
+        Method::DELETE,
+        &format!("/v1/demos/{demo_id}"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
 /// Run one Keep demo: multipart file passthrough to agent-runtime `/v1/demos/{id}`.
 /// `pdf-brief` is one id among several, so the original route keeps working.
 pub async fn demo_run(
@@ -494,18 +544,8 @@ pub async fn demo_run(
     Path(demo_id): Path<String>,
     request: axum::http::Request<Body>,
 ) -> Response {
-    // The id becomes part of the upstream path, so accept slug characters only.
-    if demo_id.is_empty()
-        || demo_id.len() > 48
-        || !demo_id
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "invalid demo id" })),
-        )
-            .into_response();
+    if !valid_demo_id(&demo_id) {
+        return bad_demo_id();
     }
     let (base, token) = match upstream(&state) {
         Ok(v) => v,

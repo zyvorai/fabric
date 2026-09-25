@@ -3,8 +3,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { FileText, Shield } from 'lucide-react'
-import { DemoInfo, DemoResult, listDemos, runDemo } from '../api/agents'
+import { FileText, Shield, Trash2 } from 'lucide-react'
+import { deleteDemo, DemoInfo, DemoResult, listDemos, runDemo } from '../api/agents'
+import DeployUseCase from '../components/keep/DeployUseCase'
 import { PageHeader, Card } from '../components/ui'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
@@ -35,18 +36,21 @@ export default function KeepHome() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<DemoResult | null>(null)
 
-  useEffect(() => {
-    let live = true
+  const [showDeploy, setShowDeploy] = useState(false)
+
+  const refresh = () =>
     listDemos()
       .then((list) => {
-        if (live && list.length > 0) setDemos(list)
+        if (list.length > 0) setDemos(list)
+        return list
       })
       .catch(() => {
         /* older runtime: keep the PDF brief fallback */
+        return [] as DemoInfo[]
       })
-    return () => {
-      live = false
-    }
+
+  useEffect(() => {
+    void refresh()
   }, [])
 
   const demo = demos.find((d) => d.id === demoId) ?? demos[0]
@@ -60,7 +64,31 @@ export default function KeepHome() {
     setChip('idle')
   }
 
+  const onDeployed = async (id: string) => {
+    await refresh()
+    pick(id)
+    setShowDeploy(false)
+    toast.success(`Use case "${id}" deployed`)
+  }
+
+  const remove = async () => {
+    if (demo.builtin !== false) return
+    try {
+      await deleteDemo(demo.id)
+      const list = await refresh()
+      pick(list[0]?.id ?? FALLBACK_DEMOS[0].id)
+      toast.success(`Removed "${demo.title}"`)
+    } catch (e) {
+      toastFailure(toast, 'Could not remove the use case', e)
+    }
+  }
+
+  const needsFile = demo.has_sample === false
   const run = async () => {
+    if (needsFile && !file) {
+      setError('This use case has no built-in sample. Pick a file to run it.')
+      return
+    }
     setBusy(true)
     setError(null)
     setResult(null)
@@ -151,9 +179,20 @@ export default function KeepHome() {
                   disabled={busy}
                 >
                   {d.title}
+                  {d.builtin === false ? ' · custom' : ''}
                 </button>
               ))}
             </div>
+          )}
+          {demo.builtin === false && (
+            <button
+              type="button"
+              className="zf-btn zf-btn-ghost zf-btn-sm"
+              onClick={() => void remove()}
+              disabled={busy}
+            >
+              <Trash2 className="w-4 h-4 mr-1 inline" /> Remove this custom use case
+            </button>
           )}
 
           <div className="flex flex-wrap items-center gap-2">
@@ -176,7 +215,7 @@ export default function KeepHome() {
               onClick={() => inputRef.current?.click()}
               disabled={busy}
             >
-              {file ? file.name : `Pick a ${accept} file (or use the sample)`}
+              {file ? file.name : needsFile ? `Pick a ${accept} file` : `Pick a ${accept} file (or use the sample)`}
             </button>
             <button
               type="button"
@@ -213,6 +252,32 @@ export default function KeepHome() {
                 <span className="text-[var(--zf-muted)] text-xs self-center">{artifacts}</span>
               </div>
             </div>
+          )}
+        </Card>
+
+        <Card className="p-5 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--zf-ink)]">Deploy your own use case</h2>
+              <p className="text-sm text-[var(--zf-muted)] mt-1">
+                Describe what to pull out of a file. It runs in the same sealed cell as the others:
+                no browser, no network, 0 CONNECT. No code is run from your definition.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="zf-btn zf-btn-secondary zf-btn-sm shrink-0"
+              aria-expanded={showDeploy}
+              onClick={() => setShowDeploy((v) => !v)}
+            >
+              {showDeploy ? 'Close' : 'New use case'}
+            </button>
+          </div>
+          {showDeploy && (
+            <DeployUseCase
+              onDeployed={(id) => void onDeployed(id)}
+              onError={(msg) => toastFailure(toast, 'Deploy failed', new Error(msg))}
+            />
           )}
         </Card>
 

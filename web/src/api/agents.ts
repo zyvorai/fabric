@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { apiDelete, apiFetch, apiGet, apiPost } from './client'
+import type { UseCaseSpec } from '../lib/useCaseSpec'
 import { formatHttpErrorBody } from '../utils/apiError'
 import { parseJsonResponse } from '../utils/parseJsonResponse'
 
@@ -180,6 +181,9 @@ export interface DemoInfo {
   /** Lower-case file extensions without the dot. */
   accepts: string[]
   max_bytes: number
+  /** False for a use case a user deployed. */
+  builtin?: boolean
+  has_sample?: boolean
 }
 
 export interface DemoResult {
@@ -204,6 +208,18 @@ export type PdfBriefDemoResult = DemoResult
 export async function listDemos(): Promise<DemoInfo[]> {
   const out = await apiGet<{ demos: DemoInfo[] }>('/api/demos')
   return out.demos ?? []
+}
+
+/** Create or replace a user-defined use case (declarative: no code). */
+export async function saveDemo(
+  spec: UseCaseSpec,
+): Promise<{ id: string; builtin: boolean; replaced: boolean }> {
+  return apiPost('/api/demos', spec)
+}
+
+/** Remove a user-defined use case. Built-ins are refused by the runtime. */
+export async function deleteDemo(id: string): Promise<void> {
+  return apiDelete(`/api/demos/${encodeURIComponent(id)}`)
 }
 
 /** Run one demo (multipart `file`). Omit the file to use the demo's built-in sample. */
