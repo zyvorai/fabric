@@ -25,7 +25,7 @@ use axum::{
 };
 use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -603,28 +603,13 @@ pub fn signature_matches(secret: &str, body: &[u8], presented: &str) -> bool {
     constant_time_eq(expected.as_bytes(), presented.as_bytes())
 }
 
+/// HMAC-SHA256 (RFC 2104), from the RustCrypto `hmac` crate. Any key length is accepted.
 pub fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
-    let mut padded = [0u8; 64];
-    if key.len() > 64 {
-        let digested = Sha256::digest(key);
-        padded[..32].copy_from_slice(&digested);
-    } else {
-        padded[..key.len()].copy_from_slice(key);
-    }
-    let mut inner = [0x36u8; 64];
-    let mut outer = [0x5cu8; 64];
-    for i in 0..64 {
-        inner[i] ^= padded[i];
-        outer[i] ^= padded[i];
-    }
-    let mut inner_hash = Sha256::new();
-    inner_hash.update(inner);
-    inner_hash.update(message);
-    let inner_digest = inner_hash.finalize();
-    let mut outer_hash = Sha256::new();
-    outer_hash.update(outer);
-    outer_hash.update(inner_digest);
-    outer_hash.finalize().into()
+    use hmac::{Hmac, KeyInit, Mac};
+    let mut mac =
+        <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("HMAC accepts a key of any length");
+    mac.update(message);
+    mac.finalize().into_bytes().into()
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
@@ -741,6 +726,29 @@ fn bit(bits: u64, value: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// RFC 4231 test vectors: the HMAC is the standard one, including for a key longer than the block.
+    #[test]
+    fn hmac_sha256_matches_rfc_4231() {
+        let hex = |b: [u8; 32]| hex::encode(b);
+        assert_eq!(
+            hex(hmac_sha256(&[0x0b; 20], b"Hi There")),
+            "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+        );
+        assert_eq!(
+            hex(hmac_sha256(b"Jefe", b"what do ya want for nothing?")),
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+        );
+        assert_eq!(
+            hex(hmac_sha256(
+                &[0xaa; 131],
+                b"Test Using Larger Than Block-Size Key - Hash Key First"
+            )),
+            "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
+        );
+        // An empty key is legal too.
+        assert_eq!(hmac_sha256(b"", b"x").len(), 32);
+    }
+
     use super::*;
     use crate::model::LoopBounds;
 

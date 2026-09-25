@@ -110,6 +110,26 @@ test("only the phone-facing routes are exposed", async (t) => {
   }
 });
 
+test("only plain path segments reach a shard: traversal, encoded dots and slashes are refused", async (t) => {
+  const { base, login, eu } = await setup(t);
+  for (const p of [
+    "/api/sessions/%2e%2e/keep/status",
+    "/api/sessions/..%2fkeep/status",
+    "/api/sessions/%2F%2Fevil.example",
+    "/api/sessions/a%5Cb",
+    "/api/sessions//x",
+    "/api/sessions/a b",
+  ]) {
+    const r = await fetch(`${base}${p}`, { headers: { authorization: login() } });
+    assert.ok([400, 404].includes(r.status), `${p} -> ${r.status}`);
+  }
+  assert.ok(!eu.seen.some((c) => c.url.includes("keep") || c.url.includes("evil")), "nothing odd reached the shard");
+  // Ordinary nested paths, with ids and a query, still work.
+  const ok = await fetch(`${base}/api/artifacts/11111111-1111-4111-8111-111111111111/diff/22222222-2222-4222-8222-222222222222?x=1`, { headers: { authorization: login() } });
+  assert.equal(ok.status, 200);
+  assert.ok(eu.seen.some((c) => c.url === "/v1/artifacts/11111111-1111-4111-8111-111111111111/diff/22222222-2222-4222-8222-222222222222?x=1"));
+});
+
 test("a POST body (an approval decision) is forwarded intact", async (t) => {
   const { base, login, eu } = await setup(t);
   const body = JSON.stringify({ decision: "approved", device_id: "d", signature: "AAAA" });

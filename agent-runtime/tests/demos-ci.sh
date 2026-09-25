@@ -653,8 +653,9 @@ ok "the operator can still decide without a phone"
 
 echo "demos-ci: the reference vendor gateway in front of a shard"
 GW_PORT=$(free_port)
+GW_ADMIN=$(python3 -c 'import secrets; print(secrets.token_hex(8))')   # a throwaway key for this run
 cat > "$WORK/gw.json" <<JSON
-{"jwtSecret":"gw-login-secret","relaySecret":"gw-relay-secret","adminKey":"gw-admin","defaultRegion":"eu","port":$GW_PORT,
+{"jwtSecret":"gw-login-secret","relaySecret":"gw-relay-secret","adminKey":"$GW_ADMIN","defaultRegion":"eu","port":$GW_PORT,
  "stateFile":"$WORK/gw-users.json","shards":[{"id":"eu-1","region":"eu","url":"$KEEP_BASE","token":"$KEEP_TOKEN_VALUE"}]}
 JSON
 node "$ROOT/reference/vendor-gateway/src/main.js" "$WORK/gw.json" >"$WORK/gw.log" 2>&1 &
@@ -681,10 +682,11 @@ ok "through the gateway users are isolated, and operator routes are not exposed"
 $PHONE keygen "$WORK/dora.key" p256 >/dev/null; $PHONE enrol "$WORK/dora.key" dora-phone > "$WORK/dora-enrol.json"
 [[ "$(gw "$DORA_STRONG" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/dora-enrol.json" "$GW/api/devices")" == "201" ]] || fail "a strong login should enrol a device"
 [[ "$(gw "$DORA" "$GW/api/devices" | python3 -c 'import json,sys; print(",".join(d["device_id"] for d in json.load(sys.stdin)["items"]))')" == "dora-phone" ]] || fail "the enrolled device should be listed"
-[[ "$(curl -s -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$KEEP_BASE/v1/users/dora/devices" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["items"]))')" == "1" ]] || fail "the shard should hold dora's device"
+[[ "$(op "$KEEP_BASE/v1/users/dora/devices" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["items"]))')" == "1" ]] || fail "the shard should hold dora's device"
 ok "enrolling a device needs a strong login; the gateway enrols it on the shard for the right user"
-[[ "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-admin-key: gw-admin' "$GW/admin/shards")" == "200" && "$(curl -s "$GW/admin/shards" -H 'x-admin-key: gw-admin' | grep -c "$KEEP_TOKEN_VALUE")" == "0" ]] || fail "the admin view must not leak the operator token"
-[[ "$(curl -s -H 'x-admin-key: gw-admin' "$GW/admin/usage?user_id=dora" | json usage.runs)" == "1" ]] || fail "usage rollup should report dora's run"
+gwa() { curl -s -H "x-admin-key: $GW_ADMIN" "$@"; }
+[[ "$(gwa -o /dev/null -w '%{http_code}' "$GW/admin/shards")" == "200" && "$(gwa "$GW/admin/shards" | grep -c "$KEEP_TOKEN_VALUE")" == "0" ]] || fail "the admin view must not leak the operator token"
+[[ "$(gwa "$GW/admin/usage?user_id=dora" | json usage.runs)" == "1" ]] || fail "usage rollup should report dora's run"
 ok "the gateway's admin view hides operator tokens and rolls up usage per user"
 
 echo "demos-ci: $PASSED checks passed"

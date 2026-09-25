@@ -1,0 +1,9 @@
+# Fingerprints (commit:file:rule:line) of findings that are not secrets.
+#
+# agent-runtime/tests/demos-ci.sh in commit a363604c drove a throwaway local e2e gateway with a fixed test
+# admin key and put a `curl -H "Authorization: ..."` header next to a URL. Nothing here is a credential: the
+# gateway and runtime exist only for the length of the test, on 127.0.0.1. The script no longer contains the
+# literal (the key is generated per run); these entries only silence the historical lines.
+a363604c65393ce9012736c390b747d97437a2dc:agent-runtime/tests/demos-ci.sh:curl-auth-header:660
+a363604c65393ce9012736c390b747d97437a2dc:agent-runtime/tests/demos-ci.sh:curl-auth-header:662
+a363604c65393ce9012736c390b747d97437a2dc:agent-runtime/tests/demos-ci.sh:curl-auth-header:663
