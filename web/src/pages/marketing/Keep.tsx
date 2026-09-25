@@ -7,6 +7,9 @@ import MarketingLayout from '../../components/MarketingLayout'
 import KeepDemoStoryboard from '../../components/keep/KeepDemoStoryboard'
 import KeepSplitSight from '../../components/keep/KeepSplitSight'
 import KeepMuseCompare from '../../components/keep/KeepMuseCompare'
+import KeepInstall from '../../components/keep/KeepInstall'
+import KeepDemoFrame from '../../components/keep/KeepDemoFrame'
+import marketing from '../../../../docs/keep/marketing.json'
 
 const DOCS = 'https://github.com/zyvorai/fabric/blob/main/docs'
 
@@ -21,25 +24,56 @@ export default function Keep() {
         <section className="keep-mkt-hero">
           <p className="mkt-reveal keep-mkt-brand">Keep</p>
           <h1 className="mkt-reveal-delay">
-            Your agent gets a real computer.
-            <br />
-            You keep the keys.
+            {marketing.tagline}
           </h1>
-          <p className="lede mkt-reveal-delay">
-            Keep gives an untrusted AI agent its own sealed computer on hardware you control, while
-            you hold the policy, the credentials and the approvals. Open source.
-          </p>
+          <p className="lede mkt-reveal-delay">{marketing.lede}</p>
           <div className="mkt-cta-row mkt-reveal-delay-2">
-            <Link to={primaryTo} className="zf-btn zf-btn-primary">
+            <a href="#install" className="zf-btn zf-btn-primary">
+              Try it in 60 seconds
+            </a>
+            <Link to={primaryTo} className="zf-btn zf-btn-secondary">
               {primaryLabel}
             </Link>
-            <Link to="/product" className="zf-btn zf-btn-secondary">
-              Fabric control plane →
-            </Link>
+            <a
+              href="https://github.com/zyvorai/fabric"
+              className="zf-btn zf-btn-secondary"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Star on GitHub
+            </a>
           </div>
           <div className="keep-mkt-hero-plane mkt-reveal-delay-2">
             <KeepSplitSight />
           </div>
+        </section>
+
+        <section className="keep-mkt-section">
+          <p className="keep-mkt-eyebrow">Get started</p>
+          <h2>Run it in 60 seconds.</h2>
+          <KeepInstall />
+          <KeepDemoFrame />
+        </section>
+
+        <section className="keep-mkt-section">
+          <p className="keep-mkt-eyebrow">Why Keep</p>
+          <h2>Yours to run, read and take.</h2>
+          <div className="keep-mkt-values">
+            {marketing.values.map((v) => (
+              <div key={v.title} className="keep-mkt-value">
+                <h3>{v.title}</h3>
+                <p>{v.body}</p>
+              </div>
+            ))}
+          </div>
+          <ul className="keep-mkt-features">
+            {marketing.features.map((f) => (
+              <li key={f.title}>
+                <strong>{f.title}</strong>
+                <span>{f.body}</span>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className="keep-mkt-section">
@@ -100,12 +134,7 @@ export default function Keep() {
           <p className="keep-mkt-eyebrow">Meta Muse vs Keep</p>
           <h2>Same threat model. Different owner.</h2>
           <KeepMuseCompare />
-          <p className="keep-mkt-honesty">
-            Honest about the limits: Keep runs on measured VMs today, and its evidence class is{' '}
-            <code className="font-mono text-[13px]">software-test</code>. Until it runs on verified
-            confidential hardware with a key only you hold, the host can still see inside the VM,
-            and we will not claim otherwise.
-          </p>
+          <p className="keep-mkt-honesty">Honest about the limits: {marketing.honesty}</p>
         </section>
 
         <section className="mkt-band">

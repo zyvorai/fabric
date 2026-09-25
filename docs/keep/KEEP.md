@@ -1,5 +1,7 @@
 # Keep
 
+> New here? Start with the [Keep README](https://github.com/zyvorai/fabric/blob/main/docs/keep/README.md). This page is the full spec.
+
 **Pitch:** *the agent gets a real computer; you keep the keys, the policy, and the right to leave.*
 
 Keep is a personal workstation for an untrusted agent. Muse got the threat model right; Keep ships the open version Meta cannot: **you run it, you read it, you take it with you.**
@@ -109,7 +111,7 @@ Security profiles (FluxVM Phase 6):
 | `measured` | `software-test` | **never** |
 | `confidential-snp` / `confidential-tdx` | `sev-snp` / `tdx` only after verified hardware run | gated |
 
-## Keep 0.1 — six-pack (shipped)
+## Keep 0.1 — shipped
 
 1. **BYO model socket** — Grok / local GGUF / vLLM / Muse-class API; cell unchanged.
 2. **Signed YAML Sentinel** — Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) fail-closed; `sentinel/keep.policy.yaml`.

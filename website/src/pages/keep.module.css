@@ -76,13 +76,14 @@
   margin-top: 2rem;
 }
 
-.hero .button--secondary {
+.hero :global(.button--secondary) {
   color: #0c1118;
   background: #f5f5f7;
   border-color: #f5f5f7;
 }
 
-.hero .button--outline.button--secondary {
+.hero a:global(.button--outline.button--secondary),
+.hero a:global(.button--outline.button--secondary):hover {
   color: #e8eef5;
   background: transparent;
   border-color: rgba(232, 238, 245, 0.4);
@@ -459,4 +460,78 @@
 .stageLine em {
   font-style: normal;
   font-weight: 600;
+}
+
+/* Install strip, demo frame, value cards, feature grid */
+.install {
+  max-width: 44rem;
+  margin: 1.5rem 0 0;
+}
+
+.installNote {
+  font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-700);
+  margin: 0.25rem 0 0;
+}
+
+.demoFrame {
+  margin: 1.75rem 0 0.5rem;
+  max-width: 47.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.55);
+}
+
+.demoFrame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.value {
+  padding: 1.25rem 1.25rem 1.1rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 12px;
+  background: var(--ifm-background-color);
+}
+
+.value h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+.value p {
+  margin: 0;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.45;
+}
+
+.features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.75rem 1.5rem;
+}
+
+.features li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.features span {
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.95rem;
+  line-height: 1.4;
 }

@@ -2,6 +2,13 @@ import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
+import Head from '@docusaurus/Head';
+import CodeBlock from '@theme/CodeBlock';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import marketing from '../../../docs/keep/marketing.json';
+import Reveal from '../components/Reveal';
 import styles from './keep.module.css';
 
 function SplitSight(): ReactNode {
@@ -27,49 +34,8 @@ function SplitSight(): ReactNode {
   );
 }
 
-// Every row is stated in docs/keep/KEEP.md. Rows with no source for the Muse side are left out.
-const COMPARE_ROWS = [
-  {
-    label: 'Where it runs',
-    muse: 'Meta’s cloud only.',
-    keep: 'Your laptop, mini-PC or FluxVM host.',
-  },
-  {
-    label: 'Policy',
-    muse: 'A closed policy engine.',
-    keep: 'A signed keep.policy.yaml you can diff in git.',
-  },
-  {
-    label: 'The cell',
-    muse: 'A container-style cell that shares a kernel with its policy engine.',
-    keep: 'A Firecracker/KVM microVM on FluxVM, with its own kernel.',
-  },
-  {
-    label: 'Model',
-    muse: 'Tied to Muse Spark.',
-    keep: 'Bring your own model socket.',
-  },
-  {
-    label: 'Training',
-    muse: 'Trajectories may train after sanitization.',
-    keep: 'Off by default. Export needs a scoped token.',
-  },
-  {
-    label: 'Secrets',
-    muse: 'Surrogates swapped in at egress.',
-    keep: 'The same idea: the vault injects on the host, and the agent never sees a real secret.',
-  },
-  {
-    label: 'Browser',
-    muse: 'A measured, accessibility-style appliance.',
-    keep: 'The same idea: the agent sees structure, you see pixels.',
-  },
-  {
-    label: 'Honesty',
-    muse: 'A footnote.',
-    keep: 'Up front: measured means software-test until verified hardware.',
-  },
-] as const;
+// Rows live in docs/keep/marketing.json (one source for README, this page and the console).
+const COMPARE_ROWS = marketing.compare;
 
 function MuseCompare(): ReactNode {
   return (
@@ -126,6 +92,47 @@ function MuseCompare(): ReactNode {
   );
 }
 
+function InstallStrip(): ReactNode {
+  return (
+    <div className={styles.install} id="install">
+      <Tabs>
+        {marketing.install.map((step, i) => (
+          <TabItem key={step.label} value={step.label} label={step.label} default={i === 0}>
+            <CodeBlock language="bash">{step.commands.join('\n')}</CodeBlock>
+            <p className={styles.installNote}>{step.note}</p>
+          </TabItem>
+        ))}
+      </Tabs>
+    </div>
+  );
+}
+
+function Values(): ReactNode {
+  return (
+    <div className={styles.values}>
+      {marketing.values.map((v, i) => (
+        <Reveal key={v.title} delay={i * 80} className={styles.value}>
+          <h3>{v.title}</h3>
+          <p>{v.body}</p>
+        </Reveal>
+      ))}
+    </div>
+  );
+}
+
+function Features(): ReactNode {
+  return (
+    <ul className={styles.features}>
+      {marketing.features.map((f) => (
+        <li key={f.title}>
+          <strong>{f.title}</strong>
+          <span>{f.body}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Section({
   eyebrow,
   title,
@@ -151,36 +158,61 @@ function Section({
 }
 
 export default function KeepPage(): ReactNode {
+  const demo = useBaseUrl('/keep/demo-static.svg');
+  const card = useBaseUrl('/img/social-card.png');
   return (
     <Layout
       title="Keep — your agent gets a real computer"
       description="An open-source workstation for an untrusted AI agent: a sealed FluxVM cell, signed policy and network rules enforced on the host, on hardware you control.">
+      <Head>
+        <meta property="og:image" content={card} />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Head>
       <main className={styles.page}>
         <header className={styles.hero}>
           <div className={styles.heroInner}>
             <p className={styles.brand}>Keep</p>
             <Heading as="h1" className={styles.headline}>
-              Your agent gets a real computer.
-              <br />
-              You keep the keys.
+              {marketing.tagline}
             </Heading>
-            <p className={styles.lede}>
-              Keep gives an untrusted AI agent its own sealed computer on hardware you control, while
-              you hold the policy, the credentials and the approvals. Open source.
-            </p>
+            <p className={styles.lede}>{marketing.lede}</p>
             <div className={styles.btnrow}>
-              <Link className="button button--secondary button--lg" to="/docs/tutorials/keep-pdf-brief">
-                Try the PDF demo
+              <a className="button button--secondary button--lg" href="#install">
+                Try it in 60 seconds
+              </a>
+              <Link
+                className="button button--outline button--lg button--secondary"
+                to="/compare">
+                Muse vs Keep
               </Link>
               <Link
                 className="button button--outline button--lg button--secondary"
-                to="/docs/keep/">
-                Keep docs
+                href="https://github.com/zyvorai/fabric">
+                Star on GitHub
               </Link>
             </div>
             <SplitSight />
           </div>
         </header>
+
+        <Section eyebrow="Get started" title="Run it in 60 seconds.">
+          <InstallStrip />
+          <div className={styles.demoFrame}>
+            <img
+              src={demo}
+              alt="Real output of ./scripts/keep-e2e.sh: 40 checks passed, 0 failed"
+              loading="lazy"
+            />
+          </div>
+          <p className={styles.crumb}>
+            Real output of <code>./scripts/keep-e2e.sh</code>, condensed. No KVM needed.
+          </p>
+        </Section>
+
+        <Section eyebrow="Why Keep" title="Yours to run, read and take." tint>
+          <Values />
+          <Features />
+        </Section>
 
         <Section eyebrow="See it work" title="Drop in a PDF. Get a brief.">
           <p className={styles.body}>
@@ -242,11 +274,7 @@ export default function KeepPage(): ReactNode {
 
         <Section eyebrow="Meta Muse vs Keep" title="Same threat model. Different owner.">
           <MuseCompare />
-          <p className={styles.honesty}>
-            Honest about the limits: Keep runs on measured VMs today, and its evidence class is{' '}
-            <code>software-test</code>. Until it runs on verified confidential hardware with a key
-            only you hold, the host can still see inside the VM, and we will not claim otherwise.
-          </p>
+          <p className={styles.honesty}>Honest about the limits: {marketing.honesty}</p>
           <div className={styles.btnrowEnd}>
             <Link className="button button--primary button--lg" to="/docs/tutorials/keep-pdf-brief">
               Try the PDF demo

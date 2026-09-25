@@ -108,32 +108,23 @@ Full capability tour and metrics: **[docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVER
 
 ## Keep — open agent workstation
 
-Muse got the threat model right. Keep ships the open version Meta cannot — on Fabric and FluxVM, not a third VMM.
+<p align="center">
+  <a href="docs/keep/README.md"><img src="docs/assets/keep/demo-static.svg" alt="Real output of ./scripts/keep-e2e.sh: 40 checks passed, 0 failed" width="640"></a>
+</p>
 
-| Layer | Role |
-|-------|------|
-| **Muse** | Closed personal agent on Meta’s cloud |
-| **Keep** | Product layer — policy, vault, approvals, browser, demos |
-| **Fabric** | Control plane — console, JWT, Agents / Sessions |
-| **FluxVM** | Hypervisor — the cell + host TC/eBPF pin |
+**Your agent gets a real computer. You keep the keys.** Keep gives an untrusted AI agent its own sealed
+FluxVM cell while you hold the policy, the credentials and the approvals. Muse got the threat model
+right; Keep is the open version you run, read and take with you.
 
-| | Muse | Keep |
-|---|---|---|
-| Where it runs | Meta cloud only | Your laptop, mini-PC, FluxVM host, or rented SNP/TDX — same API |
-| Policy | Closed Sentinel | Signed `keep.policy.yaml` you can diff in git |
-| Cell | Often nspawn — shared kernel with Sentinel | Firecracker / KVM microVM via FluxVM |
-| Model | Married to Muse Spark | BYO model socket |
-| Training | Trajectories may train after sanitize | Default off — export needs a scoped token |
-| Host eBPF | Not a tenant-owned pin you can show | FluxVM TC: `deny_udp` + gateway-only ports; cockpit CONNECT 0 |
-| Proof on stage | Trust Meta’s story | Keep audit journal + FluxVM `drop_reasons` (PacketWolf optional) |
-| Leave | Hard | `keepctl pack` / `unpack` onto another FluxVM |
+```bash
+./scripts/keep-e2e.sh   # live runtime + FluxVM stub + keepctl, no KVM. passed=40 failed=0
+```
 
-**Stage line:** Muse = agent computer in Meta’s cloud. Keep = same idea on *your* FluxVM — signed policy, and CONNECT 0 from Keep’s journal + FluxVM’s pin.
-
-Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class stays `software-test` — never marketed as “the operator cannot read this.”
+Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class stays `software-test` — never marketed as "the operator cannot read this."
 
 | Start here | |
 |---|---|
+| **Keep README** — pitch, 60-second start, Muse vs Keep | [docs/keep/README.md](docs/keep/README.md) |
 | Pitch + architecture | [docs/keep/KEEP.md](docs/keep/KEEP.md) |
 | Tutorial 16 — workstation | [docs/tutorials/16-keep-workstation.md](docs/tutorials/16-keep-workstation.md) |
 | Tutorial 17 — PDF brief (CONNECT 0) | [docs/tutorials/17-keep-pdf-brief.md](docs/tutorials/17-keep-pdf-brief.md) |
