@@ -1,0 +1,332 @@
+.page {
+  --keep-steel: #1a2330;
+  --keep-mist: #8b9bb0;
+  --keep-ink: #e8eef5;
+  --keep-plane: #0c1118;
+}
+
+.hero {
+  position: relative;
+  padding: clamp(4rem, 10vw, 7rem) 0 clamp(2.5rem, 5vw, 3.5rem);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(110, 231, 183, 0.08), transparent 55%),
+    linear-gradient(180deg, #0a0e14 0%, var(--keep-steel) 48%, #0c1118 100%);
+  color: var(--keep-ink);
+  text-align: center;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.brand {
+  font-size: clamp(3.25rem, 11vw, 6.5rem);
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+  margin: 0 0 1.25rem;
+  color: #fff;
+}
+
+.headline {
+  font-size: clamp(1.25rem, 3vw, 1.85rem) !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  margin: 0 auto 1rem;
+  max-width: 22ch;
+  color: rgba(232, 238, 245, 0.92);
+}
+
+.lede {
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  color: var(--keep-mist);
+  max-width: 34rem;
+  margin: 0 auto 1.75rem;
+  line-height: 1.45;
+}
+
+.btnrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+.btnrowEnd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-start;
+  margin-top: 2rem;
+}
+
+.hero .button--secondary {
+  color: #0c1118;
+  background: #f5f5f7;
+  border-color: #f5f5f7;
+}
+
+.hero .button--outline.button--secondary {
+  color: #e8eef5;
+  background: transparent;
+  border-color: rgba(232, 238, 245, 0.4);
+}
+
+.plane {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgba(232, 238, 245, 0.12);
+  overflow: hidden;
+  box-shadow: 0 -32px 64px rgba(0, 0, 0, 0.35);
+}
+
+.sight {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100%;
+  min-height: 220px;
+  background: var(--keep-plane);
+}
+
+@media (max-width: 640px) {
+  .sight {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sightPlane {
+  position: relative;
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  text-align: left;
+}
+
+.sightAgent {
+  border-right: 1px solid rgba(232, 238, 245, 0.1);
+  background: linear-gradient(160deg, #121820 0%, #0c1118 100%);
+}
+
+.sightOps {
+  background:
+    radial-gradient(ellipse 70% 60% at 70% 40%, rgba(110, 231, 183, 0.12), transparent 55%),
+    linear-gradient(200deg, #151c26 0%, #0a0e14 100%);
+}
+
+.sightTag {
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--keep-mist);
+  margin-bottom: 0.75rem;
+}
+
+.sightA11y {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  color: rgba(232, 238, 245, 0.75);
+  white-space: pre-wrap;
+}
+
+.sightPixels {
+  position: relative;
+  min-height: 7rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  color: rgba(232, 238, 245, 0.55);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sightScan {
+  position: absolute;
+  inset: 12% 15%;
+  border: 1px solid rgba(110, 231, 183, 0.25);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(110, 231, 183, 0.08) 48%,
+    transparent 52%
+  );
+  animation: keepScan 4.5s ease-in-out infinite;
+}
+
+@keyframes keepScan {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(-6%);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(6%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sightScan {
+    animation: none;
+  }
+}
+
+.section {
+  padding: clamp(3.5rem, 8vw, 5.5rem) 0;
+}
+
+.sectionTint {
+  background: var(--ifm-color-emphasis-100);
+}
+
+.wrap {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ifm-color-emphasis-600);
+  margin: 0 0 0.65rem;
+}
+
+.title {
+  font-size: clamp(1.75rem, 3.5vw, 2.5rem) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  margin: 0 0 0.85rem !important;
+}
+
+.body {
+  font-size: 1.125rem;
+  line-height: 1.5;
+  margin: 0 0 0.75rem;
+  max-width: 38rem;
+}
+
+.crumb {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin-top: 1rem;
+}
+
+.storyboard {
+  margin: 1.5rem 0 0.5rem;
+  padding: 1.5rem 1.25rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-background-surface-color);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.chip {
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  opacity: 0.7;
+}
+
+.chipOn {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.1);
+  opacity: 1;
+}
+
+.connect {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.65rem;
+}
+
+.connectLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.connectNum {
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #059669;
+}
+
+.storyNote {
+  font-size: 0.95rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.75rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compare dt {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-bottom: 0.4rem;
+}
+
+.compare dd {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  letter-spacing: -0.015em;
+}
+
+.honesty {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  opacity: 0.85;
+  max-width: 36rem;
+}

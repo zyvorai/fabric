@@ -100,6 +100,11 @@ const config: Config = {
       hideOnScroll: false,
       items: [
         {
+          to: '/keep',
+          label: 'Keep',
+          position: 'right',
+        },
+        {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
           position: 'right',
@@ -119,8 +124,10 @@ const config: Config = {
           title: 'Docs',
           items: [
             {label: 'Quick start', to: '/docs/getting-started/02-Quick-Start'},
+            {label: 'Keep', to: '/keep'},
+            {label: 'Keep docs', to: '/docs/keep/'},
+            {label: 'Tutorial 17 — PDF brief', to: '/docs/tutorials/keep-pdf-brief'},
             {label: 'Product overview', to: '/docs/PRODUCT_OVERVIEW'},
-            {label: 'Comparison matrix', to: '/docs/guides/decision-support/comparison-matrix'},
             {label: 'FAQ', to: '/docs/quick-reference/faq'},
           ],
         },
@@ -142,6 +149,7 @@ const config: Config = {
           title: 'Zyvor Enterprise',
           items: [
             {label: 'zyvor.dev', href: 'https://zyvor.dev'},
+            {label: 'Keep on zyvor.dev', href: 'https://zyvor.dev/keep'},
             {label: 'sales@zyvor.dev', href: 'mailto:sales@zyvor.dev'},
           ],
         },

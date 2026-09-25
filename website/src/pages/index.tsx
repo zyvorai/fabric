@@ -36,6 +36,11 @@ function HomepageHeader() {
             </Link>
             <Link
               className="button button--outline button--lg button--secondary"
+              to="/keep">
+              Meet Keep
+            </Link>
+            <Link
+              className="button button--outline button--lg button--secondary"
               to="https://github.com/zyvorai/fabric">
               View on GitHub
             </Link>

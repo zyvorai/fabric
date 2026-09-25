@@ -25,3 +25,5 @@ The dashboard screenshot on the homepage is **not** duplicated into `website/sta
 ## Deployment
 
 Deployment is automatic: `.github/workflows/pages.yml` builds and publishes this site to GitHub Pages on every push to `main` that touches `website/`, `docs/`, or the workflow file itself. There is no manual `npm run deploy` step — don't use Docusaurus's built-in `deploy` script, it targets a `gh-pages` branch this repo doesn't use.
+
+**Keep marketing:** `/keep` (Muse-caliber product page) plus docs under `/docs/keep/` and Tutorial 17 at `/docs/tutorials/keep-pdf-brief`. Live URL: `https://zyvorai.github.io/fabric/keep`.

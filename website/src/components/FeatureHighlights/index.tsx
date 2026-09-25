@@ -71,6 +71,13 @@ const FeatureList: FeatureItem[] = [
     icon: ICONS.network,
   },
   {
+    title: 'Keep — agent workstation',
+    description:
+      'Your agent gets a real computer; you keep the keys. FluxVM cell, signed policy, host eBPF deny_udp, and a stage demo: PDF → brief.md with cockpit CONNECT 0.',
+    to: '/keep',
+    icon: ICONS.shield,
+  },
+  {
     title: 'Security-first architecture',
     description:
       '31-round security audit: 194 issues identified and fixed, 0 outstanding. Zero unsafe Rust, zero shell pipelines, JWT + 3-tier RBAC on every endpoint, audit logging with export.',
