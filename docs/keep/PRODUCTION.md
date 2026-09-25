@@ -20,7 +20,7 @@ Check a running install any time with `./scripts/keepctl doctor [--smoke]`.
 
 ## Keep 0.1 pilot — release gate
 
-Run on a customer-like FluxVM host with a registered agent template (`node22-agent` / `agent-node`):
+Run on a customer-like FluxVM host with a registered agent template (`node22-agent` / `agent-node`; bake it with `./scripts/keep-bake-node22-agent.sh`):
 
 ```bash
 KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-pilot-gate.sh

@@ -177,7 +177,7 @@ cargo test --manifest-path agent-runtime/Cargo.toml --lib
 # 2. End to end: live runtime + FluxVM sandbox stub + keepctl
 ./scripts/keep-e2e.sh          # ends with: passed=40 failed=0
 
-# 3. On a FluxVM host with a node22-agent template
+# 3. On a FluxVM host with a node22-agent template (./scripts/keep-bake-node22-agent.sh builds it)
 ./scripts/keep-live-lab.sh
 ```
 

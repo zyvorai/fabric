@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **The cell template and seven scenario packs, in the repo.** `agent-runtime/templates/node22-agent/`
+  (Ubuntu 24.04, Node 22, poppler, the guest agent) with a one-command bake,
+  `./scripts/keep-bake-node22-agent.sh` (`--dry-run` shows what is missing). New use-case packs under
+  `examples/keep-agents/`: `status-page-watch`, `mailbox-triage`, `api-facts`, `expense-sheet`,
+  `nda-review`, and two model-assisted ones, `invoice-model-brief` and `meeting-notes-model`. Docs:
+  [SCENARIOS.md](docs/keep/SCENARIOS.md).
 - **Model-assisted use cases.** A use case can declare one `model` step: after the cell
   extracts the text, the host sends it to a single OpenAI-compatible endpoint and adds the
   reply to the artifact. The cell stays offline (0 CONNECT); the vault decides whether the

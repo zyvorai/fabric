@@ -340,6 +340,62 @@ gkey=$("$KEEPCTL" grants list | awk '/model-brief/{print $1}')
 ok "keepctl grants list and revoke"
 for id in model-brief model-other model-nocred; do curl -sf -X DELETE "$BASE/v1/demos/$id" >/dev/null || fail "delete $id"; done
 
+echo "demos-ci: scenario packs (examples/keep-agents)"
+pack_test() { # dir artifact
+  (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "examples/keep-agents/$1" --test) > "$WORK/pack-$1.out" 2>&1 || fail "$1: pack deploy --test failed: $(cat "$WORK/pack-$1.out")"
+  grep -q "test passed: $2, 0 CONNECT" "$WORK/pack-$1.out" || fail "$1: expected '$2, 0 CONNECT': $(cat "$WORK/pack-$1.out")"
+  # the sample run again, to read the artifact
+  local r; r=$(curl -sf -X POST -F note=none "$BASE/v1/demos/$1") || fail "$1: sample run failed"
+  curl -sf "$BASE/v1/artifacts/$(echo "$r" | json artifacts.0.id)" | json body
+}
+b=$(pack_test status-page-watch status.md)
+echo "$b" | grep -qF "Object storage" || fail "status-page-watch: outage line missing: $b"
+echo "$b" | grep -qF "pageview" && fail "status-page-watch: page script leaked into the summary"
+echo "$b" | grep -qF "09:40 UTC" || fail "status-page-watch: times not extracted: $b"
+ok "status-page-watch: html sample ran, script dropped, times extracted, 0 CONNECT"
+b=$(pack_test mailbox-triage mailbox-triage.md)
+echo "$b" | grep -qF "1× Invoice 2041 is overdue" && echo "$b" | grep -qF "1× ana@example.com" || fail "mailbox-triage: subjects or senders missing: $b"
+echo "$b" | grep -qF "Please reply" || fail "mailbox-triage: reply section missing: $b"
+ok "mailbox-triage: mbox sample ran, subjects and senders extracted, 0 CONNECT"
+b=$(pack_test api-facts facts.md)
+echo "$b" | grep -qF "order.id\`: A-1042" && echo "$b" | grep -qF "KB-01; MS-07" || fail "api-facts: json paths not read: $b"
+ok "api-facts: json_path read keys, indexes and wildcards, 0 CONNECT"
+
+for p in expense-sheet nda-review invoice-model-brief meeting-notes-model; do
+  (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "examples/keep-agents/$p") > "$WORK/pack-$p.out" 2>&1 || fail "$p: pack deploy failed: $(cat "$WORK/pack-$p.out")"
+done
+ok "expense-sheet, nda-review and both model packs deploy (specs validate on the server)"
+python3 - "$WORK" <<'PY'
+import sys, zipfile
+w = sys.argv[1]
+with zipfile.ZipFile(w + "/exp.xlsx", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("xl/workbook.xml", '<workbook><sheets><sheet name="March" sheetId="1"/></sheets></workbook>')
+    z.writestr("xl/sharedStrings.xml", "<sst><si><t>date</t></si><si><t>category</t></si><si><t>vendor</t></si><si><t>amount</t></si><si><t>Travel</t></si><si><t>Meals</t></si><si><t>AirCo</t></si><si><t>Bistro</t></si></sst>")
+    rows = [(0,1,2,3), (None,4,6,None), (None,4,6,None), (None,5,7,None)]
+    sheet = "".join('<row r="%d">' % (i+1) + "".join('<c r="%s%d" t="s"><v>%d</v></c>' % ("ABCD"[j], i+1, v) for j, v in enumerate(r) if v is not None) + "</row>" for i, r in enumerate(rows))
+    z.writestr("xl/worksheets/sheet1.xml", "<worksheet><sheetData>" + sheet + "</sheetData></worksheet>")
+with zipfile.ZipFile(w + "/nda.docx", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("word/document.xml", "<w:document><w:body>" + "".join("<w:p><w:r><w:t>%s</w:t></w:r></w:p>" % t for t in [
+        "This Agreement is governed by the laws of Portugal.",
+        "The term of this Agreement is two (2) years and renews for 30 days at a time.",
+        "Confidential Information must not be disclosed. Damages of EUR 50,000 apply."]) + "</w:body></w:document>")
+PY
+r=$("$KEEPCTL" run expense-sheet "$WORK/exp.xlsx") || fail "expense-sheet run: $r"
+b=$(curl -sf "$BASE/v1/artifacts/$(echo "$r" | json artifacts.0.id)" | json body)
+echo "$b" | grep -qF "Travel (2)" && echo "$b" | grep -qF "AirCo (2)" || fail "expense-sheet: categories or vendors not counted: $b"
+ok "expense-sheet: xlsx read, top categories and vendors counted, 0 CONNECT"
+r=$("$KEEPCTL" run nda-review "$WORK/nda.docx") || fail "nda-review run: $r"
+b=$(curl -sf "$BASE/v1/artifacts/$(echo "$r" | json artifacts.0.id)" | json body)
+echo "$b" | grep -qF "governed by the laws of Portugal" && echo "$b" | grep -qF "two (2) years" && echo "$b" | grep -qF "EUR 50,000" || fail "nda-review: clauses, durations or amounts missing: $b"
+ok "nda-review: docx read, governing law, duration and amount found, 0 CONNECT"
+printf '%%PDF-1.4' > "$WORK/inv.pdf"
+code=$(curl -s -o "$WORK/mb.out" -w '%{http_code}' -X POST -F "file=@$WORK/inv.pdf" "$BASE/v1/demos/invoice-model-brief")
+[[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mb.out" || fail "invoice-model-brief must be refused by the vault out of the box (403): $code $(cat "$WORK/mb.out")"
+code=$(curl -s -o "$WORK/mn.out" -w '%{http_code}' -X POST -F note=none "$BASE/v1/demos/meeting-notes-model")
+[[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mn.out" || fail "meeting-notes-model must be refused by the vault out of the box (403): $code $(cat "$WORK/mn.out")"
+ok "both model packs are refused (403) until an operator allows their endpoint"
+for p in status-page-watch mailbox-triage api-facts expense-sheet nda-review invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
+
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")
 [[ "$code" == "400" ]] || fail "wrong extension should be 400, got $code"; ok "wrong file type refused (400)"

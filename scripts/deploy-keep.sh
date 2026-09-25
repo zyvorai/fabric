@@ -16,7 +16,8 @@
 #      fabricd at it, restarts both
 #   4. runs the CSV cleanup once as a smoke test (the PDF demos also need pdftotext in the template)
 #
-# It does not install FluxVM or bake VM templates. If either is missing it stops
+# It does not install FluxVM or bake VM templates (bake the cell template on the host with
+# scripts/keep-bake-node22-agent.sh, which is in the synced tree). If either is missing it stops
 # and says exactly what to do.
 # ============================================================================
 set -euo pipefail
@@ -194,13 +195,13 @@ if KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN="$TOKEN" "$DIR/scripts/keep-demo.sh
   ok "csv-clean ran in a sealed cell with 0 CONNECT"
 else
   tail -5 /tmp/keep-smoke.log | sed 's/^/    /'
-  die "the smoke test failed. Usually the '${ZYVOR_DEMO_TEMPLATE:-node22-agent}' template is missing or its guest agent is not answering: set ZYVOR_DEMO_TEMPLATE in $ENV to a template that boots (see docs/tutorials/11-* and scripts/keep-bake-*.sh), then re-run this command." 3
+  die "the smoke test failed. Usually the '${ZYVOR_DEMO_TEMPLATE:-node22-agent}' template is missing or its guest agent is not answering: bake it on the host with ~/zyvor-fabric/scripts/keep-bake-node22-agent.sh (--dry-run shows what is missing), or set ZYVOR_DEMO_TEMPLATE in $ENV to a template that boots, then re-run this command." 3
 fi
 # The PDF demos also need pdftotext (poppler) in the template. Report, do not fail.
 if KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN="$TOKEN" "$DIR/scripts/keep-demo.sh" pdf-brief >/tmp/keep-smoke-pdf.log 2>&1; then
   ok "pdf-brief ran too"
 else
-  info "the PDF demos need a template with pdftotext (poppler-utils); the other demos work. See docs/tutorials/17-keep-pdf-brief.md"
+  info "the PDF demos need a template with pdftotext (poppler-utils); the other demos work. The template built by scripts/keep-bake-node22-agent.sh has it. See docs/tutorials/17-keep-pdf-brief.md"
 fi
 REMOTE
 rc=$?
