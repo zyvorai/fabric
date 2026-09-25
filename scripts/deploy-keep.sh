@@ -117,6 +117,8 @@ set +e
 ssh -o BatchMode=yes "$TARGET" \
   "PUBKEY='$PUBKEY' KEEP_DEV='$DEV' DIR='$REMOTE_DIR' bash -s" <<'REMOTE'
 set -euo pipefail
+# Non-interactive ssh has a minimal PATH; the Fabric deploy adds the same directories.
+export PATH="$HOME/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:$PATH"
 SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo -n"
 ok()   { printf '  ✓ %s\n' "$*"; }
 info() { printf '  · %s\n' "$*"; }
@@ -127,6 +129,7 @@ curl -fsS -m 5 http://127.0.0.1:7788/readyz >/dev/null 2>&1 \
 ok "FluxVM is ready"
 
 [ -d "$DIR/agent-runtime" ] || die "sources not found at $DIR (the Fabric deploy step must run first)"
+command -v cargo >/dev/null || die "cargo (Rust) is not installed for $(id -un); the Fabric deploy needs it too"
 ( cd "$DIR/agent-runtime" && cargo build --release 2>&1 | tail -3 )
 $SUDO install -m 0755 "$DIR/agent-runtime/target/release/zyvor-fabric-agent-runtime" /usr/bin/zyvor-fabric-agent-runtime
 $SUDO install -m 0644 "$DIR/systemd/zyvor-fabric-agent-runtime.service" /etc/systemd/system/zyvor-fabric-agent-runtime.service

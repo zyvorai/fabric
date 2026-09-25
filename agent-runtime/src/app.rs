@@ -912,7 +912,7 @@ pub(crate) async fn create_session(
 /// command, or `guest_start_timeout_secs` elapses. Only meaningful right
 /// after a cold `create_sandbox()`; a resumed/prewarmed sandbox's channel is
 /// already up.
-async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Result<()> {
+pub(crate) async fn wait_for_guest_agent_ready(state: &AppState, sandbox_id: Uuid) -> Result<()> {
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(state.config.guest_start_timeout_secs);
     loop {

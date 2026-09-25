@@ -607,6 +607,10 @@ pub(crate) async fn demo_run(
         .map_err(ApiError::internal)?;
 
     let guest_path = format!("/home/agent/work/{}", spec.guest_file);
+    // A real VM takes seconds to boot; talk to the guest only once its agent answers.
+    crate::app::wait_for_guest_agent_ready(&state, sandbox.id)
+        .await
+        .map_err(|e| ApiError::bad_gateway(format!("the cell did not become ready: {e:#}")))?;
     state
         .fluxvm
         .process(sandbox.id, "mkdir -p /home/agent/work", Some(30))
