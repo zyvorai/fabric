@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: Apache-2.0
+#
+# Run the Keep scenarios against a LIVE runtime, in real cells (needs the node22-agent template:
+# ./scripts/keep-bake-node22-agent.sh). Unlike agent-runtime/tests/demos-ci.sh this uses no stand-in.
+#
+#   export KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=...
+#   ./scripts/keep-live-scenarios.sh            # everything (a few minutes: each run boots a cell)
+#   ./scripts/keep-live-scenarios.sh --quick    # built-ins + one extractor each, no batch or zip
+#
+# Needs: curl, python3, node (for keepctl deploy). Custom use cases it creates are deleted afterwards.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+KEEPCTL="$ROOT/scripts/keepctl"
+: "${KEEP_API:=${ZYVOR_AGENT_URL:-http://127.0.0.1:9096}}"
+export KEEP_API
+QUICK=0
+[[ "${1:-}" == "--quick" ]] && QUICK=1
+AUTH=()
+[[ -n "${KEEP_TOKEN:-${ZYVOR_AGENT_TOKEN:-}}" ]] && AUTH=(-H "Authorization: Bearer ${KEEP_TOKEN:-$ZYVOR_AGENT_TOKEN}")
+export KEEP_TOKEN="${KEEP_TOKEN:-${ZYVOR_AGENT_TOKEN:-}}"
+
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/keep-live.XXXXXX")"
+PASSED=0; FAILED=0
+CREATED=()
+cleanup() {
+  for id in ${CREATED[@]+"${CREATED[@]}"}; do curl -s -o /dev/null -X DELETE "${AUTH[@]}" "$KEEP_API/v1/demos/$id"; done
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+
+ok()   { PASSED=$((PASSED + 1)); echo "  ok   $*"; }
+bad()  { FAILED=$((FAILED + 1)); echo "  FAIL $*"; }
+json() { python3 -c 'import json,sys
+d=json.load(sys.stdin)
+for part in sys.argv[1].split("."):
+    d = d[int(part)] if part.isdigit() else d[part]
+print(d if not isinstance(d,(dict,list)) else json.dumps(d))' "$1"; }
+api()  { curl -s "${AUTH[@]}" "$@"; }
+# check <name> <haystack> <needle>
+has()  { if grep -qF -- "$3" <<<"$2"; then ok "$1"; else bad "$1 (missing: $3)"; echo "       got: $(head -c 300 <<<"$2")"; fi; }
+body_of() { api "$KEEP_API/v1/artifacts/$(json artifacts.0.id <<<"$1")" | json body; }
+
+echo "==> live scenarios against $KEEP_API"
+api -f "$KEEP_API/healthz" >/dev/null || { echo "runtime not reachable at $KEEP_API" >&2; exit 2; }
+
+# ---- fixtures -----------------------------------------------------------------
+python3 - "$WORK" <<'PY'
+import sys, zipfile
+w = sys.argv[1]
+def sst(*s): return "<sst>" + "".join(f"<si><t>{x}</t></si>" for x in s) + "</sst>"
+with zipfile.ZipFile(w + "/exp.xlsx", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("xl/workbook.xml", '<workbook><sheets><sheet name="March" sheetId="1"/></sheets></workbook>')
+    z.writestr("xl/sharedStrings.xml", sst("date", "category", "vendor", "amount", "Travel", "Meals", "AirCo", "Bistro"))
+    rows = [(0, 1, 2, 3), (None, 4, 6, None), (None, 4, 6, None), (None, 5, 7, None)]
+    body = "".join('<row r="%d">' % (i + 1) + "".join('<c r="%s%d" t="s"><v>%d</v></c>' % ("ABCD"[j], i + 1, v) for j, v in enumerate(r) if v is not None) + "</row>" for i, r in enumerate(rows))
+    z.writestr("xl/worksheets/sheet1.xml", "<worksheet><sheetData>" + body + "</sheetData></worksheet>")
+with zipfile.ZipFile(w + "/nda.docx", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("word/document.xml", "<w:document><w:body>" + "".join("<w:p><w:r><w:t>%s</w:t></w:r></w:p>" % t for t in [
+        "This Agreement is governed by the laws of Portugal.",
+        "The term of this Agreement is two (2) years and renews for 30 days at a time.",
+        "Confidential Information must not be disclosed. Damages of EUR 50,000 apply."]) + "</w:body></w:document>")
+with zipfile.ZipFile(w + "/logs.zip", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("app/a.log", "2026-09-25 10:00:01 ERROR db timeout id=1\n2026-09-25 10:00:02 ERROR db timeout id=2\n2026-09-25 10:00:03 INFO ok\n")
+    z.writestr("app/b.log", "2026-09-25 11:00:01 WARN slow request took 900ms\n2026-09-25 11:00:02 ERROR disk full\n")
+    z.writestr("app/readme.md", "ignored")
+PY
+printf 'name,qty\nAnn,1\nBob,=cmd|calc\n' > "$WORK/a.csv"; printf 'name,qty\nCy,2\n' > "$WORK/b.csv"; printf 'name,qty\nDee,3\n' > "$WORK/c.csv"
+
+# ---- built-in use cases, on their bundled samples --------------------------------
+echo "== built-in use cases (each boots a cell)"
+for id in csv-clean log-triage meeting-actions sbom-summary pdf-brief contract-clauses security-questionnaire; do
+  [[ "$QUICK" == 1 && "$id" != csv-clean && "$id" != pdf-brief ]] && continue
+  r=$(api -X POST -F note=none "$KEEP_API/v1/demos/$id")
+  if [[ "$(json egress_connects <<<"$r" 2>/dev/null)" == "0" ]]; then ok "$id runs in a real cell, 0 CONNECT"; else bad "$id: $(head -c 300 <<<"$r")"; fi
+done
+
+# ---- scenario packs -----------------------------------------------------------------
+echo "== scenario packs"
+deploy() { KEEP_API="$KEEP_API" "$KEEPCTL" deploy "$ROOT/examples/keep-agents/$1" "${@:2}" >"$WORK/deploy-$1.out" 2>&1; }
+run() { api -X POST -F "file=@$2" "$KEEP_API/v1/demos/$1"; }
+for p in status-page-watch mailbox-triage api-facts; do CREATED+=("$p"); done
+CREATED+=(expense-sheet nda-review invoice-model-brief meeting-notes-model)
+
+for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is overdue" "api-facts:KB-01; MS-07"; do
+  p="${pair%%:*}"; want="${pair#*:}"
+  if deploy "$p"; then
+    r=$(api -X POST -F note=none "$KEEP_API/v1/demos/$p")
+    if [[ "$(json egress_connects <<<"$r" 2>/dev/null)" == "0" ]]; then has "$p: sample summarised in a real cell" "$(body_of "$r")" "$want"; else bad "$p: $(head -c 300 <<<"$r")"; fi
+  else bad "$p: deploy failed: $(head -c 300 "$WORK/deploy-$p.out")"; fi
+  [[ "$QUICK" == 1 ]] && break
+done
+
+deploy expense-sheet && { r=$(run expense-sheet "$WORK/exp.xlsx"); has "expense-sheet: real xlsx read (Node in the cell)" "$(body_of "$r" 2>/dev/null)" "Travel (2)"; } || bad "expense-sheet deploy"
+deploy nda-review && { r=$(run nda-review "$WORK/nda.docx"); has "nda-review: real docx read" "$(body_of "$r" 2>/dev/null)" "governed by the laws of Portugal"; } || bad "nda-review deploy"
+
+# ---- model packs must be refused until the operator allows an endpoint -------------------
+for p in invoice-model-brief meeting-notes-model; do deploy "$p" || bad "$p deploy"; done
+printf '%%PDF-1.4' > "$WORK/inv.pdf"
+code=$(curl -s -o "$WORK/m.out" -w '%{http_code}' "${AUTH[@]}" -X POST -F "file=@$WORK/inv.pdf" "$KEEP_API/v1/demos/invoice-model-brief")
+if [[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/m.out"; then ok "invoice-model-brief refused by the vault (403), no cell started"; else bad "invoice-model-brief: $code $(head -c 200 "$WORK/m.out")"; fi
+
+# ---- batch, zip, triggers, history --------------------------------------------------------
+if [[ "$QUICK" == 0 ]]; then
+  echo "== batch, zip, triggers, history"
+  out=$("$KEEPCTL" run csv-clean "$WORK/a.csv" "$WORK/b.csv" "$WORK/c.csv" 2>&1)
+  if python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["ok"]==3 and d["egress_connects"]==0 and len({r["result"]["session_id"] for r in d["results"]})==3' "$out" 2>/dev/null; then ok "batch of 3: one real cell per file, 0 CONNECT"; else bad "batch: $(head -c 300 <<<"$out")"; fi
+  out=$("$KEEPCTL" run log-triage "$WORK/logs.zip" 2>&1)
+  if python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["count"]==2 and d["ok"]==2 and d["egress_connects"]==0' "$out" 2>/dev/null; then ok "zip of logs: 2 files, 2 cells, the .md ignored"; else bad "zip: $(head -c 300 <<<"$out")"; fi
+
+  tr=$(api -X POST -H 'content-type: application/json' -d '{"use_case":"csv-clean","kind":"webhook"}' "$KEEP_API/v1/triggers")
+  tid=$(json id <<<"$tr"); tsec=$(json secret <<<"$tr")
+  r=$("$KEEPCTL" trigger fire "$tid" "$tsec" "$WORK/a.csv" 2>&1)
+  if [[ "$(json egress_connects <<<"$r" 2>/dev/null)" == "0" ]]; then ok "webhook trigger: signed call ran csv-clean in a real cell"; else bad "webhook: $(head -c 300 <<<"$r")"; fi
+  api -o /dev/null -X DELETE "$KEEP_API/v1/triggers/$tid"
+
+  ids=$("$KEEPCTL" artifacts --use-case csv-clean | grep " clean.csv" | awk '{print $1}' | head -2)
+  if [[ "$(wc -l <<<"$ids" | tr -d ' ')" -ge 2 ]]; then
+    d=$("$KEEPCTL" diff "$(sed -n 2p <<<"$ids")" "$(sed -n 1p <<<"$ids")" 2>&1)
+    has "history: diff between two runs of csv-clean" "$d" "added"
+  else bad "history: fewer than 2 csv-clean artifacts"; fi
+  chain=$("$KEEPCTL" audit --limit 5 2>&1 >/dev/null)
+  has "audit journal chain is intact" "$chain" '"chain_ok": true'
+fi
+
+echo
+echo "passed=$PASSED failed=$FAILED"
+[[ "$FAILED" == 0 ]]

@@ -3,6 +3,8 @@
 ## 0.3.0
 
 ### Added
+- **`scripts/keep-live-scenarios.sh`** runs the built-ins, the scenario packs, batch, zip, a webhook trigger and
+  history against a live runtime in real cells (18 checks).
 - **The cell template and seven scenario packs, in the repo.** `agent-runtime/templates/node22-agent/`
   (Ubuntu 24.04, Node 22, poppler, the guest agent) with a one-command bake,
   `./scripts/keep-bake-node22-agent.sh` (`--dry-run` shows what is missing). New use-case packs under

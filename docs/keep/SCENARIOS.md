@@ -61,6 +61,21 @@ in **Keep history**.
 **A drop folder for expenses.** Set `ZYVOR_AGENT_WATCH_ROOT`, add a folder trigger for `expense-sheet`, and save
 each month's `.xlsx` into that folder. Each file runs once.
 
+## Test them on a real host
+
+`agent-runtime/tests/demos-ci.sh` uses a FluxVM stand-in. To run the scenarios in **real cells**, bake the template
+and point the live script at your runtime:
+
+```bash
+export KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=...
+./scripts/keep-live-scenarios.sh            # built-ins, scenario packs, batch, zip, webhook trigger, history
+./scripts/keep-live-scenarios.sh --quick    # a smaller run
+```
+
+It deletes the custom use cases it created. Evidence class stays `software-test`: a passing run shows the runtime,
+the cell and the extractors work, not that the host cannot read the VM. The model step is not part of this script
+because it needs an endpoint you allow; [MODEL.md](MODEL.md) describes how to test it.
+
 ## Making your own
 
 Copy the closest pack, change `title`, `accepts` and the rules, and follow
