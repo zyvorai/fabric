@@ -82,7 +82,8 @@ start_runtime() { # name listen egress [extra env...]
   PIDS+=($!)
 }
 
-start_runtime runtime "$RT_PORT" "$RT_EGRESS" ZYVOR_AGENT_ALLOW_NO_AUTH=1
+mkdir -p "$WORK/watch"
+start_runtime runtime "$RT_PORT" "$RT_EGRESS" ZYVOR_AGENT_ALLOW_NO_AUTH=1 ZYVOR_AGENT_WATCH_ROOT="$WORK/watch"
 wait_http "$BASE/healthz" || fail "runtime did not start"
 export KEEP_API="$BASE"
 
@@ -158,6 +159,55 @@ sleep 2
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/artifacts/$tid")
 [[ "$code" == "404" ]] || fail "expired artifact should be 404, got $code"
 ok "artifact ttl: bad value refused, expired artifact is gone"
+
+echo "demos-ci: batch upload and triggers"
+printf 'name,qty\nD,1\n' > "$WORK/b1.csv"; printf 'name,qty\nE,2\n' > "$WORK/b2.csv"; printf 'name,qty\nF,3\n' > "$WORK/b3.csv"
+out=$("$KEEPCTL" run csv-clean "$WORK/b1.csv" "$WORK/b2.csv" "$WORK/b3.csv") || fail "batch run failed: $out"
+echo "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["count"]==3 and d["ok"]==3 and d["failed"]==0 and d["egress_connects"]==0 and d["batch_id"], d' || fail "batch summary wrong: $out"
+sessions=$(echo "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len({r["result"]["session_id"] for r in d["results"]}))')
+[[ "$sessions" == "3" ]] || fail "batch should use one cell per file, got $sessions sessions"
+ok "batch of 3: one cell per file, one batch id, 0 CONNECT"
+printf 'MZ' > "$WORK/bad.exe"
+code=$(curl -s -o "$WORK/mixed.json" -w '%{http_code}' -X POST -F "file=@$WORK/b1.csv" -F "file=@$WORK/bad.exe" "$BASE/v1/demos/csv-clean")
+[[ "$code" == "207" ]] || fail "a batch with one bad file should be 207, got $code"
+python3 -c 'import json; d=json.load(open("'"$WORK"'/mixed.json")); assert d["ok"]==1 and d["failed"]==1 and d["results"][1]["status"]==400, d' || fail "mixed batch report wrong: $(cat "$WORK/mixed.json")"
+ok "mixed batch is 207: the good file ran, the wrong type was refused (400)"
+python3 -c "print('x'*10)" > "$WORK/x.csv"
+args=(); for i in $(seq 1 21); do args+=(-F "file=@$WORK/x.csv"); done
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${args[@]}" "$BASE/v1/demos/csv-clean")
+[[ "$code" == "400" ]] || fail "21 files should be refused (400), got $code"
+ok "batch over 20 files refused (400)"
+
+tr=$(curl -sf -X POST -H 'content-type: application/json' -d '{"use_case":"csv-clean","kind":"webhook"}' "$BASE/v1/triggers") || fail "create webhook trigger"
+tid=$(echo "$tr" | json id); tsecret=$(echo "$tr" | json secret)
+curl -sf "$BASE/v1/triggers" | grep -q "$tsecret" && fail "the trigger list leaked the secret"
+printf 'name,qty\nG,7\n' > "$WORK/hook.csv"
+resp=$("$KEEPCTL" trigger fire "$tid" "$tsecret" "$WORK/hook.csv") || fail "signed trigger fire failed"
+[[ "$(echo "$resp" | json egress_connects)" == "0" ]] || fail "webhook run: egress_connects not 0"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'x-zyvor-signature: sha256=00' -H 'x-zyvor-filename: hook.csv' --data-binary @"$WORK/hook.csv" "$BASE/v1/triggers/$tid/hook")
+[[ "$code" == "401" ]] || fail "bad signature should be 401, got $code"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/triggers/$(python3 -c 'import uuid; print(uuid.uuid4())')/hook")
+[[ "$code" == "404" ]] || fail "unknown trigger should be 404, got $code"
+ok "webhook trigger: signed call runs the use case, bad signature 401, unknown id 404, secret never listed"
+
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"use_case":"csv-clean","kind":"folder","dir":"../escape"}' "$BASE/v1/triggers")
+[[ "$code" == "400" ]] || fail "folder dir with .. should be 400, got $code"
+fr=$(curl -sf -X POST -H 'content-type: application/json' -d '{"use_case":"csv-clean","kind":"folder","dir":"inbox","interval_seconds":5}' "$BASE/v1/triggers") || fail "create folder trigger"
+fid=$(echo "$fr" | json id)
+printf 'name,qty\nH,9\n' > "$WORK/watch/inbox/drop1.csv"; printf 'MZ' > "$WORK/watch/inbox/skip.exe"
+for _ in $(seq 1 40); do
+  runs=$(curl -sf "$BASE/v1/triggers" | python3 -c 'import json,sys; print([t for t in json.load(sys.stdin)["items"] if t["id"]=="'"$fid"'"][0]["runs"])')
+  [[ "$runs" -ge 1 ]] && break; sleep 1
+done
+[[ "$runs" == "1" ]] || fail "folder trigger should have run exactly once, runs=$runs"
+sleep 12
+runs=$(curl -sf "$BASE/v1/triggers" | python3 -c 'import json,sys; print([t for t in json.load(sys.stdin)["items"] if t["id"]=="'"$fid"'"][0]["runs"])')
+[[ "$runs" == "1" ]] || fail "the same file must not run twice, runs=$runs"
+ok "folder trigger: a dropped file ran once, wrong type ignored, no repeat"
+"$KEEPCTL" trigger list | grep -q "$fid" || fail "keepctl trigger list missing the folder trigger"
+"$KEEPCTL" trigger rm "$fid" && "$KEEPCTL" trigger rm "$tid" || fail "keepctl trigger rm"
+[[ -z "$("$KEEPCTL" trigger list 2>/dev/null)" ]] || fail "triggers still listed after rm"
+ok "keepctl trigger list and rm"
 
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")

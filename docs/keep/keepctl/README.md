@@ -27,6 +27,16 @@ keepctl audit <session-uuid> --limit 20           # journal rows; the hash-chain
 keepctl approvals pending                         # pending | approved | denied, or none for all
 ```
 
+Batches and triggers ([TRIGGERS.md](../TRIGGERS.md)):
+
+```bash
+keepctl run csv-clean jan.csv feb.csv            # one cell per file
+keepctl trigger add-webhook csv-clean            # prints a secret once
+keepctl trigger fire <id> <secret> ./orders.csv  # a signed call, as a webhook sender would make
+keepctl trigger add-folder log-triage inbox 30   # needs ZYVOR_AGENT_WATCH_ROOT on the runtime
+keepctl trigger list
+```
+
 The console shows the same three views at `/app/keep/history` (Runs, Audit, Approvals).
 
 Lab live gate (stub + FluxVM proof):

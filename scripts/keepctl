@@ -22,7 +22,8 @@
 #   keepctl export-token …           # scoped trajectory export (default: none)
 #   keepctl cockpit <session-id>     # taint + last decisions JSON
 #   keepctl list                     # the use cases this runtime can run
-#   keepctl run <use-case> <file>    # run one; exits 2 if the cell made an outbound connection
+#   keepctl run <use-case> <file>...  # run one or a batch (one cell per file); exits 2 on any outbound connection
+#   keepctl trigger list|add-webhook|add-folder|rm|fire …   # start a use case without an upload
 #   keepctl artifacts [--use-case <id>] [--since <rfc3339>] [--limit <n>]
 #   keepctl diff <older-artifact-id> <newer-artifact-id>   # line diff of two runs
 #   keepctl audit [<session-id>] [--limit <n>]             # journal + hash-chain check
@@ -46,7 +47,7 @@ else
   AUTH_TOKEN=""
 fi
 usage() {
-  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -381,18 +382,75 @@ for d in json.load(sys.stdin)["demos"]:
 
   run)
     id="${1:-}"
-    file="${2:-}"
-    [[ "$id" =~ ^[a-z0-9-]+$ && -n "$file" && -f "$file" ]] || {
-      echo "usage: keepctl run <use-case> <file>" >&2
+    shift || true
+    [[ "$id" =~ ^[a-z0-9-]+$ && $# -ge 1 ]] || {
+      echo "usage: keepctl run <use-case> <file>..." >&2
       exit 1
     }
-    out=$(api POST "/v1/demos/${id}" -F "file=@${file}")
-    echo "$out" | python3 -m json.tool
-    conn=$(echo "$out" | python3 -c "import json,sys; print(json.load(sys.stdin).get('egress_connects', -1))")
+    form=()
+    for file in "$@"; do
+      [[ -f "$file" ]] || { echo "not a file: $file" >&2; exit 1; }
+      form+=(-F "file=@${file}")
+    done
+    # -f would hide the body of a 207 (some files failed); read the status ourselves.
+    tmp=$(mktemp)
+    code=$(curl -sS -o "$tmp" -w '%{http_code}' -X POST ${AUTH_TOKEN:+-H "Authorization: Bearer ${AUTH_TOKEN}"} "${form[@]}" "$BASE/v1/demos/${id}")
+    python3 -m json.tool <"$tmp" || cat "$tmp"
+    conn=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('egress_connects', -1))" "$tmp" 2>/dev/null || echo -1)
+    rm -f "$tmp"
+    if [[ "$code" != "201" && "$code" != "207" ]]; then
+      echo "FAIL: HTTP $code" >&2
+      exit 1
+    fi
     if [[ "$conn" != "0" ]]; then
       echo "FAIL: egress_connects=$conn" >&2
       exit 2
     fi
+    if [[ "$code" == "207" ]]; then
+      echo "some files failed (see results above)" >&2
+      exit 3
+    fi
+    ;;
+
+  trigger)
+    sub="${1:-}"
+    shift || true
+    case "$sub" in
+      list)
+        api GET "/v1/triggers" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+if not d.get("watch_root_configured"):
+    print("(folder triggers are off: set ZYVOR_AGENT_WATCH_ROOT on the runtime)", file=sys.stderr)
+for t in d["items"]:
+    where = t["hook"] if t["kind"] == "webhook" else "%s every %s" % (t["dir"], t.get("cron") or ("%ss" % t["interval_seconds"]))
+    print("%s  %-8s %-20s runs=%-4s %s%s" % (t["id"], t["kind"], t["use_case"], t["runs"], where, ("  ERROR: " + t["last_error"]) if t.get("last_error") else ""))'
+        ;;
+      add-webhook)
+        uc="${1:-}"
+        [[ -n "$uc" ]] || { echo "usage: keepctl trigger add-webhook <use-case>" >&2; exit 1; }
+        api POST "/v1/triggers" -H 'content-type: application/json' -d "{\"use_case\":\"${uc}\",\"kind\":\"webhook\"}" | python3 -m json.tool
+        echo "The secret is shown once. Keep it; it signs every call." >&2
+        ;;
+      add-folder)
+        uc="${1:-}"; dir="${2:-}"; every="${3:-30}"
+        [[ -n "$uc" && -n "$dir" ]] || { echo "usage: keepctl trigger add-folder <use-case> <dir-name> [interval-seconds]" >&2; exit 1; }
+        api POST "/v1/triggers" -H 'content-type: application/json' -d "{\"use_case\":\"${uc}\",\"kind\":\"folder\",\"dir\":\"${dir}\",\"interval_seconds\":${every}}" | python3 -m json.tool
+        ;;
+      rm)
+        [[ -n "${1:-}" ]] || { echo "usage: keepctl trigger rm <trigger-id>" >&2; exit 1; }
+        api DELETE "/v1/triggers/${1}"
+        ;;
+      fire)
+        id="${1:-}"; secret="${2:-}"; file="${3:-}"
+        [[ -n "$id" && -n "$secret" && -f "$file" ]] || { echo "usage: keepctl trigger fire <trigger-id> <secret> <file>" >&2; exit 1; }
+        sig=$(openssl dgst -sha256 -hmac "$secret" -hex <"$file" | awk '{print $NF}')
+        curl -fsS -X POST "$BASE/v1/triggers/${id}/hook" \
+          -H "x-zyvor-signature: sha256=${sig}" -H "x-zyvor-filename: $(basename "$file")" \
+          --data-binary "@${file}" | python3 -m json.tool
+        ;;
+      *) echo "usage: keepctl trigger list|add-webhook|add-folder|rm|fire" >&2; exit 1 ;;
+    esac
     ;;
 
   artifacts)

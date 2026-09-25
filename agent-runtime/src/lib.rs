@@ -30,6 +30,7 @@ pub mod schedules;
 pub mod sentinel;
 pub mod skills;
 pub mod store;
+pub mod triggers;
 pub mod unwrap_tokens;
 pub mod workstations;
 

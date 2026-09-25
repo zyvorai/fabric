@@ -358,7 +358,19 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/v1/demos/{id}",
-            post(crate::demos::demo_run).delete(crate::demos::demo_delete),
+            post(crate::demos::demo_run)
+                .layer(axum::extract::DefaultBodyLimit::max(
+                    crate::demos::MAX_BATCH_BYTES + 1024 * 1024,
+                ))
+                .delete(crate::demos::demo_delete),
+        )
+        .route(
+            "/v1/triggers",
+            get(crate::triggers::list_triggers).post(crate::triggers::create_trigger),
+        )
+        .route(
+            "/v1/triggers/{id}",
+            axum::routing::delete(crate::triggers::delete_trigger),
         )
         .route(
             "/v1/artifacts",
@@ -393,6 +405,12 @@ pub fn public_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(|| async { Json(json!({"ok": true})) }))
         .route("/v1/hooks/{id}", post(crate::schedules::webhook_ingress))
+        .route(
+            "/v1/triggers/{id}/hook",
+            post(crate::triggers::trigger_hook).layer(axum::extract::DefaultBodyLimit::max(
+                crate::demos::MAX_BATCH_BYTES,
+            )),
+        )
         .route("/keep/cockpit", get(cockpit_page))
         .route("/keep/browser", get(crate::browser::browser_page))
         .merge(protected)

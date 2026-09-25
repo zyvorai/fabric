@@ -26,6 +26,9 @@ async fn main() -> Result<()> {
     tokio::spawn(zyvor_fabric_agent_runtime::schedules::schedule_loop(
         state.clone(),
     ));
+    tokio::spawn(zyvor_fabric_agent_runtime::triggers::trigger_loop(
+        state.clone(),
+    ));
     tokio::spawn(zyvor_fabric_agent_runtime::workstations::workstation_loop(
         state.clone(),
     ));

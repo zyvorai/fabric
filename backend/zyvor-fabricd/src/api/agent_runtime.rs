@@ -1090,6 +1090,45 @@ pub async fn diff_artifacts(
     .await
 }
 
+/// Triggers that start a use case without an upload (signed webhooks, watched folders). Admin only.
+pub async fn list_triggers(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    proxy(&state, Method::GET, "/v1/triggers", None, None, None).await
+}
+
+pub async fn create_trigger(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> Response {
+    proxy(&state, Method::POST, "/v1/triggers", None, Some(body), None).await
+}
+
+pub async fn delete_trigger(
+    RequireAdmin(_): RequireAdmin,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Response {
+    if uuid::Uuid::parse_str(&id).is_err() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "trigger id must be a UUID" })),
+        )
+            .into_response();
+    }
+    proxy(
+        &state,
+        Method::DELETE,
+        &format!("/v1/triggers/{id}"),
+        None,
+        None,
+        None,
+    )
+    .await
+}
+
 /// Skill names go into the upstream path, so they are restricted to the
 /// characters the runtime itself accepts.
 fn valid_skill_name(name: &str) -> bool {

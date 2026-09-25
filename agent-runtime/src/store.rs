@@ -10,6 +10,7 @@ use crate::model::{
     WarmSandboxState, WebhookRecord, WorkstationRecord,
 };
 use crate::skills::SkillStore;
+use crate::triggers::TriggerRecord;
 use anyhow::{bail, Context, Result};
 use base64::Engine;
 use chrono::Utc;
@@ -40,6 +41,8 @@ pub struct Store {
     artifacts: RwLock<HashMap<Uuid, ArtifactRecord>>,
     /// User-defined one-click demos (declarative specs), keyed by id.
     demo_specs: RwLock<HashMap<String, CustomDemoRecord>>,
+    /// What starts a use case without an upload: signed webhooks and watched folders.
+    triggers: RwLock<HashMap<Uuid, TriggerRecord>>,
     /// Tamper-evident record of planned, approved, denied and performed actions.
     pub audit: AuditLog,
     /// Immutable, content-addressed skill bundles agents can mount.
@@ -69,6 +72,7 @@ impl Store {
             goals: RwLock::new(HashMap::new()),
             artifacts: RwLock::new(HashMap::new()),
             demo_specs: RwLock::new(HashMap::new()),
+            triggers: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -124,6 +128,7 @@ impl Store {
         *self.approvals.write().await = read_id_map(&self.root.join("approvals.json")).await?;
         *self.goals.write().await = read_id_map(&self.root.join("goals.json")).await?;
         *self.artifacts.write().await = read_id_map(&self.root.join("artifacts.json")).await?;
+        *self.triggers.write().await = read_id_map(&self.root.join("triggers.json")).await?;
         let specs = match fs::read(self.root.join("demo_specs.json")).await {
             Ok(raw) => serde_json::from_slice::<Vec<CustomDemoRecord>>(&raw)
                 .context("decoding demo_specs.json")?,
@@ -788,6 +793,45 @@ impl Store {
         Ok(existed)
     }
 
+    pub async fn list_triggers(&self) -> Vec<TriggerRecord> {
+        let mut out: Vec<_> = self.triggers.read().await.values().cloned().collect();
+        out.sort_by_key(|t| t.created_at);
+        out
+    }
+
+    pub async fn get_trigger(&self, id: Uuid) -> Option<TriggerRecord> {
+        self.triggers.read().await.get(&id).cloned()
+    }
+
+    pub async fn save_trigger(&self, record: TriggerRecord) -> Result<()> {
+        let mut map = self.triggers.write().await;
+        map.insert(record.id, record);
+        self.persist_vec("triggers.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    /// Save only if the trigger still exists, so a scan that outlived a delete
+    /// does not bring the trigger back.
+    pub async fn save_trigger_if_present(&self, record: TriggerRecord) -> Result<()> {
+        let mut map = self.triggers.write().await;
+        if !map.contains_key(&record.id) {
+            return Ok(());
+        }
+        map.insert(record.id, record);
+        self.persist_vec("triggers.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    pub async fn delete_trigger(&self, id: Uuid) -> Result<bool> {
+        let mut map = self.triggers.write().await;
+        let existed = map.remove(&id).is_some();
+        if existed {
+            self.persist_vec("triggers.json", &map.values().cloned().collect::<Vec<_>>())
+                .await?;
+        }
+        Ok(existed)
+    }
+
     pub async fn list_artifacts(&self) -> Vec<ArtifactRecord> {
         let now = chrono::Utc::now();
         let mut out: Vec<_> = self
@@ -962,6 +1006,11 @@ impl Identified for ApprovalRecord {
     }
 }
 impl Identified for GoalRecord {
+    fn identified_id(&self) -> Uuid {
+        self.id
+    }
+}
+impl Identified for TriggerRecord {
     fn identified_id(&self) -> Uuid {
         self.id
     }

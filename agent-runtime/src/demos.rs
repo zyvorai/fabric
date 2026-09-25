@@ -305,6 +305,11 @@ impl Resolved {
     }
 }
 
+/// What a trigger needs to pre-filter files: accepted extensions and the size cap.
+pub(crate) async fn use_case_limits(state: &AppState, id: &str) -> Option<(Vec<String>, usize)> {
+    resolve(state, id).await.map(|r| (r.accepts, r.max_bytes))
+}
+
 /// Built-ins first, then user-defined use cases.
 async fn resolve(state: &AppState, id: &str) -> Option<Resolved> {
     if let Some(d) = spec_by_id(id) {
@@ -451,9 +456,130 @@ fn extension(filename: &str) -> String {
 pub(crate) async fn demo_run(
     State(state): State<Arc<AppState>>,
     Path(demo_id): Path<String>,
-    multipart: Multipart,
+    mut multipart: Multipart,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
-    let result = run_demo(state.clone(), demo_id.clone(), multipart).await;
+    if resolve(&state, &demo_id).await.is_none() {
+        return Err(ApiError::not_found(format!("no demo named {demo_id:?}")));
+    }
+    let mut files: Vec<Upload> = Vec::new();
+    let mut total = 0usize;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?
+    {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "file" || name == "pdf" {
+            let filename = field.file_name().map(str::to_string);
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| ApiError::bad_request(e.to_string()))?
+                .to_vec();
+            total += bytes.len();
+            if files.len() >= MAX_BATCH_FILES || total > MAX_BATCH_BYTES {
+                return Err(ApiError::bad_request(format!(
+                    "a batch takes at most {MAX_BATCH_FILES} files and {} MiB in total",
+                    MAX_BATCH_BYTES / (1024 * 1024)
+                )));
+            }
+            files.push(Upload { filename, bytes });
+        }
+    }
+    match files.len() {
+        0 => run_use_case(state, demo_id, None, None, None).await,
+        1 => {
+            let f = files.remove(0);
+            run_use_case(state, demo_id, f.filename, Some(f.bytes), None).await
+        }
+        _ => run_batch(state, demo_id, files).await,
+    }
+}
+
+/// One uploaded file, before it is checked against the use case.
+pub(crate) struct Upload {
+    pub filename: Option<String>,
+    pub bytes: Vec<u8>,
+}
+
+pub(crate) const MAX_BATCH_FILES: usize = 20;
+pub(crate) const MAX_BATCH_BYTES: usize = 64 * 1024 * 1024;
+
+/// Several files, one sealed cell each, grouped under one `batch_id`. The batch
+/// stops at the first frozen session (a 409): something reached for the network.
+async fn run_batch(
+    state: Arc<AppState>,
+    demo_id: String,
+    files: Vec<Upload>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let batch_id = Uuid::new_v4();
+    let count = files.len();
+    let (mut ok, mut failed, mut connects) = (0usize, 0usize, 0u64);
+    let mut results: Vec<Value> = Vec::with_capacity(count);
+    let mut stopped = false;
+    for f in files {
+        let name = f.filename.clone().unwrap_or_default();
+        if stopped {
+            failed += 1;
+            results.push(json!({
+                "filename": name, "ok": false, "skipped": true,
+                "error": "skipped: an earlier file froze its session"
+            }));
+            continue;
+        }
+        match run_use_case(
+            state.clone(),
+            demo_id.clone(),
+            f.filename,
+            Some(f.bytes),
+            Some(batch_id),
+        )
+        .await
+        {
+            Ok((_, Json(v))) => {
+                ok += 1;
+                connects += v["egress_connects"].as_u64().unwrap_or(0);
+                results.push(json!({ "filename": name, "ok": true, "result": v }));
+            }
+            Err(e) => {
+                failed += 1;
+                stopped = e.status() == StatusCode::CONFLICT;
+                results.push(json!({
+                    "filename": name, "ok": false,
+                    "status": e.status().as_u16(), "error": e.message()
+                }));
+            }
+        }
+    }
+    let status = if failed == 0 {
+        StatusCode::CREATED
+    } else {
+        StatusCode::MULTI_STATUS
+    };
+    Ok((
+        status,
+        Json(json!({
+            "batch_id": batch_id,
+            "demo": demo_id,
+            "count": count,
+            "ok": ok,
+            "failed": failed,
+            "egress_connects": connects,
+            "results": results,
+        })),
+    ))
+}
+
+/// Run one use case on one file (or its sample) and tell the operator how it went.
+/// Shared by the upload route, batches and triggers.
+pub(crate) async fn run_use_case(
+    state: Arc<AppState>,
+    demo_id: String,
+    filename: Option<String>,
+    upload: Option<Vec<u8>>,
+    batch_id: Option<Uuid>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let result = run_demo(state.clone(), demo_id.clone(), filename, upload, batch_id).await;
     match &result {
         Ok((_, Json(v))) => {
             let artifacts = v["artifacts"]
@@ -497,31 +623,14 @@ pub(crate) async fn demo_run(
 async fn run_demo(
     state: Arc<AppState>,
     demo_id: String,
-    mut multipart: Multipart,
+    filename: Option<String>,
+    upload: Option<Vec<u8>>,
+    batch_id: Option<Uuid>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     let spec = resolve(&state, &demo_id)
         .await
         .ok_or_else(|| ApiError::not_found(format!("no demo named {demo_id:?}")))?;
 
-    let mut upload: Option<Vec<u8>> = None;
-    let mut filename: Option<String> = None;
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| ApiError::bad_request(e.to_string()))?
-    {
-        let name = field.name().unwrap_or("").to_string();
-        if name == "file" || name == "pdf" {
-            filename = field.file_name().map(str::to_string);
-            upload = Some(
-                field
-                    .bytes()
-                    .await
-                    .map_err(|e| ApiError::bad_request(e.to_string()))?
-                    .to_vec(),
-            );
-        }
-    }
     let (filename, input) = match upload {
         Some(bytes) => (
             filename.unwrap_or_else(|| spec.guest_file.to_string()),
@@ -606,7 +715,7 @@ async fn run_demo(
         agent_version: "demo".into(),
         sandbox_id: sandbox.id,
         status: SessionStatus::Running,
-        input: json!({ "demo": spec.id, "filename": filename }),
+        input: json!({ "demo": spec.id, "filename": filename, "batch_id": batch_id }),
         created_at: now,
         updated_at: now,
         last_event_seq: 0,
@@ -747,6 +856,7 @@ async fn run_demo(
                 "filename": filename,
                 "extract_chars": extract.chars().count(),
                 "demo": spec.id,
+                "batch_id": batch_id,
             }),
             created_at: Utc::now(),
             expires_at: None,
@@ -799,6 +909,7 @@ async fn run_demo(
         StatusCode::CREATED,
         Json(json!({
             "demo": spec.id,
+            "batch_id": batch_id,
             "session_id": id,
             "agent": spec.id,
             "goal_id": goal.id,

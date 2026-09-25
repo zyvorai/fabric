@@ -1264,6 +1264,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route("/approvals/{id}", post(api::agent_runtime::decide_approval))
         .route("/audit/agent-actions", get(api::agent_runtime::list_audit))
+        .route(
+            "/triggers",
+            get(api::agent_runtime::list_triggers).post(api::agent_runtime::create_trigger),
+        )
+        .route("/triggers/{id}", delete(api::agent_runtime::delete_trigger))
         .route("/artifacts", get(api::agent_runtime::list_artifacts))
         .route(
             "/artifacts/{a}/diff/{b}",

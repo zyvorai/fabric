@@ -18,10 +18,10 @@ Where each piece stands. Sources: [STATUS.md](STATUS.md), [KEEP-0.2.md](KEEP-0.2
 
 ## Planned product surface
 
-Phased, in this order. Phase 1 is in progress; the rest is not started.
+Phased, in this order. Phases 1 and 2 are done; the rest is not started.
 
 1. **Run history and visibility** (shipped in this branch): artifact TTL and diff, run notifications, console and `keepctl` views.
-2. **Triggers and batch:** connect `/v1/schedules` and `/v1/webhooks` to use cases, a watched folder, multi-file upload.
+2. **Triggers and batch** (done): signed webhook and watched-folder triggers, multi-file upload. See [TRIGGERS.md](TRIGGERS.md).
 3. **More file types:** docx, xlsx, html, eml/mbox, zip, OCR for scanned PDFs, regex / JSON-path / table rules.
 4. **Model-assisted use cases:** a pack that declares one allowlisted model host, with a proof of "exactly N connections, all to that host" instead of zero.
 

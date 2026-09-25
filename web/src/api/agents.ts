@@ -201,6 +201,24 @@ export interface DemoResult {
   error?: string
 }
 
+/** Several files in one call: one cell per file, grouped under one batch id. */
+export interface BatchResult {
+  batch_id: string
+  demo: string
+  count: number
+  ok: number
+  failed: number
+  egress_connects: number
+  results: Array<{
+    filename: string
+    ok: boolean
+    skipped?: boolean
+    status?: number
+    error?: string
+    result?: DemoResult
+  }>
+}
+
 /** Kept for existing imports; the PDF brief is one demo among several. */
 export type PdfBriefDemoResult = DemoResult
 
@@ -270,6 +288,18 @@ export async function runDemo(id: string, file?: File | null): Promise<DemoResul
     throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
   }
   return parseJsonResponse<DemoResult>(res)
+}
+
+/** Run a use case on several files. A 207 (some files failed) still returns the report. */
+export async function runDemoBatch(id: string, files: File[]): Promise<BatchResult> {
+  const fd = new FormData()
+  for (const file of files) fd.append('file', file, file.name || 'input')
+  const res = await apiFetch(`/api/demos/${encodeURIComponent(id)}`, { method: 'POST', body: fd })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(formatHttpErrorBody(res.status, res.statusText, body))
+  }
+  return parseJsonResponse<BatchResult>(res)
 }
 
 /** One-click PDF → brief.md (multipart). Omit file to use the lab sample. */
@@ -408,4 +438,36 @@ export async function listAudit(limit = 100, sessionId?: string): Promise<AuditP
   const qs = new URLSearchParams({ limit: String(limit) })
   if (sessionId) qs.set('session_id', sessionId)
   return apiGet(`/api/audit/agent-actions?${qs}`)
+}
+
+export interface TriggerItem {
+  id: string
+  use_case: string
+  kind: 'webhook' | 'folder'
+  enabled: boolean
+  runs: number
+  last_run_at?: string | null
+  last_error?: string | null
+  dir?: string | null
+  interval_seconds?: number | null
+  cron?: string | null
+  hook?: string | null
+}
+
+export async function listTriggers(): Promise<{ items: TriggerItem[]; watch_root_configured: boolean }> {
+  return apiGet('/api/triggers')
+}
+
+/** A webhook trigger's `secret` comes back once, here, and is never listed again. */
+export async function createTrigger(body: {
+  use_case: string
+  kind: 'webhook' | 'folder'
+  dir?: string
+  interval_seconds?: number
+}): Promise<TriggerItem & { secret?: string }> {
+  return apiPost('/api/triggers', body)
+}
+
+export async function deleteTrigger(id: string): Promise<void> {
+  return apiDelete(`/api/triggers/${encodeURIComponent(id)}`)
 }

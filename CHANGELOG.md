@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **Keep triggers and batch.** `POST /v1/demos/{id}` takes several files (one cell each,
+  one `batch_id`, 207 when some fail). Signed webhook triggers
+  (`POST /v1/triggers/{id}/hook`) and watched-folder triggers (under
+  `ZYVOR_AGENT_WATCH_ROOT`) start a use case without an upload. `keepctl run` takes
+  several files and `keepctl trigger list|add-webhook|add-folder|rm|fire`; the console
+  uploads several files and has a Triggers tab. Docs: [TRIGGERS.md](docs/keep/TRIGGERS.md).
 - **Keep run history.** Artifacts can carry `ttl_seconds` (hidden at once, swept on
   the next write); `GET /v1/artifacts` filters by `use_case` and `since`;
   `GET /v1/artifacts/{a}/diff/{b}` returns a line diff of two runs. The approval

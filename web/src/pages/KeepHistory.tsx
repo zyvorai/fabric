@@ -8,10 +8,15 @@ import {
   ArtifactDiff,
   ArtifactItem,
   AuditPage,
+  createTrigger,
+  deleteTrigger,
   diffArtifacts,
   listApprovals,
   listArtifacts,
   listAudit,
+  listDemos,
+  listTriggers,
+  TriggerItem,
 } from '../api/agents'
 import { Card, PageHeader } from '../components/ui'
 import {
@@ -23,10 +28,11 @@ import {
   demoIdsOf,
 } from '../lib/keepHistory'
 
-type Tab = 'runs' | 'audit' | 'approvals'
+type Tab = 'runs' | 'triggers' | 'audit' | 'approvals'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'runs', label: 'Runs' },
+  { id: 'triggers', label: 'Triggers' },
   { id: 'audit', label: 'Audit' },
   { id: 'approvals', label: 'Approvals' },
 ]
@@ -45,6 +51,14 @@ export default function KeepHistory() {
   const [selected, setSelected] = useState<string[]>([])
   const [diff, setDiff] = useState<ArtifactDiff | null>(null)
 
+  const [triggers, setTriggers] = useState<TriggerItem[]>([])
+  const [watchRoot, setWatchRoot] = useState(true)
+  const [demoIds, setDemoIds] = useState<string[]>([])
+  const [newKind, setNewKind] = useState<'webhook' | 'folder'>('webhook')
+  const [newUseCase, setNewUseCase] = useState('')
+  const [newDir, setNewDir] = useState('')
+  const [newSecret, setNewSecret] = useState<{ hook: string; secret: string } | null>(null)
+
   const [audit, setAudit] = useState<AuditPage | null>(null)
   const [approvals, setApprovals] = useState<ApprovalItem[]>([])
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>('all')
@@ -54,7 +68,13 @@ export default function KeepHistory() {
     setError(null)
     try {
       if (tab === 'runs') setArtifacts(await listArtifacts({ limit: 200 }))
-      else if (tab === 'audit') setAudit(await listAudit(200))
+      else if (tab === 'triggers') {
+        const [t, demos] = await Promise.all([listTriggers(), listDemos()])
+        setTriggers(t.items)
+        setWatchRoot(t.watch_root_configured)
+        setDemoIds(demos.map((d) => d.id))
+        setNewUseCase((cur) => cur || demos[0]?.id || '')
+      } else if (tab === 'audit') setAudit(await listAudit(200))
       else setApprovals(await listApprovals())
     } catch (e) {
       setError(errText(e))
@@ -73,6 +93,33 @@ export default function KeepHistory() {
     [artifacts, useCase],
   )
   const byId = useMemo(() => new Map(artifacts.map((a) => [a.id, a])), [artifacts])
+
+  const addTrigger = async () => {
+    setError(null)
+    setNewSecret(null)
+    try {
+      const made = await createTrigger({
+        use_case: newUseCase,
+        kind: newKind,
+        ...(newKind === 'folder' ? { dir: newDir.trim() } : {}),
+      })
+      if (made.secret && made.hook) setNewSecret({ hook: made.hook, secret: made.secret })
+      setNewDir('')
+      await load()
+    } catch (e) {
+      setError(errText(e))
+    }
+  }
+
+  const removeTrigger = async (id: string) => {
+    setError(null)
+    try {
+      await deleteTrigger(id)
+      await load()
+    } catch (e) {
+      setError(errText(e))
+    }
+  }
 
   const compare = async () => {
     const [x, y] = selected.map((id) => byId.get(id))
@@ -200,6 +247,103 @@ export default function KeepHistory() {
                   ))}
                 </pre>
               </div>
+            )}
+          </Card>
+        )}
+
+        {tab === 'triggers' && (
+          <Card className="p-5 space-y-4">
+            <p className="text-sm text-[var(--zf-muted)]">
+              A trigger starts a use case without an upload. A webhook takes a signed POST whose body is the
+              file; a folder is scanned and each new file runs in its own sealed cell. Both go through the
+              same checks and the same 0-CONNECT rule as an upload.
+            </p>
+            <div className="flex flex-wrap items-end gap-3 text-sm">
+              <label className="text-[var(--zf-muted)]">
+                Use case{' '}
+                <select
+                  className="ml-1 rounded border border-[var(--zf-hairline)] bg-transparent px-2 py-1"
+                  value={newUseCase}
+                  onChange={(e) => setNewUseCase(e.target.value)}
+                >
+                  {demoIds.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-[var(--zf-muted)]">
+                Kind{' '}
+                <select
+                  className="ml-1 rounded border border-[var(--zf-hairline)] bg-transparent px-2 py-1"
+                  value={newKind}
+                  onChange={(e) => setNewKind(e.target.value as 'webhook' | 'folder')}
+                >
+                  <option value="webhook">webhook</option>
+                  <option value="folder" disabled={!watchRoot}>
+                    folder{watchRoot ? '' : ' (off: no watch root)'}
+                  </option>
+                </select>
+              </label>
+              {newKind === 'folder' && (
+                <label className="text-[var(--zf-muted)]">
+                  Folder name{' '}
+                  <input
+                    className="ml-1 rounded border border-[var(--zf-hairline)] bg-transparent px-2 py-1"
+                    value={newDir}
+                    onChange={(e) => setNewDir(e.target.value)}
+                    placeholder="inbox"
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                className="zf-btn zf-btn-primary zf-btn-sm"
+                disabled={!newUseCase || (newKind === 'folder' && !newDir.trim())}
+                onClick={() => void addTrigger()}
+              >
+                Add trigger
+              </button>
+            </div>
+
+            {newSecret && (
+              <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-1">
+                <p className="font-medium">Copy the secret now. It is shown once and signs every call.</p>
+                <p>
+                  Hook: <code className="font-mono text-xs">{newSecret.hook}</code>
+                </p>
+                <p>
+                  Secret: <code className="font-mono text-xs break-all">{newSecret.secret}</code>
+                </p>
+              </div>
+            )}
+
+            {triggers.length === 0 ? (
+              <p className="text-sm text-[var(--zf-muted)]">No triggers yet.</p>
+            ) : (
+              <ul className="divide-y divide-[var(--zf-hairline)]">
+                {triggers.map((t) => (
+                  <li key={t.id} className="py-2 text-sm flex flex-wrap items-center gap-3">
+                    <span className="font-mono text-xs">{t.kind}</span>
+                    <span className="font-medium text-[var(--zf-ink)]">{t.use_case}</span>
+                    <span className="text-[var(--zf-muted)]">
+                      {t.kind === 'webhook'
+                        ? t.hook
+                        : `${t.dir} · ${t.cron ?? `every ${t.interval_seconds}s`}`}
+                    </span>
+                    <span className="text-xs text-[var(--zf-muted)]">{t.runs} runs</span>
+                    {t.last_error && <span className="text-xs text-red-600">{t.last_error}</span>}
+                    <button
+                      type="button"
+                      className="zf-btn zf-btn-ghost zf-btn-sm ml-auto"
+                      onClick={() => void removeTrigger(t.id)}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
         )}
