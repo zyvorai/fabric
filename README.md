@@ -125,6 +125,7 @@ Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class sta
 | Start here | |
 |---|---|
 | **Keep README** — pitch, 60-second start, Muse vs Keep | [docs/keep/README.md](docs/keep/README.md) |
+| **Phone makers** — an agent computer per user, keys on the phone | [docs/keep/VENDORS.md](docs/keep/VENDORS.md) · [Pages](https://zyvorai.github.io/fabric/keep/phones) |
 | Pitch + architecture | [docs/keep/KEEP.md](docs/keep/KEEP.md) |
 | Tutorial 16 — workstation | [docs/tutorials/16-keep-workstation.md](docs/tutorials/16-keep-workstation.md) |
 | Tutorial 17 — PDF brief (CONNECT 0) | [docs/tutorials/17-keep-pdf-brief.md](docs/tutorials/17-keep-pdf-brief.md) |

@@ -9,6 +9,8 @@ phone vendor's agent service, a team), the layer above hands each person a **use
 person's data. Keep stays a single-host building block; you run many hosts and route each user to one
 ([VENDORS.md](VENDORS.md)).
 
+![Two users on one shard: each token reaches only its own sessions, cells, approvals, artifacts and audit rows; the other user answers 404; operator routes are 403.](../assets/keep/tenant-isolation.svg)
+
 ## User tokens
 
 The operator mints one per user:

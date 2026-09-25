@@ -128,6 +128,26 @@ export default function KeepPage(): ReactNode {
           </Section>
 
           <Section
+            id="phones"
+            eyebrow="For phone makers"
+            title="An agent computer per user. The keys stay on the phone."
+            lede="How an Android maker, or anyone with a phone and an account system, can offer this: a sealed cell per job in your cloud, approvals only the user’s enrolled phone key can sign, and the model you choose."
+            wide>
+            <Reveal>
+              <div className={styles.phonesFigure}>
+                <img
+                  src={useBaseUrl('/keep/vendor-architecture.svg')}
+                  alt="Phone, vendor gateway and push relay on the vendor side; shards running Keep cells on the Keep side."
+                  loading="lazy"
+                />
+              </div>
+            </Reveal>
+            <Link className={styles.more} to="/keep/phones">
+              Keep for phone makers ›
+            </Link>
+          </Section>
+
+          <Section
             id="muse"
             eyebrow="Meta Muse vs Keep"
             title="Same threat model. Different owner."
