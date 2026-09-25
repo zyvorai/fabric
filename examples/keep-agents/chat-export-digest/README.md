@@ -2,8 +2,9 @@
 
 An exported chat in, a one-page digest out: who talks most, the plans and times people agreed, open questions, money
 mentioned and links. Written for the `.txt` export that WhatsApp and similar apps produce
-(`12/03/2025, 09:14 - Ana: text`); other layouts still get the plans, questions, money and links, but the speaker
-count needs that line shape, so adjust the first pattern for your app.
+(`12/03/2025, 09:14 - Ana: text`, the Android layout) and for the iPhone layout (`[12/03/2025, 19:05:11] Cy: text`); each has its
+own "Who talks most" section, and the one that does not match your file shows nothing. Other layouts still get the plans,
+questions, money and links; adjust a speaker pattern for your app. The export is a text file, so it can come from a phone and be uploaded from a Mac or a PC.
 
 ```bash
 ./scripts/keepctl deploy examples/keep-agents/chat-export-digest --test

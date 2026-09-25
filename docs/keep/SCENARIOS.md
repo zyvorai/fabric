@@ -94,6 +94,44 @@ Samples use made-up ids and figures. These files carry business and personal dat
 Aadhaar, full bank numbers and PAN out of them, and note the evidence class is `software-test`: the host's operator could
 still read a cell's memory ([VENDORS.md](VENDORS.md)).
 
+### Developer-tool packs
+
+For what developers and teams already export: GitHub CLI output, Xcode logs, VS Code settings. Keep does **not** call GitHub or drive
+the tools: you run the command, save the output and drop it in. They list and count; they are not scanners, linters or reviewers.
+
+| Pack | You run, then drop in | You get | Sample |
+|---|---|---|---|
+| [`github-prs`](../../examples/keep-agents/github-prs/README.md) | `gh pr list --state all --json number,title,author,state,createdAt,mergedAt,labels` | states, authors, labels, merges per month, titles | real layout |
+| [`github-issues`](../../examples/keep-agents/github-issues/README.md) | `gh issue list --state all --json number,title,author,state,labels,createdAt` | open vs closed, authors, labels, issues per month | real layout |
+| [`github-actions-log`](../../examples/keep-agents/github-actions-log/README.md) | `gh run view <id> --log-failed` | `##[error]` lines, failing job and step, exit codes, repeated compiler errors and warnings | real layout |
+| [`dependabot-alerts`](../../examples/keep-agents/dependabot-alerts/README.md) | `gh api repos/OWNER/REPO/dependabot/alerts` | states, severities, ecosystems, packages, manifests, advisories | real layout, trimmed |
+| [`git-log-digest`](../../examples/keep-agents/git-log-digest/README.md) | `git log --pretty=format:'%h\|%an\|%ad\|%s' --date=short` | commits per author and month, commit prefixes, merges | real layout |
+| [`xcodebuild-log`](../../examples/keep-agents/xcodebuild-log/README.md) | `xcodebuild ... > build.log` | build result, errors by file:line (no directories), repeated messages, failed targets and tests | documented layout |
+| [`xcode-crash-log`](../../examples/keep-agents/xcode-crash-log/README.md) | a legacy `.crash` report (text) | app, version, OS, exception, crashed thread, frames | documented layout |
+| [`vscode-extensions`](../../examples/keep-agents/vscode-extensions/README.md) | `code --list-extensions --show-versions` | count, publishers, names | documented layout |
+| [`vscode-settings-audit`](../../examples/keep-agents/vscode-settings-audit/README.md) | `settings.json` | settings that are set, telemetry and trust lines, secret-looking setting *names* (values not shown) | documented layout |
+
+### Browser and desktop-app packs
+
+| Pack | You drop in | You get | Sample |
+|---|---|---|---|
+| [`bookmarks-digest`](../../examples/keep-agents/bookmarks-digest/README.md) | a bookmarks HTML export (Safari, Chrome, Edge, Firefox) | top sites, folders, titles | documented layout |
+| [`browser-history-takeout`](../../examples/keep-agents/browser-history-takeout/README.md) | Google Takeout `BrowserHistory.json` | top sites, how pages were reached, titles | documented layout |
+| [`mac-apps-inventory`](../../examples/keep-agents/mac-apps-inventory/README.md) | `system_profiler SPApplicationsDataType` | apps, where each came from, first signer, kind, top-level folder | real layout |
+| [`mac-launch-items`](../../examples/keep-agents/mac-launch-items/README.md) | `launchctl list` | non-Apple items, exit statuses, labels with a non-zero status | real layout |
+| [`windows-services`](../../examples/keep-agents/windows-services/README.md) | `Get-Service \| Export-Csv -NoTypeInformation` | status and start-type counts, names | documented layout |
+| [`windows-scheduled-tasks`](../../examples/keep-agents/windows-scheduled-tasks/README.md) | `schtasks /query /fo csv /v` | tasks, state, last result, run-as account | documented layout |
+| [`sales-register-sheet`](../../examples/keep-agents/sales-register-sheet/README.md), [`inventory-sheet`](../../examples/keep-agents/inventory-sheet/README.md), [`attendance-sheet`](../../examples/keep-agents/attendance-sheet/README.md) | an Excel sheet (`.xlsx`, first sheet) | rows per customer, location or employee and status; the first rows. No arithmetic | built by CI (no text sample) |
+
+**Already covered by earlier packs:** Apple Mail and Outlook mail exports (`.mbox`, `.eml`) work with `mailbox-triage`,
+`receivables-ageing`, `subscription-finder`, `reimbursement-claims` and `travel-itinerary`; Apple and Outlook calendars (`.ics`) with
+`calendar-week`; WhatsApp exports (Android and iPhone layouts) with `chat-export-digest`; Excel with `expense-sheet` and the sheets above.
+
+**Not covered, and why:** Siri (it has no export; see [RECIPES.md](RECIPES.md) for calling Keep from a Shortcut), PowerPoint (`.pptx` needs a new
+reader, not a pack), legacy `.ppt`, Outlook `.msg` / `.pst`, `.evtx` and browser history databases (binary), passwords and keychain exports (never
+read), and live GitHub or Xcode access. "Real layout" samples follow output captured from a real run with names replaced; "documented layout" samples
+were written from the tool's documented output and **have not been checked against a real export**, so try a pack on your own file first.
+
 The two model packs send the extracted text to an endpoint **you** allow, after **you** approve it once. Out of the
 box they are refused, because the vault has no such credential. See [MODEL.md](MODEL.md).
 
