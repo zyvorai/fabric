@@ -68,6 +68,17 @@ fabricd already scopes agents and sessions by the login's `tenant` and `sub`. It
 `session_id` you own. `POST /api/agent-tokens` turns a logged-in user's JWT into a runtime user token for **their own**
 id, for a client that talks to the runtime directly.
 
+## Test it on a real host
+
+`scripts/keep-live-tenancy.sh` runs two users in real cells against a live shard: isolation, a phone-signed approval
+(with forged and flipped decisions refused), revocation, and with `--gateway` a vendor login through the reference
+gateway. It needs the operator token and the `node22-agent` template.
+
+```bash
+export KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=<operator token>
+./scripts/keep-live-tenancy.sh --gateway
+```
+
 ## What this does not do
 
 - **The operator token is still all-powerful**, and the runtime trusts whoever holds it. Keep it on your gateway,

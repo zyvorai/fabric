@@ -3,6 +3,8 @@
 ## 0.3.0
 
 ### Added
+- **`scripts/keep-live-tenancy.sh`**: two users, a phone-signed approval and the reference gateway against a
+  live shard in real cells (29 checks pass on the lab host).
 - **A blueprint and a reference gateway for phone vendors.** `docs/keep/VENDORS.md` (architecture, who runs
   what, what to claim and not claim, questions for counsel), `reference/vendor-gateway` (vendor login in,
   placement by region, scoped user tokens, device enrolment behind a strong login, push relay with adapters,
