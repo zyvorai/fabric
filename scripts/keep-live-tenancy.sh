@@ -9,6 +9,10 @@
 #   ./scripts/keep-live-tenancy.sh                # tokens, isolation, signed approval
 #   ./scripts/keep-live-tenancy.sh --gateway      # ...and a vendor login through the reference gateway
 #
+# The phone-signing part opens approvals on a real waiting agent, so it needs to deploy one. In Keep mode that
+# needs your signing seed: export KEEP_POLICY_SEED=$(cat ~/.config/zyvor/keep-signer.seed). Without it that part
+# is skipped, and says so.
+#
 # It creates users named live-ana-<n>, live-ben-<n>, live-gw-<n> and one device; it removes the device and
 # revokes the tokens afterwards. The runs and audit rows it makes stay (that is what they are for).
 set -uo pipefail
@@ -67,11 +71,42 @@ check "a user token in the URL is refused" "$(curl -s -o /dev/null -w '%{http_co
 check "usage counts ana's run" "$(as "$TA" "$KEEP_API/v1/usage" | json usage.runs)" "1"
 
 echo "== a phone-signed approval on the shard"
+# A use case's session ends with its run (and its cell is released), so approvals need an agent session that
+# is still waiting: a "waiter" agent, started as ana, that takes two steers.
+WPACK="$WORK/waiter"; mkdir -p "$WPACK"
+cat > "$WPACK/agent.ts" <<'TS'
+import { defineAgent } from "@zyvor/fabric-agent";
+export default defineAgent({ async run(ctx) {
+  const seen = [];
+  for (let i = 0; i < 2; i++) seen.push(await ctx.nextSteer({ timeoutMs: 300000 }));
+  return { steers: seen.length };
+} });
+TS
+cat > "$WPACK/pack.json" <<JSON
+{ "kind": "agent", "name": "live-waiter-$N",
+  "manifest": { "template": "${ZYVOR_DEMO_TEMPLATE:-node22-agent}", "egress_mode": "deny", "confinement": "strict" },
+  "goal": { "title": "Wait", "text": "Wait for two decisions." } }
+JSON
+printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$WPACK/keep.policy.yaml"
+SESSION=""
+if [[ -z "${KEEP_POLICY_SEED:-}" ]]; then
+  echo "  skip the phone-signed approval: set KEEP_POLICY_SEED to deploy the waiter agent (Keep mode needs a signed deploy)"
+elif node "$ROOT/sdk/agent-runtime/src/cli.js" pack deploy "$WPACK" --url "$KEEP_API" --token "$KEEP_TOKEN" >"$WORK/waiter.out" 2>&1; then
+  SESSION=$(as "$TA" -X POST -H 'content-type: application/json' -d "{\"agent\":\"live-waiter-$N\",\"input\":{}}" "$KEEP_API/v1/sessions" | json id)
+  for _ in $(seq 1 100); do
+    st=$(as "$TA" "$KEEP_API/v1/sessions/$SESSION" | json status); [[ "$st" == "waiting" || "$st" == "running" ]] && break; sleep 0.5
+  done
+  [[ "$st" == "waiting" || "$st" == "running" ]] && ok "ana's waiter agent is running in a real cell" || bad "ana's waiter agent did not start (status $st)"
+else
+  bad "could not deploy the waiter agent: $(head -c 300 "$WORK/waiter.out")"
+fi
+if [[ -n "$SESSION" ]]; then
+SA_WAIT="$SESSION"
 $PHONE keygen "$WORK/phone.key" p256 >/dev/null
 $PHONE enrol "$WORK/phone.key" live-phone --push-kind fcm --push-token T > "$WORK/enrol.json"
 check "the operator enrols ana's phone key" "$(op -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$KEEP_API/v1/users/$ANA/devices")" "201"
 check "ana's own token cannot enrol a key" "$(code "$TA" -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$KEEP_API/v1/users/$ANA/devices")" "403"
-AP=$(op -X POST -H 'content-type: application/json' -d "{\"session_id\":\"$SA\",\"kind\":\"send\",\"subject\":\"mail.example\",\"prompt\":\"live test approval\",\"planned_action\":{\"method\":\"POST\",\"body_sha256\":\"abc\"}}" "$KEEP_API/v1/approvals" | json id)
+AP=$(op -X POST -H 'content-type: application/json' -d "{\"session_id\":\"$SA_WAIT\",\"kind\":\"send\",\"subject\":\"mail.example\",\"prompt\":\"live test approval\",\"planned_action\":{\"method\":\"POST\",\"body_sha256\":\"abc\"}}" "$KEEP_API/v1/approvals" | json id)
 as "$TA" "$KEEP_API/v1/inbox" | python3 -c 'import json,sys; p=[a for a in json.load(sys.stdin)["pending_approvals"] if a["id"]=="'"$AP"'"]; assert len(p)==1 and "sign" in p[0]; json.dump(p[0], open("'"$WORK"'/appr.json","w"))' && ok "ana's inbox lists the approval with what to sign" || bad "the inbox did not list the approval"
 check "ben cannot see ana's approval" "$(as "$TB" "$KEEP_API/v1/approvals" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["items"]))')" "0"
 check "ben cannot decide ana's approval" "$(code "$TB" -X POST -H 'content-type: application/json' -d '{"decision":"approved"}' "$KEEP_API/v1/approvals/$AP")" "404"
@@ -84,10 +119,13 @@ check "a decision flipped after signing is refused" "$(code "$TA" -X POST -H 'co
 check "the approval is still pending" "$(op "$KEEP_API/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$AP"'"][0]["status"])')" "pending"
 $PHONE decide "$WORK/phone.key" live-phone "$WORK/appr.json" approved > "$WORK/ok.json"
 c=$(as "$TA" -o "$WORK/decide.out" -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/ok.json" "$KEEP_API/v1/approvals/$AP")
-# A demo session has no agent to steer, so the API may answer 500 after it has recorded the decision.
-[[ "$c" == "200" || ( "$c" == "500" && "$(cat "$WORK/decide.out")" == *"reading agent record"* ) ]] && ok "the phone-signed decision is accepted" || bad "the signed decision: HTTP $c $(head -c 200 "$WORK/decide.out")"
+[[ "$c" == "200" ]] && ok "the phone-signed decision is accepted" || bad "the signed decision: HTTP $c $(head -c 200 "$WORK/decide.out")"
 check "the approval is recorded as approved" "$(op "$KEEP_API/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$AP"'"][0]["status"])')" "approved"
-op "$KEEP_API/v1/audit?limit=500&session_id=$SA" | python3 -c 'import json,sys; r=json.load(sys.stdin)["items"]; assert any(x["action"]=="approval.device_signature" and x["phase"]=="performed" for x in r) and sum(1 for x in r if x["action"]=="approval.device_signature" and x["phase"]=="failed")>=2' && ok "the journal has the accepted signature and the refused attempts" || bad "the journal is missing the signature rows"
+op "$KEEP_API/v1/audit?limit=500&session_id=$SA_WAIT" | python3 -c 'import json,sys; r=json.load(sys.stdin)["items"]; assert any(x["action"]=="approval.device_signature" and x["phase"]=="performed" for x in r) and sum(1 for x in r if x["action"]=="approval.device_signature" and x["phase"]=="failed")>=2' && ok "the journal has the accepted signature and the refused attempts" || bad "the journal is missing the signature rows"
+
+# Finish the waiter: it takes two steers, and only one decision has been made.
+op -o /dev/null -X POST -H 'content-type: application/json' -d '{}' "$KEEP_API/v1/sessions/$SA_WAIT/cancel"
+fi
 
 echo "== revocation"
 op -o /dev/null -X POST "$KEEP_API/v1/users/$ANA/revoke-tokens"

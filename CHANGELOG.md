@@ -2,6 +2,12 @@
 
 ## 0.3.0
 
+### Fixed
+- **A use-case run left its cell alive for 30 minutes.** The run's session stayed "Running" and its cell held
+  memory until the sandbox's own lifetime ended, so a busy host filled with idle cells (a lab host stopped answering
+  after about 25 runs in 35 minutes). A finished run now ends its session and the terminal-session cleanup loop
+  deletes the cell at once; a cell frozen for touching the network is kept for inspection.
+
 ### Added
 - **`scripts/keep-live-tenancy.sh`**: two users, a phone-signed approval and the reference gateway against a
   live shard in real cells (29 checks pass on the lab host).

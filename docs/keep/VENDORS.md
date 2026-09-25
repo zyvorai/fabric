@@ -63,7 +63,7 @@ front, so nothing here needs a distributed scheduler.
 ## Sizing: measure, do not guess
 
 A cell is a microVM. Its memory is the template's (`node22-agent`: 2 GiB), so the ceiling on **concurrent cells** per
-host is roughly `(RAM − what the host itself needs) ÷ what a cell really costs`, and the template's memory is only a floor: measured below, a 2 GiB cell cost about 3 GiB of host memory. How many *users* that serves depends on how often
+host is roughly `(RAM − what the host itself needs) ÷ what a cell really costs`. The template's memory is the guest's allowance, not the host's real cost (the VMM and page cache add to it, and a guest may not touch all of it), so measure the real cost on your hardware. How many *users* that serves depends on how often
 each is active, which only your own traffic can tell you.
 
 `scripts/keep-bench.sh` measures cold cell runs end to end and how they hold up as more run at once. Run it on your
@@ -72,22 +72,25 @@ own hardware; the figure below is one lab host and is **not a promise**.
 Measured on one lab host (Ubuntu 26.04, 12 vCPU, 31 GiB RAM with about 12.5 GiB already in use by other services),
 `node22-agent` template (2 GiB per cell), `csv-clean` on a tiny file, six runs per level, 2026-09-25:
 
-| Concurrent runs | ok | failed | p50 | worst of 6 | runs per minute | lowest free memory |
-|---|---|---|---|---|---|---|
-| 1 | 6 | 0 | 16.8 s | 28.2 s | 3.2 | 15.5 GiB |
-| 2 | 6 | 0 | 18.0 s | 18.6 s | 6.6 | 12.1 GiB |
+| Concurrent runs | ok | failed | p50 | worst of 6 | runs per minute |
+|---|---|---|---|---|---|
+| 1 | 6 | 0 | 16.8 s | 28.2 s | 3.2 |
+| 2 | 6 | 0 | 18.0 s | 18.6 s | 6.6 |
 
 What that says, and does not say:
 
-- A **cold** run (boot a fresh cell, extract, tear down) takes roughly **17 to 18 seconds** here, and two at once did not
-  slow each other much (throughput about doubled). It is not an interactive latency; it is fine for jobs, not for
-  a chat that must answer at once (that is what a warm pool is for, and it is **not measured**).
-- Free memory fell from 18.4 GiB to 15.5 GiB with one cell and to 12.1 GiB with two: about **3 GiB per concurrent cell**,
-  more than the template's 2 GiB, because the VMM and the page cache cost memory too. Size from that, not from the template.
-- Concurrency 4 was **skipped** by the script's own safety limit (it would need more than 60% of the free memory).
-  Six runs per level is a small sample: the "worst of 6" is not a real p95.
+- A **cold** run (boot a fresh cell, extract, produce the artifact) took roughly **17 to 18 seconds** here, and two at
+  once did not slow each other much (throughput about doubled). It is not an interactive latency; it is fine for jobs,
+  not for a chat that must answer at once (that is what a warm pool is for, and it is **not measured**).
+- **Memory per cell is not established.** The script also recorded the host's free memory, but those runs were made
+  *before* a bug was fixed: a use-case run left its cell alive for the sandbox's 30-minute lifetime, so cells piled up
+  during the measurement and the free-memory readings cannot be turned into a per-cell figure. Running about 25 such
+  runs in 35 minutes on that host later made it stop answering SSH. The fix (a finished run now ends its session, and the
+  cleanup loop deletes the cell at once) is in the runtime; **re-run `keep-bench.sh` on your own hardware to size memory**.
+- Concurrency 4 was **skipped** by the script's own safety limit. Six runs per level is a small sample: the "worst of 6"
+  is not a real p95.
 - One host, one workload, a tiny file. Real documents take longer to extract. Treat this as a method and a first data
-  point, and run `keep-bench.sh` on your own hardware.
+  point.
 
 Things that limit density today, none of them hidden:
 

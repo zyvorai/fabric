@@ -746,6 +746,11 @@ pub(crate) async fn run_use_case(
     result
 }
 
+/// Run a use case in a fresh cell, then end its session so the cell is released.
+///
+/// A run used to leave its session "Running" and its cell alive until the sandbox's own lifetime
+/// (30 minutes) ran out. On a busy host those cells piled up, each holding memory. Marking the
+/// session finished hands the cell to the terminal-session cleanup loop, which deletes it at once.
 async fn run_demo(
     state: Arc<AppState>,
     demo_id: String,
@@ -753,6 +758,53 @@ async fn run_demo(
     upload: Option<Vec<u8>>,
     batch_id: Option<Uuid>,
     user: Option<String>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let mut session_id: Option<Uuid> = None;
+    let result = run_demo_inner(
+        state.clone(),
+        demo_id,
+        filename,
+        upload,
+        batch_id,
+        user,
+        &mut session_id,
+    )
+    .await;
+    if let Some(id) = session_id {
+        finish_session(&state, id, &result).await;
+    }
+    result
+}
+
+/// Mark a use-case session done. A session frozen because its cell tried to reach the network
+/// (a 409) is left as it is: the cell is kept for inspection until its own lifetime ends.
+async fn finish_session(state: &AppState, id: Uuid, result: &ApiResult<(StatusCode, Json<Value>)>) {
+    if matches!(result, Err(e) if e.status() == StatusCode::CONFLICT) {
+        return;
+    }
+    let outcome = state
+        .store
+        .update_session(id, |s| match result {
+            Ok(_) => s.status = SessionStatus::Completed,
+            Err(e) => {
+                s.status = SessionStatus::Failed;
+                s.error = Some(e.message().to_string());
+            }
+        })
+        .await;
+    if let Err(error) = outcome {
+        tracing::warn!(session = %id, %error, "could not end the use-case session");
+    }
+}
+
+async fn run_demo_inner(
+    state: Arc<AppState>,
+    demo_id: String,
+    filename: Option<String>,
+    upload: Option<Vec<u8>>,
+    batch_id: Option<Uuid>,
+    user: Option<String>,
+    created: &mut Option<Uuid>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     if let Some(u) = user.as_deref() {
         crate::usage::check_run_quota(&state, u, crate::usage::Limits::from_env()).await?;
@@ -875,6 +927,7 @@ async fn run_demo(
         .save_session(session.clone())
         .await
         .map_err(ApiError::internal)?;
+    *created = Some(id);
 
     let goal = GoalRecord {
         id: Uuid::new_v4(),

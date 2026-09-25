@@ -549,6 +549,12 @@ SA=$(echo "$ra" | json session_id); SB=$(echo "$rb" | json session_id)
 AA=$(echo "$ra" | json artifacts.0.id); AB=$(echo "$rb" | json artifacts.0.id)
 [[ "$(echo "$ra" | json egress_connects)" == "0" && "$(echo "$rb" | json egress_connects)" == "0" ]] || fail "user runs must keep 0 CONNECT: $ra"
 ok "each user ran csv-clean with their own token, 0 CONNECT"
+# A use-case run ends its session, and the cleanup loop then deletes the cell (it used to linger for 30 minutes).
+for _ in $(seq 1 50); do [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json status)" == "completed" ]] && break; sleep 0.2; done
+[[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json status)" == "completed" ]] || fail "a finished use-case run should leave a completed session"
+for _ in $(seq 1 50); do [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sandbox_released)" == "True" ]] && break; sleep 0.2; done
+[[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sandbox_released)" == "True" ]] || fail "the finished run's cell should have been released"
+ok "a finished use-case run completes its session and releases its cell"
 [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions" | python3 -c 'import json,sys; print(",".join(s["id"] for s in json.load(sys.stdin)["items"]))')" == "$SA" ]] || fail "ana should list only her own session"
 [[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB")" == "404" ]] || fail "ana must not read ben's session"
 [[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB/cockpit")" == "404" ]] || fail "ana must not read ben's cockpit"
@@ -575,7 +581,28 @@ echo "demos-ci: phone-signed approvals (enrol, push relay, sign, refuse forgerie
 PHONE="node $ROOT/sdk/agent-runtime/src/phone-cli.js"
 op() { curl -s -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$@"; }
 CAROL=$(mint carol)
-rc=$(as "$CAROL" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean"); SC=$(echo "$rc" | json session_id)
+# A use case's session ends with its run, so approvals need a real agent session that is still waiting:
+# a signed "waiter" agent that takes two steers (each decision steers it), started as carol.
+WPACK="$WORK/waiter"; mkdir -p "$WPACK"
+cat > "$WPACK/agent.ts" <<'TS'
+import { defineAgent } from "@zyvor/fabric-agent";
+export default defineAgent({ async run(ctx) {
+  const seen = [];
+  for (let i = 0; i < 2; i++) seen.push(await ctx.nextSteer({ timeoutMs: 120000 }));
+  return { steers: seen.length };
+} });
+TS
+cat > "$WPACK/pack.json" <<'JSON'
+{ "kind": "agent", "name": "waiter",
+  "manifest": { "template": "ci", "egress_mode": "deny", "confinement": "strict" },
+  "goal": { "title": "Wait", "text": "Wait for two decisions." } }
+JSON
+printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$WPACK/keep.policy.yaml"
+KEEP_POLICY_SEED="$SEED" FABRIC_AGENT_URL="$KEEP_BASE" node "$CLI" pack deploy "$WPACK" >"$WORK/waiter.out" 2>&1 || fail "waiter agent deploy failed: $(cat "$WORK/waiter.out")"
+SC=$(as "$CAROL" -X POST -H 'content-type: application/json' -d '{"agent":"waiter","input":{}}' "$KEEP_BASE/v1/sessions" | json id) || fail "start carol's waiter session"
+for _ in $(seq 1 100); do
+  [[ "$(as "$CAROL" "$KEEP_BASE/v1/sessions/$SC" | json status)" == "waiting" || "$(as "$CAROL" "$KEEP_BASE/v1/sessions/$SC" | json status)" == "running" ]] && break; sleep 0.2
+done
 $PHONE keygen "$WORK/carol.key" p256 >/dev/null
 $PHONE enrol "$WORK/carol.key" carol-phone --push-kind fcm --push-token PUSH123 > "$WORK/enrol.json"
 [[ "$(op -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$KEEP_BASE/v1/users/carol/devices")" == "201" ]] || fail "operator enrolment should be 201"
@@ -612,10 +639,7 @@ $PHONE decide "$WORK/intruder.key" carol-phone "$WORK/appr1.json" approved > "$W
 [[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A1"'"][0]["status"])')" == "pending" ]] || fail "refused decisions must leave the approval pending"
 ok "unsigned, flipped and forged decisions are refused (403) and the approval stays pending"
 code=$(as "$CAROL" -o "$WORK/decide-ok.out" -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-ok.json" "$KEEP_BASE/v1/approvals/$A1")
-# An approval opened through the plain API is not held by the broker, so a decision also tries to steer the
-# session, and a demo session has no agent record to steer (a 500 after the decision is recorded). That is
-# the test setup, not the signature: what matters is that the decision was accepted and recorded.
-[[ "$code" == "200" || ( "$code" == "500" && "$(cat "$WORK/decide-ok.out")" == *"reading agent record"* ) ]] || fail "the phone-signed decision should be accepted, got $code: $(cat "$WORK/decide-ok.out")"
+[[ "$code" == "200" ]] || fail "the phone-signed decision should be accepted, got $code: $(cat "$WORK/decide-ok.out")"
 [[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A1"'"][0]["status"])')" == "approved" ]] || fail "the approval should be approved"
 [[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-ok.json" "$KEEP_BASE/v1/approvals/$A1")" =~ ^(409|403)$ ]] || fail "a replay of a decided approval must be refused"
 ok "the phone-signed decision is accepted once; replaying it is refused"
@@ -623,7 +647,7 @@ op "$KEEP_BASE/v1/audit?limit=500&session_id=$SC" | python3 -c 'import json,sys;
 ok "the journal records the accepted signature and the refused attempts"
 A2=$(mkapp "delete file" bbb)
 code=$(op -o "$WORK/op-decide.out" -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"decision":"denied"}' "$KEEP_BASE/v1/approvals/$A2")
-[[ "$code" == "200" || ( "$code" == "500" && "$(cat "$WORK/op-decide.out")" == *"reading agent record"* ) ]] || fail "the operator may decide unsigned, got $code: $(cat "$WORK/op-decide.out")"
+[[ "$code" == "200" ]] || fail "the operator may decide unsigned, got $code: $(cat "$WORK/op-decide.out")"
 [[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A2"'"][0]["status"])')" == "denied" ]] || fail "the operator's unsigned decision should be recorded"
 ok "the operator can still decide without a phone"
 

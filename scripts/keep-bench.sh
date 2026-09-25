@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Measure a live Keep shard: how long a real cell run takes end to end, and how that holds up as more
-# run at once. Every run boots a fresh cell from the template, extracts, and tears down, so these are
-# COLD numbers. Sizing a fleet from anything else is a guess.
+# run at once. Every run boots a fresh cell from the template and extracts, so these are COLD numbers.
+# (Needs a runtime that ends a use-case session when its run finishes, so the cell is released; on an older
+# runtime the cells linger for 30 minutes and will exhaust the host.) Sizing a fleet from anything else is a guess.
 #
 #   export KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=...
 #   ./scripts/keep-bench.sh                          # 6 runs at concurrency 1, 2, 4
@@ -112,7 +113,7 @@ print("|---|---|---|---|---|---|---|---|")
 for r in rows:
     print("| %d | %d | %d | %s | %s | %s | %s | %s |" % (r["concurrency"], r["ok"], r["failed"], f(r["p50_s"]), f(r["p95_s"]), f(r["max_s"]), f(r["runs_per_minute"]), r.get("lowest_available_mib", "-")))
 print()
-print("Each run is a cold cell boot + extract + teardown. The template gives a cell %d MiB, but the host pays more (the VMM and page cache):" % cell)
+print("Each run is a cold cell boot + extract. The template gives a cell %d MiB; the host pays something different (the VMM and page cache):" % cell)
 print("compare 'lowest free MiB' between levels to see what one more concurrent cell really costs on this host.")
 print("Not measured: warm-pool starts, hibernate/resume, sustained load. Do not size a fleet from a short run.")
 json.dump(rows, open("/dev/stderr", "w"))
