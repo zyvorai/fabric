@@ -115,8 +115,8 @@ const config: Config = {
           position: 'right',
         },
         {
-          to: '/compare',
-          label: 'Compare',
+          to: '/#matrix',
+          label: 'Matrix',
           position: 'right',
         },
         {
@@ -140,7 +140,7 @@ const config: Config = {
           items: [
             {label: 'Quick start', to: '/docs/getting-started/Quick-Start'},
             {label: 'Keep', to: '/keep'},
-            {label: 'Muse vs Keep · Fabric · FluxVM', to: '/compare'},
+            {label: 'Fabric vs the field', to: '/#matrix'},
             {label: 'Keep docs', to: '/docs/keep/'},
             {label: 'Tutorial 17 — PDF brief', to: '/docs/tutorials/keep-pdf-brief'},
             {label: 'Product overview', to: '/docs/PRODUCT_OVERVIEW'},

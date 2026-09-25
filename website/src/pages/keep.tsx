@@ -110,7 +110,7 @@ export default function KeepPage(): ReactNode {
               ))}
             </div>
             <p className={styles.crumb}>
-              <Link to="/compare">The full comparison →</Link>
+              <Link to="/?t=stack#matrix">The full comparison →</Link>
             </p>
             <p className={styles.honesty}>Honest about the limits: {marketing.honesty}</p>
           </Reveal>

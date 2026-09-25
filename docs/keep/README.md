@@ -265,7 +265,7 @@ Muse got the threat model right. Keep is the version you run, read and take with
 | Browser | An accessibility-tree browser agent. | The same idea: the agent sees structure, you see pixels. |
 | Operator access | Governed by Meta's operational policies, not cryptography. | The same limit today, stated up front (see above). |
 
-Full matrix: [/compare](https://zyvorai.github.io/fabric/compare). Longer read: [Keep vs Meta Muse](https://zyvor.dev/blog/keep-vs-meta-muse).
+Full matrix: [homepage matrix](https://zyvorai.github.io/fabric/?t=stack#matrix). Longer read: [Keep vs Meta Muse](https://zyvor.dev/blog/keep-vs-meta-muse).
 
 Sources for the Muse column: [MarkTechPost, 2026-09-08](https://www.marktechpost.com/2026/09/08/meta-introduces-muse-a-personal-ai-agent-that-runs-on-its-own-dedicated-secure-cloud-computer/) · [Vellum, "Official Muse Breakdown"](https://www.vellum.ai/blog/official-muse-breakdown) · [DEV Community, "Meta Muse and the Secure VM Bet"](https://dev.to/ifynx_studio/meta-muse-and-the-secure-vm-bet-personal-agents-that-act-without-owning-your-secrets-1ik4). Zyvor is not affiliated with Meta; if a Muse row is out of date, please open an issue.
 
