@@ -1,6 +1,6 @@
 # deck-outline
 
-A PowerPoint file in, an outline out: how many slides, every amount and date on them, open points (`TBD`, `draft`, `confidential`), action and owner lines, and the speaker notes.
+A PowerPoint file in, an outline out: how many slides, every amount (with the currency before or after the number) and date on them, open points (`TBD`, `draft`, `confidential`), action and owner lines, and the speaker notes.
 
 ```bash
 ./scripts/keepctl deploy examples/keep-agents/deck-outline
