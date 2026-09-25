@@ -100,7 +100,7 @@ signed bytes untouched; your seed never leaves your machine.
 
 ```bash
 ./scripts/keepctl doctor           # runtime, Keep mode, signers, FluxVM, use-case counts
-./scripts/keepctl doctor --smoke   # also runs the PDF brief once in a real cell
+./scripts/keepctl doctor --smoke   # also runs the CSV cleanup once in a real cell
 ```
 
 ## Where next

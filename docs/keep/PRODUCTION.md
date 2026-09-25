@@ -12,9 +12,9 @@ On a host that already runs FluxVM:
 
 It creates a signer seed on **your** machine (`~/.config/zyvor/keep-signer.seed`, never copied to
 the host), deploys Fabric and the console, builds and installs agent-runtime with its systemd unit,
-registers only your **public** key as a trusted signer, points fabricd at it, and runs the PDF brief
-once as a smoke test. It does not install FluxVM or bake templates: if FluxVM is not answering, or
-the `node22-agent` template is missing, it stops and says what to do. Re-running is safe.
+registers only your **public** key as a trusted signer, points fabricd at it, and runs the CSV cleanup
+once as a smoke test (the PDF demos also need a template with `pdftotext`; it reports if yours has none). It does not install FluxVM or bake templates: if FluxVM is not answering, or
+the demo template does not boot, it stops and says what to do. Re-running is safe.
 
 Check a running install any time with `./scripts/keepctl doctor [--smoke]`.
 

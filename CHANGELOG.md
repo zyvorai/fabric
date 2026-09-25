@@ -19,7 +19,7 @@
   [Tutorial 18](docs/tutorials/18-keep-use-cases.md).
 - **`./scripts/deploy keep user@host`.** Installs Fabric and the Keep runtime on a
   host that already runs FluxVM, registers only the author's public signer key,
-  and smoke-tests a PDF brief.
+  and smoke-tests the CSV cleanup (the PDF demos also need pdftotext in the template).
 - **Demos e2e in CI** (`agent-runtime/tests/demos-ci.sh`) against the real runtime
   and the FluxVM stand-in.
 

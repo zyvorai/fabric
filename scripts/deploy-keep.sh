@@ -14,7 +14,7 @@
 #   3. on the host: builds agent-runtime, installs its systemd unit, writes its env
 #      file (API token generated there, your signer's PUBLIC key registered), points
 #      fabricd at it, restarts both
-#   4. runs the PDF brief once as a smoke test (needs the node22-agent template)
+#   4. runs the CSV cleanup once as a smoke test (the PDF demos also need pdftotext in the template)
 #
 # It does not install FluxVM or bake VM templates. If either is missing it stops
 # and says exactly what to do.
@@ -95,7 +95,7 @@ if [[ "$DRY" == "1" ]]; then
     say "  3. write /etc/zyvor-fabricd/zyvor-fabric-agent.env (API token generated on the host; Keep mode, trusted signer $PUBKEY)"
   fi
   say "  4. add [agent_runtime] to zyvor-fabricd.toml, restart both services"
-  say "  5. smoke test: keep-demo.sh pdf-brief on the host"
+  say "  5. smoke test: keep-demo.sh csv-clean on the host"
   exit 0
 fi
 
@@ -189,12 +189,18 @@ s = json.load(sys.stdin)
 print("  · Keep mode: %s, trusted signers: %d, use cases: %d built-in" % (s["keep_mode"], s["trusted_signers"], s["demos"]["builtin"]))'
 
 echo
-echo "==> smoke test: PDF brief"
-if KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN="$TOKEN" "$DIR/scripts/keep-demo.sh" pdf-brief >/tmp/keep-smoke.log 2>&1; then
-  ok "pdf-brief ran in a sealed cell with 0 CONNECT"
+echo "==> smoke test: CSV cleanup (needs no extra tools in the template)"
+if KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN="$TOKEN" "$DIR/scripts/keep-demo.sh" csv-clean >/tmp/keep-smoke.log 2>&1; then
+  ok "csv-clean ran in a sealed cell with 0 CONNECT"
 else
   tail -5 /tmp/keep-smoke.log | sed 's/^/    /'
-  die "the smoke test failed. Usually the '${ZYVOR_DEMO_TEMPLATE:-node22-agent}' template is missing or has no pdftotext: see docs/tutorials/11-* and scripts/keep-bake-*.sh, then re-run this command." 3
+  die "the smoke test failed. Usually the '${ZYVOR_DEMO_TEMPLATE:-node22-agent}' template is missing or its guest agent is not answering: set ZYVOR_DEMO_TEMPLATE in $ENV to a template that boots (see docs/tutorials/11-* and scripts/keep-bake-*.sh), then re-run this command." 3
+fi
+# The PDF demos also need pdftotext (poppler) in the template. Report, do not fail.
+if KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN="$TOKEN" "$DIR/scripts/keep-demo.sh" pdf-brief >/tmp/keep-smoke-pdf.log 2>&1; then
+  ok "pdf-brief ran too"
+else
+  info "the PDF demos need a template with pdftotext (poppler-utils); the other demos work. See docs/tutorials/17-keep-pdf-brief.md"
 fi
 REMOTE
 rc=$?

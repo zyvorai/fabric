@@ -8,7 +8,7 @@
 #   keepctl deploy <pack-dir> [--run] [--test] [--dry-run]
 #                                   # one command: build, sign (KEEP_POLICY_SEED), deploy a pack.json
 #   keepctl bundle <pack-dir>        # write <name>.keeppack.json for the console's Deploy a pack
-#   keepctl doctor [--smoke]         # runtime, Keep mode, signers, FluxVM, demos (+ a live PDF brief)
+#   keepctl doctor [--smoke]         # runtime, Keep mode, signers, FluxVM, demos (+ a live CSV cleanup)
 #   keepctl create -f agent.json --signature agent.json.sig
 #                                   # deploy with signed full manifest in Keep mode
 #   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
@@ -128,8 +128,8 @@ print("  · demo template: %s" % s["demo_template"])
 print("  · use cases: %d built-in, %d custom" % (s["demos"]["builtin"], s["demos"]["custom"]))
 sys.exit(1 if bad else 0)' || rc=$?
     if [[ "$smoke" == "1" && $rc -eq 0 ]]; then
-      echo "==> smoke test: pdf-brief on its sample"
-      "$(dirname "$0")/keep-demo.sh" pdf-brief >/dev/null && echo "  ✓ pdf-brief ran, 0 CONNECT" || { echo "  ✗ smoke test failed" >&2; rc=1; }
+      echo "==> smoke test: csv-clean on its sample"
+      "$(dirname "$0")/keep-demo.sh" csv-clean >/dev/null && echo "  ✓ csv-clean ran, 0 CONNECT" || { echo "  ✗ smoke test failed" >&2; rc=1; }
     fi
     exit $rc
     ;;
