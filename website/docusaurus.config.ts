@@ -105,6 +105,11 @@ const config: Config = {
           position: 'right',
         },
         {
+          to: '/compare',
+          label: 'Compare',
+          position: 'right',
+        },
+        {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
           position: 'right',
@@ -125,6 +130,7 @@ const config: Config = {
           items: [
             {label: 'Quick start', to: '/docs/getting-started/02-Quick-Start'},
             {label: 'Keep', to: '/keep'},
+            {label: 'Muse vs Keep · Fabric · FluxVM', to: '/compare'},
             {label: 'Keep docs', to: '/docs/keep/'},
             {label: 'Tutorial 17 — PDF brief', to: '/docs/tutorials/keep-pdf-brief'},
             {label: 'Product overview', to: '/docs/PRODUCT_OVERVIEW'},
