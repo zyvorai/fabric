@@ -21,6 +21,7 @@
 | Model-assisted use cases | Opt-in host-side model step: vault-gated endpoint, first-use approval, audited calls, sanitised reply, `keepctl grants` | [`MODEL.md`](MODEL.md) |
 | Scenarios and the cell template | Seven scenario packs; `node22-agent` template and `keep-bake-node22-agent.sh` | [`SCENARIOS.md`](SCENARIOS.md) |
 | Many users | User tokens, per-user isolation, quotas, usage, revocation | [`TENANCY.md`](TENANCY.md) |
+| Phone-signed approvals | Device enrolment, push relays, signed decisions, `keep-phone`, test vectors | [`mobile/README.md`](mobile/README.md) |
 | Install Keep | `./scripts/deploy keep user@host` (needs FluxVM on the host); `keepctl doctor` | [`PRODUCTION.md`](PRODUCTION.md) · `scripts/deploy-keep.sh` |
 | CI | Keep workflow: unit tests, **demos e2e** (7 built-ins, a custom use case, signed pack deploy in Keep mode, against the real runtime and the FluxVM stand-in), stub e2e | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
 | Tutorial | Hands-on + pack appendix + demos + your own | [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17](../tutorials/17-keep-pdf-brief.md) · [Tutorial 18](../tutorials/18-keep-use-cases.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) |

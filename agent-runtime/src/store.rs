@@ -3,6 +3,7 @@
 
 use crate::audit::AuditLog;
 use crate::demo_rules::CustomDemoRecord;
+use crate::devices::DeviceRecord;
 use crate::goals::{ArtifactRecord, GoalRecord};
 use crate::model::{
     AgentRecord, ApprovalKind, ApprovalRecord, ApprovalStatus, DeployAgentRequest, GrantScope,
@@ -48,6 +49,8 @@ pub struct Store {
     model_grants: RwLock<HashMap<String, ModelGrant>>,
     /// Per user: tokens issued before this instant are refused (a phone was lost, say).
     token_floors: RwLock<HashMap<String, chrono::DateTime<chrono::Utc>>>,
+    /// Enrolled phones, keyed `user/device`.
+    devices: RwLock<HashMap<String, DeviceRecord>>,
     /// Tamper-evident record of planned, approved, denied and performed actions.
     pub audit: AuditLog,
     /// Immutable, content-addressed skill bundles agents can mount.
@@ -80,6 +83,7 @@ impl Store {
             triggers: RwLock::new(HashMap::new()),
             model_grants: RwLock::new(HashMap::new()),
             token_floors: RwLock::new(HashMap::new()),
+            devices: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -143,6 +147,16 @@ impl Store {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
             Err(e) => return Err(e.into()),
         };
+        let devices = match fs::read(self.root.join("devices.json")).await {
+            Ok(raw) => serde_json::from_slice::<Vec<DeviceRecord>>(&raw)
+                .context("decoding devices.json")?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(e.into()),
+        };
+        *self.devices.write().await = devices
+            .into_iter()
+            .map(|d| (format!("{}/{}", d.user_id, d.device_id), d))
+            .collect();
         let grants = match fs::read(self.root.join("model_grants.json")).await {
             Ok(raw) => serde_json::from_slice::<Vec<ModelGrant>>(&raw)
                 .context("decoding model_grants.json")?,
@@ -810,6 +824,51 @@ impl Store {
                 &map.values().cloned().collect::<Vec<_>>(),
             )
             .await?;
+        }
+        Ok(existed)
+    }
+
+    pub async fn list_devices(&self, user: &str) -> Vec<DeviceRecord> {
+        let mut out: Vec<_> = self
+            .devices
+            .read()
+            .await
+            .values()
+            .filter(|d| d.user_id == user)
+            .cloned()
+            .collect();
+        out.sort_by_key(|d| d.created_at);
+        out
+    }
+
+    pub async fn get_device(&self, user: &str, device: &str) -> Option<DeviceRecord> {
+        self.devices
+            .read()
+            .await
+            .get(&format!("{user}/{device}"))
+            .cloned()
+    }
+
+    /// Enrol or replace a device. A user may hold at most 10.
+    pub async fn save_device(&self, record: DeviceRecord) -> Result<()> {
+        let mut map = self.devices.write().await;
+        let key = format!("{}/{}", record.user_id, record.device_id);
+        if !map.contains_key(&key)
+            && map.values().filter(|d| d.user_id == record.user_id).count() >= 10
+        {
+            anyhow::bail!("a user can have at most 10 enrolled devices");
+        }
+        map.insert(key, record);
+        self.persist_vec("devices.json", &map.values().cloned().collect::<Vec<_>>())
+            .await
+    }
+
+    pub async fn delete_device(&self, user: &str, device: &str) -> Result<bool> {
+        let mut map = self.devices.write().await;
+        let existed = map.remove(&format!("{user}/{device}")).is_some();
+        if existed {
+            self.persist_vec("devices.json", &map.values().cloned().collect::<Vec<_>>())
+                .await?;
         }
         Ok(existed)
     }

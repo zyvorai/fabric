@@ -1141,6 +1141,12 @@ pub struct DecideApprovalRequest {
     pub scope: Option<GrantScope>,
     #[serde(default)]
     pub comment: Option<String>,
+    /// The enrolled phone that made this decision, and its signature over the decision
+    /// (see `devices.rs`). Both or neither.
+    #[serde(default)]
+    pub device_id: Option<String>,
+    #[serde(default)]
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

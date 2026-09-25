@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **Phone-signed approvals.** The operator enrols a phone's public key per user (ECDSA P-256 as Android
+  Keystore holds it, or Ed25519); the phone signs an exact text naming the approval, the decision, a digest of
+  the planned action and a server challenge, and the runtime refuses any decision whose signature does not
+  verify (flipped, replayed, forged or late). Mandatory per credential or globally for user tokens. Approvals
+  push to each device through a vendor-run relay. Node reference client `keep-phone`, cross-language test
+  vectors. Docs: [docs/keep/mobile](docs/keep/mobile/README.md).
 - **Many users on one Keep shard.** Operator-minted, per-user, stateless **user tokens**
   (`POST /v1/user-tokens`, scopes `read` / `run` / `approve`, revocable per user) reach only that
   user's sessions, approvals, artifacts and audit rows; everything else is 403 by default and

@@ -47,6 +47,10 @@ pub struct CredentialDescriptor {
     /// What such an approval is called to the operator: `send` (default) or `purchase`.
     #[serde(default)]
     pub approval_kind: Option<String>,
+    /// Approvals for this credential must be signed by the user's enrolled phone key when a user
+    /// token decides them (see `devices.rs`). The operator token can always decide unsigned.
+    #[serde(default)]
+    pub require_device_signature: bool,
 }
 
 /// The stand-in for credential `name` that a session's agent holds. It is derived
@@ -301,6 +305,7 @@ mod tests {
             allowed_users: vec![],
             approval_kind: None,
             intercept: false,
+            require_device_signature: false,
         };
         assert!(credential_allows_request(
             &d,

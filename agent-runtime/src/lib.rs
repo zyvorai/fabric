@@ -15,6 +15,7 @@ pub mod credentials;
 pub mod demo_builders;
 pub mod demo_rules;
 pub mod demos;
+pub mod devices;
 pub mod egress;
 pub mod export_tokens;
 pub mod fluxvm;

@@ -77,5 +77,5 @@ id, for a client that talks to the runtime directly.
 - **The vault is one per shard**: secrets come from the host environment and are shared by every user of that shard.
   `allowed_users` on a credential limits who may use it; there is no per-user secret store.
 - **Approvals still trust the token.** A user token that has the `approve` scope can decide that user's approvals.
-  Requiring the approval to be signed by the user's enrolled phone key is planned ([VENDORS.md](VENDORS.md)).
+  Requiring the approval to be signed by the user's enrolled phone key is available: see [mobile/README.md](mobile/README.md).
 - **No per-user identity check.** The runtime believes the `user_id` the operator put in a token.

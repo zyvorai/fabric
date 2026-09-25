@@ -525,3 +525,390 @@ async fn quotas_return_429_when_the_operator_sets_them() {
         "no model calls yet"
     );
 }
+
+// ---- phone-signed decisions -------------------------------------------------------------------
+
+use base64::Engine as _;
+use p256::ecdsa::signature::Signer as _;
+use p256::pkcs8::EncodePublicKey as _;
+
+fn os_rng() -> impl ed25519_dalek::ed25519::signature::rand_core::CryptoRngCore {
+    ed25519_dalek::ed25519::signature::rand_core::OsRng
+}
+
+fn b64(bytes: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+/// An enrolled phone: the private key stays here, the public key goes to the runtime.
+struct Phone {
+    id: &'static str,
+    sk: p256::ecdsa::SigningKey,
+}
+
+impl Phone {
+    fn new(id: &'static str) -> Self {
+        Self {
+            id,
+            sk: p256::ecdsa::SigningKey::random(&mut os_rng()),
+        }
+    }
+
+    fn enrol_body(&self) -> Value {
+        let spki = self.sk.verifying_key().to_public_key_der().unwrap();
+        json!({"device_id": self.id, "alg": "p256", "public_key": b64(spki.as_bytes()),
+               "push": {"kind": "fcm", "token": "device-push-token"}})
+    }
+
+    /// Sign the payload the server tells the phone to sign.
+    fn sign(&self, approval: &ApprovalRecord, decision: ApprovalStatus) -> String {
+        let key = crate::authz::signing_key(Some(OP), None).unwrap();
+        let payload = crate::devices::signing_payload(
+            approval,
+            decision,
+            &crate::devices::challenge(&key, approval),
+        );
+        let sig: p256::ecdsa::Signature = self.sk.sign(payload.as_bytes());
+        b64(sig.to_der().as_bytes())
+    }
+}
+
+async fn decide(
+    w: &World,
+    who: &str,
+    id: Uuid,
+    decision: &str,
+    phone: Option<(&str, String)>,
+) -> (StatusCode, Value) {
+    let mut body = json!({ "decision": decision });
+    if let Some((device, sig)) = phone {
+        body["device_id"] = json!(device);
+        body["signature"] = json!(sig);
+    }
+    call(
+        &w.app,
+        "POST",
+        &format!("/v1/approvals/{id}"),
+        Some(who),
+        Some(body),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn a_phone_signed_decision_is_accepted_and_recorded() {
+    let w = world().await;
+    let phone = Phone::new("ana-phone");
+    let (st, v) = call(
+        &w.app,
+        "POST",
+        "/v1/users/ana/devices",
+        Some(OP),
+        Some(phone.enrol_body()),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{v}");
+    let a = w.state.store.get_approval(w.ana.approval).await.unwrap();
+    let sig = phone.sign(&a, ApprovalStatus::Approved);
+    let (st, v) = decide(&w, &w.ana.token, a.id, "approved", Some((phone.id, sig))).await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(
+        w.state.store.get_approval(a.id).await.unwrap().status,
+        ApprovalStatus::Approved
+    );
+    let rows = w
+        .state
+        .store
+        .audit
+        .list(Some(a.session_id), 100)
+        .await
+        .unwrap();
+    assert!(rows.iter().any(|r| r.action == "approval.device_signature"
+        && r.phase == AuditPhase::Performed
+        && r.detail["device_id"] == "ana-phone"));
+    assert!(
+        rows.iter()
+            .any(|r| r.action == "approval.send" && r.detail["device_id"] == "ana-phone"),
+        "the decision row names the device"
+    );
+}
+
+#[tokio::test]
+async fn a_forged_flipped_or_borrowed_signature_is_refused_and_changes_nothing() {
+    let w = world().await;
+    let phone = Phone::new("ana-phone");
+    call(
+        &w.app,
+        "POST",
+        "/v1/users/ana/devices",
+        Some(OP),
+        Some(phone.enrol_body()),
+    )
+    .await;
+    // Ben has a phone too.
+    let bens = Phone::new("ben-phone");
+    call(
+        &w.app,
+        "POST",
+        "/v1/users/ben/devices",
+        Some(OP),
+        Some(bens.enrol_body()),
+    )
+    .await;
+    let a = w.state.store.get_approval(w.ana.approval).await.unwrap();
+    let intruder = Phone::new("ana-phone");
+
+    for (why, device, sig, decision) in [
+        (
+            "another key under ana's device id",
+            "ana-phone",
+            intruder.sign(&a, ApprovalStatus::Approved),
+            "approved",
+        ),
+        (
+            "signed approved, sent denied",
+            "ana-phone",
+            phone.sign(&a, ApprovalStatus::Approved),
+            "denied",
+        ),
+        (
+            "ben's phone on ana's approval",
+            "ben-phone",
+            bens.sign(&a, ApprovalStatus::Approved),
+            "approved",
+        ),
+        (
+            "a device nobody enrolled",
+            "ghost",
+            phone.sign(&a, ApprovalStatus::Approved),
+            "approved",
+        ),
+        ("garbage", "ana-phone", "AAAA".to_string(), "approved"),
+    ] {
+        let (st, v) = decide(&w, &w.ana.token, a.id, decision, Some((device, sig))).await;
+        assert_eq!(st, StatusCode::FORBIDDEN, "{why}: {v}");
+        assert_eq!(
+            w.state.store.get_approval(a.id).await.unwrap().status,
+            ApprovalStatus::Pending,
+            "{why}"
+        );
+    }
+    // A signature without a device, or a device without a signature, is a plain 400.
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/approvals/{}", a.id),
+        Some(&w.ana.token),
+        Some(json!({"decision": "approved", "device_id": "ana-phone"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let rows = w
+        .state
+        .store
+        .audit
+        .list(Some(a.session_id), 100)
+        .await
+        .unwrap();
+    assert!(
+        rows.iter()
+            .filter(|r| r.action == "approval.device_signature" && r.phase == AuditPhase::Failed)
+            .count()
+            >= 4
+    );
+}
+
+#[tokio::test]
+async fn a_signature_after_the_window_is_refused() {
+    let w = world().await;
+    let phone = Phone::new("ana-phone");
+    call(
+        &w.app,
+        "POST",
+        "/v1/users/ana/devices",
+        Some(OP),
+        Some(phone.enrol_body()),
+    )
+    .await;
+    let mut a = w.state.store.get_approval(w.ana.approval).await.unwrap();
+    a.created_at = Utc::now() - chrono::Duration::seconds(crate::devices::sign_ttl_seconds() + 60);
+    w.state.store.save_approval(a.clone()).await.unwrap();
+    let (st, v) = decide(
+        &w,
+        &w.ana.token,
+        a.id,
+        "approved",
+        Some((phone.id, phone.sign(&a, ApprovalStatus::Approved))),
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    assert!(v["error"].as_str().unwrap().contains("window"), "{v}");
+}
+
+#[tokio::test]
+async fn users_cannot_enrol_devices_but_can_list_their_own() {
+    let w = world().await;
+    let phone = Phone::new("evil");
+    // A stolen user token must not be able to add its own key.
+    for path in ["/v1/users/ana/devices", "/v1/users/ben/devices"] {
+        let (st, _) = call(
+            &w.app,
+            "POST",
+            path,
+            Some(&w.ana.token),
+            Some(phone.enrol_body()),
+        )
+        .await;
+        assert_eq!(st, StatusCode::FORBIDDEN, "{path}");
+    }
+    let (st, _) = call(
+        &w.app,
+        "DELETE",
+        "/v1/users/ana/devices/x",
+        Some(&w.ana.token),
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    call(
+        &w.app,
+        "POST",
+        "/v1/users/ana/devices",
+        Some(OP),
+        Some(Phone::new("ana-phone").enrol_body()),
+    )
+    .await;
+    call(
+        &w.app,
+        "POST",
+        "/v1/users/ben/devices",
+        Some(OP),
+        Some(Phone::new("ben-phone").enrol_body()),
+    )
+    .await;
+    let (st, v) = call(
+        &w.app,
+        "GET",
+        "/v1/users/ana/devices",
+        Some(&w.ana.token),
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(ids(&v, "device_id"), vec!["ana-phone"]);
+    let (st, _) = call(
+        &w.app,
+        "GET",
+        "/v1/users/ben/devices",
+        Some(&w.ana.token),
+        None,
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::NOT_FOUND,
+        "another user's device list is not visible"
+    );
+    // The operator manages them, and a removed phone stops signing.
+    let (st, _) = call(
+        &w.app,
+        "DELETE",
+        "/v1/users/ana/devices/ana-phone",
+        Some(OP),
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::NO_CONTENT);
+    let (_, v) = call(&w.app, "GET", "/v1/users/ana/devices", Some(OP), None).await;
+    assert!(v["items"].as_array().unwrap().is_empty());
+    // Bad keys are refused at enrolment.
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/users/ana/devices",
+        Some(OP),
+        Some(json!({"device_id": "d", "alg": "p256", "public_key": "AAAA"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn the_inbox_carries_what_a_phone_needs_to_sign() {
+    let w = world().await;
+    let (_, v) = call(&w.app, "GET", "/v1/inbox", Some(&w.ana.token), None).await;
+    let sign = &v["pending_approvals"][0]["sign"];
+    assert_eq!(sign["format"], "keep-approval-v1");
+    let a = w.state.store.get_approval(w.ana.approval).await.unwrap();
+    let key = crate::authz::signing_key(Some(OP), None).unwrap();
+    assert_eq!(sign["challenge"], crate::devices::challenge(&key, &a));
+    assert_eq!(sign["action_sha256"], crate::devices::action_sha256(&a));
+    assert_eq!(sign["expires_at"], crate::devices::expires_at(&a));
+}
+
+#[tokio::test]
+async fn a_credential_can_require_the_phone_while_the_operator_can_still_decide() {
+    let file = std::env::temp_dir().join(format!("zyvor-creds-{}.json", Uuid::new_v4()));
+    std::fs::write(
+        &file,
+        json!({"mail": {"host": "mail.example", "header": "authorization", "env": "UNUSED_KEY",
+                        "require_device_signature": true}})
+        .to_string(),
+    )
+    .unwrap();
+    let (state, base) = state_and_session_cfg(|c| {
+        c.api_token = Some(OP.into());
+        c.credentials_file = Some(file);
+    })
+    .await;
+    let app = public_router(state.clone());
+    let ana = fixture(&state, &base, &app, "ana").await;
+    let phone = Phone::new("ana-phone");
+    call(
+        &app,
+        "POST",
+        "/v1/users/ana/devices",
+        Some(OP),
+        Some(phone.enrol_body()),
+    )
+    .await;
+    // Make ana's approval one that uses the credential.
+    let mut a = state.store.get_approval(ana.approval).await.unwrap();
+    a.planned_action = Some(json!({"credential": "mail", "method": "POST"}));
+    state.store.save_approval(a.clone()).await.unwrap();
+    let w = World {
+        app: app.clone(),
+        state: state.clone(),
+        ana,
+        ben: fixture(&state, &base, &app, "ben").await,
+        orphan_artifact: Uuid::new_v4(),
+    };
+
+    let (st, v) = decide(&w, &w.ana.token, a.id, "approved", None).await;
+    assert_eq!(st, StatusCode::FORBIDDEN, "{v}");
+    assert!(
+        v["error"].as_str().unwrap().contains("must be signed"),
+        "{v}"
+    );
+    assert_eq!(
+        state.store.get_approval(a.id).await.unwrap().status,
+        ApprovalStatus::Pending
+    );
+    let (st, v) = decide(
+        &w,
+        &w.ana.token,
+        a.id,
+        "approved",
+        Some((phone.id, phone.sign(&a, ApprovalStatus::Approved))),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+
+    // The operator (the gateway acting for the user, or an admin) may decide unsigned.
+    let b = state.store.get_approval(w.ben.approval).await.unwrap();
+    let mut b2 = b.clone();
+    b2.planned_action = Some(json!({"credential": "mail"}));
+    state.store.save_approval(b2).await.unwrap();
+    let (st, _) = decide(&w, OP, b.id, "denied", None).await;
+    assert_eq!(st, StatusCode::OK);
+}

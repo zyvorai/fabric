@@ -186,6 +186,8 @@ pub enum UserRoute {
     Approval(Uuid, Scope),
     /// Names one or two artifacts, whose sessions must be the user's.
     Artifacts(Vec<Uuid>, Scope),
+    /// A route under `/v1/users/{id}/…`: the id must be the caller's own.
+    OwnUser(String, Scope),
 }
 
 /// The only routes a user token can reach. Anything not listed is [`UserRoute::Denied`].
@@ -218,6 +220,11 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
             (Some(a), Some(b)) => UserRoute::Artifacts(vec![a, b], Scope::Read),
             _ => UserRoute::Denied,
         },
+        // A user may list their own enrolled devices. Enrolling and removing them is an operator
+        // action, so a stolen user token cannot add its own key.
+        ["v1", "users", uid, "devices"] if read => {
+            UserRoute::OwnUser((*uid).to_string(), Scope::Read)
+        }
         ["v1", "audit"] | ["v1", "usage"] | ["v1", "inbox"] | ["v1", "demos"] if read => {
             UserRoute::Open(Scope::Read)
         }
@@ -473,5 +480,19 @@ mod tests {
             user_route(&Method::GET, "/v1/sessions/not-a-uuid"),
             UserRoute::Denied
         );
+        // Devices: read your own list; enrolling or removing one is not for users.
+        assert_eq!(
+            user_route(&Method::GET, "/v1/users/ana/devices"),
+            UserRoute::OwnUser("ana".into(), Scope::Read)
+        );
+        for m in [Method::POST, Method::DELETE, Method::PUT] {
+            for p in [
+                "/v1/users/ana/devices",
+                "/v1/users/ana/devices/phone",
+                "/v1/users/ana/revoke-tokens",
+            ] {
+                assert_eq!(user_route(&m, p), UserRoute::Denied, "{m} {p}");
+            }
+        }
     }
 }

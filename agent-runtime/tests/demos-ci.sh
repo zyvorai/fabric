@@ -451,8 +451,12 @@ ok "keepctl doctor reports FluxVM ready and 7 built-ins"
 echo "demos-ci: signed pack deploy in Keep mode"
 SEED=$(python3 -c 'print("07"*32)')
 PUB=$(S=$SEED node --input-type=module -e "import('$ROOT/sdk/agent-runtime/src/sign.js').then(m=>console.log(m.publicKeyHex(process.env.S)))")
+RELAY_PORT=$(free_port)
+RELAY_STUB_LOG="$WORK/relay.log" python3 "$ROOT/agent-runtime/tests/relay_stub.py" "$RELAY_PORT" >"$WORK/relay-stub.log" 2>&1 &
+PIDS+=($!)
+: >"$WORK/relay.log"
 start_runtime keep-runtime "$KEEP_PORT" "$KEEP_EGRESS" \
-  ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE" ZYVOR_AGENT_USER_MAX_RUNS_PER_DAY=3
+  ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE" ZYVOR_AGENT_USER_MAX_RUNS_PER_DAY=3 ZYVOR_AGENT_REQUIRE_DEVICE_SIGNATURE=1 ZYVOR_AGENT_PUSH_RELAYS="{\"fcm\":\"http://127.0.0.1:$RELAY_PORT/push\"}" ZYVOR_AGENT_PUSH_RELAY_SECRET=relay-e2e-secret
 wait_http "$KEEP_BASE/healthz" || fail "keep-mode runtime did not start"
 export KEEP_TOKEN="$KEEP_TOKEN_VALUE"
 PACK="$WORK/my-agent"; mkdir -p "$PACK"
@@ -528,5 +532,61 @@ ok "ana hits her run quota (429) after 3; ben is unaffected; usage reports the r
 curl -s -o /dev/null -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$KEEP_BASE/v1/users/ana/revoke-tokens"
 [[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions")" == "401" && "$(as "$BEN" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions")" == "200" ]] || fail "revoking ana must cut off ana only"
 ok "revoking a user's tokens cuts off that user only"
+
+echo "demos-ci: phone-signed approvals (enrol, push relay, sign, refuse forgeries)"
+PHONE="node $ROOT/sdk/agent-runtime/src/phone-cli.js"
+op() { curl -s -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$@"; }
+CAROL=$(mint carol)
+rc=$(as "$CAROL" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean"); SC=$(echo "$rc" | json session_id)
+$PHONE keygen "$WORK/carol.key" p256 >/dev/null
+$PHONE enrol "$WORK/carol.key" carol-phone --push-kind fcm --push-token PUSH123 > "$WORK/enrol.json"
+[[ "$(op -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$KEEP_BASE/v1/users/carol/devices")" == "201" ]] || fail "operator enrolment should be 201"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$KEEP_BASE/v1/users/carol/devices")" == "403" ]] || fail "a user token must not enrol a device"
+ok "the operator enrols carol's phone key; carol's own token cannot"
+mkapp() { op -X POST -H 'content-type: application/json' -d "{\"session_id\":\"$SC\",\"kind\":\"send\",\"subject\":\"mail.example\",\"prompt\":\"$1\",\"planned_action\":{\"method\":\"POST\",\"body_sha256\":\"$2\"}}" "$KEEP_BASE/v1/approvals" | json id; }
+A1=$(mkapp "send report" aaa)
+for _ in $(seq 1 50); do [[ -s "$WORK/relay.log" ]] && break; sleep 0.1; done
+python3 - "$WORK/relay.log" "$A1" <<'PY' || fail "the push relay did not get a valid signed message for the approval"
+import hashlib, hmac, json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])]
+assert len(rows) == 1, rows
+r = rows[0]
+assert r["event"] == "approval.requested"
+want = "sha256=" + hmac.new(b"relay-e2e-secret", r["body"].encode(), hashlib.sha256).hexdigest()
+assert hmac.compare_digest(r["sig"], want), "relay signature mismatch"
+b = json.loads(r["body"])
+assert b["device"]["id"] == "carol-phone" and b["device"]["push"]["token"] == "PUSH123", b["device"]
+assert b["approval"]["id"] == sys.argv[2] and b["sign"]["format"] == "keep-approval-v1" and len(b["sign"]["challenge"]) == 32
+assert "planned_action" not in b["approval"] and "relay-e2e-secret" not in r["body"]
+PY
+ok "opening an approval pushes a signed message to carol's device through the relay, with no request details"
+
+as "$CAROL" "$KEEP_BASE/v1/inbox" | python3 -c 'import json,sys; d=json.load(sys.stdin); p=[a for a in d["pending_approvals"] if a["id"]=="'"$A1"'"]; assert len(p)==1 and "sign" in p[0]; json.dump(p[0], open("'"$WORK"'/appr1.json","w"))' || fail "carol's inbox should list the approval with signing info"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"decision":"approved"}' "$KEEP_BASE/v1/approvals/$A1")" == "403" ]] || fail "an unsigned decision by a user token must be refused when signatures are required"
+$PHONE decide "$WORK/carol.key" carol-phone "$WORK/appr1.json" approved > "$WORK/decide-ok.json"
+$PHONE decide "$WORK/carol.key" carol-phone "$WORK/appr1.json" denied > "$WORK/decide-denied.json"
+# Signed "denied" but sent as "approved": the signature must not carry over.
+python3 -c 'import json; d=json.load(open("'"$WORK"'/decide-denied.json")); d["decision"]="approved"; json.dump(d, open("'"$WORK"'/decide-flipped.json","w"))'
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-flipped.json" "$KEEP_BASE/v1/approvals/$A1")" == "403" ]] || fail "a flipped decision must be refused"
+$PHONE keygen "$WORK/intruder.key" p256 >/dev/null
+$PHONE decide "$WORK/intruder.key" carol-phone "$WORK/appr1.json" approved > "$WORK/decide-forged.json"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-forged.json" "$KEEP_BASE/v1/approvals/$A1")" == "403" ]] || fail "a signature from another key must be refused"
+[[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A1"'"][0]["status"])')" == "pending" ]] || fail "refused decisions must leave the approval pending"
+ok "unsigned, flipped and forged decisions are refused (403) and the approval stays pending"
+code=$(as "$CAROL" -o "$WORK/decide-ok.out" -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-ok.json" "$KEEP_BASE/v1/approvals/$A1")
+# An approval opened through the plain API is not held by the broker, so a decision also tries to steer the
+# session, and a demo session has no agent record to steer (a 500 after the decision is recorded). That is
+# the test setup, not the signature: what matters is that the decision was accepted and recorded.
+[[ "$code" == "200" || ( "$code" == "500" && "$(cat "$WORK/decide-ok.out")" == *"reading agent record"* ) ]] || fail "the phone-signed decision should be accepted, got $code: $(cat "$WORK/decide-ok.out")"
+[[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A1"'"][0]["status"])')" == "approved" ]] || fail "the approval should be approved"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-ok.json" "$KEEP_BASE/v1/approvals/$A1")" =~ ^(409|403)$ ]] || fail "a replay of a decided approval must be refused"
+ok "the phone-signed decision is accepted once; replaying it is refused"
+op "$KEEP_BASE/v1/audit?limit=500&session_id=$SC" | python3 -c 'import json,sys; rows=json.load(sys.stdin)["items"]; assert any(r["action"]=="approval.device_signature" and r["phase"]=="performed" and r["detail"]["device_id"]=="carol-phone" for r in rows), [r["action"] for r in rows]; assert sum(1 for r in rows if r["action"]=="approval.device_signature" and r["phase"]=="failed")>=2' || fail "the audit journal should record the signed decision and the refused ones"
+ok "the journal records the accepted signature and the refused attempts"
+A2=$(mkapp "delete file" bbb)
+code=$(op -o "$WORK/op-decide.out" -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"decision":"denied"}' "$KEEP_BASE/v1/approvals/$A2")
+[[ "$code" == "200" || ( "$code" == "500" && "$(cat "$WORK/op-decide.out")" == *"reading agent record"* ) ]] || fail "the operator may decide unsigned, got $code: $(cat "$WORK/op-decide.out")"
+[[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A2"'"][0]["status"])')" == "denied" ]] || fail "the operator's unsigned decision should be recorded"
+ok "the operator can still decide without a phone"
 
 echo "demos-ci: $PASSED checks passed"

@@ -370,6 +370,14 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/user-tokens", post(mint_user_token))
         .route("/v1/users/{id}/revoke-tokens", post(revoke_user_tokens))
+        .route(
+            "/v1/users/{id}/devices",
+            get(list_devices).post(enroll_device),
+        )
+        .route(
+            "/v1/users/{id}/devices/{device}",
+            axum::routing::delete(remove_device),
+        )
         .route("/v1/usage", get(usage_route))
         .route("/v1/inbox", get(inbox))
         .route("/v1/model-grants", get(crate::model_call::list_grants))
@@ -494,6 +502,7 @@ async fn api_auth(
             UserRoute::Open(s) => (*s, true),
             UserRoute::Session(sid, s) => (*s, authz::owns_session(&state, id, *sid).await),
             UserRoute::Approval(aid, s) => (*s, authz::owns_approval(&state, id, *aid).await),
+            UserRoute::OwnUser(uid, s) => (*s, uid == id),
             UserRoute::Artifacts(ids, s) => {
                 let mut all = true;
                 for a in ids {
@@ -3155,12 +3164,21 @@ async fn inbox(
             .ok_or_else(|| ApiError::bad_request("user_id is required"))?,
     };
     let mine = authz::session_ids_of(&state, &user).await;
-    let pending: Vec<_> = state
+    let signing_key = authz::signing_key_for(&state);
+    let pending: Vec<Value> = state
         .store
         .list_approvals()
         .await
         .into_iter()
         .filter(|a| a.status == ApprovalStatus::Pending && mine.contains(&a.session_id))
+        .map(|a| {
+            let mut v = json!(a);
+            // What the phone needs to sign this approval.
+            if let Some(key) = &signing_key {
+                v["sign"] = crate::devices::signing_info(key, &a);
+            }
+            v
+        })
         .collect();
     let artifacts = state.store.list_artifacts().await;
     let mut sessions: Vec<_> = state
@@ -3190,6 +3208,67 @@ async fn inbox(
     Ok(Json(
         json!({ "user_id": user, "pending_approvals": pending, "recent_runs": recent }),
     ))
+}
+
+/// `POST /v1/users/{id}/devices` (operator): enrol a phone's public key for a user. The gateway
+/// does this after its own strong login, so a stolen user token cannot add a key of its own.
+async fn enroll_device(
+    State(state): State<Arc<AppState>>,
+    Path(user): Path<String>,
+    Json(req): Json<crate::devices::EnrollRequest>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    crate::model::validate_user_id(&user).map_err(ApiError::bad_request)?;
+    let record =
+        crate::devices::build_record(&user, req, Utc::now()).map_err(ApiError::bad_request)?;
+    state
+        .store
+        .save_device(record.clone())
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.device.enrolled",
+            Some(user.clone()),
+            json!({ "device_id": record.device_id, "alg": record.alg, "push_kind": record.push.as_ref().map(|p| p.kind.clone()) }),
+        )
+        .await;
+    Ok((StatusCode::CREATED, Json(json!(record))))
+}
+
+/// `GET /v1/users/{id}/devices`: the operator, or the user for their own id.
+async fn list_devices(State(state): State<Arc<AppState>>, Path(user): Path<String>) -> Json<Value> {
+    Json(json!({ "items": state.store.list_devices(&user).await }))
+}
+
+/// `DELETE /v1/users/{id}/devices/{device}` (operator): a lost phone stops signing.
+async fn remove_device(
+    State(state): State<Arc<AppState>>,
+    Path((user, device)): Path<(String, String)>,
+) -> ApiResult<StatusCode> {
+    if !state
+        .store
+        .delete_device(&user, &device)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::not_found("device not found"));
+    }
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.device.removed",
+            Some(user),
+            json!({ "device_id": device }),
+        )
+        .await;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn list_approvals(
@@ -3241,6 +3320,7 @@ async fn create_approval(
 
 async fn decide_approval(
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
     Path(id): Path<Uuid>,
     Json(req): Json<DecideApprovalRequest>,
 ) -> ApiResult<Json<ApprovalRecord>> {
@@ -3261,6 +3341,15 @@ async fn decide_approval(
     if !session_running && (record.broker_held || record.kind == ApprovalKind::Egress) {
         return Err(ApiError::conflict("session is not running"));
     }
+    // A phone-signed decision is verified before anything changes; a user token may be required to sign.
+    let signed_by = crate::devices::check_decision(
+        &state,
+        &principal,
+        &record,
+        session.user_id.as_deref(),
+        &req,
+    )
+    .await?;
     let scope = (record.kind == ApprovalKind::Egress).then(|| req.scope.unwrap_or_default());
     let Some(record) = state
         .store
@@ -3284,7 +3373,7 @@ async fn decide_approval(
             phase,
             format!("approval.{}", record.kind.as_str()),
             record.subject.clone(),
-            json!({"approval_id": record.id, "comment": record.comment}),
+            json!({"approval_id": record.id, "comment": record.comment, "device_id": signed_by}),
         )
         .await
     {
