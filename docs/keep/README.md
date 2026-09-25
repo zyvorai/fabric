@@ -223,7 +223,7 @@ A **pack** is a directory with a single `pack.json`. Three kinds:
 | `agent` | A TypeScript agent that runs **inside the cell**, with a manifest and an optional signed policy | `keepctl deploy <dir>`, or `keepctl bundle` and then the console's **Deploy a pack** |
 | `builtin` | Documents a use case the runtime already ships. Nothing to deploy. | `keepctl deploy <dir> --test` runs it |
 
-The extractor is a fixed list (`pdftotext` or `text`), never a command. Reference: [PACKS.md](PACKS.md). Walkthrough: [Tutorial 19 — build your own use case](../tutorials/19-build-your-own-use-case.md).
+The extractor is a fixed list (`pdftotext` or `text`), never a command. Reference: [PACKS.md](PACKS.md). Walkthrough: [Tutorial 19 — build your own use case](../tutorials/19-build-your-own-use-case.md). A worked example: [Tutorial 20 — a digest of a mail export](../tutorials/20-sort-a-mail-export.md) (no code, no model).
 
 ## Install it on a host
 

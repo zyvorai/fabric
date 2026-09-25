@@ -14,7 +14,7 @@
 | Keep Browser 0.3 | Split-sight, trajectory-as-code, origin IFC, SNI-identity badge, goal tabs | [`browser/BROWSER-0.3.md`](browser/BROWSER-0.3.md) |
 | Host eBPF (FluxVM only) | `deny_udp` + gateway pin; audit `egress_connects`; freeze on deny | FluxVM TC + agent-runtime confine |
 | One-click use cases | Table-driven demos (7): drop a file, get an artifact; expect 0 CONNECT | [`demos/`](demos/README.md) · `examples/keep-agents/<id>/` · `keep-demo.sh` |
-| Your own use cases | Declarative `pack.json` (no code) deployed from the console or `keepctl deploy`; TypeScript agent packs signed with Node and deployed in one command | [`PACKS.md`](PACKS.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) |
+| Your own use cases | Declarative `pack.json` (no code) deployed from the console or `keepctl deploy`; TypeScript agent packs signed with Node and deployed in one command | [`PACKS.md`](PACKS.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) · [Tutorial 20: mail export digest](../tutorials/20-sort-a-mail-export.md) |
 | Install Keep | `./scripts/deploy keep user@host` (needs FluxVM on the host); `keepctl doctor` | [`PRODUCTION.md`](PRODUCTION.md) · `scripts/deploy-keep.sh` |
 | CI | Keep workflow: unit tests, **demos e2e** (7 built-ins, a custom use case, signed pack deploy in Keep mode, against the real runtime and the FluxVM stand-in), stub e2e | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
 | Tutorial | Hands-on + pack appendix + demos + your own | [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17](../tutorials/17-keep-pdf-brief.md) · [Tutorial 18](../tutorials/18-keep-use-cases.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) |
