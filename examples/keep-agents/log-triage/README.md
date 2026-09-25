@@ -3,7 +3,7 @@
 Log file in → `triage.md` out: lines by level, the most repeated errors (numbers and timestamps collapsed), first and last timestamp, and the busiest error minutes. **No browser. Zero CONNECT.**
 
 ```bash
-./scripts/keep-demo.sh log-triage examples/keep-agents/log-triage/sample.log
+./scripts/keep-demo.sh log-triage examples/keep-agents/log-triage/sample.txt
 # or console: /app/keep → Log triage
 # or API: POST /v1/demos/log-triage (multipart field `file`)
 ```

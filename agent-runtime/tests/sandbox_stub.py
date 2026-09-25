@@ -151,11 +151,53 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and vm:
             self._send(200, {"id": vm.group(1), "status": "running"})
             return
+        # Keep demo support: readiness, network policy, freeze and drop reasons.
+        if method == "GET" and path == "/v1/security/capabilities":
+            self._send(200, {"snp_present": False, "tdx_present": False})
+            return
+        policy = re.fullmatch(r"/v1/vms/([^/]+)/network/policy", path)
+        if method in {"POST", "PUT"} and policy:
+            body = self._read_json()
+            with LOCK:
+                SANDBOXES.setdefault(policy.group(1), {})["policy"] = body
+            self._send(200, {"ok": True})
+            return
+        freeze = re.fullmatch(r"/v1/vms/([^/]+)/(freeze|thaw)", path)
+        if method == "POST" and freeze:
+            with LOCK:
+                SANDBOXES.setdefault(freeze.group(1), {})["frozen"] = freeze.group(2) == "freeze"
+            self._send(200, {"ok": True})
+            return
+        if method == "GET" and re.fullmatch(r"/v1/vms/([^/]+)/network/drop-reasons", path):
+            self._send(200, {"drops": []})
+            return
         self._send(404, {"error": "not found"})
+
+    def _demo_command(self, sandbox_id: str, command: str) -> dict | None:
+        """Run the fixed extract commands the Keep demos send, against this
+        sandbox's own directory. Anything else is refused, so the stub can never
+        become a general shell."""
+        guest = "/home/agent/work"
+        work = os.path.join(ROOT, sandbox_id, guest.lstrip("/"))
+        if command.strip() == f"mkdir -p {guest}":
+            os.makedirs(work, exist_ok=True)
+            return {"stdout": ""}
+        allowed = (
+            re.fullmatch(rf"pdftotext -layout {re.escape(guest)}/input\.pdf - 2>/dev/null \| head -c \d+", command)
+            or re.fullmatch(rf"head -c \d+ {re.escape(guest)}/input\.(txt|log|json|csv)", command)
+        )
+        if not allowed:
+            return None
+        local = command.replace(guest, work)
+        result = subprocess.run(["bash", "-c", local], capture_output=True, timeout=30, check=False)
+        return {"stdout": result.stdout.decode("utf-8", "replace"), "exit_code": result.returncode}
 
     def _process(self, sandbox_id: str, command: str) -> dict:
         if "ip route" in command:
             return {"stdout": "127.0.0.1\n"}
+        demo = self._demo_command(sandbox_id, command)
+        if demo is not None:
+            return demo
         if "worker.mjs" not in command:
             return {"stdout": ""}
         env = os.environ.copy()

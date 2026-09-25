@@ -12,6 +12,10 @@ on:
       - "agent-runtime/**"
       - "docs/keep/**"
       - "scripts/keepctl"
+      - "scripts/keep-demo.sh"
+      - "scripts/keep-demo-pdf.sh"
+      - "sdk/agent-runtime/**"
+      - "examples/keep-agents/**"
       - "scripts/keep-e2e.sh"
       - "scripts/keep-bake-browser-agent.sh"
       - "scripts/keep-bake-browser-smoke.sh"
@@ -22,6 +26,10 @@ on:
       - "agent-runtime/**"
       - "docs/keep/**"
       - "scripts/keepctl"
+      - "scripts/keep-demo.sh"
+      - "scripts/keep-demo-pdf.sh"
+      - "sdk/agent-runtime/**"
+      - "examples/keep-agents/**"
       - "scripts/keep-e2e.sh"
       - "scripts/keep-bake-browser-agent.sh"
       - "scripts/keep-bake-browser-smoke.sh"
@@ -50,6 +58,30 @@ jobs:
           cargo test --manifest-path agent-runtime/Cargo.toml credentials -- --nocapture
           cargo test --manifest-path agent-runtime/Cargo.toml notify -- --nocapture
           cargo test --manifest-path agent-runtime/Cargo.toml --lib
+
+  keep-demos-e2e:
+    # The one-click demos, a user-defined use case, and a signed pack deploy in
+    # Keep mode, against the real runtime binary and the FluxVM stand-in.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: agent-runtime
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+      - name: Install poppler (pdftotext for the PDF demos)
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: Build the runtime and install the SDK
+        run: |
+          cargo build --manifest-path agent-runtime/Cargo.toml
+          npm ci --prefix sdk/agent-runtime --no-audit --no-fund
+      - name: SDK tests (pack composition and Ed25519 signing)
+        run: npm test --prefix sdk/agent-runtime
+      - name: Demos, custom use cases and signed packs
+        run: bash agent-runtime/tests/demos-ci.sh
 
   keep-browser-bake-smoke:
     runs-on: ubuntu-latest

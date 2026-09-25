@@ -14,8 +14,10 @@
 | Keep Browser 0.3 | Split-sight, trajectory-as-code, origin IFC, SNI-identity badge, goal tabs | [`browser/BROWSER-0.3.md`](browser/BROWSER-0.3.md) |
 | Host eBPF (FluxVM only) | `deny_udp` + gateway pin; audit `egress_connects`; freeze on deny | FluxVM TC + agent-runtime confine |
 | One-click use cases | Table-driven demos (7): drop a file, get an artifact; expect 0 CONNECT | [`demos/`](demos/README.md) · `examples/keep-agents/<id>/` · `keep-demo.sh` |
-| CI | Keep workflow (stub e2e) | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
-| Tutorial | Hands-on + pack appendix + demos | [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17](../tutorials/17-keep-pdf-brief.md) · [Tutorial 18](../tutorials/18-keep-use-cases.md) |
+| Your own use cases | Declarative `pack.json` (no code) deployed from the console or `keepctl deploy`; TypeScript agent packs signed with Node and deployed in one command | [`PACKS.md`](PACKS.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) |
+| Install Keep | `./scripts/deploy keep user@host` (needs FluxVM on the host); `keepctl doctor` | [`PRODUCTION.md`](PRODUCTION.md) · `scripts/deploy-keep.sh` |
+| CI | Keep workflow: unit tests, **demos e2e** (7 built-ins, a custom use case, signed pack deploy in Keep mode, against the real runtime and the FluxVM stand-in), stub e2e | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
+| Tutorial | Hands-on + pack appendix + demos + your own | [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17](../tutorials/17-keep-pdf-brief.md) · [Tutorial 18](../tutorials/18-keep-use-cases.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) |
 
 ## Packaged agents
 
@@ -39,6 +41,8 @@
 cargo test --manifest-path agent-runtime/Cargo.toml --lib
 cargo test --manifest-path agent-runtime/Cargo.toml goals -- --nocapture
 ./scripts/keep-e2e.sh
+# One-click demos, custom use case and signed pack deploy (real runtime + FluxVM stand-in, no VM):
+bash agent-runtime/tests/demos-ci.sh
 # Lab FluxVM host (template required — soft-pass removed):
 KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-live-lab.sh
 # Full pilot (happy + deny, archived logs):
@@ -53,3 +57,14 @@ Measured = `software-test`. Host can still see the VM until Keep 0.2 + hardware.
 Guest vsock is healthy on QEMU `node22-agent` (musl-static guest-agent) and on
 Firecracker `node22-fc` (flat ext4 rootfs — see `scripts/keep-bake-fc-rootfs.sh`).
 The pilot gate prefers `node22-fc` when that template is registered.
+
+## What the demos e2e proves, and what it does not
+
+`agent-runtime/tests/demos-ci.sh` runs the real runtime binary against `tests/sandbox_stub.py`
+(guest commands run on the CI machine, real `pdftotext`, no VM). It checks the seven built-in demos and
+their artifacts, refusal of wrong file types, oversize uploads and unknown ids, spreadsheet-formula
+neutralisation, deploying and deleting a user-defined use case, `keepctl doctor`, and, in Keep mode,
+that an unsigned deploy is refused while a Node-signed one is accepted and a one-byte change to the
+signed bytes is refused. It does **not** prove cell isolation or that the host eBPF pin stops a
+connection: that needs a FluxVM host (`keep-live-lab.sh`). The freeze-on-connect rule is unit-tested
+by counting the `egress.connect` / `ebpf.*` audit rows it depends on.

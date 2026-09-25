@@ -3,6 +3,34 @@
 ## 0.3.0
 
 ### Added
+- **Keep use cases you build yourself.** A declarative `pack.json` (an extractor
+  plus bounded summary rules, no code) is deployed from the console
+  (`/app/keep` → **Deploy your own use case**) or with `keepctl deploy`;
+  TypeScript agent packs deploy in one command, signed with Node's Ed25519
+  (byte-compatible with `keep_sign_policy`). New `keepctl bundle` / `doctor`,
+  console **Deploy an agent pack**, `POST /v1/demos` + `DELETE /v1/demos/{id}`,
+  `GET /v1/keep/status`, fabricd `POST /api/packs` (admin, signed bytes forwarded
+  untouched). Docs: [PACKS.md](docs/keep/PACKS.md),
+  [Tutorial 19](docs/tutorials/19-build-your-own-use-case.md).
+- **Six more one-click use cases**, table-driven: contract clauses, security
+  questionnaire, meeting actions, log triage, SBOM summary, CSV cleanup (with
+  spreadsheet-formula neutralisation). `GET /v1/demos`, `POST /v1/demos/{id}`,
+  `./scripts/keep-demo.sh`. Docs: [demos/README.md](docs/keep/demos/README.md),
+  [Tutorial 18](docs/tutorials/18-keep-use-cases.md).
+- **`./scripts/deploy keep user@host`.** Installs Fabric and the Keep runtime on a
+  host that already runs FluxVM, registers only the author's public signer key,
+  and smoke-tests a PDF brief.
+- **Demos e2e in CI** (`agent-runtime/tests/demos-ci.sh`) against the real runtime
+  and the FluxVM stand-in.
+
+### Fixed
+- `deny_udp` is carried through the driver-core `VmNetworkPolicy` (the fluxvm
+  driver stopped compiling once the client gained the field) and is part of the
+  policy fingerprint.
+- `session-ci.sh` no longer collides with the default CONNECT proxy port; Keep
+  workflow clippy passes (`browser::driver_call` visibility).
+
+### Added (earlier)
 - **Keep Browser 0.3.** Split-sight `agent_paused_reason`, origin taint lattice,
   trajectory-as-code (`browse-script` artifact), goal-bound tabs, honesty badge,
   profile inspect, SNI-identity label. Docs: [BROWSER-0.3.md](docs/keep/browser/BROWSER-0.3.md).

@@ -31,6 +31,14 @@ and the API returns `409`.
 | Registry | `agent-runtime/src/demos.rs` (`DEMOS`) |
 | Builders | `agent-runtime/src/demo_builders.rs` |
 
+## Testing
+
+```bash
+bash agent-runtime/tests/demos-ci.sh   # real runtime + FluxVM stand-in; needs node 20, python3, curl (pdftotext for the PDF demos)
+```
+
+See [STATUS.md](../STATUS.md#what-the-demos-e2e-proves-and-what-it-does-not) for what this does and does not prove.
+
 ## What "extractive" means
 
 The guest runs one fixed command to pull text out of the upload (`pdftotext`, or `head`

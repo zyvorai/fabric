@@ -146,6 +146,9 @@ curl -s -o /dev/null "http://127.0.0.1:${STUB_PORT}/" || fail "sandbox stub did 
 ZYVOR_AGENT_ALLOW_NO_AUTH=1 \
 ZYVOR_AGENT_LISTEN=127.0.0.1:19096 \
 ZYVOR_AGENT_EGRESS_LISTEN=127.0.0.1:18083 \
+# The CONNECT proxy defaults to 0.0.0.0:18083, the same port as the egress broker
+# above, which fails with "Address already in use" on Linux. This test does not use it.
+ZYVOR_AGENT_PROXY_LISTEN=off \
 ZYVOR_AGENT_FLUXVM_URL="http://127.0.0.1:${STUB_PORT}" \
 ZYVOR_AGENT_EGRESS_ADVERTISE_HOST=127.0.0.1 \
 ZYVOR_AGENT_STATE_DIR="$WORK/state" \

@@ -1058,6 +1058,35 @@ mod tests {
         .unwrap()
     }
 
+    /// The fail-closed rule hangs on this count: any `egress.connect` or `ebpf.*`
+    /// audit row for the session means the run is frozen (409), and rows for other
+    /// sessions or other actions must not trip it.
+    #[tokio::test]
+    async fn egress_connects_counts_connect_and_ebpf_rows_for_this_session_only() {
+        let state = crate::goals::tests::test_state().await;
+        let (mine, other) = (Uuid::new_v4(), Uuid::new_v4());
+        assert_eq!(session_egress_connects(&state, mine).await, 0);
+        let add = |sid: Uuid, action: &str| {
+            let state = state.clone();
+            let action = action.to_string();
+            async move {
+                state
+                    .store
+                    .audit
+                    .append(Some(sid), AuditPhase::Performed, &action, None, json!({}))
+                    .await
+                    .unwrap();
+            }
+        };
+        add(mine, "demo.pdf_brief.done").await; // not a connect
+        add(other, "egress.connect").await; // someone else's connect
+        assert_eq!(session_egress_connects(&state, mine).await, 0);
+        add(mine, "egress.connect").await;
+        add(mine, "ebpf.deny").await;
+        add(mine, "ebpf.udp_deny").await;
+        assert_eq!(session_egress_connects(&state, mine).await, 3);
+    }
+
     #[tokio::test]
     async fn keep_status_reports_mode_signers_fluxvm_and_demo_counts() {
         let state = crate::goals::tests::test_state().await;
