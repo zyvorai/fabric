@@ -12,6 +12,17 @@ Labeled when [`./scripts/keep-pilot-gate.sh`](../../scripts/keep-pilot-gate.sh) 
 | OOB approval | Webhook + approve **and** deny paths; no unapproved mutate |
 | Packaged agents | `examples/keep-agents/` + goals/artifacts |
 
+## Archive index
+
+| Run | Template | Result |
+|---|---|---|
+| [20260924T141927Z](20260924T141927Z/SUMMARY.md) | `node22-agent` | Happy PASS · Deny PASS |
+| [20260924T154950Z](20260924T154950Z/SUMMARY.md) | `node22-agent` | Happy PASS · Deny PASS |
+| [20260924T182930Z](20260924T182930Z/SUMMARY.md) | `node22-fc` | Happy PASS · Deny PASS · `cell_backend=flux-vm` · `guest_worker=ok` |
+| [20260924T190954Z](20260924T190954Z/SUMMARY.md) | `node22-agent` (lab) | Browser screenshot proof: view lists the tab, screenshot HTTP 200 (`keep-cdp-stub`, no input takeover) |
+
+All runs report evidence class **software-test**.
+
 ## Guest worker note
 
 QEMU `node22-agent` boots with a **musl-static** `fluxvm-guest-agent` (host glibc

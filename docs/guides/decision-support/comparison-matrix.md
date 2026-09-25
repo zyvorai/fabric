@@ -73,7 +73,7 @@ Proxmox provides a REST API, but many advanced features are more easily accessed
 | **Clone (linked)** | qcow2 backing file clone | `virt-clone --reflink` | Linked clone support |
 | **Snapshots** | REST endpoint (disk + full) | `virsh snapshot-create` | `qm snapshot` |
 | **Snapshot tree** | Tree endpoint with hierarchy | `virsh snapshot-list --tree` | Web UI tree view |
-| **Live migration** | Not available | `virsh migrate` | Built-in cluster migration |
+| **Live migration** | Disk-copy path GA; native FluxVM transport preview; full HA cutover pre-GA | `virsh migrate` | Built-in cluster migration |
 | **CPU hotplug** | REST endpoint + event | `virsh setvcpus --live` | `qm set --vcpus` |
 | **Memory hotplug** | REST endpoint + event | `virsh setmem --live` | `qm set --memory` |
 | **Disk hotplug** | REST endpoint + event | `virsh attach-disk` | `qm set --scsi` |

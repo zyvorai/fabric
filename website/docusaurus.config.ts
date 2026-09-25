@@ -128,7 +128,7 @@ const config: Config = {
         {
           title: 'Docs',
           items: [
-            {label: 'Quick start', to: '/docs/getting-started/02-Quick-Start'},
+            {label: 'Quick start', to: '/docs/getting-started/Quick-Start'},
             {label: 'Keep', to: '/keep'},
             {label: 'Muse vs Keep · Fabric · FluxVM', to: '/compare'},
             {label: 'Keep docs', to: '/docs/keep/'},

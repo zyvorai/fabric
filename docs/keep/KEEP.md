@@ -33,6 +33,7 @@ BIN=agent-runtime/target/release/zyvor-fabric-agent-runtime \
 
 GitHub Actions: [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml)  
 Hands-on: [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17 — PDF brief](../tutorials/17-keep-pdf-brief.md)  
+Evidence and status: [Security profiles](SECURITY-PROFILES.md) · [Roadmap](ROADMAP.md)  
 Production checklist: [PRODUCTION.md](PRODUCTION.md)  
 FluxVM measured profiles (sibling repo): `./scripts/test-security-profiles.sh`
 

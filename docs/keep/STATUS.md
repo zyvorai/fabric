@@ -8,7 +8,7 @@
 | Keep docs | In Fabric | `docs/keep/` |
 | keepctl | Script | `scripts/keepctl` |
 | Agent runtime | Policy YAML, goals/artifacts, cockpit, export-token | `agent-runtime/` |
-| Packaged agents | `infra-ops`, `migration-op`, `deploy-op` + `_fabric` | [`examples/keep-agents/`](../../examples/keep-agents/) |
+| Packaged agents | `infra-ops`, `migration-op`, `deploy-op`, `browser-research`, `pdf-brief` + `_fabric` | [`examples/keep-agents/`](../../examples/keep-agents/) |
 | Keep console view | Goal → task → evidence → approval → outcome + PDF demo home | `/app/keep` · `/app/keep/:sessionId` |
 | Keep 0.2 | **Soft scaffolding complete** + brokered browser; **hardware still gated** | [`KEEP-0.2.md`](KEEP-0.2.md) · [`browser/DRIVER.md`](browser/DRIVER.md) |
 | Keep Browser 0.3 | Split-sight, trajectory-as-code, origin IFC, SNI-identity badge, goal tabs | [`browser/BROWSER-0.3.md`](browser/BROWSER-0.3.md) |
@@ -24,6 +24,7 @@
 | infra-ops | alerts, VMs, lifecycle; restart/remediation behind ask |
 | migration-op | `/api/migrations` + GuestKit inspect/rescue (no Transiva in-repo) |
 | deploy-op | `/readyz` + `/health` → readiness artifact |
+| browser-research | allowlisted a11y browse → research markdown |
 | pdf-brief | PDF → `brief.md`; no browser; 0 CONNECT |
 
 ## How to test
