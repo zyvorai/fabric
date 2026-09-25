@@ -117,7 +117,7 @@ Security profiles (FluxVM Phase 6):
 4. **Phone-only high-risk approvals** — buy / send / delete via webhook / `/v1/approvals`, never in chat.
 5. **Pack / unpack** — `keepctl pack` → USB or S3 → `keepctl unpack` on another FluxVM node.
 6. **Cockpit + browser live view** — visible taint, last decisions, tab listing (`/keep/browser`), screenshot + read-only screencast; input takeover not implemented.
-7. **PDF brief one-click** — `/app/keep` + `keep-demo-pdf.sh`; expect `egress_connects: 0` ([demos/pdf-brief.md](demos/pdf-brief.md)).
+7. **One-click use cases** — `/app/keep` + `keep-demo.sh <id>`: PDF brief, contract clauses, security questionnaire, meeting actions, log triage, SBOM summary, CSV cleanup; each expects `egress_connects: 0` ([demos/README.md](demos/README.md)).
 8. **Host eBPF pin (FluxVM)** — `deny_udp` + gateway-only ports; no PacketWolf required ([confine.md](confine.md)).
 
 Lab gate: `./scripts/keep-live-lab.sh`. Guest boot needs a FluxVM template (Tutorial 11).
@@ -145,7 +145,7 @@ fabric/docs/keep/
   KEEP-0.2.md       # hardware gate
   STATUS.md
   confine.md        # FluxVM host eBPF (deny_udp)
-  demos/            # pdf-brief stage demo
+  demos/            # one-click use cases (pdf-brief, contract-clauses, log-triage, ...)
   sentinel/         # keep.policy.yaml example
   vault/ cell/ browser/ approve/ cockpit/
 fabric/scripts/keepctl
