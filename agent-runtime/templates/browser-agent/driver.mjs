@@ -284,8 +284,9 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(status, { "content-type": "application/json" });
     res.end(JSON.stringify(result));
   } catch (e) {
+    console.error("keep-browser-driver tool error:", e);
     res.writeHead(500, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: String(e && e.message ? e.message : e) }));
+    res.end(JSON.stringify({ error: "internal error" }));
   }
 });
 

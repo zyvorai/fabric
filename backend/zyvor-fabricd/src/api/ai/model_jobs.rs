@@ -690,31 +690,49 @@ pub async fn receive_blob(
     let root = state_dir.join("ai-models").join("blobs");
     std::fs::create_dir_all(&root)
         .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let partial = root.join(format!(".{digest}.partial"));
-    let dest = root.join(&digest);
-    if let Err(error) = write_hashed_body(body, &partial, &digest).await {
-        let _ = std::fs::remove_file(&partial);
-        return Err(err(StatusCode::BAD_REQUEST, error));
-    }
-    std::fs::rename(&partial, &dest)
-        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    if model_cache::confine(&dest, &state_dir).is_err() {
-        let _ = std::fs::remove_file(&dest);
-        return Err(err(
-            StatusCode::BAD_REQUEST,
-            "blob path escaped the model directory",
-        ));
-    }
-    if let Ok(Some(mut model)) = state.store.get_entity::<ModelArtifact>(STORE_MODELS, &name) {
-        if model.local_path.is_none() {
-            model.local_path = Some(dest.display().to_string());
-            let _ = state.store.save_entity(STORE_MODELS, &name, &model);
+    let root_s = root.to_string_lossy();
+    let partial_path = format!("{root_s}/.{digest}.partial");
+    let dest_path = format!("{root_s}/{digest}");
+    // CodeQL path-injection barrier: filesystem ops only inside fs_checked!.
+    input_guard::fs_checked!(
+        partial_path,
+        err(StatusCode::BAD_REQUEST, "invalid blob path"),
+        |partial_path| {
+            input_guard::fs_checked!(
+                dest_path,
+                err(StatusCode::BAD_REQUEST, "invalid blob path"),
+                |dest_path| {
+                    if let Err(error) =
+                        write_hashed_body(body, FsPath::new(&partial_path), &digest).await
+                    {
+                        let _ = std::fs::remove_file(&partial_path);
+                        return Err(err(StatusCode::BAD_REQUEST, error));
+                    }
+                    std::fs::rename(&partial_path, &dest_path)
+                        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    if model_cache::confine(FsPath::new(&dest_path), &state_dir).is_err() {
+                        let _ = std::fs::remove_file(&dest_path);
+                        return Err(err(
+                            StatusCode::BAD_REQUEST,
+                            "blob path escaped the model directory",
+                        ));
+                    }
+                    if let Ok(Some(mut model)) =
+                        state.store.get_entity::<ModelArtifact>(STORE_MODELS, &name)
+                    {
+                        if model.local_path.is_none() {
+                            model.local_path = Some(dest_path.clone());
+                            let _ = state.store.save_entity(STORE_MODELS, &name, &model);
+                        }
+                    }
+                    Ok((
+                        StatusCode::CREATED,
+                        Json(serde_json::json!({ "digest": digest.to_ascii_lowercase() })),
+                    ))
+                }
+            )
         }
-    }
-    Ok((
-        StatusCode::CREATED,
-        Json(serde_json::json!({ "digest": digest.to_ascii_lowercase() })),
-    ))
+    )
 }
 
 fn replicate_token_ok(got: Option<&str>) -> bool {
@@ -735,33 +753,41 @@ async fn write_hashed_body(
     use futures::StreamExt;
     use sha2::{Digest, Sha256};
     use tokio::io::AsyncWriteExt;
-    let mut file = tokio::fs::File::create(path)
-        .await
-        .map_err(|err| err.to_string())?;
-    let mut hasher = Sha256::new();
-    let mut total = 0u64;
-    let mut stream = body.into_data_stream();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|err| err.to_string())?;
-        total = total.saturating_add(chunk.len() as u64);
-        if total > 8 * 1024 * 1024 * 1024 {
-            return Err("model blob exceeds 8 GiB".into());
+    let path_s = path.to_string_lossy().into_owned();
+    let digest = digest.to_ascii_lowercase();
+    // CodeQL path-injection barrier at the File::create sink.
+    input_guard::fs_checked!(path_s, "invalid blob path".to_string(), |path_s| {
+        async move {
+            let mut file = tokio::fs::File::create(&path_s)
+                .await
+                .map_err(|err| err.to_string())?;
+            let mut hasher = Sha256::new();
+            let mut total = 0u64;
+            let mut stream = body.into_data_stream();
+            while let Some(chunk) = stream.next().await {
+                let chunk = chunk.map_err(|err| err.to_string())?;
+                total = total.saturating_add(chunk.len() as u64);
+                if total > 8 * 1024 * 1024 * 1024 {
+                    return Err("model blob exceeds 8 GiB".into());
+                }
+                hasher.update(&chunk);
+                file.write_all(&chunk)
+                    .await
+                    .map_err(|err| err.to_string())?;
+            }
+            file.flush().await.map_err(|err| err.to_string())?;
+            let got: String = hasher
+                .finalize()
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect();
+            if got != digest {
+                return Err("blob digest does not match".into());
+            }
+            Ok(())
         }
-        hasher.update(&chunk);
-        file.write_all(&chunk)
-            .await
-            .map_err(|err| err.to_string())?;
-    }
-    file.flush().await.map_err(|err| err.to_string())?;
-    let got: String = hasher
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    if got != digest.to_ascii_lowercase() {
-        return Err("blob digest does not match".into());
-    }
-    Ok(())
+    })
+    .await
 }
 
 /// DELETE /api/ai/models/{name}/cache/{node}

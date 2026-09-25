@@ -22,6 +22,17 @@ import { usePageLoader } from '../hooks/usePageLoader'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
 
+const ALLOWED_BROWSER_SHOT_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+function browserShotMime(mime: string | undefined): string {
+  if (mime && ALLOWED_BROWSER_SHOT_MIMES.has(mime)) return mime
+  return 'image/jpeg'
+}
+
+function browserShotDataUrl(mime: string | undefined, imageBase64: string): string {
+  return `data:${browserShotMime(mime)};base64,${imageBase64}`
+}
+
 /** One Keep view: goal → current task → evidence → approval → outcome. */
 export default function KeepSession() {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -51,7 +62,14 @@ export default function KeepSession() {
       }
       try {
         const frame = await getSessionBrowserScreenshot(sessionId)
-        setShot(frame)
+        setShot(
+          frame
+            ? {
+                ...frame,
+                mime: browserShotMime(frame.mime),
+              }
+            : null,
+        )
       } catch {
         setShot(null)
       }
@@ -112,7 +130,7 @@ export default function KeepSession() {
         if (m.type === 'frame' && m.image_base64) {
           setShot({
             session_id: sessionId,
-            mime: m.mime || 'image/jpeg',
+            mime: browserShotMime(m.mime),
             image_base64: m.image_base64,
             title: 'screencast',
             url: '',
@@ -348,7 +366,7 @@ export default function KeepSession() {
               <img
                 alt={shot.title || 'browser screenshot'}
                 className="w-full max-h-80 object-contain rounded border border-[var(--zf-hairline)] bg-black"
-                src={`data:${shot.mime || 'image/jpeg'};base64,${shot.image_base64}`}
+                src={browserShotDataUrl(shot.mime, shot.image_base64)}
               />
               <p className="text-[12px] text-[var(--zf-muted)] truncate">
                 {shot.title} · {shot.url}

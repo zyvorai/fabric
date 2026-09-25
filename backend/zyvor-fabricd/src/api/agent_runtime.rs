@@ -75,6 +75,14 @@ async fn proxy(
         Ok(v) => v,
         Err(resp) => return resp,
     };
+    // CodeQL SSRF barrier: only allowlisted path shapes reach the outbound client.
+    if !path.starts_with('/') || path.contains("..") || !input_guard::COMMAND_ARGS.contains(path) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid agent-runtime path" })),
+        )
+            .into_response();
+    }
     let mut url = format!("{base}{path}");
     if let Some(q) = query {
         if !q.is_empty() {
@@ -706,7 +714,12 @@ pub async fn demo_run(
         Ok(v) => v,
         Err(resp) => return resp,
     };
-    let url = format!("{base}/v1/demos/{demo_id}");
+    let path = format!("/v1/demos/{demo_id}");
+    // CodeQL SSRF barrier: path must pass the same allowlist as `proxy`.
+    if path.contains("..") || !input_guard::COMMAND_ARGS.contains(&path) {
+        return bad_demo_id();
+    }
+    let url = format!("{base}{path}");
     let ct = request.headers().get(header::CONTENT_TYPE).cloned();
     let body = match axum::body::to_bytes(request.into_body(), 32 * 1024 * 1024).await {
         Ok(b) => b,
