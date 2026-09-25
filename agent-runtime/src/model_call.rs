@@ -164,20 +164,19 @@ async fn audit(
         .await;
 }
 
-/// Send `text` to the declared endpoint and return the reply. Fails closed: any refusal or error
-/// fails the run rather than quietly skipping the model step.
-pub(crate) async fn call(
-    state: &AppState,
-    session: &SessionRecord,
-    use_case: &str,
-    spec: &ModelSpec,
-    text: &str,
-) -> Result<ModelOutcome, ApiError> {
+/// The endpoint, and the header and secret to reach it, once the vault allows the call.
+struct Authorized {
+    url: url::Url,
+    host: String,
+    header: String,
+    secret: String,
+}
+
+/// Ask the vault whether this endpoint may be used. It decides host, method, path and port.
+fn authorize(state: &AppState, spec: &ModelSpec) -> Result<Authorized, ApiError> {
     let url = spec.endpoint().map_err(ApiError::bad_request)?;
     let host = spec.host();
     let port = url.port_or_known_default().unwrap_or(443);
-
-    // 1. The vault decides whether this endpoint is reachable at all.
     if !state.vault_is_unlocked() {
         return Err(ApiError::forbidden(
             "vault locked: the model step cannot use its credential until it is unlocked",
@@ -197,6 +196,36 @@ pub(crate) async fn call(
         )
         .map_err(|e| ApiError::forbidden(format!("model step refused by the vault: {e}")))?;
     let header = descriptor.header.clone();
+    Ok(Authorized {
+        url,
+        host,
+        header,
+        secret,
+    })
+}
+
+/// Fail fast: check the vault before a cell is created, so a misconfigured endpoint does not
+/// cost a sandbox boot. It does not open an approval and sends nothing.
+pub(crate) fn preflight(state: &AppState, spec: &ModelSpec) -> Result<(), ApiError> {
+    authorize(state, spec).map(|_| ())
+}
+
+/// Send `text` to the declared endpoint and return the reply. Fails closed: any refusal or error
+/// fails the run rather than quietly skipping the model step.
+pub(crate) async fn call(
+    state: &AppState,
+    session: &SessionRecord,
+    use_case: &str,
+    spec: &ModelSpec,
+    text: &str,
+) -> Result<ModelOutcome, ApiError> {
+    // 1. The vault decides whether this endpoint is reachable at all.
+    let Authorized {
+        url,
+        host,
+        header,
+        secret,
+    } = authorize(state, spec)?;
 
     let body = request_body(spec, text);
     let body_sha256 = hex::encode(Sha256::digest(&body));
@@ -722,5 +751,25 @@ mod tests {
         assert!(rows
             .iter()
             .any(|r| r.action == "model.call" && r.phase == AuditPhase::Failed));
+    }
+
+    #[tokio::test]
+    async fn preflight_checks_the_vault_without_approving_or_sending() {
+        let (port, seen) = stub(200, "x").await;
+        let (state, _session) = state_for(port).await;
+        assert!(preflight(&state, &spec(port)).is_ok());
+        let bad = ModelSpec {
+            credential: "nope".into(),
+            ..spec(port)
+        };
+        let err = preflight(&state, &bad).unwrap_err();
+        assert_eq!(err.status(), StatusCode::FORBIDDEN);
+        assert!(
+            err.message().contains("refused by the vault"),
+            "{}",
+            err.message()
+        );
+        assert!(state.store.list_approvals().await.is_empty());
+        assert!(seen.lock().unwrap().is_empty());
     }
 }

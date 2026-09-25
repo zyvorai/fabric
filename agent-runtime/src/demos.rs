@@ -779,6 +779,11 @@ async fn run_demo(
         )));
     }
 
+    // A model step the vault would refuse fails now, before a cell is created.
+    if let Some(ms) = &spec.model {
+        crate::model_call::preflight(&state, ms)?;
+    }
+
     // Validate the input before touching FluxVM: bad uploads fail fast and cheap.
     if let Err(e) = state.fluxvm.security_capabilities().await {
         return Err(ApiError::bad_gateway(format!(
