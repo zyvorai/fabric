@@ -15,6 +15,7 @@ use crate::{
     app::{ApiError, ApiResult},
     audit::AuditPhase,
     demo_builders::{self as b, BuildResult},
+    demo_rules::{CustomDemoRecord, CustomDemoSpec, Extractor, MAX_CUSTOM_DEMOS, MAX_SPEC_BYTES},
     goals::{ArtifactRecord, GoalRecord, GoalStatus},
     model::{SessionRecord, SessionStartMode, SessionStartPolicy, SessionStatus},
     AppState,
@@ -228,19 +229,193 @@ fn spec_by_id(id: &str) -> Option<&'static DemoSpec> {
     DEMOS.iter().find(|d| d.id == id)
 }
 
-/// `GET /v1/demos` — what the console can offer.
-pub(crate) async fn demo_list() -> Json<Value> {
-    Json(json!({
-        "demos": DEMOS.iter().map(|d| json!({
-            "id": d.id,
-            "title": d.title,
-            "description": d.blurb,
-            "accepts": d.accepts,
-            "max_bytes": d.max_bytes,
+fn builtin_ids() -> Vec<&'static str> {
+    DEMOS.iter().map(|d| d.id).collect()
+}
+
+/// How a resolved demo turns extracted text into artifacts.
+enum ResolvedBuild {
+    Native(fn(&str, &str) -> BuildResult),
+    Rules(Box<CustomDemoSpec>),
+}
+
+/// What the runner needs, owned so built-in and custom demos share one path.
+struct Resolved {
+    id: String,
+    accepts: Vec<String>,
+    guest_file: String,
+    extract_cmd: String,
+    max_bytes: usize,
+    empty_msg: String,
+    goal_title: String,
+    goal_description: String,
+    build: ResolvedBuild,
+    sample: Option<(String, Vec<u8>)>,
+}
+
+impl Resolved {
+    fn builtin(d: &DemoSpec) -> Self {
+        let (name, bytes) = (d.sample)();
+        Self {
+            id: d.id.into(),
+            accepts: d.accepts.iter().map(|e| e.to_string()).collect(),
+            guest_file: d.guest_file.into(),
+            extract_cmd: d.extract_cmd.into(),
+            max_bytes: d.max_bytes,
+            empty_msg: d.empty_msg.into(),
+            goal_title: d.goal_title.into(),
+            goal_description: d.goal_description.into(),
+            build: ResolvedBuild::Native(d.build),
+            sample: Some((name.to_string(), bytes)),
+        }
+    }
+
+    fn custom(spec: CustomDemoSpec) -> Self {
+        let guest = spec.guest_file();
+        let max_bytes = spec.max_bytes();
+        let (extract_cmd, empty_msg) = match spec.extract {
+            Extractor::Pdftotext => (PDF_CMD.to_string(), PDF_EMPTY),
+            Extractor::Text => (format!("head -c {max_bytes} {{path}}"), "The file is empty"),
+        };
+        Self {
+            id: spec.id.clone(),
+            accepts: spec.accepts.clone(),
+            guest_file: guest.into(),
+            extract_cmd,
+            max_bytes,
+            empty_msg: empty_msg.into(),
+            goal_title: spec.title.clone(),
+            goal_description: format!(
+                "Read /home/agent/work/{guest} only. Write artifact {}. No browser. No hosts.",
+                spec.artifact_title()
+            ),
+            sample: spec
+                .sample
+                .as_ref()
+                .map(|s| (s.filename.clone(), s.text.clone().into_bytes())),
+            build: ResolvedBuild::Rules(Box::new(spec)),
+        }
+    }
+
+    fn build(&self, filename: &str, extract: &str) -> BuildResult {
+        match &self.build {
+            ResolvedBuild::Native(f) => f(filename, extract),
+            ResolvedBuild::Rules(spec) => spec.render(filename, extract),
+        }
+    }
+}
+
+/// Built-ins first, then user-defined use cases.
+async fn resolve(state: &AppState, id: &str) -> Option<Resolved> {
+    if let Some(d) = spec_by_id(id) {
+        return Some(Resolved::builtin(d));
+    }
+    state
+        .store
+        .get_demo_spec(id)
+        .await
+        .map(|r| Resolved::custom(r.spec))
+}
+
+/// `GET /v1/demos` — what the console can offer, built-ins and custom.
+pub(crate) async fn demo_list(State(state): State<Arc<AppState>>) -> Json<Value> {
+    let mut demos: Vec<Value> = DEMOS
+        .iter()
+        .map(|d| {
+            json!({
+                "id": d.id,
+                "title": d.title,
+                "description": d.blurb,
+                "accepts": d.accepts,
+                "max_bytes": d.max_bytes,
+                "browser": "none",
+                "egress": "deny",
+                "builtin": true,
+                "has_sample": true,
+            })
+        })
+        .collect();
+    for r in state.store.list_demo_specs().await {
+        let s = &r.spec;
+        demos.push(json!({
+            "id": s.id,
+            "title": s.title,
+            "description": s.description,
+            "accepts": s.accepts,
+            "max_bytes": s.max_bytes(),
             "browser": "none",
             "egress": "deny",
-        })).collect::<Vec<_>>(),
-    }))
+            "builtin": false,
+            "has_sample": s.sample.is_some(),
+            "updated_at": r.updated_at,
+        }));
+    }
+    Json(json!({ "demos": demos }))
+}
+
+/// `POST /v1/demos` — create or replace a user-defined use case. A spec is
+/// data (an extractor enum plus bounded rules), so it cannot widen what the
+/// host does; every run is still strictly confined and 0-CONNECT checked.
+pub(crate) async fn demo_save(
+    State(state): State<Arc<AppState>>,
+    Json(spec): Json<CustomDemoSpec>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    spec.validate(&builtin_ids())
+        .map_err(ApiError::bad_request)?;
+    let size = serde_json::to_vec(&spec)
+        .map(|v| v.len())
+        .unwrap_or(usize::MAX);
+    if size > MAX_SPEC_BYTES {
+        return Err(ApiError::bad_request(format!(
+            "spec is {size} bytes; the limit is {MAX_SPEC_BYTES}"
+        )));
+    }
+    let existing = state.store.get_demo_spec(&spec.id).await;
+    if existing.is_none() && state.store.list_demo_specs().await.len() >= MAX_CUSTOM_DEMOS {
+        return Err(ApiError::bad_request(format!(
+            "at most {MAX_CUSTOM_DEMOS} custom use cases; delete one first"
+        )));
+    }
+    let now = Utc::now();
+    let created = existing.as_ref().map(|r| r.created_at).unwrap_or(now);
+    let id = spec.id.clone();
+    state
+        .store
+        .save_demo_spec(CustomDemoRecord {
+            spec,
+            created_at: created,
+            updated_at: now,
+        })
+        .await
+        .map_err(ApiError::internal)?;
+    let code = if existing.is_some() {
+        StatusCode::OK
+    } else {
+        StatusCode::CREATED
+    };
+    Ok((
+        code,
+        Json(json!({ "id": id, "builtin": false, "replaced": existing.is_some() })),
+    ))
+}
+
+/// `DELETE /v1/demos/{id}` — remove a user-defined use case (never a built-in).
+pub(crate) async fn demo_delete(
+    State(state): State<Arc<AppState>>,
+    Path(demo_id): Path<String>,
+) -> ApiResult<StatusCode> {
+    if spec_by_id(&demo_id).is_some() {
+        return Err(ApiError::bad_request(
+            "built-in use cases cannot be deleted",
+        ));
+    }
+    match state.store.delete_demo_spec(&demo_id).await {
+        Ok(true) => Ok(StatusCode::NO_CONTENT),
+        Ok(false) => Err(ApiError::not_found(format!(
+            "no use case named {demo_id:?}"
+        ))),
+        Err(e) => Err(ApiError::internal(e)),
+    }
 }
 
 fn extension(filename: &str) -> String {
@@ -257,7 +432,8 @@ pub(crate) async fn demo_run(
     Path(demo_id): Path<String>,
     mut multipart: Multipart,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
-    let spec = spec_by_id(&demo_id)
+    let spec = resolve(&state, &demo_id)
+        .await
         .ok_or_else(|| ApiError::not_found(format!("no demo named {demo_id:?}")))?;
 
     let mut upload: Option<Vec<u8>> = None;
@@ -284,10 +460,15 @@ pub(crate) async fn demo_run(
             filename.unwrap_or_else(|| spec.guest_file.to_string()),
             bytes,
         ),
-        None => {
-            let (n, bytes) = (spec.sample)();
-            (n.to_string(), bytes)
-        }
+        None => match spec.sample.clone() {
+            Some(sample) => sample,
+            None => {
+                return Err(ApiError::bad_request(format!(
+                    "the {} use case has no built-in sample; upload a file",
+                    spec.id
+                )))
+            }
+        },
     };
     if input.is_empty() {
         return Err(ApiError::bad_request("empty file"));
@@ -301,7 +482,7 @@ pub(crate) async fn demo_run(
         )));
     }
     let ext = extension(&filename);
-    if !spec.accepts.contains(&ext.as_str()) {
+    if !spec.accepts.contains(&ext) {
         return Err(ApiError::bad_request(format!(
             "the {} demo accepts .{} files, not .{}",
             spec.id,
@@ -345,7 +526,7 @@ pub(crate) async fn demo_run(
                 state.config.proxy_listen.map(|a| a.port()),
                 &[],
                 Some(&id.to_string()),
-                Some(spec.id),
+                Some(&spec.id),
             );
             let _ = state.fluxvm.set_network_policy(sandbox.id, &policy).await;
         }
@@ -354,7 +535,7 @@ pub(crate) async fn demo_run(
     let now = Utc::now();
     let session = SessionRecord {
         id,
-        agent: spec.id.into(),
+        agent: spec.id.clone(),
         agent_version: "demo".into(),
         sandbox_id: sandbox.id,
         status: SessionStatus::Running,
@@ -386,9 +567,9 @@ pub(crate) async fn demo_run(
 
     let goal = GoalRecord {
         id: Uuid::new_v4(),
-        title: spec.goal_title.into(),
-        description: spec.goal_description.into(),
-        agent: spec.id.into(),
+        title: spec.goal_title.clone(),
+        description: spec.goal_description.clone(),
+        agent: spec.id.clone(),
         user_id: None,
         session_id: Some(id),
         status: GoalStatus::Open,
@@ -438,7 +619,7 @@ pub(crate) async fn demo_run(
                 .trim()
                 .to_string();
             if stdout.is_empty() {
-                return Err(ApiError::bad_request(spec.empty_msg));
+                return Err(ApiError::bad_request(spec.empty_msg.clone()));
             }
             stdout
         }
@@ -455,19 +636,21 @@ pub(crate) async fn demo_run(
         }
     };
 
-    let built = (spec.build)(&filename, &extract).map_err(ApiError::bad_request)?;
+    let built = spec
+        .build(&filename, &extract)
+        .map_err(ApiError::bad_request)?;
     let mut goal = goal;
     let mut saved: Vec<ArtifactRecord> = Vec::new();
     for a in &built {
         let art = ArtifactRecord {
             id: Uuid::new_v4(),
-            kind: a.kind.into(),
-            title: a.title.into(),
+            kind: a.kind.clone(),
+            title: a.title.clone(),
             body: a.body.clone(),
             content_type: Some(a.content_type.into()),
             goal_id: Some(goal.id),
             session_id: Some(id),
-            agent: Some(spec.id.into()),
+            agent: Some(spec.id.clone()),
             metadata: json!({
                 "filename": filename,
                 "extract_chars": extract.chars().count(),
@@ -509,7 +692,7 @@ pub(crate) async fn demo_run(
             Some(id),
             AuditPhase::Performed,
             &format!("demo.{}.done", spec.id.replace('-', "_")),
-            Some(spec.id.into()),
+            Some(spec.id.clone()),
             json!({
                 "filename": filename,
                 "extract_chars": extract.chars().count(),
@@ -719,12 +902,19 @@ mod tests {
         Multipart::from_request(req, &()).await.unwrap()
     }
 
+    async fn run_in(
+        state: Arc<AppState>,
+        id: &str,
+        file: Option<(&str, &[u8])>,
+    ) -> Result<(StatusCode, Json<Value>), ApiError> {
+        demo_run(State(state), Path(id.into()), multipart(file).await).await
+    }
+
     async fn run(
         id: &str,
         file: Option<(&str, &[u8])>,
     ) -> Result<(StatusCode, Json<Value>), ApiError> {
-        let state = crate::goals::tests::test_state().await;
-        demo_run(State(state), Path(id.into()), multipart(file).await).await
+        run_in(crate::goals::tests::test_state().await, id, file).await
     }
 
     fn status_of(e: ApiError) -> StatusCode {
@@ -782,7 +972,8 @@ mod tests {
 
     #[tokio::test]
     async fn demo_list_names_every_demo_with_deny_egress_and_no_browser() {
-        let Json(v) = demo_list().await;
+        let state = crate::goals::tests::test_state().await;
+        let Json(v) = demo_list(State(state)).await;
         let demos = v["demos"].as_array().unwrap();
         assert_eq!(demos.len(), DEMOS.len());
         assert!(demos
@@ -828,6 +1019,142 @@ mod tests {
                 "{id}: expected {needle:?} in\n{body}"
             );
         }
+    }
+
+    fn custom(id: &str) -> CustomDemoSpec {
+        serde_json::from_value(json!({
+            "id": id,
+            "title": "Invoice check",
+            "description": "Totals and repeats",
+            "accepts": ["txt"],
+            "extract": "text",
+            "summary": [
+                {"kind": "keyword_sections", "title": "Totals", "keywords": ["total"]},
+                {"kind": "stats"}
+            ],
+            "sample": {"filename": "sample.txt", "text": "Total: 10\nTotal: 20\n"}
+        }))
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_custom_use_case_can_be_saved_listed_resolved_and_deleted() {
+        let state = crate::goals::tests::test_state().await;
+        let (code, Json(first)) = demo_save(State(state.clone()), Json(custom("invoice-check")))
+            .await
+            .unwrap();
+        assert_eq!(
+            (code, first["replaced"].clone()),
+            (StatusCode::CREATED, json!(false))
+        );
+        // Saving again replaces it.
+        let (code, Json(v)) = demo_save(State(state.clone()), Json(custom("invoice-check")))
+            .await
+            .unwrap();
+        assert_eq!((code, v["replaced"].clone()), (StatusCode::OK, json!(true)));
+
+        let Json(list) = demo_list(State(state.clone())).await;
+        let mine = list["demos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["id"] == "invoice-check")
+            .expect("custom demo is listed");
+        assert_eq!(
+            (mine["builtin"].clone(), mine["egress"].clone()),
+            (json!(false), json!("deny"))
+        );
+
+        // It resolves to the same runner shape as a built-in and renders through its rules.
+        let r = resolve(&state, "invoice-check").await.unwrap();
+        assert_eq!(r.guest_file, "input.txt");
+        assert!(r.extract_cmd.starts_with("head -c ") && r.extract_cmd.contains("{path}"));
+        let (name, bytes) = r.sample.clone().unwrap();
+        let out = r
+            .build(&name, std::str::from_utf8(&bytes).unwrap())
+            .unwrap();
+        assert!(out[0].body.contains("Total: 10") && out[0].title == "summary.md");
+
+        // A valid upload reaches FluxVM (down in tests), so it fails closed with 502.
+        let err = run_in(
+            state.clone(),
+            "invoice-check",
+            Some(("a.txt", b"Total: 1\n")),
+        )
+        .await;
+        assert_eq!(status_of(err.unwrap_err()), StatusCode::BAD_GATEWAY);
+        // Wrong file type is refused before FluxVM is touched.
+        let err = run_in(state.clone(), "invoice-check", Some(("a.pdf", b"%PDF"))).await;
+        assert_eq!(status_of(err.unwrap_err()), StatusCode::BAD_REQUEST);
+        // With no upload its own sample is used (and then FluxVM is down).
+        let err = run_in(state.clone(), "invoice-check", None).await;
+        assert_eq!(status_of(err.unwrap_err()), StatusCode::BAD_GATEWAY);
+
+        assert_eq!(
+            demo_delete(State(state.clone()), Path("invoice-check".into()))
+                .await
+                .unwrap(),
+            StatusCode::NO_CONTENT
+        );
+        assert!(resolve(&state, "invoice-check").await.is_none());
+        let gone = demo_delete(State(state), Path("invoice-check".into())).await;
+        assert_eq!(status_of(gone.unwrap_err()), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn custom_specs_cannot_shadow_or_delete_built_ins_or_exceed_limits() {
+        let state = crate::goals::tests::test_state().await;
+        let err = demo_save(State(state.clone()), Json(custom("pdf-brief")))
+            .await
+            .unwrap_err();
+        assert_eq!(status_of(err), StatusCode::BAD_REQUEST);
+        let err = demo_delete(State(state.clone()), Path("pdf-brief".into()))
+            .await
+            .unwrap_err();
+        assert_eq!(status_of(err), StatusCode::BAD_REQUEST);
+
+        let mut bad = custom("wrong-ext");
+        bad.accepts = vec!["pdf".into()]; // text extractor cannot read pdf
+        let err = demo_save(State(state.clone()), Json(bad))
+            .await
+            .unwrap_err();
+        assert_eq!(status_of(err), StatusCode::BAD_REQUEST);
+
+        for i in 0..MAX_CUSTOM_DEMOS {
+            let (code, Json(_)) = demo_save(State(state.clone()), Json(custom(&format!("uc-{i}"))))
+                .await
+                .unwrap();
+            assert_eq!(code, StatusCode::CREATED);
+        }
+        let err = demo_save(State(state), Json(custom("one-too-many")))
+            .await
+            .unwrap_err();
+        assert_eq!(status_of(err), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn custom_specs_survive_a_store_reopen() {
+        let root = std::env::temp_dir().join(format!("zyvor-demo-specs-{}", Uuid::new_v4()));
+        {
+            let store = crate::store::Store::open(&root).await.unwrap();
+            let now = Utc::now();
+            store
+                .save_demo_spec(CustomDemoRecord {
+                    spec: custom("kept"),
+                    created_at: now,
+                    updated_at: now,
+                })
+                .await
+                .unwrap();
+        }
+        let store = crate::store::Store::open(&root).await.unwrap();
+        assert_eq!(
+            store.get_demo_spec("kept").await.unwrap().spec,
+            custom("kept")
+        );
+        assert!(store.delete_demo_spec("kept").await.unwrap());
+        let store = crate::store::Store::open(&root).await.unwrap();
+        assert!(store.list_demo_specs().await.is_empty());
     }
 
     #[test]

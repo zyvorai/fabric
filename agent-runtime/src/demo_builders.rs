@@ -16,18 +16,18 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DemoArtifact {
     /// Artifact kind stored with the record (`brief`, `clauses`, `csv`, ...).
-    pub kind: &'static str,
+    pub kind: String,
     /// File-style title shown in the console (`brief.md`, `clean.csv`).
-    pub title: &'static str,
+    pub title: String,
     pub content_type: &'static str,
     pub body: String,
 }
 
 impl DemoArtifact {
-    fn markdown(kind: &'static str, title: &'static str, body: String) -> Self {
+    fn markdown(kind: &str, title: &str, body: String) -> Self {
         Self {
-            kind,
-            title,
+            kind: kind.into(),
+            title: title.into(),
             content_type: "text/markdown",
             body,
         }
@@ -408,7 +408,7 @@ fn log_level(line: &str) -> Option<&'static str> {
 }
 
 /// Replace timestamps and digit runs so repeated messages group together.
-fn normalise_message(line: &str) -> String {
+pub(crate) fn normalise_message(line: &str) -> String {
     let no_ts = match find_timestamp(line) {
         Some(ts) => line.replacen(&ts, "", 1),
         None => line.to_string(),
@@ -747,8 +747,8 @@ pub fn csv_clean(filename: &str, extract: &str) -> BuildResult {
     );
     Ok(vec![
         DemoArtifact {
-            kind: "csv",
-            title: "clean.csv",
+            kind: "csv".into(),
+            title: "clean.csv".into(),
             content_type: "text/csv",
             body: clean,
         },

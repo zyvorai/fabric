@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::audit::AuditLog;
+use crate::demo_rules::CustomDemoRecord;
 use crate::goals::{ArtifactRecord, GoalRecord};
 use crate::model::{
     AgentRecord, ApprovalKind, ApprovalRecord, ApprovalStatus, DeployAgentRequest, GrantScope,
@@ -37,6 +38,8 @@ pub struct Store {
     approvals: RwLock<HashMap<Uuid, ApprovalRecord>>,
     goals: RwLock<HashMap<Uuid, GoalRecord>>,
     artifacts: RwLock<HashMap<Uuid, ArtifactRecord>>,
+    /// User-defined one-click demos (declarative specs), keyed by id.
+    demo_specs: RwLock<HashMap<String, CustomDemoRecord>>,
     /// Tamper-evident record of planned, approved, denied and performed actions.
     pub audit: AuditLog,
     /// Immutable, content-addressed skill bundles agents can mount.
@@ -65,6 +68,7 @@ impl Store {
             approvals: RwLock::new(HashMap::new()),
             goals: RwLock::new(HashMap::new()),
             artifacts: RwLock::new(HashMap::new()),
+            demo_specs: RwLock::new(HashMap::new()),
         };
         store.load().await?;
         Ok(store)
@@ -120,6 +124,14 @@ impl Store {
         *self.approvals.write().await = read_id_map(&self.root.join("approvals.json")).await?;
         *self.goals.write().await = read_id_map(&self.root.join("goals.json")).await?;
         *self.artifacts.write().await = read_id_map(&self.root.join("artifacts.json")).await?;
+        let specs = match fs::read(self.root.join("demo_specs.json")).await {
+            Ok(raw) => serde_json::from_slice::<Vec<CustomDemoRecord>>(&raw)
+                .context("decoding demo_specs.json")?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(e.into()),
+        };
+        *self.demo_specs.write().await =
+            specs.into_iter().map(|r| (r.spec.id.clone(), r)).collect();
         Ok(())
     }
 
@@ -740,6 +752,40 @@ impl Store {
         map.insert(record.id, record);
         self.persist_vec("goals.json", &map.values().cloned().collect::<Vec<_>>())
             .await
+    }
+
+    pub async fn list_demo_specs(&self) -> Vec<CustomDemoRecord> {
+        let mut out: Vec<_> = self.demo_specs.read().await.values().cloned().collect();
+        out.sort_by(|a, b| a.spec.id.cmp(&b.spec.id));
+        out
+    }
+
+    pub async fn get_demo_spec(&self, id: &str) -> Option<CustomDemoRecord> {
+        self.demo_specs.read().await.get(id).cloned()
+    }
+
+    pub async fn save_demo_spec(&self, record: CustomDemoRecord) -> Result<()> {
+        let mut map = self.demo_specs.write().await;
+        map.insert(record.spec.id.clone(), record);
+        self.persist_vec(
+            "demo_specs.json",
+            &map.values().cloned().collect::<Vec<_>>(),
+        )
+        .await
+    }
+
+    /// Returns whether a spec with that id existed.
+    pub async fn delete_demo_spec(&self, id: &str) -> Result<bool> {
+        let mut map = self.demo_specs.write().await;
+        let existed = map.remove(id).is_some();
+        if existed {
+            self.persist_vec(
+                "demo_specs.json",
+                &map.values().cloned().collect::<Vec<_>>(),
+            )
+            .await?;
+        }
+        Ok(existed)
     }
 
     pub async fn list_artifacts(&self) -> Vec<ArtifactRecord> {
