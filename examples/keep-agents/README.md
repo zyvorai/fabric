@@ -8,6 +8,7 @@
 | [`browser-research`](./browser-research/) | Allowlisted a11y browse → research markdown |
 | [`pdf-brief`](./pdf-brief/) | One-click PDF → `brief.md` (no browser, 0 CONNECT) |
 | [`invoice-check`](./invoice-check/) | A use case **you** define: `kind: usecase`, no code |
+| [`inbox-digest`](./inbox-digest/) | A use case **you** define: drop in a plain-text mail export, get a digest (no code, no model, 0 CONNECT) |
 | [`_fabric`](./_fabric/) | Shared client + credential/policy recipes |
 
 ```bash

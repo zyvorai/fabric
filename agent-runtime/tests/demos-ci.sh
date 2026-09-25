@@ -162,6 +162,19 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE/v1/demos/invoice-
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -F note=none "$BASE/v1/demos/invoice-check")
 [[ "$code" == "404" ]] || fail "deleted use case should be 404, got $code"; ok "custom use case deleted"
 
+echo "demos-ci: inbox-digest example pack"
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy examples/keep-agents/inbox-digest --test) | tee "$WORK/inbox.out"
+grep -q "test passed: inbox-digest.md, 0 CONNECT" "$WORK/inbox.out" || fail "inbox-digest pack deploy --test did not pass"
+ok "inbox-digest: saved, ran on its sample, 0 CONNECT"
+body=$(curl -sf -X POST -F note=none "$BASE/v1/demos/inbox-digest")
+aid=$(echo "$body" | json artifacts.0.id)
+digest=$(curl -sf "$BASE/v1/artifacts/$aid" | json body)
+echo "$digest" | grep -q "Needs a reply" && echo "$digest" | grep -q "INV-2041" && echo "$digest" | grep -q "Meetings" || fail "inbox digest is missing expected sections"
+printf '%s\n' "$digest" > "$WORK/inbox-digest.md"
+ok "inbox-digest: the digest groups reply, money and meeting lines"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE/v1/demos/inbox-digest")
+[[ "$code" == "204" ]] || fail "deleting the inbox-digest use case should be 204, got $code"
+
 echo "demos-ci: keepctl doctor"
 "$KEEPCTL" doctor | tee "$WORK/doctor.out" >/dev/null || fail "keepctl doctor failed"
 grep -q "FluxVM ready" "$WORK/doctor.out" && grep -q "7 built-in" "$WORK/doctor.out" || fail "doctor output unexpected"
