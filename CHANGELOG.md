@@ -27,8 +27,10 @@
 - `deny_udp` is carried through the driver-core `VmNetworkPolicy` (the fluxvm
   driver stopped compiling once the client gained the field) and is part of the
   policy fingerprint.
-- `session-ci.sh` no longer collides with the default CONNECT proxy port; Keep
-  workflow clippy passes (`browser::driver_call` visibility).
+- The Agent Runtime `sessions` job passes again: `session-ci.sh` no longer collides
+  with the default CONNECT proxy port and the FluxVM stand-in answers the guest-agent
+  ping the runtime now sends. Keep workflow clippy passes (`browser::driver_call`
+  visibility).
 
 ### Added (earlier)
 - **Keep Browser 0.3.** Split-sight `agent_paused_reason`, origin taint lattice,

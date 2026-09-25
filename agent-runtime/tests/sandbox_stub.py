@@ -151,6 +151,11 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and vm:
             self._send(200, {"id": vm.group(1), "status": "running"})
             return
+        # The runtime pings the in-guest agent before it starts the worker.
+        if method == "POST" and re.fullmatch(r"/v1/vms/([^/]+)/agent/ping", path):
+            self._read_json()
+            self._send(200, {"ok": True})
+            return
         # Keep demo support: readiness, network policy, freeze and drop reasons.
         if method == "GET" and path == "/v1/security/capabilities":
             self._send(200, {"snp_present": False, "tdx_present": False})
