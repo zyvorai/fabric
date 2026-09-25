@@ -46,3 +46,18 @@ console.log(session.start_mode, session.startup_ms, session.sandbox_released);
 ```
 
 Standby VMs are single-use. Fabric never returns a sandbox to the pool after user agent code has executed in it. Use `start_policy: "require-warm"` when a caller prefers backpressure over a cold start, or `"cold-only"` to bypass the pool.
+
+## Packs: one-command deploy
+
+`fabric-agent pack` deploys a directory with a `pack.json` (see [docs/keep/PACKS.md](../../docs/keep/PACKS.md)):
+
+```bash
+export KEEP_POLICY_SEED=$(openssl rand -hex 32)       # your signing key (Keep mode)
+fabric-agent pack keys                                # public key to register on the runtime
+fabric-agent pack deploy ./my-pack --run              # build, sign, deploy, apply policy, start a session
+fabric-agent pack deploy ./my-usecase --test          # declarative use case: save, run on its sample, need 0 CONNECT
+fabric-agent pack bundle ./my-pack                    # <name>.keeppack.json for the console's Deploy a pack
+```
+
+Signing uses Node's built-in Ed25519, byte-compatible with `keep_sign_policy`, so no Rust toolchain
+is needed. `--dry-run` prints the plan without contacting the runtime.

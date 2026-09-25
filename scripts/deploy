@@ -7,6 +7,7 @@
 #   ./scripts/deploy remote sus@212.8.252.194
 #   ./scripts/deploy remote sus 212.8.252.194 --quick
 #   ./scripts/deploy remote --quick              # reuse .deploy-last
+#   ./scripts/deploy keep sus@host           # Fabric + Keep runtime (needs FluxVM on the host)
 #   ./scripts/deploy check sus@host
 #   ./scripts/deploy status
 # ============================================================================
@@ -23,6 +24,7 @@ usage() {
 Usage:
   $(basename "$0") remote USER@HOST [flags...]
   $(basename "$0") remote USER HOST [PASSWORD] [flags...]
+  $(basename "$0") keep USER@HOST [--dev] [--dry-run] [--skip-fabric]
   $(basename "$0") k8s USER@HOST [flags...]
   $(basename "$0") k8s HOST [USER] [--quick|--uninstall]
   $(basename "$0") check [USER@HOST | USER HOST]
@@ -91,6 +93,9 @@ case "$cmd" in
     remote)
         exec "$SCRIPT_DIR/deploy-remote.sh" "$@"
         ;;
+    keep)
+        exec "$SCRIPT_DIR/deploy-keep.sh" "$@"
+        ;;
     k8s|kubernetes)
         exec "$SCRIPT_DIR/deploy-k8s-remote.sh" "$@"
         ;;
@@ -98,6 +103,6 @@ case "$cmd" in
         if [[ "$cmd" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$cmd" == *.* ]] || [[ "$cmd" == *@* ]]; then
             exec "$SCRIPT_DIR/deploy-remote.sh" "$cmd" "$@"
         fi
-        deploy_ui_error "Unknown subcommand: $cmd (try: remote, k8s, check, status)"
+        deploy_ui_error "Unknown subcommand: $cmd (try: remote, keep, k8s, check, status)"
         ;;
 esac

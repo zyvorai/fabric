@@ -1,5 +1,23 @@
 # Production readiness (what landed vs what still needs hardware)
 
+## Install Keep on a host (one command)
+
+On a host that already runs FluxVM:
+
+```bash
+./scripts/deploy keep user@host            # Keep mode: signed deploys only
+./scripts/deploy keep user@host --dev      # dev: unsigned packs allowed
+./scripts/deploy keep user@host --dry-run  # print the plan, change nothing
+```
+
+It creates a signer seed on **your** machine (`~/.config/zyvor/keep-signer.seed`, never copied to
+the host), deploys Fabric and the console, builds and installs agent-runtime with its systemd unit,
+registers only your **public** key as a trusted signer, points fabricd at it, and runs the PDF brief
+once as a smoke test. It does not install FluxVM or bake templates: if FluxVM is not answering, or
+the `node22-agent` template is missing, it stops and says what to do. Re-running is safe.
+
+Check a running install any time with `./scripts/keepctl doctor [--smoke]`.
+
 ## Keep 0.1 pilot — release gate
 
 Run on a customer-like FluxVM host with a registered agent template (`node22-agent` / `agent-node`):

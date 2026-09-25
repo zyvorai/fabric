@@ -41,15 +41,21 @@ need a model socket, which these demos deliberately do not use.
 
 ## Adding a use case
 
-1. Add a builder to `demo_builders.rs` (`fn(filename, extract) -> BuildResult`) with a
-   unit test that feeds it a small fixture.
-2. Add a `DemoSpec` to `DEMOS` in `demos.rs`: accepted extensions, the fixed guest file
-   name and extract command, a size limit, and a built-in sample.
-3. Add `examples/keep-agents/<id>/` (pdf-brief shape) and `docs/keep/demos/<id>.md`.
+Most use cases need **no Rust**. Describe one as a `pack.json` (an extractor plus a few summary
+rules), or fill in the form at `/app/keep` → **Deploy your own use case**, then:
 
-The console picker, the fabricd proxy and `keep-demo.sh` pick the new demo up without
-further changes. A demo that needs the network or a browser is not this shape; use a
-pack with an allowlist instead.
+```bash
+./scripts/keepctl deploy ./my-usecase --test
+```
+
+See [Tutorial 19](../../tutorials/19-build-your-own-use-case.md) and the field reference in
+[PACKS.md](../PACKS.md). A use case that needs code is a TypeScript `agent` pack that runs inside
+the cell.
+
+To add a **built-in** (shipped with the runtime) instead: add a builder to `demo_builders.rs` with
+a unit test, a `DemoSpec` to `DEMOS` in `demos.rs`, then `examples/keep-agents/<id>/` (with
+`"kind": "builtin"`) and `docs/keep/demos/<id>.md`. The console picker, the fabricd proxy and
+`keep-demo.sh` pick it up without further changes.
 
 Honesty: evidence class stays `software-test`; zero CONNECT is a Keep audit claim, not
 "the operator cannot read the cell".
