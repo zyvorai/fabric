@@ -84,9 +84,9 @@ run() { api -X POST -F "file=@$2" "$KEEP_API/v1/demos/$1"; }
 for p in status-page-watch mailbox-triage api-facts; do CREATED+=("$p"); done
 CREATED+=(expense-sheet nda-review invoice-model-brief meeting-notes-model)
 
-EXTRA_PACKS=(chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder receipt-pdf mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims)
+EXTRA_PACKS=(chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder receipt-pdf mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims github-prs github-issues github-actions-log dependabot-alerts git-log-digest xcodebuild-log xcode-crash-log vscode-extensions vscode-settings-audit bookmarks-digest browser-history-takeout mac-apps-inventory mac-launch-items windows-services windows-scheduled-tasks sales-register-sheet inventory-sheet attendance-sheet)
 for p in "${EXTRA_PACKS[@]}"; do CREATED+=("$p"); done
-for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is overdue" "api-facts:KB-01; MS-07" "chat-export-digest:4× Ana" "bank-sms-ledger:was declined" "card-statement:Dining (3)" "calendar-week:2× Team standup" "contacts-audit:2× Ana Example" "travel-itinerary:2× K7QP2M" "subscription-finder:1× EUR 39.00" "mac-system-report:1× Apple M4" "homebrew-audit:1× openjdk" "mac-log-triage:2× analyticsd" "mac-update-history:5× 26.0" "windows-systeminfo:1× KB5034441" "windows-hotfixes:Security Update (3)" "windows-installed-software:Example Software Inc. (2)" "windows-event-log:Error (2)" "receivables-ageing:4× INV-2026-0142" "po-line-items:1× PO-7781/2026" "employee-ledger:E001 (2)" "reimbursement-claims:2× Rs 4,200"; do
+for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is overdue" "api-facts:KB-01; MS-07" "chat-export-digest:4× Ana" "bank-sms-ledger:was declined" "card-statement:Dining (3)" "calendar-week:2× Team standup" "contacts-audit:2× Ana Example" "travel-itinerary:2× K7QP2M" "subscription-finder:1× EUR 39.00" "mac-system-report:1× Apple M4" "homebrew-audit:1× openjdk" "mac-log-triage:2× analyticsd" "mac-update-history:5× 26.0" "windows-systeminfo:1× KB5034441" "windows-hotfixes:Security Update (3)" "windows-installed-software:Example Software Inc. (2)" "windows-event-log:Error (2)" "receivables-ageing:4× INV-2026-0142" "po-line-items:1× PO-7781/2026" "employee-ledger:E001 (2)" "reimbursement-claims:2× Rs 4,200" "github-prs:3× MERGED" "github-issues:2× CLOSED" "github-actions-log:1× test Lint" "dependabot-alerts:2× high" "git-log-digest:4× Ana Dev" "xcodebuild-log:BUILD FAILED" "xcode-crash-log:EXC_BAD_ACCESS" "vscode-extensions:2× ms-python" "vscode-settings-audit:1× github.copilot.advanced.apiToken" "bookmarks-digest:3× example.com" "browser-history-takeout:3× LINK" "mac-apps-inventory:2× Apple" "mac-launch-items:1× com.example.oldjob" "windows-services:Running (3)" "windows-scheduled-tasks:SYSTEM (3)"; do
   p="${pair%%:*}"; want="${pair#*:}"
   if deploy "$p"; then
     r=$(api -X POST -F note=none "$KEEP_API/v1/demos/$p")
@@ -94,6 +94,30 @@ for pair in "status-page-watch:Object storage" "mailbox-triage:Invoice 2041 is o
   else bad "$p: deploy failed: $(head -c 300 "$WORK/deploy-$p.out")"; fi
   [[ "$QUICK" == 1 ]] && break
 done
+
+# Excel packs have no bundled sample (a sample must be text): build small workbooks
+python3 - "$WORK" <<'PY'
+import sys, zipfile
+w = sys.argv[1]
+def mk(path, name, rows):
+    strings, idx = [], {}
+    def si(x):
+        if x not in idx: idx[x] = len(strings); strings.append(x)
+        return idx[x]
+    body = "".join('<row r="%d">' % r + "".join('<c r="%s%d" t="s"><v>%d</v></c>' % ("ABCDEFGH"[c], r, si(str(v))) for c, v in enumerate(row)) + "</row>" for r, row in enumerate(rows, 1))
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("xl/workbook.xml", '<workbook><sheets><sheet name="%s" sheetId="1"/></sheets></workbook>' % name)
+        z.writestr("xl/sharedStrings.xml", "<sst>" + "".join("<si><t>%s</t></si>" % x for x in strings) + "</sst>")
+        z.writestr("xl/worksheets/sheet1.xml", "<worksheet><sheetData>" + body + "</sheetData></worksheet>")
+mk(w + "/sales.xlsx", "Register", [["date","customer","invoice_no","taxable_value","tax","total"],["2026-09-01","Acme Traders","INV-101","10000","1800","11800"],["2026-09-03","Globex Ltd","INV-102","5000","900","5900"],["2026-09-09","Acme Traders","INV-103","2500","450","2950"]])
+mk(w + "/stock.xlsx", "Stock", [["sku","description","qty","location","reorder_level"],["A-100","Widget","40","Warehouse A","20"],["B-220","Bracket","8","Warehouse A","15"],["C-330","Cable set","120","Warehouse B","30"]])
+mk(w + "/attendance.xlsx", "Sept", [["employee","date","status"],["E001","2026-09-01","Present"],["E001","2026-09-02","Leave"],["E002","2026-09-01","Present"],["E002","2026-09-02","Present"]])
+PY
+if [[ "$QUICK" == 0 ]]; then
+  deploy sales-register-sheet && { r=$(run sales-register-sheet "$WORK/sales.xlsx"); has "sales-register-sheet: real xlsx read" "$(body_of "$r" 2>/dev/null)" "Acme Traders (2)"; } || bad "sales-register-sheet deploy"
+  deploy inventory-sheet && { r=$(run inventory-sheet "$WORK/stock.xlsx"); has "inventory-sheet: real xlsx read" "$(body_of "$r" 2>/dev/null)" "Warehouse A (2)"; } || bad "inventory-sheet deploy"
+  deploy attendance-sheet && { r=$(run attendance-sheet "$WORK/attendance.xlsx"); has "attendance-sheet: real xlsx read" "$(body_of "$r" 2>/dev/null)" "Present (3)"; } || bad "attendance-sheet deploy"
+fi
 
 # receipt-pdf has no bundled sample: build a small PDF with a text layer and read it with the cell's poppler
 python3 - "$WORK/receipt.pdf" <<'PY'

@@ -96,6 +96,7 @@ describe('useCaseSpec', () => {
     for (const [extract, accepts] of [
       ['docx', ['docx']],
       ['xlsx', ['xlsx']],
+      ['pptx', ['pptx']],
       ['html', ['html', 'htm']],
       ['eml', ['eml', 'mbox']],
     ] as const) {

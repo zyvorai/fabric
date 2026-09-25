@@ -20,6 +20,14 @@
   host) and the app (use cases, runs and compare, approvals, watch folders, menu bar, Services entry, Shortcuts intent, `keep://`). Ad-hoc signed,
   local build only. Verified: connect and list, the client against real cells, and a watched folder running a file end to end; the Shortcuts/Siri
   intent, Services entry, menu bar and URL scheme are built but not exercised. `docs/keep/MACOS-APP.md`.
+- **Eighteen developer-tool, browser and desktop-app use cases**, plus **recipes** for calling Keep from Siri Shortcuts, macOS,
+  Windows and other agents. Packs: `github-prs`, `github-issues`, `github-actions-log`, `dependabot-alerts`, `git-log-digest`,
+  `xcodebuild-log`, `xcode-crash-log`, `vscode-extensions`, `vscode-settings-audit`, `bookmarks-digest`, `browser-history-takeout`,
+  `mac-apps-inventory`, `mac-launch-items`, `windows-services`, `windows-scheduled-tasks`, and three Excel sheets
+  (`sales-register-sheet`, `inventory-sheet`, `attendance-sheet`); `chat-export-digest` now also reads WhatsApp's iPhone
+  export layout. Declarative and extractive, no runtime change. GitHub, `git log`, `launchctl` and `system_profiler` samples follow
+  real output; the others follow documented layouts and are not verified against a real export. `docs/keep/RECIPES.md` documents
+  the two calls (run a use case, read the artifact) with a Shortcut, a macOS script, a PowerShell script and webhook triggers.
 - **Four office use cases.** `receivables-ageing` and `reimbursement-claims` (from a mail export), `po-line-items` (a PO as
   text) and `employee-ledger` (a CSV), for the paperwork around invoices, POs, staff and claims. Extractive; they list and
   count, and are not books of account, tax validation or payroll.

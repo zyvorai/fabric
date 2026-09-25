@@ -10,10 +10,17 @@
   "summary": [
     {
       "kind": "regex_extract",
-      "title": "Who talks most",
+      "title": "Who talks most (Android layout)",
       "pattern": "(?m)^\\d{1,2}/\\d{1,2}/\\d{2,4}, \\d{1,2}:\\d{2}(?: ?[AP]M)? - ([^:\\n]+):",
       "max_matches": 8,
       "group": 1
+    },
+    {
+      "kind": "regex_extract",
+      "title": "Who talks most (iPhone layout)",
+      "pattern": "(?m)^\\[\\d{1,2}/\\d{1,2}/\\d{2,4}, \\d{1,2}:\\d{2}(?::\\d{2})?(?: ?[AP]M)?\\] ([^:\\n]+):",
+      "group": 1,
+      "max_matches": 8
     },
     {
       "kind": "keyword_sections",

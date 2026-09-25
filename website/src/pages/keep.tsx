@@ -150,9 +150,9 @@ export default function KeepPage(): ReactNode {
 
           <Section
             id="desktop"
-            eyebrow="Mac, Windows and office files"
+            eyebrow="Mac, Windows, developer and office files"
             title="Files from a Mac or a PC, read in a sealed cell."
-            lede="Ready-made use cases for what people export from their machines and for the paperwork around invoices, purchase orders, staff and claims. Keep reads the file you give it; it does not connect to the computer or drive its desktop, and it is not your books of account."
+            lede="Ready-made use cases for what people export from their machines and tools (GitHub, Xcode, VS Code, browsers, Excel) and for the paperwork around invoices, purchase orders, staff and claims. Keep reads the file you give it; it does not connect to the computer or drive its desktop, and it is not your books of account."
             tint
             wide>
             <ul className={styles.features}>

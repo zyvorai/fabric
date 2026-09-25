@@ -111,6 +111,38 @@ pub fn parse_gateway(host: &str) -> Result<IpAddr> {
     }
 }
 
+/// Applies a confinement step, trying again a couple of times before giving up.
+///
+/// Applying a policy is idempotent (it replaces the VM's policy), and on a busy FluxVM host the eBPF load
+/// or map update occasionally fails once and works a moment later (seen as `bpftool prog load` and
+/// `bpftool map update` errors, about 3 in 110 cell runs). A cell must never run unconfined, so after the
+/// last attempt the caller still fails closed with the last error; this only removes the spurious refusals.
+pub async fn with_retries<F, Fut>(
+    attempts: u32,
+    pause: std::time::Duration,
+    mut apply: F,
+) -> Result<()>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<()>>,
+{
+    let attempts = attempts.max(1);
+    let mut last = None;
+    for n in 1..=attempts {
+        match apply().await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                if n < attempts {
+                    tracing::warn!(attempt = n, of = attempts, error = %format!("{e:#}"), "confinement failed, retrying");
+                    tokio::time::sleep(pause).await;
+                }
+                last = Some(e);
+            }
+        }
+    }
+    Err(last.expect("at least one attempt ran"))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -131,6 +163,47 @@ mod tests {
     }
 
     use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn confinement_is_retried_and_succeeds_when_a_later_attempt_works() {
+        let calls = AtomicU32::new(0);
+        let r = with_retries(3, Duration::from_millis(1), || async {
+            if calls.fetch_add(1, Ordering::SeqCst) < 2 {
+                bail!("bpftool prog load failed")
+            }
+            Ok(())
+        })
+        .await;
+        assert!(r.is_ok());
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn confinement_still_fails_closed_after_the_last_attempt() {
+        let calls = AtomicU32::new(0);
+        let r = with_retries(3, Duration::from_millis(1), || async {
+            calls.fetch_add(1, Ordering::SeqCst);
+            bail!("bpftool map update failed")
+        })
+        .await;
+        let e = r.unwrap_err();
+        assert!(format!("{e:#}").contains("map update"), "{e:#}");
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn a_step_that_works_first_time_is_not_repeated() {
+        let calls = AtomicU32::new(0);
+        with_retries(3, Duration::from_millis(1), || async {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        })
+        .await
+        .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn allows_only_the_gateway_on_the_broker_and_proxy_ports() {
