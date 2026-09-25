@@ -1,0 +1,68 @@
+name: KeepForMac
+options:
+  bundleIdPrefix: dev.zyvor
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"          # ad-hoc: runs on this Mac, not distributable
+    ENABLE_HARDENED_RUNTIME: NO
+packages:
+  KeepKit:
+    path: .
+targets:
+  KeepForMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/KeepForMac
+    dependencies:
+      - package: KeepKit
+        product: KeepKit
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Keep for Mac
+        CFBundleName: KeepForMac
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSHumanReadableCopyright: "Copyright 2026 Zyvor. Apache-2.0."
+        NSUserNotificationsUsageDescription: "Keep tells you when a run finishes or needs your approval."
+        NSFaceIDUsageDescription: "Approvals are signed with your fingerprint."
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.zyvor.keep
+            CFBundleURLSchemes: [keep]
+        NSServices:
+          - NSMenuItem:
+              default: Send to Keep
+            NSMessage: sendToKeep
+            NSPortName: KeepForMac
+            NSSendFileTypes: [public.data]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.zyvor.keep
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+  KeepForMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/KeepForMacTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: dev.zyvor.keep.tests
+    dependencies:
+      - target: KeepForMac
+schemes:
+  KeepForMac:
+    build:
+      targets:
+        KeepForMac: all
+    test:
+      targets: [KeepForMacTests]

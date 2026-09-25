@@ -1,0 +1,20 @@
+name: Keep for Mac
+on:
+  pull_request:
+    paths: ['integrations/macos-keep/**', 'docs/keep/mobile/test-vectors.json', 'examples/keep-agents/**', '.github/workflows/macos-keep.yml']
+  push:
+    branches: [main]
+    paths: ['integrations/macos-keep/**', 'docs/keep/mobile/test-vectors.json', '.github/workflows/macos-keep.yml']
+permissions:
+  contents: read
+jobs:
+  keepkit:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: KeepKit unit tests
+        working-directory: integrations/macos-keep
+        run: swift test
+      - name: App builds and its tests pass
+        working-directory: integrations/macos-keep
+        run: xcodebuild -project KeepForMac.xcodeproj -scheme KeepForMac -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test

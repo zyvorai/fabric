@@ -15,6 +15,11 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **Keep for Mac** (`integrations/macos-keep`): a native SwiftUI client. `KeepKit` (API client, Keychain token store, Secure Enclave approval
+  signing checked against the runtime's test vectors, secret scan, folder rules, pack catalogue; 33 unit tests, 4 live tests passed against a real
+  host) and the app (use cases, runs and compare, approvals, watch folders, menu bar, Services entry, Shortcuts intent, `keep://`). Ad-hoc signed,
+  local build only. Verified: connect and list, the client against real cells, and a watched folder running a file end to end; the Shortcuts/Siri
+  intent, Services entry, menu bar and URL scheme are built but not exercised. `docs/keep/MACOS-APP.md`.
 - **Four office use cases.** `receivables-ageing` and `reimbursement-claims` (from a mail export), `po-line-items` (a PO as
   text) and `employee-ledger` (a CSV), for the paperwork around invoices, POs, staff and claims. Extractive; they list and
   count, and are not books of account, tax validation or payroll.
