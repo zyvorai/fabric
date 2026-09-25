@@ -107,7 +107,11 @@ async fn session_agent(
 }
 
 /// Call the guest a11y driver (`POST /v1/tool` on DRIVER_PORT).
-pub(crate) async fn driver_call(state: &AppState, session_id: Uuid, body: Value) -> ApiResult<Value> {
+pub(crate) async fn driver_call(
+    state: &AppState,
+    session_id: Uuid,
+    body: Value,
+) -> ApiResult<Value> {
     let (session, agent) = session_agent(state, session_id).await?;
     if let Some(reason) = session.agent_paused_reason {
         return Err(ApiError::conflict(format!(
