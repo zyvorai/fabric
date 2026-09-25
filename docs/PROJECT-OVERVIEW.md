@@ -1,6 +1,4 @@
-# Zyvor Fabric — full overview
-
-> This is the long-form project overview. For the short version, see the [README](../README.md).
+# Zyvor Fabric
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](../LICENSE)
 [![CI](https://github.com/zyvorai/fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/zyvorai/fabric/actions/workflows/ci.yml)
