@@ -3,7 +3,7 @@ import XCTest
 
 final class SafetyTests: XCTestCase {
     func testSecretsAreFoundButNeverEchoed() throws {
-        let f = try Fixture.tempFile("notes.txt", "deploy with -----BEGIN OPENSSH PRIVATE KEY-----\nabc\nand key AKIAABCDEFGHIJKLMNOP and token=abcdEFGH12345678abcdEFGH")
+        let f = try Fixture.tempFile("notes.txt", "deploy with \(fakePrivateKeyHeader)\nabc\nand key \(fakeAWSKey) and token=\(fakeToken)")
         let found = SecretScan.scan(fileURL: f)
         XCTAssertTrue(found.contains { $0.kind == "a private key" })
         XCTAssertTrue(found.contains { $0.kind == "an AWS access key id" })
@@ -20,7 +20,7 @@ final class SafetyTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent("photo.png")
-        try Data([0x89, 0x50, 0, 0x47] + Array("AKIAABCDEFGHIJKLMNOP".utf8)).write(to: url)
+        try Data([0x89, 0x50, 0, 0x47] + Array((fakeAWSKey).utf8)).write(to: url)
         XCTAssertTrue(SecretScan.scan(fileURL: url).isEmpty)
     }
 

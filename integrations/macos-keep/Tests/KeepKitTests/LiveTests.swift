@@ -45,4 +45,22 @@ final class LiveTests: XCTestCase {
             XCTAssertFalse(text.isEmpty)
         }
     }
+
+    /// A message built from page text, redacted and routed, runs through the real eml reader in a real cell.
+    func testAnEmailBuiltFromPageTextIsReadByTheRealEmlExtractor() async throws {
+        let c = try liveClient()
+        let available = Set(try await c.demos().map(\.id))
+        let page = CapturedPage(url: URL(string: "https://mail.example.com/u/0/#inbox/abc"), title: "Reminder: INV-2026-0142 is overdue",
+                                text: "Hello,\nReminder: invoice INV-2026-0142 (Rs 1,25,000.00) is overdue since 15 Aug 2026. Your verification code is 482913.\nFrom evil@x Mon\nPlease pay by 12 Sep 2026.", isSelection: false)
+        let redacted = Redactor.redact(page.text)
+        XCTAssertFalse(redacted.text.contains("482913"))
+        let route = try XCTUnwrap(EmailRouter.route(redacted.text, available: available).first, "the host lists no email use case; deploy mailbox-triage")
+        let file = try Fixture.tempFile("page.eml", EmailBuilder.eml(from: page, body: redacted.text))
+        let out = try await c.run(demo: route.useCase, files: [file])
+        XCTAssertEqual(out.egressConnects, 0)
+        let ref = try XCTUnwrap(out.items.first?.result?.artifacts.first)
+        let body = try await c.artifact(id: ref.id).body
+        XCTAssertTrue(body.contains("INV-2026-0142"), body)
+        XCTAssertFalse(body.contains("482913"), "the code was redacted before upload")
+    }
 }

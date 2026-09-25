@@ -30,10 +30,13 @@ public enum SecretScan {
         guard let handle = try? FileHandle(forReadingFrom: fileURL), let data = try? handle.read(upToCount: maxBytes) else { return found }
         try? handle.close()
         if data.contains(0) { return found }  // binary: names only
-        let text = String(decoding: data, as: UTF8.self)
-        for (pattern, kind) in contentPatterns where text.range(of: pattern, options: .regularExpression) != nil {
-            found.append(SecretFinding(kind: kind, where_: "contents"))
+        return found + scan(text: String(decoding: data, as: UTF8.self))
+    }
+
+    /// The same content checks on text that is not in a file yet (for example an email read from a browser).
+    public static func scan(text: String) -> [SecretFinding] {
+        contentPatterns.compactMap { pattern, kind in
+            text.range(of: pattern, options: .regularExpression) != nil ? SecretFinding(kind: kind, where_: "contents") : nil
         }
-        return found
     }
 }

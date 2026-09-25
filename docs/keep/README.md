@@ -308,7 +308,7 @@ Start with [VENDORS.md](VENDORS.md); it lists what is built, what is reference c
 
 - [KEEP.md](KEEP.md) — the full spec, architecture and security profiles
 - [Tutorial 16 — Keep workstation](../tutorials/16-keep-workstation.md) · [17 — PDF brief](../tutorials/17-keep-pdf-brief.md) · [18 — use cases](../tutorials/18-keep-use-cases.md) · [19 — your own use case](../tutorials/19-build-your-own-use-case.md)
-- [MACOS-APP.md](MACOS-APP.md) — Keep for Mac, a native client app
+- [MACOS-APP.md](MACOS-APP.md) — Solvor, the native Mac client for Keep
 - [RECIPES.md](RECIPES.md) — calling Keep from Siri Shortcuts, macOS, Windows and other agents
 - [VENDORS.md](VENDORS.md) — offering Keep to many users, as a phone vendor might · [picture version](https://zyvorai.github.io/fabric/keep/phones)
 - [PRODUCTION.md](PRODUCTION.md) — production checklist · [STATUS.md](STATUS.md) — what ships today

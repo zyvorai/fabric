@@ -1,4 +1,4 @@
-name: KeepForMac
+name: Solvor
 options:
   bundleIdPrefix: dev.zyvor
   deploymentTarget:
@@ -16,53 +16,58 @@ packages:
   KeepKit:
     path: .
 targets:
-  KeepForMac:
+  Solvor:
     type: application
     platform: macOS
     sources:
-      - path: Sources/KeepForMac
+      - path: Sources/Solvor
+      - path: Resources/Assets.xcassets
     dependencies:
       - package: KeepKit
         product: KeepKit
     info:
       path: Resources/Info.plist
       properties:
-        CFBundleDisplayName: Keep for Mac
-        CFBundleName: KeepForMac
+        CFBundleDisplayName: Solvor
+        CFBundleName: Solvor
         LSApplicationCategoryType: public.app-category.developer-tools
         NSHumanReadableCopyright: "Copyright 2026 Zyvor. Apache-2.0."
         NSUserNotificationsUsageDescription: "Keep tells you when a run finishes or needs your approval."
         NSFaceIDUsageDescription: "Approvals are signed with your fingerprint."
+        NSMicrophoneUsageDescription: "Solvor listens when you press the microphone button, to hear a command."
+        NSSpeechRecognitionUsageDescription: "Solvor turns what you say into text, on this Mac when your language allows it, to understand a command."
+        NSAppleEventsUsageDescription: "Solvor reads the email you have open in your browser, only when you ask it to."
         CFBundleURLTypes:
-          - CFBundleURLName: dev.zyvor.keep
+          - CFBundleURLName: dev.zyvor.solvor
             CFBundleURLSchemes: [keep]
         NSServices:
           - NSMenuItem:
               default: Send to Keep
             NSMessage: sendToKeep
-            NSPortName: KeepForMac
+            NSPortName: Solvor
             NSSendFileTypes: [public.data]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.zyvor.keep
+        PRODUCT_BUNDLE_IDENTIFIER: dev.zyvor.solvor
+        PRODUCT_NAME: Solvor
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
-  KeepForMacTests:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  SolvorTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: Tests/KeepForMacTests
+      - path: Tests/SolvorTests
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: dev.zyvor.keep.tests
+        PRODUCT_BUNDLE_IDENTIFIER: dev.zyvor.solvor.tests
     dependencies:
-      - target: KeepForMac
+      - target: Solvor
 schemes:
-  KeepForMac:
+  Solvor:
     build:
       targets:
-        KeepForMac: all
+        Solvor: all
     test:
-      targets: [KeepForMacTests]
+      targets: [SolvorTests]

@@ -52,3 +52,9 @@ final class StubProtocol: URLProtocol {
         return URLSession(configuration: c)
     }
 }
+
+
+// Fake secrets for testing the scanner, built at run time so no literal that looks like a credential sits in the source.
+let fakeAWSKey = "AKIA" + "ABCDEFGHIJKLMNOP"
+let fakeToken = "abcdEFGH" + "12345678abcdEFGH"
+let fakePrivateKeyHeader = "-----BEGIN OPENSSH " + "PRIVATE KEY-----"
