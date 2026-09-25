@@ -115,6 +115,11 @@ const config: Config = {
           position: 'right',
         },
         {
+          to: '/keep/phones',
+          label: 'Phones',
+          position: 'right',
+        },
+        {
           to: '/#matrix',
           label: 'Matrix',
           position: 'right',
@@ -140,6 +145,7 @@ const config: Config = {
           items: [
             {label: 'Quick start', to: '/docs/getting-started/Quick-Start'},
             {label: 'Keep', to: '/keep'},
+            {label: 'Keep for phone makers', to: '/keep/phones'},
             {label: 'Fabric vs the field', to: '/#matrix'},
             {label: 'Keep docs', to: '/docs/keep/'},
             {label: 'Tutorial 17 — PDF brief', to: '/docs/tutorials/keep-pdf-brief'},

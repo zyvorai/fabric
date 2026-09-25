@@ -11,17 +11,20 @@ describes; Keep is the version the vendor runs, reads and can take apart.
 This page is a blueprint and a list of what exists. It is honest about what does not. Read
 [the limits](#what-you-can-and-cannot-claim) before you promise anything to a user.
 
+## Start here
+
+Read in this order: this page (the blueprint and the limits), then [TENANCY.md](TENANCY.md) (many users on one
+shard), then [mobile/README.md](mobile/README.md) (the phone side), then the
+[reference gateway](https://github.com/zyvorai/fabric/tree/main/reference/vendor-gateway) and [MODELS.md](MODELS.md). A picture version of this
+page is on the [Keep for phone makers](https://zyvorai.github.io/fabric/keep/phones) site page.
+
 ## The shape
 
-```
-Phone app ── vendor login ──> Vendor gateway ──> shard router (user → shard, region)
-   ▲  push (Mi Push / HMS / OPPO / vivo / FCM)              │
-   │                                                        ▼
-Vendor push relay <── signed message ─────── Shard: Keep runtime + FluxVM (sealed cells, policy, vault, audit)
-```
+![Architecture: the phone, the vendor gateway, the push relay and the model are the vendor's; shards running the Keep runtime and FluxVM cells are Keep's.](../assets/keep/vendor-architecture.svg)
 
 A **shard** is one Keep host. Keep stays a single-host building block; the vendor runs many and puts a router in
-front, so nothing here needs a distributed scheduler.
+front, so nothing here needs a distributed scheduler. Purple is the vendor's, blue is Keep's, dashed boxes are
+interfaces Keep defines and the vendor implements.
 
 | The vendor owns | Keep provides |
 |---|---|
@@ -35,6 +38,8 @@ front, so nothing here needs a distributed scheduler.
 
 ## What a user's day looks like
 
+![Five steps: sign up, enrol the phone, ask, approve, see what happened.](../assets/keep/vendor-user-day.svg)
+
 1. **Sign up.** The vendor's app logs the user in. The gateway assigns a shard in their region, once.
 2. **Enrol the phone.** After a strong login the app makes a P-256 key in the phone's keystore and the gateway
    enrols its public key on the user's shard.
@@ -45,16 +50,22 @@ front, so nothing here needs a distributed scheduler.
    decision. The shard refuses anything the enrolled key did not sign.
 5. **See what happened.** Runs, artifacts and the audit trail come back through the same path.
 
+### The approval, step by step
+
+![Sequence diagram of a phone-signed approval: the shard opens an approval and pushes through the relay, the phone signs, the shard verifies.](../assets/keep/approval-handshake.svg)
+
+Wire format and the signed text are in [mobile/README.md](mobile/README.md).
+
 ## What exists today, and where it is documented
 
 | Piece | Status | Where |
 |---|---|---|
 | Sealed cell, signed policy, vault, egress control, audit | Built | [KEEP.md](KEEP.md), [SECURITY-PROFILES.md](SECURITY-PROFILES.md) |
 | Many users on one shard: user tokens, isolation, quotas, usage, revocation | Built and tested | [TENANCY.md](TENANCY.md) |
-| Phone-signed approvals, device enrolment, push relay interface | Built and tested (server side); Node reference client | [mobile/README.md](mobile/README.md) |
+| Phone-signed approvals, device enrolment, push relay interface | Built. Unit and CI end-to-end tests pass; **not yet run with a waiting agent on a real cell** (the lab host's template gives the guest no network route). Node reference client | [mobile/README.md](mobile/README.md) |
 | The vendor's choice of model (Qwen, DeepSeek, GLM, local, its own) | Built and tested | [MODELS.md](MODELS.md), [MODEL.md](MODEL.md) |
 | Document use cases, triggers, batch, ready-made scenarios | Built | [PACKS.md](PACKS.md), [TRIGGERS.md](TRIGGERS.md), [SCENARIOS.md](SCENARIOS.md) |
-| Gateway: login, placement by region, token minting, push relay | **Reference code**, tested | [`reference/vendor-gateway`](../../reference/vendor-gateway/README.md) |
+| Gateway: login, placement by region, token minting, push relay | **Reference code**, tested | [`reference/vendor-gateway`](https://github.com/zyvorai/fabric/tree/main/reference/vendor-gateway) |
 | Benchmark for cold-start and concurrency | Script | `scripts/keep-bench.sh` |
 | An Android app | **Not built.** A sketch of the signing code is in the mobile guide | [mobile/README.md](mobile/README.md) |
 | Vendor push adapters (FCM, Mi Push, HMS, OPPO, vivo) | **Placeholders**: each needs the vendor's own credentials | gateway README |
@@ -68,6 +79,8 @@ each is active, which only your own traffic can tell you.
 
 `scripts/keep-bench.sh` measures cold cell runs end to end and how they hold up as more run at once. Run it on your
 own hardware; the figure below is one lab host and is **not a promise**.
+
+![Bar charts of run time, throughput and host memory at 1, 2 and 4 concurrent runs.](../assets/keep/vendor-benchmark.svg)
 
 Measured on one lab host (Ubuntu 26.04, 12 vCPU, 31 GiB RAM, about 7.7 GiB in use by other services),
 `node22-agent` template (2 GiB per cell), `csv-clean` on a tiny file, eight runs per level, 2026-09-25, after the

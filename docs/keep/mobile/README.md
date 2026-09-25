@@ -11,6 +11,8 @@ phone   ──(3) sign on device
 phone   ──(4) POST /v1/approvals/{id} {decision, device_id, signature} ──> runtime  (verified, then recorded)
 ```
 
+![Sequence diagram of a phone-signed approval.](../../assets/keep/approval-handshake.svg)
+
 ## 1. Enrol the phone
 
 The phone makes a key pair in its hardware-backed keystore and sends the **public** key to *your* gateway after

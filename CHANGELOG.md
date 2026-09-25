@@ -15,6 +15,11 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **Keep for phone makers, pictured.** A `/keep/phones` page on the GitHub Pages site (architecture, a user's day
+  with a phone mock-up, the phone-signed approval handshake, per-user isolation, the measured benchmark, and a
+  built / reference / not-built status list) and five diagrams in `docs/assets/keep/` that the docs embed too.
+  `VENDORS.md`, `TENANCY.md` and the mobile guide now show them, and `VENDORS.md` states that phone-signed
+  approvals have not yet been run with a waiting agent on a real cell. The Zyvor website is not changed.
 - **`scripts/keep-live-tenancy.sh`**: two users, a phone-signed approval and the reference gateway against a
   live shard in real cells (29 checks pass on the lab host).
 - **A blueprint and a reference gateway for phone vendors.** `docs/keep/VENDORS.md` (architecture, who runs
