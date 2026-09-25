@@ -14,6 +14,13 @@ import { Placement, TokenBroker } from "./shards.js";
 /** The only runtime routes exposed to a phone. Everything else is a 404 here (and 403 at the runtime). */
 const EXPOSED = ["sessions", "approvals", "artifacts", "audit", "demos", "usage", "inbox"];
 
+/**
+ * What may follow `/api/` on its way to a shard: plain path segments only. No dot segments, no `%` (so no
+ * encoded slashes or dots), no backslashes. The upstream URL is then built from a fixed base, so a request can
+ * choose which exposed route it reaches but never which host.
+ */
+const SAFE_REST = /^[a-z]+(?:\/[A-Za-z0-9._~-]+)*\/?$/;
+
 const send = (res, status, body) => {
   res.writeHead(status, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
@@ -80,7 +87,13 @@ export function createGateway(config, { fetchImpl = fetch, adapters, log = () =>
     const rest = url.pathname.replace(/^\/api\//, "");
     const first = rest.split("/")[0];
     if (!EXPOSED.includes(first)) return send(res, 404, { error: "not found" });
-    const target = `${who.shard.url}/v1/${rest}${url.search}`;
+    if (!SAFE_REST.test(rest) || rest.split("/").some((seg) => seg === "." || seg === "..")) {
+      return send(res, 400, { error: "bad path" });
+    }
+    const base = new URL(who.shard.url);
+    const target = new URL(`/v1/${rest}`, base);
+    target.search = url.search;
+    if (target.origin !== base.origin) return send(res, 400, { error: "bad path" });
     const hasBody = !["GET", "HEAD"].includes(req.method);
     const bodyBytes = hasBody ? await readBody(req, 70 * 1024 * 1024) : undefined;
     const attempt = async () => {
