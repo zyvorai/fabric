@@ -119,6 +119,23 @@ if [[ "$QUICK" == 0 ]]; then
   deploy attendance-sheet && { r=$(run attendance-sheet "$WORK/attendance.xlsx"); has "attendance-sheet: real xlsx read" "$(body_of "$r" 2>/dev/null)" "Present (3)"; } || bad "attendance-sheet deploy"
 fi
 
+# deck-outline reads a .pptx (no bundled sample: a sample must be text): build a small deck with speaker notes
+python3 - "$WORK/deck.pptx" <<'PY'
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED)
+z.writestr("ppt/presentation.xml", '<p:presentation xmlns:r="r"><p:sldIdLst><p:sldId id="256" r:id="rId2"/><p:sldId id="257" r:id="rId1"/></p:sldIdLst></p:presentation>')
+z.writestr("ppt/_rels/presentation.xml.rels", '<Relationships><Relationship Id="rId1" Type="x/slide" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="x/slide" Target="slides/slide2.xml"/></Relationships>')
+z.writestr("ppt/slides/slide1.xml", "<p:sld><a:p><a:r><a:t>Budget plan</a:t></a:r></a:p><a:p><a:r><a:t>Spend 50,000 EUR, owner TBD by Friday 3 Oct</a:t></a:r></a:p></p:sld>")
+z.writestr("ppt/slides/_rels/slide1.xml.rels", '<Relationships><Relationship Id="rId9" Type="x/notesSlide" Target="../notesSlides/notesSlide1.xml"/></Relationships>')
+z.writestr("ppt/notesSlides/notesSlide1.xml", "<p:notes><a:p><a:r><a:t>Say the number twice</a:t></a:r></a:p></p:notes>")
+z.writestr("ppt/slides/slide2.xml", "<p:sld><a:p><a:r><a:t>Welcome</a:t></a:r></a:p></p:sld>")
+z.close()
+PY
+if [[ "$QUICK" == 0 ]]; then
+  CREATED+=(deck-outline)
+  deploy deck-outline && { r=$(run deck-outline "$WORK/deck.pptx"); has "deck-outline: real pptx read (Node in the cell)" "$(body_of "$r" 2>/dev/null)" "Say the number twice"; } || bad "deck-outline deploy"
+fi
+
 # receipt-pdf has no bundled sample: build a small PDF with a text layer and read it with the cell's poppler
 python3 - "$WORK/receipt.pdf" <<'PY'
 import sys
