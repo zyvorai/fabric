@@ -4,19 +4,25 @@
   "description": "TypeScript/JavaScript SDK and deploy CLI for Zyvor Fabric Agent Runtime",
   "type": "module",
   "license": "Apache-2.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
+    },
+    "./phone": {
+      "default": "./src/phone.js"
     }
   },
   "bin": {
-    "fabric-agent": "./src/cli.js"
+    "fabric-agent": "./src/cli.js",
+    "keep-phone": "./src/phone-cli.js"
   },
   "scripts": {
     "test": "node --test",
-    "lint": "node --check src/index.js && node --check src/cli.js"
+    "lint": "node --check src/index.js && node --check src/cli.js && node --check src/phone.js && node --check src/phone-cli.js"
   },
   "dependencies": {
     "esbuild": "^0.28.2"

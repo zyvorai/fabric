@@ -219,6 +219,10 @@ pub(crate) async fn call(
     spec: &ModelSpec,
     text: &str,
 ) -> Result<ModelOutcome, ApiError> {
+    // A user's daily model-call allowance, when the operator set one.
+    if let Some(user) = session.user_id.as_deref() {
+        crate::usage::check_model_quota(state, user, crate::usage::Limits::from_env()).await?;
+    }
     // 1. The vault decides whether this endpoint is reachable at all.
     let Authorized {
         url,

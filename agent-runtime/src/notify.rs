@@ -30,33 +30,158 @@ const RETRY_DELAYS: [Duration; 2] = [Duration::from_secs(1), Duration::from_secs
 
 /// Tell the operator's device about a new approval, in the background.
 pub fn approval_requested(state: &AppState, record: &ApprovalRecord) {
-    let Some(webhook) = state.config.approval_webhook.clone() else {
+    let webhook = state.config.approval_webhook.clone();
+    let relays = push_relays();
+    if webhook.is_none() && relays.is_empty() {
         return;
-    };
+    }
+    // Relays are signed with their own secret, or the approval webhook's when that is all there is.
+    let relay_secret = std::env::var("ZYVOR_AGENT_PUSH_RELAY_SECRET")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| webhook.as_ref().map(|w| w.secret.clone()));
+    let key = crate::authz::signing_key_for(state);
     let http = state.egress_http.clone();
     let store = state.store.clone();
     let record = record.clone();
     tokio::spawn(async move {
         let session = store.get_session(record.session_id).await;
-        let body = payload(
-            &record,
-            session.as_ref().map(|s| s.agent.as_str()),
-            session.as_ref().and_then(|s| s.user_id.as_deref()),
-        );
-        if let Err(error) = deliver(&http, &webhook, &body, &RETRY_DELAYS).await {
-            tracing::warn!(%error, approval_id = %record.id, "approval notification failed");
+        if let Some(webhook) = webhook {
+            let body = payload(
+                &record,
+                session.as_ref().map(|s| s.agent.as_str()),
+                session.as_ref().and_then(|s| s.user_id.as_deref()),
+            );
+            if let Err(error) = deliver(&http, &webhook, &body, &RETRY_DELAYS).await {
+                tracing::warn!(%error, approval_id = %record.id, "approval notification failed");
+                let _ = store
+                    .audit
+                    .append(
+                        Some(record.session_id),
+                        AuditPhase::Failed,
+                        "approval.notify",
+                        record.subject.clone(),
+                        json!({"approval_id": record.id, "error": error.to_string()}),
+                    )
+                    .await;
+            }
+        }
+        if let (Some(user), Some(key), Some(secret)) = (
+            session.as_ref().and_then(|s| s.user_id.clone()),
+            key,
+            relay_secret,
+        ) {
+            push_to_devices(
+                &http,
+                &store,
+                &relays,
+                &secret,
+                &key,
+                &user,
+                &record,
+                &RETRY_DELAYS,
+            )
+            .await;
+        }
+    });
+}
+
+/// Push relays by kind, from `ZYVOR_AGENT_PUSH_RELAYS` (a JSON object of `kind -> URL`). Keep
+/// never embeds a vendor's push SDK: a relay the vendor runs turns this signed message into an
+/// FCM, Mi Push, HMS or other push. Only `https` URLs, or `http` for loopback, are used.
+pub fn push_relays() -> std::collections::HashMap<String, String> {
+    let Ok(raw) = std::env::var("ZYVOR_AGENT_PUSH_RELAYS") else {
+        return Default::default();
+    };
+    serde_json::from_str::<std::collections::HashMap<String, String>>(&raw)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|(_, url)| {
+            url::Url::parse(url).is_ok_and(|u| {
+                u.scheme() == "https"
+                    || (u.scheme() == "http"
+                        && matches!(u.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")))
+            })
+        })
+        .collect()
+}
+
+/// What a relay receives for one device: who to wake, what is waiting, and what to sign.
+pub fn device_payload(
+    record: &ApprovalRecord,
+    agent: Option<&str>,
+    device: &crate::devices::DeviceRecord,
+    key: &[u8],
+) -> Vec<u8> {
+    let value: Value = json!({
+        "event": "approval.requested",
+        "channel": "out_of_band",
+        "device": {
+            "id": device.device_id,
+            "user_id": device.user_id,
+            "push": device.push,
+        },
+        "approval": {
+            "id": record.id,
+            "session_id": record.session_id,
+            "agent": agent,
+            "kind": record.kind.as_str(),
+            "subject": record.subject,
+            "prompt": record.prompt,
+            "created_at": record.created_at,
+        },
+        "sign": crate::devices::signing_info(key, record),
+        "decide": {
+            "method": "POST",
+            "path": format!("/v1/approvals/{}", record.id),
+            "body": {"decision": "approved|denied", "device_id": device.device_id, "signature": "<base64 signature>"},
+        },
+        "note": "Never confirm this inside the agent chat. Sign the payload on the phone.",
+    });
+    serde_json::to_vec(&value).unwrap_or_default()
+}
+
+/// Send one message per enrolled device that has a push target the operator has a relay for.
+#[allow(clippy::too_many_arguments)]
+pub async fn push_to_devices(
+    http: &reqwest::Client,
+    store: &crate::store::Store,
+    relays: &std::collections::HashMap<String, String>,
+    secret: &str,
+    key: &[u8],
+    user: &str,
+    record: &ApprovalRecord,
+    retry_delays: &[Duration],
+) {
+    let agent = store.get_session(record.session_id).await.map(|s| s.agent);
+    for device in store.list_devices(user).await {
+        let Some(target) = device.push.as_ref() else {
+            continue;
+        };
+        let Some(url) = relays.get(&target.kind) else {
+            continue;
+        };
+        let body = device_payload(record, agent.as_deref(), &device, key);
+        let relay = ApprovalWebhook {
+            url: url.clone(),
+            secret: secret.to_string(),
+        };
+        if let Err(error) =
+            deliver_event(http, &relay, "approval.requested", &body, retry_delays).await
+        {
+            tracing::warn!(%error, device = %device.device_id, "device push failed");
             let _ = store
                 .audit
                 .append(
                     Some(record.session_id),
                     AuditPhase::Failed,
-                    "approval.notify",
+                    "approval.push",
                     record.subject.clone(),
-                    json!({"approval_id": record.id, "error": error.to_string()}),
+                    json!({"approval_id": record.id, "device_id": device.device_id, "push_kind": target.kind, "error": error.to_string()}),
                 )
                 .await;
         }
-    });
+    }
 }
 
 /// The notification body. It carries what a person needs to decide and route
@@ -368,5 +493,88 @@ mod tests {
         .to_string();
         assert!(error.contains("500"), "{error}");
         assert_eq!(seen.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn approvals_are_pushed_to_each_enrolled_device_through_its_relay() {
+        use crate::devices::{DeviceRecord, KeyAlg, PushTarget};
+        let (url, seen) = receiver(0).await;
+        let (state, base) = crate::egress::ask_tests::state_and_session_cfg(|_| {}).await;
+        let mut session = base.clone();
+        session.id = uuid::Uuid::new_v4();
+        session.user_id = Some("ana".into());
+        state.store.save_session(session.clone()).await.unwrap();
+        let mk = |id: &str, push: Option<PushTarget>| DeviceRecord {
+            user_id: "ana".into(),
+            device_id: id.into(),
+            name: None,
+            alg: KeyAlg::Ed25519,
+            public_key: "x".into(),
+            push,
+            created_at: chrono::Utc::now(),
+        };
+        state
+            .store
+            .save_device(mk(
+                "a-fcm",
+                Some(PushTarget {
+                    kind: "fcm".into(),
+                    token: "T1".into(),
+                }),
+            ))
+            .await
+            .unwrap();
+        state.store.save_device(mk("a-none", None)).await.unwrap();
+        state
+            .store
+            .save_device(mk(
+                "a-unrouted",
+                Some(PushTarget {
+                    kind: "hms".into(),
+                    token: "T2".into(),
+                }),
+            ))
+            .await
+            .unwrap();
+        let mut r = record();
+        r.session_id = session.id;
+        let relays = std::collections::HashMap::from([("fcm".to_string(), url)]);
+        push_to_devices(
+            &state.egress_http,
+            &state.store,
+            &relays,
+            "relay-secret",
+            b"key",
+            "ana",
+            &r,
+            &[],
+        )
+        .await;
+
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1, "one device has a push target with a relay");
+        let (signature, body) = &seen[0];
+        assert!(signature_matches("relay-secret", body, signature));
+        let v: Value = serde_json::from_slice(body).unwrap();
+        assert_eq!(v["device"]["id"], "a-fcm");
+        assert_eq!(v["device"]["push"]["token"], "T1");
+        assert_eq!(v["approval"]["id"], json!(r.id));
+        assert_eq!(v["sign"]["format"], "keep-approval-v1");
+        assert_eq!(v["sign"]["challenge"].as_str().unwrap().len(), 32);
+        // The message never carries the planned action (request details) or any secret.
+        assert!(v["approval"].get("planned_action").is_none());
+        assert!(!v.to_string().contains("relay-secret"));
+    }
+
+    #[test]
+    fn only_https_or_loopback_relays_are_used() {
+        std::env::set_var(
+            "ZYVOR_AGENT_PUSH_RELAYS",
+            r#"{"fcm":"https://relay.example/push","local":"http://127.0.0.1:9000/p","bad":"http://relay.example/p","junk":"nope"}"#,
+        );
+        let mut kinds: Vec<_> = push_relays().into_keys().collect();
+        std::env::remove_var("ZYVOR_AGENT_PUSH_RELAYS");
+        kinds.sort();
+        assert_eq!(kinds, vec!["fcm", "local"]);
     }
 }

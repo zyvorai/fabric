@@ -90,7 +90,8 @@ PIDS+=($!)
 : >"$WORK/model.log"
 cat >"$WORK/creds.json" <<JSON
 {"llm": {"host": "127.0.0.1", "header": "authorization", "env": "ZY_E2E_MODEL_KEY", "prefix": "Bearer ",
-         "allowed_ports": [$MODEL_PORT], "allowed_methods": ["POST"], "path_prefixes": ["/v1/chat/completions"]}}
+         "allowed_ports": [$MODEL_PORT], "allowed_methods": ["POST"], "path_prefixes": ["/v1/chat/completions"]},
+ "llm-local": {"host": "127.0.0.1", "header": "authorization", "kind": "fabric", "allowed_ports": [$MODEL_PORT]}}
 JSON
 start_runtime runtime "$RT_PORT" "$RT_EGRESS" ZYVOR_AGENT_ALLOW_NO_AUTH=1 ZYVOR_AGENT_WATCH_ROOT="$WORK/watch" ZYVOR_AGENT_CREDENTIALS_FILE="$WORK/creds.json"
 wait_http "$BASE/healthz" || fail "runtime did not start"
@@ -396,6 +397,43 @@ code=$(curl -s -o "$WORK/mn.out" -w '%{http_code}' -X POST -F note=none "$BASE/v
 ok "both model packs are refused (403) until an operator allows their endpoint"
 for p in status-page-watch mailbox-triage api-facts expense-sheet nda-review invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
 
+echo "demos-ci: an agent uses the model socket"
+MA="$WORK/model-agent"; cp -R "$ROOT/examples/keep-agents/model-agent" "$MA"
+python3 - "$MA/pack.json" "$MODEL_PORT" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+m = p["manifest"]
+m.update({"template": "ci", "credentials": ["llm-local"], "egress_mode": "ask", "egress_allow_hosts": ["127.0.0.1"], "allow_private_networks": True})
+m["model_socket"] = {"base_url": "http://127.0.0.1:%s/v1" % sys.argv[2], "model": "tiny-1", "credential": "llm-local"}
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+# A credential the agent is not granted is refused when the agent is deployed.
+BAD="$WORK/model-agent-bad"; cp -R "$MA" "$BAD"
+python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); p["name"]="model-agent-bad"; p["manifest"]["credentials"]=[]; json.dump(p, open(sys.argv[1],"w"))' "$BAD/pack.json"
+if (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$BAD") >"$WORK/bad-agent.out" 2>&1; then fail "a model_socket credential the agent lacks must be refused at deploy"; fi
+grep -q "must also be listed in credentials" "$WORK/bad-agent.out" || fail "the refusal should say why: $(cat "$WORK/bad-agent.out")"
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$MA") >"$WORK/model-agent.out" 2>&1 || fail "model-agent deploy failed: $(cat "$WORK/model-agent.out")"
+ok "a model_socket is validated at deploy: a credential the agent lacks is refused, a good one deploys"
+lines_before=$(wc -l < "$WORK/model.log")
+sid=$(curl -sf -X POST -H 'content-type: application/json' -d '{"agent":"model-agent","input":{"question":"What is the total due?"}}' "$BASE/v1/sessions" | json id) || fail "start model-agent session"
+for _ in $(seq 1 100); do
+  st=$(curl -sf "$BASE/v1/sessions/$sid" | json status)
+  [[ "$st" == "completed" || "$st" == "failed" ]] && break; sleep 0.3
+done
+[[ "$st" == "completed" ]] || fail "the model agent did not complete (status $st): $(curl -s "$BASE/v1/sessions/$sid/events" --max-time 3 | tail -c 600) | $(tail -n 5 "$WORK"/sandboxes/*.log 2>/dev/null | tail -c 600)"
+ans=$(curl -sN --max-time 5 "$BASE/v1/sessions/$sid/events" | grep -o '"answer":"[^"]*"' | head -1)
+echo "$ans" | grep -q "4,200 EUR" || fail "the agent's answer is missing the model's reply: $ans"
+python3 - "$WORK/model.log" "$lines_before" <<'PY' || fail "the model endpoint did not get the agent's call as expected"
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])][int(sys.argv[2]):]
+assert len(rows) == 1, rows
+req = json.loads(rows[0]["body"])
+assert rows[0]["path"] == "/v1/chat/completions" and req["model"] == "tiny-1", rows[0]
+assert req["messages"][-1]["content"] == "What is the total due?" and req["max_tokens"] == 200
+assert "sk-e2e-secret-key" not in json.dumps(rows), "no key belongs in this request"
+PY
+ok "an agent called ctx.model.chat(): runtime env -> worker -> egress broker -> the socket's endpoint, and the reply came back"
+
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")
 [[ "$code" == "400" ]] || fail "wrong extension should be 400, got $code"; ok "wrong file type refused (400)"
@@ -451,8 +489,12 @@ ok "keepctl doctor reports FluxVM ready and 7 built-ins"
 echo "demos-ci: signed pack deploy in Keep mode"
 SEED=$(python3 -c 'print("07"*32)')
 PUB=$(S=$SEED node --input-type=module -e "import('$ROOT/sdk/agent-runtime/src/sign.js').then(m=>console.log(m.publicKeyHex(process.env.S)))")
+RELAY_PORT=$(free_port)
+RELAY_STUB_LOG="$WORK/relay.log" python3 "$ROOT/agent-runtime/tests/relay_stub.py" "$RELAY_PORT" >"$WORK/relay-stub.log" 2>&1 &
+PIDS+=($!)
+: >"$WORK/relay.log"
 start_runtime keep-runtime "$KEEP_PORT" "$KEEP_EGRESS" \
-  ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
+  ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE" ZYVOR_AGENT_USER_MAX_RUNS_PER_DAY=3 ZYVOR_AGENT_REQUIRE_DEVICE_SIGNATURE=1 ZYVOR_AGENT_PUSH_RELAYS="{\"fcm\":\"http://127.0.0.1:$RELAY_PORT/push\"}" ZYVOR_AGENT_PUSH_RELAY_SECRET=relay-e2e-secret
 wait_http "$KEEP_BASE/healthz" || fail "keep-mode runtime did not start"
 export KEEP_TOKEN="$KEEP_TOKEN_VALUE"
 PACK="$WORK/my-agent"; mkdir -p "$PACK"
@@ -495,5 +537,154 @@ post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Beare
 [[ "$(post "$WORK/deploy.bytes")" == "201" ]] || fail "exact signed bytes should deploy (201)"
 [[ "$(post "$WORK/deploy.tampered")" =~ ^40[13]$ ]] || fail "tampered bytes must be refused"
 ok "bundle bytes verify; a one-byte change is refused"
+
+echo "demos-ci: two users on one shard (user tokens, isolation, quota, revocation)"
+mint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":600}" "$KEEP_BASE/v1/user-tokens" | json token; }
+as() { local tok=$1; shift; curl -s -H "Authorization: Bearer $tok" "$@"; }
+ANA=$(mint ana); BEN=$(mint ben)
+[[ "$ANA" == kut1.* && "$BEN" == kut1.* ]] || fail "user tokens were not minted"
+printf 'name,qty\nAna,1\n' > "$WORK/ua.csv"; printf 'name,qty\nBen,2\n' > "$WORK/ub.csv"
+ra=$(as "$ANA" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean"); rb=$(as "$BEN" -X POST -F "file=@$WORK/ub.csv" "$KEEP_BASE/v1/demos/csv-clean")
+SA=$(echo "$ra" | json session_id); SB=$(echo "$rb" | json session_id)
+AA=$(echo "$ra" | json artifacts.0.id); AB=$(echo "$rb" | json artifacts.0.id)
+[[ "$(echo "$ra" | json egress_connects)" == "0" && "$(echo "$rb" | json egress_connects)" == "0" ]] || fail "user runs must keep 0 CONNECT: $ra"
+ok "each user ran csv-clean with their own token, 0 CONNECT"
+# A use-case run ends its session, and the cleanup loop then deletes the cell (it used to linger for 30 minutes).
+for _ in $(seq 1 50); do [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json status)" == "completed" ]] && break; sleep 0.2; done
+[[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json status)" == "completed" ]] || fail "a finished use-case run should leave a completed session"
+for _ in $(seq 1 50); do [[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sandbox_released)" == "True" ]] && break; sleep 0.2; done
+[[ "$(as "$ANA" "$KEEP_BASE/v1/sessions/$SA" | json sandbox_released)" == "True" ]] || fail "the finished run's cell should have been released"
+ok "a finished use-case run completes its session and releases its cell"
+[[ "$(as "$ANA" "$KEEP_BASE/v1/sessions" | python3 -c 'import json,sys; print(",".join(s["id"] for s in json.load(sys.stdin)["items"]))')" == "$SA" ]] || fail "ana should list only her own session"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB")" == "404" ]] || fail "ana must not read ben's session"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions/$SB/cockpit")" == "404" ]] || fail "ana must not read ben's cockpit"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/artifacts/$AB")" == "404" ]] || fail "ana must not read ben's artifact"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/artifacts/$AA/diff/$AB")" == "404" ]] || fail "ana must not diff against ben's artifact"
+as "$ANA" "$KEEP_BASE/v1/artifacts" | python3 -c 'import json,sys; ids=[a["id"] for a in json.load(sys.stdin)["items"]]; assert "'"$AA"'" in ids and "'"$AB"'" not in ids, ids' || fail "ana's artifact list is wrong"
+as "$ANA" "$KEEP_BASE/v1/audit?limit=500" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=json.dumps(d["items"]); assert "'"$SA"'" in t and "'"$SB"'" not in t and "entries" not in d["chain"], d["chain"]' || fail "ana's audit slice is wrong"
+ok "ana sees only her session, artifacts and audit rows; ben's are 404 or absent"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/keep/status")" == "403" && "$(as "$ANA" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"user_id":"ben"}' "$KEEP_BASE/v1/user-tokens")" == "403" ]] || fail "operator routes must be closed to user tokens"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions?token=$ANA")" == "401" ]] || fail "a user token in a query string must be refused"
+ok "operator routes are 403 for a user token; a token in the URL is 401"
+[[ "$(as "$ANA" "$KEEP_BASE/v1/usage" | json usage.runs)" == "1" ]] || fail "usage should show 1 run for ana"
+as "$ANA" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean" | json egress_connects >/dev/null || fail "ana's second run"
+as "$ANA" -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean" | json egress_connects >/dev/null || fail "ana's third run"
+code=$(as "$ANA" -o "$WORK/quota.out" -w '%{http_code}' -X POST -F "file=@$WORK/ua.csv" "$KEEP_BASE/v1/demos/csv-clean")
+[[ "$code" == "429" ]] && grep -q "quota reached" "$WORK/quota.out" || fail "the 4th run should hit the quota (429), got $code $(cat "$WORK/quota.out")"
+[[ "$(as "$BEN" -X POST -F "file=@$WORK/ub.csv" "$KEEP_BASE/v1/demos/csv-clean" | json egress_connects)" == "0" ]] || fail "ben must not be limited by ana's usage"
+ok "ana hits her run quota (429) after 3; ben is unaffected; usage reports the runs"
+curl -s -o /dev/null -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$KEEP_BASE/v1/users/ana/revoke-tokens"
+[[ "$(as "$ANA" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions")" == "401" && "$(as "$BEN" -o /dev/null -w '%{http_code}' "$KEEP_BASE/v1/sessions")" == "200" ]] || fail "revoking ana must cut off ana only"
+ok "revoking a user's tokens cuts off that user only"
+
+echo "demos-ci: phone-signed approvals (enrol, push relay, sign, refuse forgeries)"
+PHONE="node $ROOT/sdk/agent-runtime/src/phone-cli.js"
+op() { curl -s -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$@"; }
+CAROL=$(mint carol)
+# A use case's session ends with its run, so approvals need a real agent session that is still waiting:
+# a signed "waiter" agent that takes two steers (each decision steers it), started as carol.
+WPACK="$WORK/waiter"; mkdir -p "$WPACK"
+cat > "$WPACK/agent.ts" <<'TS'
+import { defineAgent } from "@zyvor/fabric-agent";
+export default defineAgent({ async run(ctx) {
+  const seen = [];
+  for (let i = 0; i < 2; i++) seen.push(await ctx.nextSteer({ timeoutMs: 120000 }));
+  return { steers: seen.length };
+} });
+TS
+cat > "$WPACK/pack.json" <<'JSON'
+{ "kind": "agent", "name": "waiter",
+  "manifest": { "template": "ci", "egress_mode": "deny", "confinement": "strict" },
+  "goal": { "title": "Wait", "text": "Wait for two decisions." } }
+JSON
+printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$WPACK/keep.policy.yaml"
+KEEP_POLICY_SEED="$SEED" FABRIC_AGENT_URL="$KEEP_BASE" node "$CLI" pack deploy "$WPACK" >"$WORK/waiter.out" 2>&1 || fail "waiter agent deploy failed: $(cat "$WORK/waiter.out")"
+SC=$(as "$CAROL" -X POST -H 'content-type: application/json' -d '{"agent":"waiter","input":{}}' "$KEEP_BASE/v1/sessions" | json id) || fail "start carol's waiter session"
+for _ in $(seq 1 100); do
+  [[ "$(as "$CAROL" "$KEEP_BASE/v1/sessions/$SC" | json status)" == "waiting" || "$(as "$CAROL" "$KEEP_BASE/v1/sessions/$SC" | json status)" == "running" ]] && break; sleep 0.2
+done
+$PHONE keygen "$WORK/carol.key" p256 >/dev/null
+$PHONE enrol "$WORK/carol.key" carol-phone --push-kind fcm --push-token PUSH123 > "$WORK/enrol.json"
+[[ "$(op -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$KEEP_BASE/v1/users/carol/devices")" == "201" ]] || fail "operator enrolment should be 201"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$KEEP_BASE/v1/users/carol/devices")" == "403" ]] || fail "a user token must not enrol a device"
+ok "the operator enrols carol's phone key; carol's own token cannot"
+mkapp() { op -X POST -H 'content-type: application/json' -d "{\"session_id\":\"$SC\",\"kind\":\"send\",\"subject\":\"mail.example\",\"prompt\":\"$1\",\"planned_action\":{\"method\":\"POST\",\"body_sha256\":\"$2\"}}" "$KEEP_BASE/v1/approvals" | json id; }
+A1=$(mkapp "send report" aaa)
+for _ in $(seq 1 50); do [[ -s "$WORK/relay.log" ]] && break; sleep 0.1; done
+python3 - "$WORK/relay.log" "$A1" <<'PY' || fail "the push relay did not get a valid signed message for the approval"
+import hashlib, hmac, json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])]
+assert len(rows) == 1, rows
+r = rows[0]
+assert r["event"] == "approval.requested"
+want = "sha256=" + hmac.new(b"relay-e2e-secret", r["body"].encode(), hashlib.sha256).hexdigest()
+assert hmac.compare_digest(r["sig"], want), "relay signature mismatch"
+b = json.loads(r["body"])
+assert b["device"]["id"] == "carol-phone" and b["device"]["push"]["token"] == "PUSH123", b["device"]
+assert b["approval"]["id"] == sys.argv[2] and b["sign"]["format"] == "keep-approval-v1" and len(b["sign"]["challenge"]) == 32
+assert "planned_action" not in b["approval"] and "relay-e2e-secret" not in r["body"]
+PY
+ok "opening an approval pushes a signed message to carol's device through the relay, with no request details"
+
+as "$CAROL" "$KEEP_BASE/v1/inbox" | python3 -c 'import json,sys; d=json.load(sys.stdin); p=[a for a in d["pending_approvals"] if a["id"]=="'"$A1"'"]; assert len(p)==1 and "sign" in p[0]; json.dump(p[0], open("'"$WORK"'/appr1.json","w"))' || fail "carol's inbox should list the approval with signing info"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"decision":"approved"}' "$KEEP_BASE/v1/approvals/$A1")" == "403" ]] || fail "an unsigned decision by a user token must be refused when signatures are required"
+$PHONE decide "$WORK/carol.key" carol-phone "$WORK/appr1.json" approved > "$WORK/decide-ok.json"
+$PHONE decide "$WORK/carol.key" carol-phone "$WORK/appr1.json" denied > "$WORK/decide-denied.json"
+# Signed "denied" but sent as "approved": the signature must not carry over.
+python3 -c 'import json; d=json.load(open("'"$WORK"'/decide-denied.json")); d["decision"]="approved"; json.dump(d, open("'"$WORK"'/decide-flipped.json","w"))'
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-flipped.json" "$KEEP_BASE/v1/approvals/$A1")" == "403" ]] || fail "a flipped decision must be refused"
+$PHONE keygen "$WORK/intruder.key" p256 >/dev/null
+$PHONE decide "$WORK/intruder.key" carol-phone "$WORK/appr1.json" approved > "$WORK/decide-forged.json"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-forged.json" "$KEEP_BASE/v1/approvals/$A1")" == "403" ]] || fail "a signature from another key must be refused"
+[[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A1"'"][0]["status"])')" == "pending" ]] || fail "refused decisions must leave the approval pending"
+ok "unsigned, flipped and forged decisions are refused (403) and the approval stays pending"
+code=$(as "$CAROL" -o "$WORK/decide-ok.out" -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-ok.json" "$KEEP_BASE/v1/approvals/$A1")
+[[ "$code" == "200" ]] || fail "the phone-signed decision should be accepted, got $code: $(cat "$WORK/decide-ok.out")"
+[[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A1"'"][0]["status"])')" == "approved" ]] || fail "the approval should be approved"
+[[ "$(as "$CAROL" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/decide-ok.json" "$KEEP_BASE/v1/approvals/$A1")" =~ ^(409|403)$ ]] || fail "a replay of a decided approval must be refused"
+ok "the phone-signed decision is accepted once; replaying it is refused"
+op "$KEEP_BASE/v1/audit?limit=500&session_id=$SC" | python3 -c 'import json,sys; rows=json.load(sys.stdin)["items"]; assert any(r["action"]=="approval.device_signature" and r["phase"]=="performed" and r["detail"]["device_id"]=="carol-phone" for r in rows), [r["action"] for r in rows]; assert sum(1 for r in rows if r["action"]=="approval.device_signature" and r["phase"]=="failed")>=2' || fail "the audit journal should record the signed decision and the refused ones"
+ok "the journal records the accepted signature and the refused attempts"
+A2=$(mkapp "delete file" bbb)
+code=$(op -o "$WORK/op-decide.out" -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"decision":"denied"}' "$KEEP_BASE/v1/approvals/$A2")
+[[ "$code" == "200" ]] || fail "the operator may decide unsigned, got $code: $(cat "$WORK/op-decide.out")"
+[[ "$(op "$KEEP_BASE/v1/approvals" | python3 -c 'import json,sys; print([a for a in json.load(sys.stdin)["items"] if a["id"]=="'"$A2"'"][0]["status"])')" == "denied" ]] || fail "the operator's unsigned decision should be recorded"
+ok "the operator can still decide without a phone"
+
+echo "demos-ci: the reference vendor gateway in front of a shard"
+GW_PORT=$(free_port)
+cat > "$WORK/gw.json" <<JSON
+{"jwtSecret":"gw-login-secret","relaySecret":"gw-relay-secret","adminKey":"gw-admin","defaultRegion":"eu","port":$GW_PORT,
+ "stateFile":"$WORK/gw-users.json","shards":[{"id":"eu-1","region":"eu","url":"$KEEP_BASE","token":"$KEEP_TOKEN_VALUE"}]}
+JSON
+node "$ROOT/reference/vendor-gateway/src/main.js" "$WORK/gw.json" >"$WORK/gw.log" 2>&1 &
+PIDS+=($!)
+GW="http://127.0.0.1:$GW_PORT"
+wait_http "$GW/healthz" || fail "the gateway did not start: $(cat "$WORK/gw.log")"
+login() { node --input-type=module -e 'import {signJwt} from "'"$ROOT"'/reference/vendor-gateway/src/jwt.js"; const c={sub:process.argv[1],exp:Math.floor(Date.now()/1000)+600}; if(process.argv[2]) c.acr=process.argv[2]; console.log(signJwt(c,"gw-login-secret"))' "$@"; }
+DORA=$(login dora); ERIN=$(login erin); DORA_STRONG=$(login dora strong)
+gw() { local tok=$1; shift; curl -s -H "Authorization: Bearer $tok" "$@"; }
+[[ "$(curl -s -o /dev/null -w '%{http_code}' "$GW/api/sessions")" == "401" ]] || fail "the gateway must refuse a request with no login"
+[[ "$(gw "not.a.jwt" -o /dev/null -w '%{http_code}' "$GW/api/sessions")" == "401" ]] || fail "the gateway must refuse a bad login"
+rd=$(gw "$DORA" -X POST -F "file=@$WORK/ua.csv" "$GW/api/demos/csv-clean")
+[[ "$(echo "$rd" | json egress_connects)" == "0" ]] || fail "a run through the gateway should work with 0 CONNECT: $rd"
+SD=$(echo "$rd" | json session_id)
+ok "a vendor login through the gateway runs a use case on the shard, 0 CONNECT"
+[[ "$(gw "$DORA" "$GW/api/sessions" | python3 -c 'import json,sys; print(",".join(s["id"] for s in json.load(sys.stdin)["items"]))')" == "$SD" ]] || fail "dora should see only her own session through the gateway"
+[[ "$(gw "$ERIN" "$GW/api/sessions" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["items"]))')" == "0" ]] || fail "erin must see none of dora's sessions"
+[[ "$(gw "$ERIN" -o /dev/null -w '%{http_code}' "$GW/api/sessions/$SD")" == "404" ]] || fail "erin must not read dora's session"
+for p in keep/status user-tokens triggers model-grants vault/status; do
+  [[ "$(gw "$DORA" -o /dev/null -w '%{http_code}' "$GW/api/$p")" == "404" ]] || fail "operator route /api/$p must not be exposed by the gateway"
+done
+ok "through the gateway users are isolated, and operator routes are not exposed"
+[[ "$(gw "$DORA" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/enrol.json" "$GW/api/devices")" == "403" ]] || fail "an ordinary login must not enrol a device"
+$PHONE keygen "$WORK/dora.key" p256 >/dev/null; $PHONE enrol "$WORK/dora.key" dora-phone > "$WORK/dora-enrol.json"
+[[ "$(gw "$DORA_STRONG" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$WORK/dora-enrol.json" "$GW/api/devices")" == "201" ]] || fail "a strong login should enrol a device"
+[[ "$(gw "$DORA" "$GW/api/devices" | python3 -c 'import json,sys; print(",".join(d["device_id"] for d in json.load(sys.stdin)["items"]))')" == "dora-phone" ]] || fail "the enrolled device should be listed"
+[[ "$(curl -s -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$KEEP_BASE/v1/users/dora/devices" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["items"]))')" == "1" ]] || fail "the shard should hold dora's device"
+ok "enrolling a device needs a strong login; the gateway enrols it on the shard for the right user"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-admin-key: gw-admin' "$GW/admin/shards")" == "200" && "$(curl -s "$GW/admin/shards" -H 'x-admin-key: gw-admin' | grep -c "$KEEP_TOKEN_VALUE")" == "0" ]] || fail "the admin view must not leak the operator token"
+[[ "$(curl -s -H 'x-admin-key: gw-admin' "$GW/admin/usage?user_id=dora" | json usage.runs)" == "1" ]] || fail "usage rollup should report dora's run"
+ok "the gateway's admin view hides operator tokens and rolls up usage per user"
 
 echo "demos-ci: $PASSED checks passed"

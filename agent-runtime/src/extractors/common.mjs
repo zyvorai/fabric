@@ -20,6 +20,19 @@ function decodeEntities(s) {
   })
 }
 
+/**
+ * Remove every tag. A single pass is not enough: "<<b>script>" loses "<b>" and leaves "<script>", so repeat
+ * until nothing changes. (The host also defangs "<" and ">" in what it renders; this is the guest's own part.)
+ */
+function stripTags(s, replacement = '') {
+  let previous
+  do {
+    previous = s
+    s = s.replace(/<[^>]*>/g, replacement)
+  } while (s !== previous)
+  return s
+}
+
 function tidy(s) {
   return s
     .replace(/[ \t\f\v]+/g, ' ')

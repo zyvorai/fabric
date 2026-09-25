@@ -1204,13 +1204,20 @@ mod tests {
         let (html, ok) = run(
             Extractor::Html,
             "a.html",
-            b"<h1>Hi &amp; bye</h1><script>alert(1)</script><p>one<br>two</p>",
+            b"<h1>Hi &amp; bye</h1><script>alert(1)</script><p>one<br>two</p><<b>script>alert(2)<</b>/script>",
         );
         assert!(
             ok && html.contains("# Hi & bye") && html.contains("one\ntwo"),
             "{html}"
         );
-        assert!(!html.contains("alert"), "scripts must be dropped: {html}");
+        assert!(
+            !html.contains("alert(1)"),
+            "scripts must be dropped: {html}"
+        );
+        assert!(
+            !html.contains("<script"),
+            "nested tags must not reassemble a tag: {html}"
+        );
 
         let (eml, ok) = run(
             Extractor::Eml,

@@ -208,6 +208,42 @@ impl AgentManifest {
         }
     }
 
+    /// Deploy-time checks for `model_socket`: a well-formed OpenAI-compatible base URL, and a
+    /// credential the agent is actually granted. Whether the endpoint may be reached is the egress
+    /// broker's decision on every call, not this check's.
+    pub fn validate_model_socket(&self) -> Result<(), String> {
+        let Some(s) = &self.model_socket else {
+            return Ok(());
+        };
+        let u = url::Url::parse(&s.base_url).map_err(|e| format!("model_socket.base_url: {e}"))?;
+        if !matches!(u.scheme(), "http" | "https") || u.host_str().is_none() {
+            return Err("model_socket.base_url must be an http or https URL with a host".into());
+        }
+        if !u.username().is_empty()
+            || u.password().is_some()
+            || u.query().is_some()
+            || u.fragment().is_some()
+        {
+            return Err(
+                "model_socket.base_url must not carry credentials, a query or a fragment".into(),
+            );
+        }
+        if s.model
+            .as_deref()
+            .is_some_and(|m| m.is_empty() || m.len() > 80 || m.chars().any(char::is_control))
+        {
+            return Err("model_socket.model must be 1-80 plain characters".into());
+        }
+        if let Some(cred) = &s.credential {
+            if !self.credentials.iter().any(|c| c == cred) {
+                return Err(format!(
+                    "model_socket.credential {cred:?} must also be listed in credentials, or the agent cannot use it"
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Deploy-time checks for `egress_rules` and `taint`.
     pub fn validate_egress_policy(&self) -> Result<(), String> {
         for rule in &self.egress_rules {
@@ -1141,6 +1177,12 @@ pub struct DecideApprovalRequest {
     pub scope: Option<GrantScope>,
     #[serde(default)]
     pub comment: Option<String>,
+    /// The enrolled phone that made this decision, and its signature over the decision
+    /// (see `devices.rs`). Both or neither.
+    #[serde(default)]
+    pub device_id: Option<String>,
+    #[serde(default)]
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1440,5 +1482,56 @@ mod home_volume_tests {
             serde_json::to_value(m).unwrap()["inner_container"],
             "strict"
         );
+    }
+
+    fn manifest_with_socket(socket: serde_json::Value, credentials: &[&str]) -> AgentManifest {
+        serde_json::from_value(serde_json::json!({
+            "template": "t", "credentials": credentials, "model_socket": socket
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_model_socket_is_checked_at_deploy() {
+        let ok =
+            |s: serde_json::Value, c: &[&str]| manifest_with_socket(s, c).validate_model_socket();
+        // No socket, a hosted API, and a local server (no key) are all fine.
+        assert!(
+            serde_json::from_value::<AgentManifest>(serde_json::json!({"template": "t"}))
+                .unwrap()
+                .validate_model_socket()
+                .is_ok()
+        );
+        assert!(ok(serde_json::json!({"base_url": "https://api.example.com/v1", "model": "m", "credential": "llm"}), &["llm"]).is_ok());
+        assert!(ok(
+            serde_json::json!({"base_url": "http://10.0.0.5:8000/v1"}),
+            &[]
+        )
+        .is_ok());
+        // A malformed URL, a URL with a secret in it, and a scheme that is not http(s).
+        for bad in [
+            "not a url",
+            "ftp://api.example.com/v1",
+            "https://user:pw@api.example.com/v1",
+            "https://api.example.com/v1?api_key=abc",
+            "https://api.example.com/v1#x",
+        ] {
+            assert!(
+                ok(serde_json::json!({"base_url": bad}), &[]).is_err(),
+                "{bad}"
+            );
+        }
+        // A credential the agent is not granted could never be used.
+        let err = ok(
+            serde_json::json!({"base_url": "https://a.example/v1", "credential": "llm"}),
+            &["other"],
+        )
+        .unwrap_err();
+        assert!(err.contains("must also be listed in credentials"), "{err}");
+        assert!(ok(
+            serde_json::json!({"base_url": "https://a.example/v1", "model": ""}),
+            &[]
+        )
+        .is_err());
     }
 }

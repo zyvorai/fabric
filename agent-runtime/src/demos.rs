@@ -21,7 +21,7 @@ use crate::{
     AppState,
 };
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Extension, Multipart, Path, State},
     http::StatusCode,
     Json,
 };
@@ -472,9 +472,12 @@ fn extension(filename: &str) -> String {
 /// PDF brief; optional — a built-in sample is used otherwise).
 pub(crate) async fn demo_run(
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<crate::authz::Principal>,
     Path(demo_id): Path<String>,
     mut multipart: Multipart,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
+    // A user token runs the use case as that user: their session, artifacts and quota.
+    let user = principal.user().map(str::to_string);
     if resolve(&state, &demo_id).await.is_none() {
         return Err(ApiError::not_found(format!("no demo named {demo_id:?}")));
     }
@@ -514,17 +517,17 @@ pub(crate) async fn demo_run(
             if !accepts.iter().any(|e| e == "zip") {
                 let inner = expand_zip(&files[0].bytes, &accepts, max_bytes)
                     .map_err(ApiError::bad_request)?;
-                return run_batch(state, demo_id, inner).await;
+                return run_batch(state, demo_id, inner, user).await;
             }
         }
     }
     match files.len() {
-        0 => run_use_case(state, demo_id, None, None, None).await,
+        0 => run_use_case(state, demo_id, None, None, None, user).await,
         1 => {
             let f = files.remove(0);
-            run_use_case(state, demo_id, f.filename, Some(f.bytes), None).await
+            run_use_case(state, demo_id, f.filename, Some(f.bytes), None, user).await
         }
-        _ => run_batch(state, demo_id, files).await,
+        _ => run_batch(state, demo_id, files, user).await,
     }
 }
 
@@ -623,6 +626,7 @@ async fn run_batch(
     state: Arc<AppState>,
     demo_id: String,
     files: Vec<Upload>,
+    user: Option<String>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     let batch_id = Uuid::new_v4();
     let count = files.len();
@@ -645,6 +649,7 @@ async fn run_batch(
             f.filename,
             Some(f.bytes),
             Some(batch_id),
+            user.clone(),
         )
         .await
         {
@@ -690,8 +695,17 @@ pub(crate) async fn run_use_case(
     filename: Option<String>,
     upload: Option<Vec<u8>>,
     batch_id: Option<Uuid>,
+    user: Option<String>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
-    let result = run_demo(state.clone(), demo_id.clone(), filename, upload, batch_id).await;
+    let result = run_demo(
+        state.clone(),
+        demo_id.clone(),
+        filename,
+        upload,
+        batch_id,
+        user,
+    )
+    .await;
     match &result {
         Ok((_, Json(v))) => {
             let artifacts = v["artifacts"]
@@ -732,13 +746,69 @@ pub(crate) async fn run_use_case(
     result
 }
 
+/// Run a use case in a fresh cell, then end its session so the cell is released.
+///
+/// A run used to leave its session "Running" and its cell alive until the sandbox's own lifetime
+/// (30 minutes) ran out. On a busy host those cells piled up, each holding memory. Marking the
+/// session finished hands the cell to the terminal-session cleanup loop, which deletes it at once.
 async fn run_demo(
     state: Arc<AppState>,
     demo_id: String,
     filename: Option<String>,
     upload: Option<Vec<u8>>,
     batch_id: Option<Uuid>,
+    user: Option<String>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
+    let mut session_id: Option<Uuid> = None;
+    let result = run_demo_inner(
+        state.clone(),
+        demo_id,
+        filename,
+        upload,
+        batch_id,
+        user,
+        &mut session_id,
+    )
+    .await;
+    if let Some(id) = session_id {
+        finish_session(&state, id, &result).await;
+    }
+    result
+}
+
+/// Mark a use-case session done. A session frozen because its cell tried to reach the network
+/// (a 409) is left as it is: the cell is kept for inspection until its own lifetime ends.
+async fn finish_session(state: &AppState, id: Uuid, result: &ApiResult<(StatusCode, Json<Value>)>) {
+    if matches!(result, Err(e) if e.status() == StatusCode::CONFLICT) {
+        return;
+    }
+    let outcome = state
+        .store
+        .update_session(id, |s| match result {
+            Ok(_) => s.status = SessionStatus::Completed,
+            Err(e) => {
+                s.status = SessionStatus::Failed;
+                s.error = Some(e.message().to_string());
+            }
+        })
+        .await;
+    if let Err(error) = outcome {
+        tracing::warn!(session = %id, %error, "could not end the use-case session");
+    }
+}
+
+async fn run_demo_inner(
+    state: Arc<AppState>,
+    demo_id: String,
+    filename: Option<String>,
+    upload: Option<Vec<u8>>,
+    batch_id: Option<Uuid>,
+    user: Option<String>,
+    created: &mut Option<Uuid>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    if let Some(u) = user.as_deref() {
+        crate::usage::check_run_quota(&state, u, crate::usage::Limits::from_env()).await?;
+    }
     let spec = resolve(&state, &demo_id)
         .await
         .ok_or_else(|| ApiError::not_found(format!("no demo named {demo_id:?}")))?;
@@ -846,7 +916,7 @@ async fn run_demo(
         capability_token: format!("demo-{}", Uuid::new_v4()),
         error: None,
         parent_session_id: None,
-        user_id: None,
+        user_id: user.clone(),
         tainted_by: vec![],
         confidential: sandbox.confidential.clone(),
         agent_paused_reason: None,
@@ -857,13 +927,14 @@ async fn run_demo(
         .save_session(session.clone())
         .await
         .map_err(ApiError::internal)?;
+    *created = Some(id);
 
     let goal = GoalRecord {
         id: Uuid::new_v4(),
         title: spec.goal_title.clone(),
         description: spec.goal_description.clone(),
         agent: spec.id.clone(),
-        user_id: None,
+        user_id: user.clone(),
         session_id: Some(id),
         status: GoalStatus::Open,
         plan: vec![],
@@ -1267,7 +1338,13 @@ mod tests {
         id: &str,
         file: Option<(&str, &[u8])>,
     ) -> Result<(StatusCode, Json<Value>), ApiError> {
-        demo_run(State(state), Path(id.into()), multipart(file).await).await
+        demo_run(
+            State(state),
+            Extension(crate::authz::Principal::Operator),
+            Path(id.into()),
+            multipart(file).await,
+        )
+        .await
     }
 
     async fn run(

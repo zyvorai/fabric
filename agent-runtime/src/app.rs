@@ -3,6 +3,7 @@
 
 use crate::{
     audit::AuditPhase,
+    authz::{self, Principal, Scope, UserRoute},
     model::{
         ApprovalKind, ApprovalRecord, ApprovalStatus, CreateApprovalRequest, CreateSessionRequest,
         DecideApprovalRequest, DelegateRequest, DeployAgentRequest, EventsQuery,
@@ -15,7 +16,7 @@ use crate::{
 use anyhow::{Context, Result};
 use axum::{
     body::Bytes,
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
     response::{
@@ -249,7 +250,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/agents/{name}/warm-pool",
             get(get_warm_pool).post(reconcile_warm_pool),
         )
-        .route("/v1/sessions", get(list_sessions).post(create_session))
+        .route(
+            "/v1/sessions",
+            get(list_sessions).post(create_session_route),
+        )
         .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
         .route("/v1/sessions/{id}/steer", post(steer_session))
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
@@ -364,6 +368,18 @@ pub fn public_router(state: Arc<AppState>) -> Router {
                 ))
                 .delete(crate::demos::demo_delete),
         )
+        .route("/v1/user-tokens", post(mint_user_token))
+        .route("/v1/users/{id}/revoke-tokens", post(revoke_user_tokens))
+        .route(
+            "/v1/users/{id}/devices",
+            get(list_devices).post(enroll_device),
+        )
+        .route(
+            "/v1/users/{id}/devices/{device}",
+            axum::routing::delete(remove_device),
+        )
+        .route("/v1/usage", get(usage_route))
+        .route("/v1/inbox", get(inbox))
         .route("/v1/model-grants", get(crate::model_call::list_grants))
         .route(
             "/v1/model-grants/{key}",
@@ -425,10 +441,11 @@ pub fn public_router(state: Arc<AppState>) -> Router {
 async fn api_auth(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    request: axum::extract::Request,
+    mut request: axum::extract::Request,
     next: Next,
 ) -> Response {
     let Some(expected) = state.config.api_token.as_deref() else {
+        request.extensions_mut().insert(Principal::Operator);
         return next.run(request).await;
     };
     let header_tok = headers
@@ -436,22 +453,74 @@ async fn api_auth(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "));
     // Browsers cannot set Authorization on WebSocket; allow ?token= for WS upgrades.
+    // Only the operator token may travel in a query string, never a user token.
     let query_tok = request.uri().query().and_then(|q| {
         q.split('&').find_map(|pair| {
             let (k, v) = pair.split_once('=')?;
             (k == "token").then_some(v)
         })
     });
-    let presented = header_tok.or(query_tok);
-    if presented.is_some_and(|v| constant_time_eq(v.as_bytes(), expected.as_bytes())) {
-        next.run(request).await
+    let unauthorized = |message: &str| {
+        (StatusCode::UNAUTHORIZED, Json(json!({ "error": message }))).into_response()
+    };
+    let forbidden =
+        |message: &str| (StatusCode::FORBIDDEN, Json(json!({ "error": message }))).into_response();
+    let principal = if header_tok
+        .or(query_tok)
+        .is_some_and(|v| constant_time_eq(v.as_bytes(), expected.as_bytes()))
+    {
+        Principal::Operator
+    } else if let Some(token) = header_tok.filter(|t| t.starts_with(authz::TOKEN_PREFIX)) {
+        let Some(key) = authz::signing_key_for(&state) else {
+            return unauthorized("missing or invalid bearer token");
+        };
+        let now = Utc::now();
+        let claims = match authz::verify(&key, token, now, None) {
+            Ok(c) => c,
+            Err(why) => return unauthorized(&format!("invalid user token: {why}")),
+        };
+        if state
+            .store
+            .token_floor(&claims.user_id)
+            .await
+            .is_some_and(|floor| claims.issued_at < floor.timestamp())
+        {
+            return unauthorized("invalid user token: token revoked");
+        }
+        Principal::User {
+            id: claims.user_id,
+            scopes: claims.scopes,
+        }
     } else {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"error": "missing or invalid bearer token"})),
-        )
-            .into_response()
+        return unauthorized("missing or invalid bearer token");
+    };
+
+    if let Principal::User { id, scopes } = &principal {
+        let route = authz::user_route(request.method(), request.uri().path());
+        let (needed, allowed) = match &route {
+            UserRoute::Denied => return forbidden("this route is not available to user tokens"),
+            UserRoute::Open(s) => (*s, true),
+            UserRoute::Session(sid, s) => (*s, authz::owns_session(&state, id, *sid).await),
+            UserRoute::Approval(aid, s) => (*s, authz::owns_approval(&state, id, *aid).await),
+            UserRoute::OwnUser(uid, s) => (*s, uid == id),
+            UserRoute::Artifacts(ids, s) => {
+                let mut all = true;
+                for a in ids {
+                    all &= authz::owns_artifact(&state, id, *a).await;
+                }
+                (*s, all)
+            }
+        };
+        if !scopes.contains(&needed) {
+            return forbidden(&format!("this token lacks the {needed:?} scope").to_lowercase());
+        }
+        // Not yours and not there look the same, so ids cannot be probed.
+        if !allowed {
+            return (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" }))).into_response();
+        }
     }
+    request.extensions_mut().insert(principal);
+    next.run(request).await
 }
 
 async fn deploy_agent(
@@ -498,6 +567,9 @@ async fn deploy_agent(
         return Err(ApiError::bad_request(message));
     }
     if let Err(message) = req.manifest.validate_egress_policy() {
+        return Err(ApiError::bad_request(message));
+    }
+    if let Err(message) = req.manifest.validate_model_socket() {
         return Err(ApiError::bad_request(message));
     }
     if let Err(message) = req
@@ -588,6 +660,24 @@ async fn reconcile_warm_pool(
         .await
         .map(Json)
         .map_err(ApiError::bad_gateway)
+}
+
+/// `POST /v1/sessions`. A user token can only start a session for itself.
+async fn create_session_route(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
+    Json(mut req): Json<CreateSessionRequest>,
+) -> ApiResult<(StatusCode, Json<SessionView>)> {
+    if let Some(uid) = principal.user() {
+        if req.user_id.as_deref().is_some_and(|u| u != uid) {
+            return Err(ApiError::forbidden(
+                "a user token can only start its own sessions",
+            ));
+        }
+        req.user_id = Some(uid.to_string());
+        crate::usage::check_run_quota(&state, uid, crate::usage::Limits::from_env()).await?;
+    }
+    create_session(State(state), Json(req)).await
 }
 
 pub(crate) async fn create_session(
@@ -1193,13 +1283,37 @@ async fn provision_guest(
         );
     }
     let command = format!(
-        "mkdir -p /opt/zyvor/agent; {proxy_env}{mitm_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
+        "mkdir -p /opt/zyvor/agent; {proxy_env}{mitm_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} ZYVOR_MODEL_BASE_URL={} ZYVOR_MODEL_NAME={} ZYVOR_MODEL_CREDENTIAL={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()),
         shell_quote(&session.capability_token),
         shell_quote(&broker),
         agent.manifest.runtime_port,
         shell_quote(agent.manifest.runtime.as_str()),
         shell_quote(&credentials),
+        // The agent's model socket: where `ctx.model.chat()` and the CLI harnesses send model calls.
+        shell_quote(
+            agent
+                .manifest
+                .model_socket
+                .as_ref()
+                .map_or("", |s| s.base_url.as_str())
+        ),
+        shell_quote(
+            agent
+                .manifest
+                .model_socket
+                .as_ref()
+                .and_then(|s| s.model.as_deref())
+                .unwrap_or("")
+        ),
+        shell_quote(
+            agent
+                .manifest
+                .model_socket
+                .as_ref()
+                .and_then(|s| s.credential.as_deref())
+                .unwrap_or("")
+        ),
     );
     with_timeout(
         HEALTH_CHECK_ATTEMPT_TIMEOUT,
@@ -1252,9 +1366,12 @@ async fn provision_guest(
 
 async fn list_sessions(
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Json<Value> {
-    let user = query.get("user_id");
+    // A user sees only their own sessions, whatever `user_id` they ask for.
+    let own = principal.user().map(str::to_string);
+    let user = own.as_ref().or_else(|| query.get("user_id"));
     let items: Vec<SessionView> = state
         .store
         .list_sessions()
@@ -2064,6 +2181,7 @@ const AUDIT_MAX_LIMIT: usize = 5000;
 
 async fn list_audit(
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
     Query(query): Query<AuditQuery>,
 ) -> ApiResult<Json<Value>> {
     // Operator console: recent journal only (not a trajectory export).
@@ -2071,16 +2189,32 @@ async fn list_audit(
         .limit
         .unwrap_or(AUDIT_DEFAULT_LIMIT)
         .clamp(1, AUDIT_MAX_LIMIT.min(500));
-    let items = state
-        .store
-        .audit
-        .list(query.session_id, limit)
-        .await
-        .map_err(ApiError::internal)?;
     let chain = state
         .store
         .audit
         .verify()
+        .await
+        .map_err(ApiError::internal)?;
+    if let Some(uid) = principal.user() {
+        // Only this user's rows. The chain verdict is global, but its size is not shown.
+        let mut mine = authz::session_ids_of(&state, uid).await;
+        if let Some(sid) = query.session_id {
+            mine.retain(|id| *id == sid);
+        }
+        let items = state
+            .store
+            .audit
+            .list_for_sessions(&mine, limit)
+            .await
+            .map_err(ApiError::internal)?;
+        return Ok(Json(
+            json!({"items": items, "chain": {"chain_ok": chain.chain_ok}, "export": false}),
+        ));
+    }
+    let items = state
+        .store
+        .audit
+        .list(query.session_id, limit)
         .await
         .map_err(ApiError::internal)?;
     Ok(Json(
@@ -2928,8 +3062,252 @@ async fn delete_skill(
     }
 }
 
-async fn list_approvals(State(state): State<Arc<AppState>>) -> Json<Value> {
-    Json(json!({"items": state.store.list_approvals().await}))
+#[derive(Debug, serde::Deserialize)]
+struct MintUserToken {
+    user_id: String,
+    /// Any of `read`, `run`, `approve`. Default: all three.
+    #[serde(default)]
+    scopes: Option<Vec<String>>,
+    #[serde(default)]
+    ttl_seconds: Option<u64>,
+}
+
+/// `POST /v1/user-tokens` (operator only): a credential that reaches one user's data.
+async fn mint_user_token(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<MintUserToken>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let Some(key) = authz::signing_key_for(&state) else {
+        return Err(ApiError::bad_request(format!(
+            "user tokens need an operator token or {}",
+            authz::SECRET_ENV
+        )));
+    };
+    let scopes: Vec<Scope> = match &req.scopes {
+        None => vec![Scope::Read, Scope::Run, Scope::Approve],
+        Some(list) => list
+            .iter()
+            .map(|s| {
+                Scope::parse(s).ok_or_else(|| ApiError::bad_request(format!("unknown scope {s:?}")))
+            })
+            .collect::<Result<_, _>>()?,
+    };
+    let (token, claims) = authz::mint(
+        &key,
+        &req.user_id,
+        &scopes,
+        req.ttl_seconds.unwrap_or(authz::DEFAULT_TTL_SECONDS),
+        Utc::now(),
+    )
+    .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.user_token.minted",
+            Some(req.user_id.clone()),
+            json!({ "scopes": claims.scopes, "expires_at": claims.expires_at }),
+        )
+        .await;
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({
+            "token": token,
+            "user_id": claims.user_id,
+            "scopes": claims.scopes,
+            "expires_at": chrono::DateTime::from_timestamp(claims.expires_at, 0),
+        })),
+    ))
+}
+
+/// `POST /v1/users/{id}/revoke-tokens` (operator only): every token issued to the user up to now
+/// stops working. Tokens minted after a second from now work again.
+async fn revoke_user_tokens(
+    State(state): State<Arc<AppState>>,
+    Path(user): Path<String>,
+) -> ApiResult<Json<Value>> {
+    crate::model::validate_user_id(&user).map_err(ApiError::bad_request)?;
+    let floor = Utc::now() + chrono::Duration::seconds(1);
+    state
+        .store
+        .set_token_floor(&user, floor)
+        .await
+        .map_err(ApiError::internal)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.user_token.revoked",
+            Some(user.clone()),
+            json!({ "not_before": floor }),
+        )
+        .await;
+    Ok(Json(json!({ "user_id": user, "not_before": floor })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct UsageQuery {
+    #[serde(default)]
+    user_id: Option<String>,
+    #[serde(default)]
+    since: Option<chrono::DateTime<Utc>>,
+}
+
+/// `GET /v1/usage?user_id=&since=`: what one user has used. A user token always reads its own.
+async fn usage_route(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
+    Query(q): Query<UsageQuery>,
+) -> ApiResult<Json<Value>> {
+    let user = match principal.user() {
+        Some(u) => u.to_string(),
+        None => q
+            .user_id
+            .ok_or_else(|| ApiError::bad_request("user_id is required"))?,
+    };
+    let usage = crate::usage::usage_for(&state, &user, q.since).await;
+    Ok(Json(json!({ "usage": usage, "limits": {
+        "max_runs_per_day": crate::usage::Limits::from_env().max_runs_per_day,
+        "max_artifacts": crate::usage::Limits::from_env().max_artifacts,
+        "max_model_calls_per_day": crate::usage::Limits::from_env().max_model_calls_per_day,
+    }})))
+}
+
+/// `GET /v1/inbox`: what a phone shows on open. The user's pending approvals and latest runs.
+/// The operator passes `?user_id=`.
+async fn inbox(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
+    Query(q): Query<UsageQuery>,
+) -> ApiResult<Json<Value>> {
+    let user = match principal.user() {
+        Some(u) => u.to_string(),
+        None => q
+            .user_id
+            .ok_or_else(|| ApiError::bad_request("user_id is required"))?,
+    };
+    let mine = authz::session_ids_of(&state, &user).await;
+    let signing_key = authz::signing_key_for(&state);
+    let pending: Vec<Value> = state
+        .store
+        .list_approvals()
+        .await
+        .into_iter()
+        .filter(|a| a.status == ApprovalStatus::Pending && mine.contains(&a.session_id))
+        .map(|a| {
+            let mut v = json!(a);
+            // What the phone needs to sign this approval.
+            if let Some(key) = &signing_key {
+                v["sign"] = crate::devices::signing_info(key, &a);
+            }
+            v
+        })
+        .collect();
+    let artifacts = state.store.list_artifacts().await;
+    let mut sessions: Vec<_> = state
+        .store
+        .list_sessions()
+        .await
+        .into_iter()
+        .filter(|s| s.user_id.as_deref() == Some(user.as_str()))
+        .collect();
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.created_at));
+    let recent: Vec<Value> = sessions
+        .iter()
+        .take(20)
+        .map(|s| {
+            json!({
+                "session_id": s.id,
+                "agent": s.agent,
+                "status": s.status,
+                "created_at": s.created_at,
+                "artifacts": artifacts.iter()
+                    .filter(|a| a.session_id == Some(s.id))
+                    .map(|a| json!({"id": a.id, "title": a.title}))
+                    .collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    Ok(Json(
+        json!({ "user_id": user, "pending_approvals": pending, "recent_runs": recent }),
+    ))
+}
+
+/// `POST /v1/users/{id}/devices` (operator): enrol a phone's public key for a user. The gateway
+/// does this after its own strong login, so a stolen user token cannot add a key of its own.
+async fn enroll_device(
+    State(state): State<Arc<AppState>>,
+    Path(user): Path<String>,
+    Json(req): Json<crate::devices::EnrollRequest>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    crate::model::validate_user_id(&user).map_err(ApiError::bad_request)?;
+    let record =
+        crate::devices::build_record(&user, req, Utc::now()).map_err(ApiError::bad_request)?;
+    state
+        .store
+        .save_device(record.clone())
+        .await
+        .map_err(ApiError::bad_request)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.device.enrolled",
+            Some(user.clone()),
+            json!({ "device_id": record.device_id, "alg": record.alg, "push_kind": record.push.as_ref().map(|p| p.kind.clone()) }),
+        )
+        .await;
+    Ok((StatusCode::CREATED, Json(json!(record))))
+}
+
+/// `GET /v1/users/{id}/devices`: the operator, or the user for their own id.
+async fn list_devices(State(state): State<Arc<AppState>>, Path(user): Path<String>) -> Json<Value> {
+    Json(json!({ "items": state.store.list_devices(&user).await }))
+}
+
+/// `DELETE /v1/users/{id}/devices/{device}` (operator): a lost phone stops signing.
+async fn remove_device(
+    State(state): State<Arc<AppState>>,
+    Path((user, device)): Path<(String, String)>,
+) -> ApiResult<StatusCode> {
+    if !state
+        .store
+        .delete_device(&user, &device)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::not_found("device not found"));
+    }
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.device.removed",
+            Some(user),
+            json!({ "device_id": device }),
+        )
+        .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_approvals(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
+) -> Json<Value> {
+    let mut items = state.store.list_approvals().await;
+    if let Some(uid) = principal.user() {
+        let mine = authz::session_ids_of(&state, uid).await;
+        items.retain(|a| mine.contains(&a.session_id));
+    }
+    Json(json!({"items": items}))
 }
 
 async fn create_approval(
@@ -2969,6 +3347,7 @@ async fn create_approval(
 
 async fn decide_approval(
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
     Path(id): Path<Uuid>,
     Json(req): Json<DecideApprovalRequest>,
 ) -> ApiResult<Json<ApprovalRecord>> {
@@ -2989,6 +3368,15 @@ async fn decide_approval(
     if !session_running && (record.broker_held || record.kind == ApprovalKind::Egress) {
         return Err(ApiError::conflict("session is not running"));
     }
+    // A phone-signed decision is verified before anything changes; a user token may be required to sign.
+    let signed_by = crate::devices::check_decision(
+        &state,
+        &principal,
+        &record,
+        session.user_id.as_deref(),
+        &req,
+    )
+    .await?;
     let scope = (record.kind == ApprovalKind::Egress).then(|| req.scope.unwrap_or_default());
     let Some(record) = state
         .store
@@ -3012,7 +3400,7 @@ async fn decide_approval(
             phase,
             format!("approval.{}", record.kind.as_str()),
             record.subject.clone(),
-            json!({"approval_id": record.id, "comment": record.comment}),
+            json!({"approval_id": record.id, "comment": record.comment, "device_id": signed_by}),
         )
         .await
     {

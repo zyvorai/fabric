@@ -102,6 +102,44 @@ async function brokerFetch(url, options = {}) {
   });
 }
 
+// The agent's model socket (manifest `model_socket`): an OpenAI-compatible endpoint the runtime
+// points this agent at. Calls go through the egress broker like any other, so the credential is
+// added on the host and the agent never holds the key.
+const modelBase = (process.env.ZYVOR_MODEL_BASE_URL || "").replace(/\/+$/, "");
+const modelName = process.env.ZYVOR_MODEL_NAME || "";
+const modelCredential = process.env.ZYVOR_MODEL_CREDENTIAL || "";
+const model = Object.freeze({
+  configured: Boolean(modelBase),
+  baseUrl: modelBase,
+  name: modelName,
+  /** chat(messages, { model?, maxTokens?, temperature? }) -> { text, raw } */
+  async chat(messages, opts = {}) {
+    if (!modelBase) throw new Error("this agent has no model_socket configured");
+    const res = await brokerFetch(`${modelBase}/chat/completions`, {
+      method: "POST",
+      credential: modelCredential || undefined,
+      headers: { "content-type": "application/json" },
+      body: {
+        model: opts.model || modelName,
+        messages,
+        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+        ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      },
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error(`model endpoint answered HTTP ${res.status}: ${raw.slice(0, 200)}`);
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error("the model reply was not JSON");
+    }
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== "string") throw new Error("the model reply had no text");
+    return { text, raw: data };
+  },
+});
+
 async function run(input) {
   if (runPromise) throw new Error("session already started");
   state = "running";
@@ -116,6 +154,7 @@ async function run(input) {
         input,
         emit,
         fetch: brokerFetch,
+        model,
         nextSteer,
         isCancelled: () => cancelled,
       });

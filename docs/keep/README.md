@@ -298,6 +298,7 @@ Sources for the Muse column: [MarkTechPost, 2026-09-08](https://www.marktechpost
 
 - [KEEP.md](KEEP.md) — the full spec, architecture and security profiles
 - [Tutorial 16 — Keep workstation](../tutorials/16-keep-workstation.md) · [17 — PDF brief](../tutorials/17-keep-pdf-brief.md) · [18 — use cases](../tutorials/18-keep-use-cases.md) · [19 — your own use case](../tutorials/19-build-your-own-use-case.md)
+- [VENDORS.md](VENDORS.md) — offering Keep to many users, as a phone vendor might
 - [PRODUCTION.md](PRODUCTION.md) — production checklist · [STATUS.md](STATUS.md) — what ships today
 - [Fabric](../../README.md) — the control plane Keep runs on
 

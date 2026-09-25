@@ -5,6 +5,6 @@ main((buf) => {
   let s = doc.toString('utf8')
   s = s.replace(/<w:tab\s*\/>/g, '\t').replace(/<w:br\b[^>]*\/>/g, '\n')
   s = s.replace(/<\/w:tc>/g, ' | ').replace(/<\/w:p>/g, '\n')
-  s = s.replace(/<[^>]*>/g, '')
+  s = stripTags(s)
   emit(tidy(decodeEntities(s)))
 })

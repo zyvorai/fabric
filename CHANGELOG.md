@@ -2,7 +2,38 @@
 
 ## 0.3.0
 
+### Fixed
+- **A use-case run left its cell alive for 30 minutes.** The run's session stayed "Running" and its cell held
+  memory until the sandbox's own lifetime ended, so a busy host filled with idle cells (a lab host stopped answering
+  after about 25 runs in 35 minutes). A finished run now ends its session and the terminal-session cleanup loop
+  deletes the cell at once; a cell frozen for touching the network is kept for inspection.
+
 ### Added
+- **`scripts/keep-live-tenancy.sh`**: two users, a phone-signed approval and the reference gateway against a
+  live shard in real cells (29 checks pass on the lab host).
+- **A blueprint and a reference gateway for phone vendors.** `docs/keep/VENDORS.md` (architecture, who runs
+  what, what to claim and not claim, questions for counsel), `reference/vendor-gateway` (vendor login in,
+  placement by region, scoped user tokens, device enrolment behind a strong login, push relay with adapters,
+  per-user rate limit, usage rollup; 12 tests, no dependencies), `scripts/keep-bench.sh` (cold-start and
+  concurrency, with a memory guard; first numbers from a lab host are in the doc), and Simplified Chinese
+  strings for the navigation, headings and buttons of the Keep pages.
+- **The model is the vendor's choice.** A manifest's `model_socket` now works: agents call
+  `ctx.model.chat()` (an OpenAI-compatible endpoint, through the egress broker with the vault credential),
+  and OpenAI-compatible CLI agents are pointed at it. Deploy checks the URL and that the credential is
+  granted. Recipes for Qwen, DeepSeek, GLM and local servers, and a `model-agent` example pack.
+  Docs: [MODELS.md](docs/keep/MODELS.md).
+- **Phone-signed approvals.** The operator enrols a phone's public key per user (ECDSA P-256 as Android
+  Keystore holds it, or Ed25519); the phone signs an exact text naming the approval, the decision, a digest of
+  the planned action and a server challenge, and the runtime refuses any decision whose signature does not
+  verify (flipped, replayed, forged or late). Mandatory per credential or globally for user tokens. Approvals
+  push to each device through a vendor-run relay. Node reference client `keep-phone`, cross-language test
+  vectors. Docs: [docs/keep/mobile](docs/keep/mobile/README.md).
+- **Many users on one Keep shard.** Operator-minted, per-user, stateless **user tokens**
+  (`POST /v1/user-tokens`, scopes `read` / `run` / `approve`, revocable per user) reach only that
+  user's sessions, approvals, artifacts and audit rows; everything else is 403 by default and
+  another user's objects are 404. Per-user quotas (429) and `GET /v1/usage`, `GET /v1/inbox`.
+  fabricd now filters approvals and audit by session ownership for non-admins and adds
+  `POST /api/agent-tokens`. Docs: [TENANCY.md](docs/keep/TENANCY.md).
 - **`scripts/keep-live-scenarios.sh`** runs the built-ins, the scenario packs, batch, zip, a webhook trigger and
   history against a live runtime in real cells (18 checks).
 - **The cell template and seven scenario packs, in the repo.** `agent-runtime/templates/node22-agent/`

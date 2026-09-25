@@ -157,6 +157,20 @@ impl AuditLog {
         Ok(entries.split_off(skip))
     }
 
+    /// Newest-last entries that belong to any of `sessions`, capped at `limit`. Used to give a
+    /// user their own slice of the journal without exposing anyone else's rows.
+    pub async fn list_for_sessions(
+        &self,
+        sessions: &std::collections::HashSet<Uuid>,
+        limit: usize,
+    ) -> Result<Vec<AuditEntry>> {
+        let _guard = self.tail.lock().await;
+        let mut entries = read_entries(&self.path).await?;
+        entries.retain(|e| e.session_id.is_some_and(|id| sessions.contains(&id)));
+        let skip = entries.len().saturating_sub(limit);
+        Ok(entries.split_off(skip))
+    }
+
     pub async fn verify(&self) -> Result<ChainStatus> {
         let _guard = self.tail.lock().await;
         let entries = read_entries(&self.path).await?;

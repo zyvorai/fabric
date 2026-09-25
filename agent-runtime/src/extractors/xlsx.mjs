@@ -23,7 +23,7 @@ main((buf) => {
   const sst = read('xl/sharedStrings.xml')
   if (sst) {
     for (const si of sst.match(/<si\b[\s\S]*?<\/si>/g) ?? []) {
-      shared.push(decodeEntities((si.match(/<t\b[^>]*>([\s\S]*?)<\/t>/g) ?? []).map((t) => t.replace(/<[^>]*>/g, '')).join('')))
+      shared.push(decodeEntities((si.match(/<t\b[^>]*>([\s\S]*?)<\/t>/g) ?? []).map((t) => stripTags(t)).join('')))
     }
   }
 
@@ -42,7 +42,7 @@ main((buf) => {
         const v = /<v>([\s\S]*?)<\/v>/.exec(c)?.[1]
         let text = ''
         if (type === 's' && v !== undefined) text = shared[Number(v)] ?? ''
-        else if (type === 'inlineStr') text = decodeEntities((c.match(/<t\b[^>]*>([\s\S]*?)<\/t>/g) ?? []).map((t) => t.replace(/<[^>]*>/g, '')).join(''))
+        else if (type === 'inlineStr') text = decodeEntities((c.match(/<t\b[^>]*>([\s\S]*?)<\/t>/g) ?? []).map((t) => stripTags(t)).join(''))
         else if (v !== undefined) text = decodeEntities(v)
         cells[colIndex(ref)] = text
       }
