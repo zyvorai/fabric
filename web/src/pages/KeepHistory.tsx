@@ -27,21 +27,18 @@ import {
   toggleSelection,
   demoIdsOf,
 } from '../lib/keepHistory'
+import { useKeepText } from '../i18n/useKeepText'
 
 type Tab = 'runs' | 'triggers' | 'audit' | 'approvals'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'runs', label: 'Runs' },
-  { id: 'triggers', label: 'Triggers' },
-  { id: 'audit', label: 'Audit' },
-  { id: 'approvals', label: 'Approvals' },
-]
+const TABS: Tab[] = ['runs', 'triggers', 'audit', 'approvals']
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const when = (iso: string) => new Date(iso).toLocaleString()
 
 /** Keep history: past runs with diff, the hash-chained audit journal, and the approval inbox. */
 export default function KeepHistory() {
+  const { t, toggle } = useKeepText()
   const [tab, setTab] = useState<Tab>('runs')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -137,29 +134,34 @@ export default function KeepHistory() {
   return (
     <div>
       <PageHeader
-        title="Keep history"
+        title={t('hist.title')}
         description="Past runs, the audit journal and approvals. Run history needs an admin token."
         onRefresh={() => void load()}
         refreshing={busy}
         actions={
-          <Link to="/app/keep" className="zf-btn zf-btn-ghost">
-            Keep
-          </Link>
+          <>
+            <Link to="/app/keep" className="zf-btn zf-btn-ghost">
+              {t('keep.title')}
+            </Link>
+            <button type="button" className="zf-btn zf-btn-ghost" onClick={toggle}>
+              {t('keep.language')}
+            </button>
+          </>
         }
       />
 
       <div className="max-w-4xl space-y-4">
         <div role="tablist" className="flex gap-2">
-          {TABS.map((t) => (
+          {TABS.map((id) => (
             <button
-              key={t.id}
+              key={id}
               type="button"
               role="tab"
-              aria-selected={tab === t.id}
-              className={`zf-btn zf-btn-sm ${tab === t.id ? 'zf-btn-primary' : 'zf-btn-secondary'}`}
-              onClick={() => setTab(t.id)}
+              aria-selected={tab === id}
+              className={`zf-btn zf-btn-sm ${tab === id ? 'zf-btn-primary' : 'zf-btn-secondary'}`}
+              onClick={() => setTab(id)}
             >
-              {t.label}
+              {t(`hist.tab.${id}` as const)}
             </button>
           ))}
         </div>
@@ -170,13 +172,13 @@ export default function KeepHistory() {
           <Card className="p-5 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <label className="text-sm text-[var(--zf-muted)]">
-                Use case{' '}
+                {t('hist.useCase')}{' '}
                 <select
                   className="ml-1 rounded border border-[var(--zf-hairline)] bg-transparent px-2 py-1 text-sm"
                   value={useCase}
                   onChange={(e) => setUseCase(e.target.value)}
                 >
-                  <option value="">All</option>
+                  <option value="">{t('hist.all')}</option>
                   {useCases.map((u) => (
                     <option key={u} value={u}>
                       {u}
@@ -190,13 +192,13 @@ export default function KeepHistory() {
                 disabled={selected.length !== 2}
                 onClick={() => void compare()}
               >
-                Compare selected
+                {t('hist.compare')}
               </button>
-              <span className="text-xs text-[var(--zf-muted)]">Pick two runs to see what changed.</span>
+              <span className="text-xs text-[var(--zf-muted)]">{t('hist.compareHint')}</span>
             </div>
 
             {shown.length === 0 ? (
-              <p className="text-sm text-[var(--zf-muted)]">No runs yet.</p>
+              <p className="text-sm text-[var(--zf-muted)]">{t('hist.noRuns')}</p>
             ) : (
               <ul className="divide-y divide-[var(--zf-hairline)]">
                 {shown.map((a) => (
@@ -212,7 +214,7 @@ export default function KeepHistory() {
                     <span className="ml-auto text-xs text-[var(--zf-muted)]">{when(a.created_at)}</span>
                     {a.session_id && (
                       <Link to={`/app/keep/${a.session_id}`} className="text-xs underline">
-                        cockpit
+                        {t('hist.cockpit')}
                       </Link>
                     )}
                   </li>
@@ -227,7 +229,7 @@ export default function KeepHistory() {
                   <strong>{diff.b.title}</strong> ({when(diff.b.created_at)}):{' '}
                   <span className="text-emerald-700">+{diff.summary.added}</span>{' '}
                   <span className="text-red-600">−{diff.summary.removed}</span>{' '}
-                  <span className="text-[var(--zf-muted)]">{diff.summary.unchanged} unchanged</span>
+                  <span className="text-[var(--zf-muted)]">{t('hist.unchanged', { n: diff.summary.unchanged })}</span>
                 </p>
                 <pre className="max-h-96 overflow-auto rounded border border-[var(--zf-hairline)] p-3 text-xs font-mono whitespace-pre-wrap">
                   {diff.lines.map((l, i) => (
@@ -260,7 +262,7 @@ export default function KeepHistory() {
             </p>
             <div className="flex flex-wrap items-end gap-3 text-sm">
               <label className="text-[var(--zf-muted)]">
-                Use case{' '}
+                {t('hist.useCase')}{' '}
                 <select
                   className="ml-1 rounded border border-[var(--zf-hairline)] bg-transparent px-2 py-1"
                   value={newUseCase}
@@ -274,7 +276,7 @@ export default function KeepHistory() {
                 </select>
               </label>
               <label className="text-[var(--zf-muted)]">
-                Kind{' '}
+                {t('hist.kind')}{' '}
                 <select
                   className="ml-1 rounded border border-[var(--zf-hairline)] bg-transparent px-2 py-1"
                   value={newKind}
@@ -288,7 +290,7 @@ export default function KeepHistory() {
               </label>
               {newKind === 'folder' && (
                 <label className="text-[var(--zf-muted)]">
-                  Folder name{' '}
+                  {t('hist.folderName')}{' '}
                   <input
                     className="ml-1 rounded border border-[var(--zf-hairline)] bg-transparent px-2 py-1"
                     value={newDir}
@@ -303,13 +305,13 @@ export default function KeepHistory() {
                 disabled={!newUseCase || (newKind === 'folder' && !newDir.trim())}
                 onClick={() => void addTrigger()}
               >
-                Add trigger
+                {t('hist.addTrigger')}
               </button>
             </div>
 
             {newSecret && (
               <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-1">
-                <p className="font-medium">Copy the secret now. It is shown once and signs every call.</p>
+                <p className="font-medium">{t('hist.secretOnce')}</p>
                 <p>
                   Hook: <code className="font-mono text-xs">{newSecret.hook}</code>
                 </p>
@@ -320,26 +322,26 @@ export default function KeepHistory() {
             )}
 
             {triggers.length === 0 ? (
-              <p className="text-sm text-[var(--zf-muted)]">No triggers yet.</p>
+              <p className="text-sm text-[var(--zf-muted)]">{t('hist.noTriggers')}</p>
             ) : (
               <ul className="divide-y divide-[var(--zf-hairline)]">
-                {triggers.map((t) => (
-                  <li key={t.id} className="py-2 text-sm flex flex-wrap items-center gap-3">
-                    <span className="font-mono text-xs">{t.kind}</span>
-                    <span className="font-medium text-[var(--zf-ink)]">{t.use_case}</span>
+                {triggers.map((tr) => (
+                  <li key={tr.id} className="py-2 text-sm flex flex-wrap items-center gap-3">
+                    <span className="font-mono text-xs">{tr.kind}</span>
+                    <span className="font-medium text-[var(--zf-ink)]">{tr.use_case}</span>
                     <span className="text-[var(--zf-muted)]">
-                      {t.kind === 'webhook'
-                        ? t.hook
-                        : `${t.dir} · ${t.cron ?? `every ${t.interval_seconds}s`}`}
+                      {tr.kind === 'webhook'
+                        ? tr.hook
+                        : `${tr.dir} · ${tr.cron ?? `every ${tr.interval_seconds}s`}`}
                     </span>
-                    <span className="text-xs text-[var(--zf-muted)]">{t.runs} runs</span>
-                    {t.last_error && <span className="text-xs text-red-600">{t.last_error}</span>}
+                    <span className="text-xs text-[var(--zf-muted)]">{t('hist.runsCount', { n: tr.runs })}</span>
+                    {tr.last_error && <span className="text-xs text-red-600">{tr.last_error}</span>}
                     <button
                       type="button"
                       className="zf-btn zf-btn-ghost zf-btn-sm ml-auto"
-                      onClick={() => void removeTrigger(t.id)}
+                      onClick={() => void removeTrigger(tr.id)}
                     >
-                      Remove
+                      {t('hist.remove')}
                     </button>
                   </li>
                 ))}
@@ -362,10 +364,10 @@ export default function KeepHistory() {
                 <thead className="text-left text-[var(--zf-muted)]">
                   <tr>
                     <th className="pr-3">#</th>
-                    <th className="pr-3">When</th>
-                    <th className="pr-3">Phase</th>
-                    <th className="pr-3">Action</th>
-                    <th>Session</th>
+                    <th className="pr-3">{t('hist.col.when')}</th>
+                    <th className="pr-3">{t('hist.col.phase')}</th>
+                    <th className="pr-3">{t('hist.col.action')}</th>
+                    <th>{t('hist.col.session')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -402,12 +404,12 @@ export default function KeepHistory() {
                   className={`zf-btn zf-btn-sm ${approvalFilter === f ? 'zf-btn-primary' : 'zf-btn-secondary'}`}
                   onClick={() => setApprovalFilter(f)}
                 >
-                  {f}
+                  {t(`hist.filter.${f}` as const)}
                 </button>
               ))}
             </div>
             <p className="text-xs text-[var(--zf-muted)]">
-              Read-only. Decide from the session&apos;s cockpit or your phone, never from this list.
+              {t('hist.approvalsNote')}
             </p>
             <ul className="divide-y divide-[var(--zf-hairline)]">
               {filterApprovals(approvals, approvalFilter).map((a) => (
@@ -417,7 +419,7 @@ export default function KeepHistory() {
                   <span className="text-[var(--zf-ink)]">{a.subject ?? a.prompt}</span>
                   <span className="ml-auto text-xs text-[var(--zf-muted)]">{when(a.created_at)}</span>
                   <Link to={`/app/keep/${a.session_id}`} className="text-xs underline">
-                    cockpit
+                    {t('hist.cockpit')}
                   </Link>
                 </li>
               ))}

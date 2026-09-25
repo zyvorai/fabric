@@ -3,6 +3,12 @@
 ## 0.3.0
 
 ### Added
+- **A blueprint and a reference gateway for phone vendors.** `docs/keep/VENDORS.md` (architecture, who runs
+  what, what to claim and not claim, questions for counsel), `reference/vendor-gateway` (vendor login in,
+  placement by region, scoped user tokens, device enrolment behind a strong login, push relay with adapters,
+  per-user rate limit, usage rollup; 12 tests, no dependencies), `scripts/keep-bench.sh` (cold-start and
+  concurrency, with a memory guard; first numbers from a lab host are in the doc), and Simplified Chinese
+  strings for the navigation, headings and buttons of the Keep pages.
 - **The model is the vendor's choice.** A manifest's `model_socket` now works: agents call
   `ctx.model.chat()` (an OpenAI-compatible endpoint, through the egress broker with the vault credential),
   and OpenAI-compatible CLI agents are pointed at it. Deploy checks the URL and that the credential is

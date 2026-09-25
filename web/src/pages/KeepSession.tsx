@@ -21,6 +21,7 @@ import PageLoadBanner from '../components/PageLoadBanner'
 import { usePageLoader } from '../hooks/usePageLoader'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
+import { useKeepText } from '../i18n/useKeepText'
 
 const ALLOWED_BROWSER_SHOT_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
@@ -37,6 +38,7 @@ function browserShotDataUrl(mime: string | undefined, imageBase64: string): stri
 export default function KeepSession() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const toast = useToastContext()
+  const { t, toggle } = useKeepText()
   const [session, setSession] = useState<SessionView | null>(null)
   const [cockpit, setCockpit] = useState<KeepCockpit | null>(null)
   const [browser, setBrowser] = useState<BrowserView | null>(null)
@@ -91,7 +93,7 @@ export default function KeepSession() {
   const decide = async (approvalId: string, decision: 'approved' | 'denied') => {
     try {
       await decideApproval(approvalId, { decision, comment: `console ${decision}` })
-      toast.success(decision === 'approved' ? 'Approved' : 'Denied')
+      toast.success(decision === 'approved' ? t('session.approved') : t('session.denied'))
       void load()
     } catch (e) {
       toastFailure(toast, 'Approval decision failed', e)
@@ -155,8 +157,8 @@ export default function KeepSession() {
     return (
       <EmptyState
         icon={<Shield className="w-8 h-8" />}
-        title="Missing session"
-        description="Open Keep from a session detail link."
+        title={t('session.missing')}
+        description={t('session.missingHint')}
       />
     )
   }
@@ -170,7 +172,7 @@ export default function KeepSession() {
   return (
     <div>
       <PageHeader
-        title="Keep"
+        title={t('keep.title')}
         description={
           session
             ? `${session.agent} · ${session.status} · evidence ${cockpit?.evidence_class ?? 'software-test'}`
@@ -179,12 +181,17 @@ export default function KeepSession() {
         onRefresh={() => void load()}
         refreshing={loading}
         actions={
-          <Link to={`/app/sessions/${sessionId}`} className="zf-btn zf-btn-ghost">
-            Session detail
-          </Link>
+          <>
+            <Link to={`/app/sessions/${sessionId}`} className="zf-btn zf-btn-ghost">
+              {t('session.detail')}
+            </Link>
+            <button type="button" className="zf-btn zf-btn-ghost" onClick={toggle}>
+              {t('keep.language')}
+            </button>
+          </>
         }
       />
-      <PageLoadBanner title="Could not load Keep view" headline={loadError} onRetry={() => void load()} />
+      <PageLoadBanner title={t('session.loadFailed')} headline={loadError} onRetry={() => void load()} />
 
       <div className="space-y-4 max-w-3xl">
         <Card className="p-4 space-y-2 text-sm">
@@ -341,7 +348,7 @@ export default function KeepSession() {
               className="text-xs text-[var(--zf-muted)] underline"
               onClick={toggleCast}
             >
-              {casting ? 'Stop screencast' : 'Start screencast'}
+              {casting ? t('session.stopCast') : t('session.startCast')}
             </button>
           </div>
           {!browser ? (
@@ -397,14 +404,14 @@ export default function KeepSession() {
                     className="zf-btn zf-btn-primary zf-btn-sm"
                     onClick={() => void decide(a.id, 'approved')}
                   >
-                    Approve
+                    {t('session.approve')}
                   </button>
                   <button
                     type="button"
                     className="zf-btn zf-btn-danger zf-btn-sm"
                     onClick={() => void decide(a.id, 'denied')}
                   >
-                    Deny
+                    {t('session.deny')}
                   </button>
                 </div>
               </div>

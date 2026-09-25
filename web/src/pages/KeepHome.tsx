@@ -20,6 +20,7 @@ import DeployUseCase from '../components/keep/DeployUseCase'
 import { PageHeader, Card } from '../components/ui'
 import { useToastContext } from '../contexts/ToastContext'
 import { toastFailure } from '../utils/toastError'
+import { useKeepText } from '../i18n/useKeepText'
 
 type Chip = 'idle' | 'cell' | 'extract' | 'done' | 'fail'
 
@@ -37,6 +38,7 @@ const FALLBACK_DEMOS: DemoInfo[] = [
 /** Keep console home: drop an untrusted file into a sealed cell, get an artifact back. */
 export default function KeepHome() {
   const toast = useToastContext()
+  const { t, toggle } = useKeepText()
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
   const [demos, setDemos] = useState<DemoInfo[]>(FALLBACK_DEMOS)
@@ -176,16 +178,19 @@ export default function KeepHome() {
   return (
     <div>
       <PageHeader
-        title="Keep"
+        title={t('keep.title')}
         description="Personal workstation for an untrusted agent — FluxVM cell, Sentinel egress, audit you can read."
         actions={
           <>
             <Link to="/app/keep/history" className="zf-btn zf-btn-ghost">
-              History
+              {t('keep.history')}
             </Link>
             <Link to="/app/agents" className="zf-btn zf-btn-ghost">
-              Agents
+              {t('keep.agents')}
             </Link>
+            <button type="button" className="zf-btn zf-btn-ghost" onClick={toggle}>
+              {t('keep.language')}
+            </button>
           </>
         }
       />
@@ -201,7 +206,7 @@ export default function KeepHome() {
               </p>
               {demo.model && (
                 <p className="text-sm mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-2">
-                  <strong>Sends text out.</strong> After the cell extracts the text, this host sends it to{' '}
+                  <strong>{t('home.sendsText')}</strong> After the cell extracts the text, this host sends it to{' '}
                   <code className="font-mono text-xs">{demo.model.host}</code> (model{' '}
                   <code className="font-mono text-xs">{demo.model.model}</code>). The cell itself stays
                   offline. The first run waits for your approval. It is listed under{' '}
@@ -243,14 +248,14 @@ export default function KeepHome() {
               onClick={() => void remove()}
               disabled={busy}
             >
-              <Trash2 className="w-4 h-4 mr-1 inline" /> Remove this custom use case
+              <Trash2 className="w-4 h-4 mr-1 inline" /> {t('home.removeCustom')}
             </button>
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className={chipClass('cell')}>cell up</span>
-            <span className={chipClass('extract')}>extract</span>
-            <span className={chipClass('done')}>artifact</span>
+            <span className={chipClass('cell')}>{t('home.chip.cell')}</span>
+            <span className={chipClass('extract')}>{t('home.chip.extract')}</span>
+            <span className={chipClass('done')}>{t('home.chip.artifact')}</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -268,7 +273,13 @@ export default function KeepHome() {
               onClick={() => inputRef.current?.click()}
               disabled={busy}
             >
-              {files.length > 1 ? `${files.length} files` : file ? file.name : needsFile ? `Pick a ${accept} file` : `Pick a ${accept} file (or use the sample)`}
+              {files.length > 1
+                ? t('home.files', { n: files.length })
+                : file
+                  ? file.name
+                  : needsFile
+                    ? t('home.pickFile', { accept })
+                    : t('home.pickFileOrSample', { accept })}
             </button>
             <button
               type="button"
@@ -276,7 +287,7 @@ export default function KeepHome() {
               onClick={() => void run()}
               disabled={busy}
             >
-              {busy ? 'Running…' : `Run ${demo.title}`}
+              {busy ? t('home.running') : t('home.run', { title: demo.title })}
             </button>
           </div>
 
@@ -289,14 +300,14 @@ export default function KeepHome() {
           {batch && (
             <div className="text-sm space-y-2 border-t border-[var(--zf-hairline)] pt-3">
               <div>
-                {batch.ok} of {batch.count} done · CONNECT:{' '}
+                {t('home.batchDone', { ok: batch.ok, count: batch.count })} · CONNECT:{' '}
                 <code className="font-mono">{batch.egress_connects}</code>
-                <span className="text-[var(--zf-muted)]"> · one sealed cell per file</span>
+                <span className="text-[var(--zf-muted)]"> · {t('home.batchNote')}</span>
               </div>
               <ul className="space-y-1">
                 {batch.results.map((r, i) => (
                   <li key={i} className="flex flex-wrap items-center gap-2">
-                    <span className={r.ok ? 'text-emerald-700' : 'text-red-600'}>{r.ok ? 'done' : 'failed'}</span>
+                    <span className={r.ok ? 'text-emerald-700' : 'text-red-600'}>{r.ok ? t('home.done') : t('home.failed')}</span>
                     <span className="font-mono text-xs">{r.filename || '(unnamed)'}</span>
                     {r.ok && r.result ? (
                       <button
@@ -304,7 +315,7 @@ export default function KeepHome() {
                         className="zf-btn zf-btn-ghost zf-btn-sm"
                         onClick={() => navigate(`/app/keep/${r.result?.session_id}`)}
                       >
-                        Open cockpit
+                        {t('home.openCockpit')}
                       </button>
                     ) : (
                       <span className="text-xs text-[var(--zf-muted)]">{r.error}</span>
@@ -318,11 +329,11 @@ export default function KeepHome() {
           {result && !error && (
             <div className="text-sm space-y-2 border-t border-[var(--zf-hairline)] pt-3">
               <div>
-                CONNECT from the cell: <code className="font-mono">{result.egress_connects ?? 0}</code>
+                {t('home.connects')}: <code className="font-mono">{result.egress_connects ?? 0}</code>
                 {result.model ? (
                   <span>
                     {' '}
-                    · text sent to <code className="font-mono">{result.model.host}</code>
+                    · {t('home.sentTo')} <code className="font-mono">{result.model.host}</code>
                   </span>
                 ) : null}
                 {result.honesty ? (
@@ -335,7 +346,7 @@ export default function KeepHome() {
                   className="zf-btn zf-btn-primary zf-btn-sm"
                   onClick={() => navigate(`/app/keep/${result.session_id}`)}
                 >
-                  Open cockpit
+                  {t('home.openCockpit')}
                 </button>
                 <span className="text-[var(--zf-muted)] text-xs self-center">{artifacts}</span>
               </div>
@@ -346,7 +357,7 @@ export default function KeepHome() {
         <Card className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-[var(--zf-ink)]">Deploy your own use case</h2>
+              <h2 className="text-base font-semibold text-[var(--zf-ink)]">{t('home.deployUseCaseTitle')}</h2>
               <p className="text-sm text-[var(--zf-muted)] mt-1">
                 Describe what to pull out of a file. It runs in the same sealed cell as the others:
                 no browser, no network, 0 CONNECT. No code is run from your definition.
@@ -358,7 +369,7 @@ export default function KeepHome() {
               aria-expanded={showDeploy}
               onClick={() => setShowDeploy((v) => !v)}
             >
-              {showDeploy ? 'Close' : 'New use case'}
+              {showDeploy ? t('home.close') : t('home.newUseCase')}
             </button>
           </div>
           {showDeploy && (
@@ -372,7 +383,7 @@ export default function KeepHome() {
         <Card className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-[var(--zf-ink)]">Deploy an agent pack</h2>
+              <h2 className="text-base font-semibold text-[var(--zf-ink)]">{t('home.deployPackTitle')}</h2>
               <p className="text-sm text-[var(--zf-muted)] mt-1">
                 For a TypeScript agent that needs its own code. Bundle it on your machine with{' '}
                 <code className="font-mono text-[12px]">fabric-agent pack bundle &lt;dir&gt;</code>,
@@ -386,7 +397,7 @@ export default function KeepHome() {
               aria-expanded={showPack}
               onClick={() => setShowPack((v) => !v)}
             >
-              {showPack ? 'Close' : 'Deploy a pack'}
+              {showPack ? t('home.close') : t('home.deployPack')}
             </button>
           </div>
           {showPack && (

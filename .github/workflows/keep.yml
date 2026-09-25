@@ -15,6 +15,10 @@ on:
       - "scripts/keep-demo.sh"
       - "scripts/keep-demo-pdf.sh"
       - "sdk/agent-runtime/**"
+      - "reference/vendor-gateway/**"
+      - "scripts/keep-bench.sh"
+      - "scripts/keep-live-scenarios.sh"
+      - "scripts/keep-bake-node22-agent.sh"
       - "examples/keep-agents/**"
       - "scripts/keep-e2e.sh"
       - "scripts/keep-bake-browser-agent.sh"
@@ -29,6 +33,10 @@ on:
       - "scripts/keep-demo.sh"
       - "scripts/keep-demo-pdf.sh"
       - "sdk/agent-runtime/**"
+      - "reference/vendor-gateway/**"
+      - "scripts/keep-bench.sh"
+      - "scripts/keep-live-scenarios.sh"
+      - "scripts/keep-bake-node22-agent.sh"
       - "examples/keep-agents/**"
       - "scripts/keep-e2e.sh"
       - "scripts/keep-bake-browser-agent.sh"
@@ -78,8 +86,10 @@ jobs:
         run: |
           cargo build --manifest-path agent-runtime/Cargo.toml
           npm ci --prefix sdk/agent-runtime --no-audit --no-fund
-      - name: SDK tests (pack composition and Ed25519 signing)
+      - name: SDK tests (pack composition, signing, phone client, model socket)
         run: npm test --prefix sdk/agent-runtime
+      - name: Vendor gateway tests
+        run: npm test --prefix reference/vendor-gateway
       - name: Demos, custom use cases and signed packs
         run: bash agent-runtime/tests/demos-ci.sh
 
@@ -134,6 +144,10 @@ jobs:
           test -f docs/tutorials/16-keep-workstation.md
           test -f scripts/keep-e2e.sh
           test -f agent-runtime/examples/keep_sign_policy.rs
+          test -f docs/keep/VENDORS.md
+          test -f docs/keep/TENANCY.md
+          test -f docs/keep/mobile/test-vectors.json
+          test -f agent-runtime/templates/node22-agent/build.json
       - name: How to re-run locally
         if: always()
         run: |
