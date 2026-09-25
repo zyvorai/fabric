@@ -86,8 +86,6 @@ const config: Config = {
             '**/*.test.{js,jsx,ts,tsx}',
             '**/__tests__/**',
             'keep/README.md',
-            // GitHub-only long-form overview (the repo README's old body); it links to files outside docs/.
-            'PROJECT-OVERVIEW.md',
           ],
         },
         blog: false,
