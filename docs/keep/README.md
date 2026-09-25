@@ -15,7 +15,7 @@ while you hold the policy, the credentials and the approvals. Open source, Apach
 ![Evidence](https://img.shields.io/badge/evidence-software--test-lightgrey)
 
 [**Try it in 60 seconds**](#try-it-in-60-seconds) ·
-[Why Keep](#why-keep) ·
+[How it works](#how-keep-works) ·
 [Keep vs Muse](#keep-vs-meta-muse) ·
 [Docs](KEEP.md) ·
 [Website](https://zyvorai.github.io/fabric/keep)
@@ -28,6 +28,19 @@ while you hold the policy, the credentials and the approvals. Open source, Apach
 
 <p align="center"><sub>Real output of <code>./scripts/keep-e2e.sh</code>, condensed. Record your own GIF with <code>./scripts/keep-record-demo.sh</code>.</sub></p>
 
+## Contents
+
+- [Why Keep](#why-keep)
+- [How Keep works](#how-keep-works)
+- [Try it in 60 seconds](#try-it-in-60-seconds)
+- [One-click use cases and ready-made agents](#one-click-use-cases-and-ready-made-agents)
+- [Build your own use case](#build-your-own-use-case)
+- [Install it on a host](#install-it-on-a-host)
+- [Security profiles and what we do not claim](#security-profiles-and-what-we-do-not-claim)
+- [Keep vs Meta Muse](#keep-vs-meta-muse)
+- [Where everything lives](#where-everything-lives)
+- [FAQ](#faq)
+
 ## Why Keep
 
 | | |
@@ -38,6 +51,118 @@ while you hold the policy, the credentials and the approvals. Open source, Apach
 
 Keep starts from one assumption: **the model is compromised the moment it reads a webpage.**
 So the agent never holds real passwords, never approves its own actions, and never decides its own network rules.
+
+## How Keep works
+
+Keep has three domains, and the line between them is the whole design. The **agent cell** is the only untrusted party. Everything with authority (policy, secrets, network rules, durable state) sits on the host side of the line.
+
+```text
+You (phone or laptop)
+  |   policy, approvals
+  v
++---------------------------------------------------------------+
+| HOST: Linux + KVM, a FluxVM node you control                  |
+|                                                               |
+|  Sentinel   signed policy, sole egress and connector          |
+|             authority, network rules enforced on the host     |
+|  Vault      secrets stay on the host, injected only at        |
+|             approved exits                                    |
+|  Supervisor starts, freezes and tears down cells              |
+|                                                               |
+|   +-------------------------------------------------------+   |
+|   | AGENT CELL: Firecracker/KVM microVM (untrusted)       |   |
+|   |   agent runtime, tools, workspace                     |   |
+|   |   no raw secrets, no host files, no network control   |   |
+|   |   brokered Chromium: accessibility tree only          |   |
+|   +-------------------------------------------------------+   |
+|                                                               |
+|  durable state (database, audit journal) lives on the host    |
++---------------------------------------------------------------+
+```
+
+Keep is a product layer of [Fabric](../../README.md) on the [agent runtime](../../agent-runtime/) and [FluxVM](https://github.com/zyvorai/fluxvm). It is not a second hypervisor and not a separate repository.
+
+### The cell
+
+The untrusted agent runtime runs in a **microVM on FluxVM**, not only in a container on the host kernel. If something inside goes wrong, an escape has to get through a hypervisor before it reaches the vault.
+
+- No raw secrets, no host filesystem, no ability to change its own network rules.
+- The admin plane is **vsock only**. There is no SSH to the agent.
+- An optional `ttl_seconds` gives you throwaway research cells.
+
+More: [cell/README.md](cell/README.md).
+
+### Sentinel: policy you can diff
+
+The agent never decides what it may do. Sentinel does, from a policy file:
+
+```yaml
+version: 1
+default_egress: deny
+allow:
+  - { host: api.stripe.com, methods: [POST], action: checkout, ask: always }
+  - { host: api.github.com, methods: [GET],  action: read,     ask: first }
+deny:
+  - { host: "*.onion" }
+taint:
+  on_untrusted_page: block_egress_until_ask
+```
+
+- **Deny by default.** Anything not listed is refused.
+- **Ask levels** per rule: `always`, `first` or `never`.
+- **Taint.** After the agent reads an untrusted page, egress is blocked until you approve, and the cockpit paints the process red.
+- **Signed.** In Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) the runtime refuses to start without `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS`, and every policy update must carry an Ed25519 signature over the exact YAML bytes. Unsigned policy does not load.
+
+More: [sentinel/README.md](sentinel/README.md).
+
+### Vault: the agent never holds the password
+
+Real credentials live in the vault on the host. The egress broker injects a secret **after** the allowlist check, so it never appears in a tool result or in the model's context. A secret is released only when the request matches the whole descriptor: credential, host, method, path, port and user. For TLS hosts a surrogate token (`zy_sur_…`) can stand in and is swapped for the real secret only at the approved exit. Password fill in the browser is done by the host and never returned to the model.
+
+> **Honest limit.** Today the secret material lives in the **host process environment**, so the operator of the host can read it. The vault protects secrets from the agent, not from the host's operator. Sealing secrets to a key only you hold is a hardware-gated goal (see [KEEP-0.2.md](KEEP-0.2.md)).
+
+More: [vault/README.md](vault/README.md).
+
+### Host confinement: rules the agent cannot argue with
+
+The agent does not police its own network. Keep posts a strict policy to FluxVM, and the **host** enforces it on the sandbox's network interface with TC/eBPF, never inside the guest.
+
+| Field | What Keep sets |
+|---|---|
+| `default_allow` | `false`: deny by default |
+| `allow_cidrs` | The gateway only |
+| `allow_ports` | The broker and an optional CONNECT proxy |
+| `deny_udp` | `true`: shuts off QUIC, WebRTC and STUN (DHCP still allowed) |
+| `deny_cidrs` | The cloud metadata address and public recursive DNS |
+
+If a connection slips through, the session is **frozen** (`agent_paused_reason: ebpf_deny`). The proof surfaces are the audit journal (`egress.connect`, `ebpf.*`), the cockpit's `egress_connects` counter, and FluxVM drop reasons such as `udp-deny` when the dataplane is attached. PacketWolf and netevd are optional observers, not requirements.
+
+More: [confine.md](confine.md).
+
+### Approvals: out of band
+
+Buying, sending, deleting and new logins never confirm inside the chat. Approval arrives on a channel the guest cannot see (a phone push or a webhook to `/v1/approvals`), and the capability token is bound to a **connector and an action**, not to a free-form sentence. More: [approve/README.md](approve/README.md).
+
+### Brokered browser: structure for the agent, pixels for you
+
+When the agent needs the web, a brokered Chromium does the browsing. The agent works from an **accessibility outline** (`heading "Vendor SOW"`, `@e1 button "Download PDF"`); you watch the real pixels with a tab listing, a screenshot and a read-only screencast. Only the listing endpoints are exposed; there is no mutating DevTools access. More: [browser/README.md](browser/README.md).
+
+<p align="center">
+  <img src="../assets/keep/split-sight.svg" alt="The agent sees an accessibility outline; you see the real pixels" width="760">
+</p>
+
+### Cockpit
+
+The console shows a session as a chain: goal, current task, egress proof, honesty badge, browser, pending approvals and outcome. The same data is a plain API (`GET /v1/sessions/{id}/cockpit`) and a minimal HTML page for a phone (`/keep/cockpit`). More: [cockpit/README.md](cockpit/README.md).
+
+### A PDF brief, step by step
+
+1. **Drop in a PDF.** Keep starts a fresh cell for the job.
+2. **The agent works inside.** It extracts text in its cell. No browser, nothing sent out.
+3. **The host guards the door.** Only the gateway is reachable; UDP, cloud metadata and public DNS are blocked.
+4. **You get the brief.** One page in your workspace; anything risky waits for your approval.
+
+The cockpit reports `egress_connects` from Keep's own audit journal, and the demos expect it to read `0`. The built-in demos are **extractive**: they pull text out and summarise it by rule, and they do not call a model, which is why zero is an honest number. Walkthrough: [Tutorial 17](../tutorials/17-keep-pdf-brief.md).
 
 ## Try it in 60 seconds
 
@@ -56,58 +181,124 @@ cargo test --manifest-path agent-runtime/Cargo.toml --lib
 ./scripts/keep-live-lab.sh
 ```
 
-Then stage the demo: [Tutorial 17 — drop in a PDF, get a brief, with zero outbound connections](../tutorials/17-keep-pdf-brief.md).
+`keepctl` in ten lines:
 
-## What you get
+```bash
+export KEEP_API=http://127.0.0.1:9096
+export KEEP_TOKEN=…                      # ZYVOR_AGENT_API_TOKEN
 
-| | |
-|---|---|
-| **Bring your own model** | A model socket. The cell stays the same. |
-| **Signed policy** | Fail-closed Sentinel loaded from a signed YAML file. |
-| **A real cell** | Firecracker/KVM microVM on FluxVM with its own kernel. |
-| **Approvals on your phone** | Buy, send and delete are approved out of band, never in the chat. |
-| **Cockpit and browser view** | Taint, recent decisions, tabs, screenshots and a read-only screencast. |
-| **One-click use cases** | PDF brief, contract clauses, security questionnaire, meeting actions, log triage, SBOM summary, CSV cleanup. See [demos](demos/README.md). |
-| **Host network pin** | FluxVM TC/eBPF: `deny_udp` and gateway-only ports, enforced outside the guest ([how](confine.md)). |
-| **Pack and unpack** | Leave whenever you want. |
+keepctl create -f deploy.json            # deploy an agent
+keepctl policy show my-agent
+keepctl policy set my-agent keep.policy.yaml keep.policy.yaml.sig
+keepctl cockpit <session-uuid>
+keepctl pack   ./keep-pack my-agent      # leave: policy, manifest, notes (no secrets)
+keepctl unpack ./keep-pack my-agent      # arrive on another FluxVM node
+```
 
-<p align="center">
-  <img src="../assets/keep/split-sight.svg" alt="The agent sees an accessibility outline; you see the real pixels" width="760">
-</p>
+Then stage the demo: [Tutorial 17 — drop in a PDF, get a brief, with zero outbound connections](../tutorials/17-keep-pdf-brief.md). Full CLI: [keepctl/README.md](keepctl/README.md).
 
-## Keep vs Meta Muse
+## One-click use cases and ready-made agents
 
-Muse got the threat model right. Keep is the version you run, read and take with you.
-Every row below is stated in [KEEP.md](KEEP.md#why-keep-beats-muse-on-purpose); Muse-side claims
-are paraphrased from public descriptions.
+Seven use cases ship built in. Each takes a file and returns an artifact, needs no browser, and expects `egress_connects: 0`. Run one from the console (`/app/keep`) or with `keep-demo.sh <id>`. See [demos/README.md](demos/README.md).
 
-| | Meta Muse | Keep |
+| Use case | You drop in | You get |
 |---|---|---|
-| Where it runs | Meta’s cloud only. | Your laptop, mini-PC or FluxVM host. |
-| Policy | A closed policy engine. | A signed `keep.policy.yaml` you can diff in git. |
-| The cell | A container-style cell that shares a kernel with its policy engine. | A Firecracker/KVM microVM on FluxVM, with its own kernel. |
-| Model | Tied to Muse Spark. | Bring your own model socket. |
-| Training | Trajectories may train after sanitization. | Off by default. Export needs a scoped token. |
-| Secrets | Surrogates swapped in at egress. | The same idea: the vault injects on the host, and the agent never sees a real secret. |
-| Browser | A measured, accessibility-style appliance. | The same idea: the agent sees structure, you see pixels. |
-| Honesty | A footnote. | Up front, right below. |
+| `pdf-brief` | a PDF | `brief.md` |
+| `contract-clauses` | a contract PDF | `clauses.md` |
+| `security-questionnaire` | a questionnaire PDF | `answers.md` |
+| `meeting-actions` | a `.txt` or `.vtt` transcript | `actions.md` |
+| `log-triage` | a `.log` or `.txt` file | `triage.md` |
+| `sbom-summary` | CycloneDX, SPDX or SARIF JSON | `summary.md` |
+| `csv-clean` | a `.csv` | `clean.csv` and `report.md` |
 
-Full matrix: [/compare](https://zyvorai.github.io/fabric/compare).
+Also packaged in [`examples/keep-agents/`](../../examples/keep-agents/): `browser-research` (allowlisted browsing to a research note), `infra-ops` (alerts, VMs and lifecycle, with remediation behind an approval), `migration-op` and `deploy-op`.
+
+## Build your own use case
+
+A **pack** is a directory with a single `pack.json`. Three kinds:
+
+| `kind` | What it is | Deploy with |
+|---|---|---|
+| `usecase` | A declarative use case: an extractor and a few summary rules. **No code.** | The console form, or `keepctl deploy <dir>` |
+| `agent` | A TypeScript agent that runs **inside the cell**, with a manifest and an optional signed policy | `keepctl deploy <dir>`, or `keepctl bundle` and then the console's **Deploy a pack** |
+| `builtin` | Documents a use case the runtime already ships. Nothing to deploy. | `keepctl deploy <dir> --test` runs it |
+
+The extractor is a fixed list (`pdftotext` or `text`), never a command. Reference: [PACKS.md](PACKS.md). Walkthrough: [Tutorial 19 — build your own use case](../tutorials/19-build-your-own-use-case.md).
+
+## Install it on a host
+
+```bash
+./scripts/deploy keep user@host     # needs FluxVM on the host
+keepctl doctor                       # checks the install
+```
+
+Keep mode is **fail-closed**: it requires trusted policy signers at startup, refuses unsigned policy updates, and requires a signature over each agent deployment. The production checklist is in [PRODUCTION.md](PRODUCTION.md).
+
+## Security profiles and what we do not claim
+
+Keep runs on FluxVM's security profiles:
+
+| Profile | Evidence class | Hardware attestation |
+|---|---|---|
+| `standard` | none | no |
+| `measured` | `software-test` | **never** |
+| `confidential-snp` / `confidential-tdx` | `sev-snp` / `tdx`, only after a verified hardware run | gated |
 
 > [!IMPORTANT]
 > **The quiet part.** Keep runs on measured VMs today, and its evidence class is `software-test`.
 > Until it runs on verified confidential hardware with a key only you hold (Keep 0.2),
-> **the host can still see inside the VM.** We will not claim otherwise.
+> **the host can still see inside the VM.** We will not claim otherwise. The cockpit shows an
+> honesty badge, and the UI must never say "the operator cannot read this" while the class is `software-test`.
 
-## Ready-made agents
+## Keep vs Meta Muse
 
-Deploy one from [`examples/keep-agents/`](../../examples/keep-agents/): `pdf-brief`, `contract-clauses`,
-`security-questionnaire`, `meeting-actions`, `log-triage`, `sbom-summary`, `csv-clean`,
-`browser-research`, `infra-ops`, `migration-op`, `deploy-op`.
+Muse got the threat model right. Keep is the version you run, read and take with you. The Muse-side details below come from public reporting (listed under the table), not from Meta's own pages, and may change.
+
+| | Meta Muse | Keep |
+|---|---|---|
+| Where it runs | Meta's cloud only; not self-hostable. | Your hardware, under Apache-2.0. |
+| The cell | A container-style cell (`systemd-nspawn`) on a VM shared with its policy engine. | A Firecracker/KVM microVM on FluxVM, with its own kernel. |
+| Model | Muse Spark, Meta's proprietary model. | Bring your own model socket. |
+| Training data | Users can opt out of interaction data being used for training. | Off by default. Export needs a scoped token. |
+| Policy | Set by Meta. | A signed `keep.policy.yaml` you can diff in git. |
+| Secrets | Credentials injected at the network boundary. | The same idea: the vault injects on the host, and the agent never sees a real secret. |
+| Browser | An accessibility-tree browser agent. | The same idea: the agent sees structure, you see pixels. |
+| Operator access | Governed by Meta's operational policies, not cryptography. | The same limit today, stated up front (see above). |
+
+Full matrix: [/compare](https://zyvorai.github.io/fabric/compare). Longer read: [Keep vs Meta Muse](https://zyvor.dev/blog/keep-vs-meta-muse).
+
+Sources for the Muse column: [MarkTechPost, 2026-09-08](https://www.marktechpost.com/2026/09/08/meta-introduces-muse-a-personal-ai-agent-that-runs-on-its-own-dedicated-secure-cloud-computer/) · [Vellum, "Official Muse Breakdown"](https://www.vellum.ai/blog/official-muse-breakdown) · [DEV Community, "Meta Muse and the Secure VM Bet"](https://dev.to/ifynx_studio/meta-muse-and-the-secure-vm-bet-personal-agents-that-act-without-owning-your-secrets-1ik4). Zyvor is not affiliated with Meta; if a Muse row is out of date, please open an issue.
+
+## Where everything lives
+
+| Path | What is there |
+|---|---|
+| [`agent-runtime/`](../../agent-runtime/) | The Rust runtime: Sentinel, vault, egress broker, approvals, browser, goals and the cockpit API |
+| [`scripts/keepctl`](../../scripts/keepctl) | The CLI |
+| [`scripts/keep-e2e.sh`](../../scripts/keep-e2e.sh) · [`keep-live-lab.sh`](../../scripts/keep-live-lab.sh) · [`keep-pilot-gate.sh`](../../scripts/keep-pilot-gate.sh) | End-to-end checks: stub, live lab and pilot gate |
+| [`examples/keep-agents/`](../../examples/keep-agents/) | The packaged use cases and agents |
+| `docs/keep/` | This documentation tree (spec, sentinel, vault, approvals, cell, browser, cockpit, demos, packs) |
+| `web/src/pages/KeepHome.tsx` · `KeepSession.tsx` | The console: `/app/keep` and `/app/keep/:sessionId` |
+| [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) | CI: unit tests, the seven demos end to end, a custom use case, a signed pack deploy, and the stub e2e |
+| [`pilot-runs/`](pilot-runs/) | Archived live-gate runs on a FluxVM host |
+
+## FAQ
+
+**Does Keep need a model?** Keep has a model socket, so you choose: a hosted API, a local model or your own inference service. The built-in demos call no model at all.
+
+**Can I try it without KVM?** Yes. Steps 1 and 2 of [Try it](#try-it-in-60-seconds) run against a FluxVM stand-in. A real cell needs a FluxVM host.
+
+**Is Keep a hypervisor?** No. FluxVM is the VM engine; Keep is Fabric's agent runtime plus a FluxVM cell.
+
+**What does `software-test` mean?** Keep runs on measured VMs with software-level evidence. It is not confidential computing, and it does not stop the host's operator from seeing inside the VM. See [the limits above](#security-profiles-and-what-we-do-not-claim).
+
+**Can I leave?** Yes. `keepctl pack` and `keepctl unpack` move your policy and agent to another FluxVM node. Secrets stay in the vault and are not exported.
 
 ## Where to go next
 
 - [KEEP.md](KEEP.md) — the full spec, architecture and security profiles
-- [Tutorial 16 — Keep workstation](../tutorials/16-keep-workstation.md) · [Tutorial 17 — PDF brief](../tutorials/17-keep-pdf-brief.md)
+- [Tutorial 16 — Keep workstation](../tutorials/16-keep-workstation.md) · [17 — PDF brief](../tutorials/17-keep-pdf-brief.md) · [18 — use cases](../tutorials/18-keep-use-cases.md) · [19 — your own use case](../tutorials/19-build-your-own-use-case.md)
 - [PRODUCTION.md](PRODUCTION.md) — production checklist · [STATUS.md](STATUS.md) — what ships today
 - [Fabric](../../README.md) — the control plane Keep runs on
+
+License: Apache-2.0.
