@@ -90,7 +90,8 @@ PIDS+=($!)
 : >"$WORK/model.log"
 cat >"$WORK/creds.json" <<JSON
 {"llm": {"host": "127.0.0.1", "header": "authorization", "env": "ZY_E2E_MODEL_KEY", "prefix": "Bearer ",
-         "allowed_ports": [$MODEL_PORT], "allowed_methods": ["POST"], "path_prefixes": ["/v1/chat/completions"]}}
+         "allowed_ports": [$MODEL_PORT], "allowed_methods": ["POST"], "path_prefixes": ["/v1/chat/completions"]},
+ "llm-local": {"host": "127.0.0.1", "header": "authorization", "kind": "fabric", "allowed_ports": [$MODEL_PORT]}}
 JSON
 start_runtime runtime "$RT_PORT" "$RT_EGRESS" ZYVOR_AGENT_ALLOW_NO_AUTH=1 ZYVOR_AGENT_WATCH_ROOT="$WORK/watch" ZYVOR_AGENT_CREDENTIALS_FILE="$WORK/creds.json"
 wait_http "$BASE/healthz" || fail "runtime did not start"
@@ -395,6 +396,43 @@ code=$(curl -s -o "$WORK/mn.out" -w '%{http_code}' -X POST -F note=none "$BASE/v
 [[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mn.out" || fail "meeting-notes-model must be refused by the vault out of the box (403): $code $(cat "$WORK/mn.out")"
 ok "both model packs are refused (403) until an operator allows their endpoint"
 for p in status-page-watch mailbox-triage api-facts expense-sheet nda-review invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
+
+echo "demos-ci: an agent uses the model socket"
+MA="$WORK/model-agent"; cp -R "$ROOT/examples/keep-agents/model-agent" "$MA"
+python3 - "$MA/pack.json" "$MODEL_PORT" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+m = p["manifest"]
+m.update({"template": "ci", "credentials": ["llm-local"], "egress_mode": "ask", "egress_allow_hosts": ["127.0.0.1"], "allow_private_networks": True})
+m["model_socket"] = {"base_url": "http://127.0.0.1:%s/v1" % sys.argv[2], "model": "tiny-1", "credential": "llm-local"}
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+# A credential the agent is not granted is refused when the agent is deployed.
+BAD="$WORK/model-agent-bad"; cp -R "$MA" "$BAD"
+python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); p["name"]="model-agent-bad"; p["manifest"]["credentials"]=[]; json.dump(p, open(sys.argv[1],"w"))' "$BAD/pack.json"
+if (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$BAD") >"$WORK/bad-agent.out" 2>&1; then fail "a model_socket credential the agent lacks must be refused at deploy"; fi
+grep -q "must also be listed in credentials" "$WORK/bad-agent.out" || fail "the refusal should say why: $(cat "$WORK/bad-agent.out")"
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$MA") >"$WORK/model-agent.out" 2>&1 || fail "model-agent deploy failed: $(cat "$WORK/model-agent.out")"
+ok "a model_socket is validated at deploy: a credential the agent lacks is refused, a good one deploys"
+lines_before=$(wc -l < "$WORK/model.log")
+sid=$(curl -sf -X POST -H 'content-type: application/json' -d '{"agent":"model-agent","input":{"question":"What is the total due?"}}' "$BASE/v1/sessions" | json id) || fail "start model-agent session"
+for _ in $(seq 1 100); do
+  st=$(curl -sf "$BASE/v1/sessions/$sid" | json status)
+  [[ "$st" == "completed" || "$st" == "failed" ]] && break; sleep 0.3
+done
+[[ "$st" == "completed" ]] || fail "the model agent did not complete (status $st): $(curl -s "$BASE/v1/sessions/$sid/events" --max-time 3 | tail -c 600) | $(tail -n 5 "$WORK"/sandboxes/*.log 2>/dev/null | tail -c 600)"
+ans=$(curl -sN --max-time 5 "$BASE/v1/sessions/$sid/events" | grep -o '"answer":"[^"]*"' | head -1)
+echo "$ans" | grep -q "4,200 EUR" || fail "the agent's answer is missing the model's reply: $ans"
+python3 - "$WORK/model.log" "$lines_before" <<'PY' || fail "the model endpoint did not get the agent's call as expected"
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])][int(sys.argv[2]):]
+assert len(rows) == 1, rows
+req = json.loads(rows[0]["body"])
+assert rows[0]["path"] == "/v1/chat/completions" and req["model"] == "tiny-1", rows[0]
+assert req["messages"][-1]["content"] == "What is the total due?" and req["max_tokens"] == 200
+assert "sk-e2e-secret-key" not in json.dumps(rows), "no key belongs in this request"
+PY
+ok "an agent called ctx.model.chat(): runtime env -> worker -> egress broker -> the socket's endpoint, and the reply came back"
 
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")

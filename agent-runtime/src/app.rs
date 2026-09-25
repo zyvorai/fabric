@@ -569,6 +569,9 @@ async fn deploy_agent(
     if let Err(message) = req.manifest.validate_egress_policy() {
         return Err(ApiError::bad_request(message));
     }
+    if let Err(message) = req.manifest.validate_model_socket() {
+        return Err(ApiError::bad_request(message));
+    }
     if let Err(message) = req
         .manifest
         .validate_resources(state.config.max_vcpus, state.config.max_memory_mib)
@@ -1280,13 +1283,37 @@ async fn provision_guest(
         );
     }
     let command = format!(
-        "mkdir -p /opt/zyvor/agent; {proxy_env}{mitm_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
+        "mkdir -p /opt/zyvor/agent; {proxy_env}{mitm_env}ZYVOR_SESSION_ID={} ZYVOR_EGRESS_CAPABILITY={} ZYVOR_EGRESS_BROKER={} ZYVOR_AGENT_PORT={} ZYVOR_AGENT_RUNTIME={} ZYVOR_HARNESS_CREDENTIALS={} ZYVOR_MODEL_BASE_URL={} ZYVOR_MODEL_NAME={} ZYVOR_MODEL_CREDENTIAL={} nohup {launcher}node /opt/zyvor/worker.mjs >/tmp/zyvor-agent.log 2>&1 </dev/null &",
         shell_quote(&session.id.to_string()),
         shell_quote(&session.capability_token),
         shell_quote(&broker),
         agent.manifest.runtime_port,
         shell_quote(agent.manifest.runtime.as_str()),
         shell_quote(&credentials),
+        // The agent's model socket: where `ctx.model.chat()` and the CLI harnesses send model calls.
+        shell_quote(
+            agent
+                .manifest
+                .model_socket
+                .as_ref()
+                .map_or("", |s| s.base_url.as_str())
+        ),
+        shell_quote(
+            agent
+                .manifest
+                .model_socket
+                .as_ref()
+                .and_then(|s| s.model.as_deref())
+                .unwrap_or("")
+        ),
+        shell_quote(
+            agent
+                .manifest
+                .model_socket
+                .as_ref()
+                .and_then(|s| s.credential.as_deref())
+                .unwrap_or("")
+        ),
     );
     with_timeout(
         HEALTH_CHECK_ATTEMPT_TIMEOUT,

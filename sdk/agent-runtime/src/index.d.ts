@@ -2,11 +2,24 @@ export interface AgentFetchOptions extends RequestInit {
   credential?: string;
 }
 
+export interface AgentModel {
+  /** False when the manifest declares no `model_socket`; `chat` then throws. */
+  readonly configured: boolean;
+  readonly baseUrl: string;
+  readonly name: string;
+  chat(
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    opts?: { model?: string; maxTokens?: number; temperature?: number },
+  ): Promise<{ text: string; raw: unknown }>;
+}
+
 export interface AgentContext<TInput = unknown> {
   readonly sessionId: string;
   readonly input: TInput;
   emit(kind: string, data?: unknown): unknown;
   fetch(input: string | URL, init?: AgentFetchOptions): Promise<Response>;
+  /** The manifest's `model_socket`: an OpenAI-compatible endpoint, called through the egress broker. */
+  model: AgentModel;
   nextSteer(options?: { timeoutMs?: number }): Promise<unknown | null>;
   isCancelled(): boolean;
 }

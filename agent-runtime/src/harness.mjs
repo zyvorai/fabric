@@ -30,6 +30,8 @@ const UPSTREAM = {
   gemini: "https://generativelanguage.googleapis.com",
   // Phase 6: Fabric-managed OpenAI-compatible Maglev VIP (no external API key).
   fabric: process.env.ZYVOR_FABRIC_INFERENCE_BASE || "",
+  // The manifest `model_socket`: any OpenAI-compatible endpoint (Qwen, DeepSeek, GLM, vLLM, ...).
+  socket: (process.env.ZYVOR_MODEL_BASE_URL || "").replace(/\/+$/, ""),
 };
 
 if (!sessionId || !capability || !broker) {
@@ -93,6 +95,7 @@ function parseCredentials(raw) {
 }
 
 function credentialFor(provider) {
+  if (provider === "socket" && process.env.ZYVOR_MODEL_CREDENTIAL) return process.env.ZYVOR_MODEL_CREDENTIAL;
   const match = credentialNames.find((name) => name.toLowerCase().includes(provider));
   return match || credentialNames[0] || null;
 }
@@ -189,6 +192,13 @@ function childEnv() {
     if (process.env.ZYVOR_FABRIC_INFERENCE_BASE) {
       env.OPENAI_BASE_URL = `${shimOrigin}/fabric`;
     }
+    // A declared model socket wins: OpenAI-compatible CLIs talk to it through the shim, which
+    // forwards through the broker with the socket's credential. Its base URL keeps its own path
+    // (for example `/v1`), like an OpenAI SDK's base_url.
+    if (UPSTREAM.socket) {
+      env.OPENAI_BASE_URL = `${shimOrigin}/socket`;
+      if (process.env.ZYVOR_MODEL_NAME) env.OPENAI_MODEL = process.env.ZYVOR_MODEL_NAME;
+    }
   }
   // Placeholder only. The egress broker strips Authorization and injects the
   // granted credential on the host. This value is not a provider secret.
@@ -221,7 +231,7 @@ function startShim() {
         if (total > 16 * 1024 * 1024) throw new Error("request too large");
         chunks.push(chunk);
       }
-      const path = url.pathname.replace(/^\/(anthropic|openai|gemini|fabric)/, "") || "/";
+      const path = url.pathname.replace(/^\/(anthropic|openai|gemini|fabric|socket)/, "") || "/";
       const forwarded = {};
       for (const [name, value] of Object.entries(req.headers)) {
         if (typeof value !== "string") continue;

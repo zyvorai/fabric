@@ -3,6 +3,11 @@
 ## 0.3.0
 
 ### Added
+- **The model is the vendor's choice.** A manifest's `model_socket` now works: agents call
+  `ctx.model.chat()` (an OpenAI-compatible endpoint, through the egress broker with the vault credential),
+  and OpenAI-compatible CLI agents are pointed at it. Deploy checks the URL and that the credential is
+  granted. Recipes for Qwen, DeepSeek, GLM and local servers, and a `model-agent` example pack.
+  Docs: [MODELS.md](docs/keep/MODELS.md).
 - **Phone-signed approvals.** The operator enrols a phone's public key per user (ECDSA P-256 as Android
   Keystore holds it, or Ed25519); the phone signs an exact text naming the approval, the decision, a digest of
   the planned action and a server challenge, and the runtime refuses any decision whose signature does not
