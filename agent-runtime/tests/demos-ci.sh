@@ -209,6 +209,49 @@ ok "folder trigger: a dropped file ran once, wrong type ignored, no repeat"
 [[ -z "$("$KEEPCTL" trigger list 2>/dev/null)" ]] || fail "triggers still listed after rm"
 ok "keepctl trigger list and rm"
 
+echo "demos-ci: more file types, new rules, zip"
+python3 - "$WORK" <<'PY'
+import sys, zipfile
+w = sys.argv[1]
+with zipfile.ZipFile(w + "/t.docx", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("word/document.xml", "<w:document><w:body><w:p><w:r><w:t>Payment due 30 days. Total 4,200 EUR</w:t></w:r></w:p></w:body></w:document>")
+with zipfile.ZipFile(w + "/t.xlsx", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("xl/workbook.xml", '<workbook><sheets><sheet name="Orders" sheetId="1"/></sheets></workbook>')
+    z.writestr("xl/sharedStrings.xml", "<sst><si><t>region</t></si><si><t>north</t></si><si><t>south</t></si></sst>")
+    z.writestr("xl/worksheets/sheet1.xml", '<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row><row r="2"><c r="A2" t="s"><v>1</v></c></row><row r="3"><c r="A3" t="s"><v>1</v></c></row><row r="4"><c r="A4" t="s"><v>2</v></c></row></sheetData></worksheet>')
+with zipfile.ZipFile(w + "/batch.zip", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("one.csv", "a,b\n1,2\n"); z.writestr("sub/two.csv", "a,b\n3,4\n"); z.writestr("readme.txt", "skip me")
+PY
+printf '<html><body><h1>Status</h1><script>steal()</script><p>Server db-1 is DOWN since 09:00</p></body></html>' > "$WORK/t.html"
+printf 'From a@x Mon\nFrom: Ann <a@x>\nSubject: Invoice\nDate: Mon, 1 Sep 2026\n\nPlease pay 300 EUR by Friday.\nFrom b@x Tue\nSubject: Lunch\n\nNoon?\n' > "$WORK/t.mbox"
+printf '{"vendor":{"name":"Acme"},"items":[{"sku":"a"},{"sku":"b"}]}' > "$WORK/t.json"
+mk() { curl -sf -X POST -H 'content-type: application/json' -d "$1" "$BASE/v1/demos" >/dev/null || fail "deploy use case: $1"; }
+mk '{"id":"docx-check","title":"Docx check","accepts":["docx"],"extract":"docx","summary":[{"kind":"regex_extract","title":"Amounts","pattern":"([0-9][0-9,]*) EUR","group":1}]}'
+mk '{"id":"xlsx-check","title":"Xlsx check","accepts":["xlsx"],"extract":"xlsx","summary":[{"kind":"csv_columns","title":"Regions","columns":["region"]},{"kind":"table","title":"Rows"}]}'
+mk '{"id":"html-check","title":"Html check","accepts":["html"],"extract":"html","summary":[{"kind":"keyword_sections","title":"Alerts","keywords":["down"]}]}'
+mk '{"id":"mbox-check","title":"Mbox check","accepts":["mbox","eml"],"extract":"eml","summary":[{"kind":"keyword_sections","title":"Money","keywords":["pay"]},{"kind":"regex_extract","title":"Subjects","pattern":"Subject: (.+)","group":1}]}'
+mk '{"id":"json-check","title":"Json check","accepts":["json"],"extract":"text","summary":[{"kind":"json_path","title":"Facts","paths":["vendor.name","items[*].sku"]}]}'
+body_of() { # use-case file
+  local r; r=$("$KEEPCTL" run "$1" "$2") || fail "$1: run failed: $r"
+  echo "$r" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["egress_connects"]==0, d; print(d["artifacts"][0]["id"])' | { read -r id; curl -sf "$BASE/v1/artifacts/$id" | json body; }
+}
+b=$(body_of docx-check "$WORK/t.docx");  echo "$b" | grep -qF "1× 4,200" || fail "docx: $b"; ok "docx extracted, regex_extract found the amount"
+b=$(body_of xlsx-check "$WORK/t.xlsx");  echo "$b" | grep -qF "north (2)" || fail "xlsx: $b"; echo "$b" | grep -qF "| region |" || fail "xlsx table: $b"; ok "xlsx extracted, csv_columns and table rules work"
+b=$(body_of html-check "$WORK/t.html");  echo "$b" | grep -qi "db-1 is DOWN" || fail "html: $b"; echo "$b" | grep -q "steal" && fail "html script leaked into the summary"; ok "html extracted, script dropped"
+b=$(body_of mbox-check "$WORK/t.mbox");  echo "$b" | grep -qF "Please pay 300 EUR" || fail "mbox: $b"; echo "$b" | grep -qF "1× Lunch" || fail "mbox subjects: $b"; ok "mbox: both messages read, headers and body"
+b=$(body_of json-check "$WORK/t.json");  echo "$b" | grep -qF "vendor.name\`: Acme" || fail "json_path: $b"; echo "$b" | grep -qF "a; b" || fail "json_path wildcard: $b"; ok "json_path reads keys and wildcards"
+printf 'not a docx' > "$WORK/fake.docx"
+code=$(curl -s -o "$WORK/fake.out" -w '%{http_code}' -X POST -F "file=@$WORK/fake.docx" "$BASE/v1/demos/docx-check")
+[[ "$code" == "400" ]] || fail "a damaged docx should be 400, got $code: $(cat "$WORK/fake.out")"
+ok "a damaged docx is refused (400), not summarised"
+code=$(curl -s -o "$WORK/badre.out" -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"id":"bad-re","title":"Bad","accepts":["txt"],"extract":"text","summary":[{"kind":"regex_extract","title":"x","pattern":"(a)\\1"}]}' "$BASE/v1/demos")
+[[ "$code" == "400" ]] || fail "a backreference pattern should be refused (400), got $code"
+ok "regex with a backreference refused at deploy (400)"
+out=$("$KEEPCTL" run csv-clean "$WORK/batch.zip") || fail "zip run failed: $out"
+echo "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["count"]==2 and d["ok"]==2 and d["egress_connects"]==0, d; assert sorted(r["filename"] for r in d["results"])==["one.csv","two.csv"], d' || fail "zip fan-out wrong: $out"
+ok "zip: two csv files run in two cells, the .txt and the path ignored"
+for id in docx-check xlsx-check html-check mbox-check json-check; do curl -sf -X DELETE "$BASE/v1/demos/$id" >/dev/null || fail "delete $id"; done
+
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")
 [[ "$code" == "400" ]] || fail "wrong extension should be 400, got $code"; ok "wrong file type refused (400)"

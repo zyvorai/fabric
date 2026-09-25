@@ -3,6 +3,11 @@
 ## 0.3.0
 
 ### Added
+- **More Keep file types and rules.** Use cases can read `.docx`, `.xlsx` (first sheet),
+  `.html`, and `.eml` / `.mbox` (fixed Node scripts run in the cell), and a zip upload fans
+  out to one cell per accepted file. New rules: `regex_extract` (linear-time `regex`),
+  `json_path`, `table`. A scanned PDF now says plainly that Keep does no OCR. Docs:
+  [PACKS.md](docs/keep/PACKS.md).
 - **Keep triggers and batch.** `POST /v1/demos/{id}` takes several files (one cell each,
   one `batch_id`, 207 when some fail). Signed webhook triggers
   (`POST /v1/triggers/{id}/hook`) and watched-folder triggers (under

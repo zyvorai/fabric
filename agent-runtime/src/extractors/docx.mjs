@@ -1,0 +1,10 @@
+main((buf) => {
+  const entries = zipEntries(buf)
+  const doc = zipRead(buf, entries, 'word/document.xml')
+  if (!doc) throw new Error('word/document.xml not found: is this a .docx file?')
+  let s = doc.toString('utf8')
+  s = s.replace(/<w:tab\s*\/>/g, '\t').replace(/<w:br\b[^>]*\/>/g, '\n')
+  s = s.replace(/<\/w:tc>/g, ' | ').replace(/<\/w:p>/g, '\n')
+  s = s.replace(/<[^>]*>/g, '')
+  emit(tidy(decodeEntities(s)))
+})

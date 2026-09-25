@@ -53,7 +53,10 @@ pub(crate) struct DemoSpec {
 }
 
 const PDF_CMD: &str = "pdftotext -layout {path} - 2>/dev/null | head -c 24000";
-const PDF_EMPTY: &str = "No text layer — host OCR, don't send pixels to the model";
+const PDF_EMPTY: &str =
+    "No text layer: this looks like a scan. Keep does not do OCR yet, and it never sends page images to a model";
+/// Where a script extractor is written inside the cell.
+const GUEST_EXTRACT_SCRIPT: &str = "/home/agent/work/extract.mjs";
 const TEXT_LIMIT: usize = 200_000;
 const JSON_LIMIT: usize = 300_000;
 const PDF_LIMIT: usize = 32 * 1024 * 1024;
@@ -245,6 +248,8 @@ struct Resolved {
     accepts: Vec<String>,
     guest_file: String,
     extract_cmd: String,
+    /// A fixed script written into the cell before extraction (never from a spec).
+    extract_script: Option<&'static str>,
     max_bytes: usize,
     empty_msg: String,
     goal_title: String,
@@ -261,6 +266,7 @@ impl Resolved {
             accepts: d.accepts.iter().map(|e| e.to_string()).collect(),
             guest_file: d.guest_file.into(),
             extract_cmd: d.extract_cmd.into(),
+            extract_script: None,
             max_bytes: d.max_bytes,
             empty_msg: d.empty_msg.into(),
             goal_title: d.goal_title.into(),
@@ -276,12 +282,17 @@ impl Resolved {
         let (extract_cmd, empty_msg) = match spec.extract {
             Extractor::Pdftotext => (PDF_CMD.to_string(), PDF_EMPTY),
             Extractor::Text => (format!("head -c {max_bytes} {{path}}"), "The file is empty"),
+            Extractor::Html | Extractor::Eml | Extractor::Docx | Extractor::Xlsx => (
+                format!("node {GUEST_EXTRACT_SCRIPT} {{path}}"),
+                "No text could be extracted: the file is empty, damaged, or not what its extension says",
+            ),
         };
         Self {
             id: spec.id.clone(),
             accepts: spec.accepts.clone(),
             guest_file: guest.into(),
             extract_cmd,
+            extract_script: spec.extract.script(),
             max_bytes,
             empty_msg: empty_msg.into(),
             goal_title: spec.title.clone(),
@@ -486,6 +497,21 @@ pub(crate) async fn demo_run(
             files.push(Upload { filename, bytes });
         }
     }
+    // A zip is a container: unpack what this use case accepts and run each file in its own cell.
+    if files.len() == 1
+        && files[0]
+            .filename
+            .as_deref()
+            .is_some_and(|n| extension(n) == "zip")
+    {
+        if let Some((accepts, max_bytes)) = use_case_limits(&state, &demo_id).await {
+            if !accepts.iter().any(|e| e == "zip") {
+                let inner = expand_zip(&files[0].bytes, &accepts, max_bytes)
+                    .map_err(ApiError::bad_request)?;
+                return run_batch(state, demo_id, inner).await;
+            }
+        }
+    }
     match files.len() {
         0 => run_use_case(state, demo_id, None, None, None).await,
         1 => {
@@ -494,6 +520,86 @@ pub(crate) async fn demo_run(
         }
         _ => run_batch(state, demo_id, files).await,
     }
+}
+
+/// Files inside a zip that the use case accepts, read into memory. Nothing is written to disk
+/// and no path from the archive is used: only its base name, for the extension check.
+/// Limits: 20 files, 64 MiB in total, each within the use case's size cap;
+/// sizes are enforced on what is actually read, not on what the archive claims.
+pub(crate) fn expand_zip(
+    bytes: &[u8],
+    accepts: &[String],
+    max_bytes: usize,
+) -> Result<Vec<Upload>, String> {
+    use std::io::Read;
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|e| format!("not a readable zip file: {e}"))?;
+    let mut out: Vec<Upload> = Vec::new();
+    let mut total = 0usize;
+    let mut skipped = 0usize;
+    for i in 0..archive.len().min(2000) {
+        let Ok(mut entry) = archive.by_index(i) else {
+            skipped += 1;
+            continue;
+        };
+        let Some(path) = entry.enclosed_name() else {
+            skipped += 1;
+            continue;
+        };
+        let Some(name) = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        if entry.is_dir()
+            || name.starts_with('.')
+            || path.components().any(|c| c.as_os_str() == "__MACOSX")
+            || !accepts.contains(&extension(&name))
+        {
+            continue;
+        }
+        if entry.size() as usize > max_bytes {
+            skipped += 1;
+            continue;
+        }
+        let mut data = Vec::new();
+        if entry
+            .by_ref()
+            .take(max_bytes as u64 + 1)
+            .read_to_end(&mut data)
+            .is_err()
+            || data.is_empty()
+            || data.len() > max_bytes
+        {
+            skipped += 1;
+            continue;
+        }
+        total += data.len();
+        if out.len() >= MAX_BATCH_FILES || total > MAX_BATCH_BYTES {
+            return Err(format!(
+                "the zip holds more than {MAX_BATCH_FILES} usable files or {} MiB; split it",
+                MAX_BATCH_BYTES / (1024 * 1024)
+            ));
+        }
+        out.push(Upload {
+            filename: Some(name),
+            bytes: data,
+        });
+    }
+    if out.is_empty() {
+        return Err(format!(
+            "the zip has no .{} files this use case can read{}",
+            accepts.join(" / ."),
+            if skipped > 0 {
+                format!(" ({skipped} entries were skipped as too big, unsafe or unreadable)")
+            } else {
+                String::new()
+            }
+        ));
+    }
+    Ok(out)
 }
 
 /// One uploaded file, before it is checked against the use case.
@@ -776,6 +882,14 @@ async fn run_demo(
         .fs_write(sandbox.id, &guest_path, &input, 0o644)
         .await
         .map_err(|e| ApiError::bad_gateway(format!("put-file: {e:#}")))?;
+
+    if let Some(script) = spec.extract_script {
+        state
+            .fluxvm
+            .fs_write(sandbox.id, GUEST_EXTRACT_SCRIPT, script.as_bytes(), 0o644)
+            .await
+            .map_err(|e| ApiError::bad_gateway(format!("put-script: {e:#}")))?;
+    }
 
     let extract = match state
         .fluxvm
@@ -1407,5 +1521,69 @@ mod tests {
         assert_eq!(extension("A.PDF"), "pdf");
         assert_eq!(extension("noext"), "");
         assert_eq!(extension("a.tar.gz"), "gz");
+    }
+
+    fn zip_of(files: &[(&str, &[u8])]) -> Vec<u8> {
+        use std::io::Write;
+        let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let opts = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (name, bytes) in files {
+            w.start_file(*name, opts).unwrap();
+            w.write_all(bytes).unwrap();
+        }
+        w.finish().unwrap().into_inner()
+    }
+
+    fn csv_only() -> Vec<String> {
+        vec!["csv".into()]
+    }
+
+    #[test]
+    fn zip_expansion_keeps_only_accepted_safe_files() {
+        let z = zip_of(&[
+            ("a.csv", b"x\n1\n"),
+            ("nested/dir/b.CSV", b"y\n2\n"),
+            ("notes.txt", b"ignored"),
+            (".hidden.csv", b"ignored"),
+            ("__MACOSX/c.csv", b"ignored"),
+            ("../../evil.csv", b"unsafe path"),
+        ]);
+        let out = expand_zip(&z, &csv_only(), 1024).unwrap();
+        let names: Vec<_> = out.iter().map(|u| u.filename.clone().unwrap()).collect();
+        // Only the base name is used, so a hostile path can never reach a file system.
+        assert_eq!(names, ["a.csv", "b.CSV"]);
+        assert_eq!(out[1].bytes, b"y\n2\n");
+    }
+
+    #[test]
+    fn zip_expansion_enforces_sizes_on_what_is_read() {
+        let big = vec![b'x'; 2000];
+        let z = zip_of(&[("big.csv", &big), ("ok.csv", b"a\n1\n")]);
+        let out = expand_zip(&z, &csv_only(), 1000).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].filename.as_deref(), Some("ok.csv"));
+        let err = expand_zip(&zip_of(&[("big.csv", &big)]), &csv_only(), 1000)
+            .err()
+            .unwrap();
+        assert!(
+            err.contains("no .csv files") && err.contains("skipped"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn zip_expansion_refuses_too_many_files_and_non_zips() {
+        let many: Vec<(String, Vec<u8>)> = (0..=MAX_BATCH_FILES)
+            .map(|i| (format!("f{i}.csv"), b"a\n1\n".to_vec()))
+            .collect();
+        let refs: Vec<(&str, &[u8])> = many
+            .iter()
+            .map(|(n, b)| (n.as_str(), b.as_slice()))
+            .collect();
+        let err = expand_zip(&zip_of(&refs), &csv_only(), 1024).err().unwrap();
+        assert!(err.contains("more than 20"), "{err}");
+        assert!(expand_zip(b"PK not really", &csv_only(), 1024).is_err());
+        assert!(expand_zip(&zip_of(&[]), &csv_only(), 1024).is_err());
     }
 }
