@@ -433,7 +433,62 @@ b=$(pack_test reimbursement-claims reimbursements.md)
 echo "$b" | grep -qF "2× Rs 4,200" && echo "$b" | grep -qF "Approved: Rs 4,200" || fail "reimbursement-claims: amounts or approval missing: $b"
 ok "reimbursement-claims: claimants, amounts and approvals read, 0 CONNECT"
 
-for p in expense-sheet nda-review receipt-pdf invoice-model-brief meeting-notes-model; do
+# developer-tool, browser and desktop-app packs
+b=$(pack_test chat-export-digest chat-digest.md)
+echo "$b" | grep -qF "2× Cy" || fail "chat-export-digest: the iPhone layout speaker missing: $b"
+ok "chat-export-digest: iPhone layout speakers read, 0 CONNECT"
+b=$(pack_test github-prs github-prs.md)
+echo "$b" | grep -qF "3× MERGED" && echo "$b" | grep -qF "3× ana-dev" && echo "$b" | grep -qF "2× bug" || fail "github-prs: states, authors or labels missing: $b"
+ok "github-prs: states, authors and labels read from gh json, 0 CONNECT"
+b=$(pack_test github-issues github-issues.md)
+echo "$b" | grep -qF "2× CLOSED" && echo "$b" | grep -qF "Question about quotas" || fail "github-issues: states or titles missing: $b"
+ok "github-issues: states and titles read from gh json, 0 CONNECT"
+b=$(pack_test github-actions-log actions-log.md)
+echo "$b" | grep -qF "1× test Lint" && echo "$b" | grep -qF "exit code 101" && echo "$b" | grep -qF "2× the 'Err'-variant" || fail "github-actions-log: failing step or repeated error missing: $b"
+ok "github-actions-log: failing steps and repeated errors read, 0 CONNECT"
+b=$(pack_test dependabot-alerts dependabot.md)
+echo "$b" | grep -qF "2× high" && echo "$b" | grep -qF "1× example-crate" && echo "$b" | grep -qF "Prototype pollution in lodash" || fail "dependabot-alerts: severities or packages missing: $b"
+ok "dependabot-alerts: severities, packages and advisories read, 0 CONNECT"
+b=$(pack_test git-log-digest git-log-digest.md)
+echo "$b" | grep -qF "4× Ana Dev" && echo "$b" | grep -qF "6× 2026-09" && echo "$b" | grep -qF "4× keep" || fail "git-log-digest: authors, months or prefixes missing: $b"
+ok "git-log-digest: authors, months and commit prefixes read, 0 CONNECT"
+b=$(pack_test xcodebuild-log xcodebuild.md)
+echo "$b" | grep -qF "BUILD FAILED" && echo "$b" | grep -qF "1× Login.swift:42:17" && echo "$b" | grep -qF "2× cannot find 'session' in scope" || fail "xcodebuild-log: result or errors missing: $b"
+echo "$b" | grep -qF "/Users/dev" && fail "xcodebuild-log: a home directory leaked into the summary: $b"
+ok "xcodebuild-log: result, errors and failed tests read, paths not echoed, 0 CONNECT"
+b=$(pack_test xcode-crash-log crash-report.md)
+echo "$b" | grep -qF "EXC_BAD_ACCESS" && echo "$b" | grep -qF "1× com.example.myapp" || fail "xcode-crash-log: exception or identifier missing: $b"
+echo "$b" | grep -qF "/Applications/MyApp.app" && fail "xcode-crash-log: the executable path leaked: $b"
+ok "xcode-crash-log: exception, app and frames read, path not echoed, 0 CONNECT"
+b=$(pack_test vscode-extensions vscode-extensions.md)
+echo "$b" | grep -qF "2× ms-python" && echo "$b" | grep -qF "1× rust-lang.rust-analyzer" || fail "vscode-extensions: publishers or names missing: $b"
+ok "vscode-extensions: publishers and names read, 0 CONNECT"
+b=$(pack_test vscode-settings-audit vscode-settings.md)
+echo "$b" | grep -qF "1× github.copilot.advanced.apiToken" && echo "$b" | grep -qF "telemetry.telemetryLevel" || fail "vscode-settings-audit: settings or the secret-looking name missing: $b"
+echo "$b" | grep -qF "REDACTED" && fail "vscode-settings-audit: a secret value leaked: $b"
+ok "vscode-settings-audit: settings read, secret-looking names listed, values not echoed, 0 CONNECT"
+b=$(pack_test bookmarks-digest bookmarks.md)
+echo "$b" | grep -qF "3× example.com" && echo "$b" | grep -qF "1× Work" || fail "bookmarks-digest: sites or folders missing: $b"
+ok "bookmarks-digest: sites and folders read from an html export, 0 CONNECT"
+b=$(pack_test browser-history-takeout browser-history.md)
+echo "$b" | grep -qF "3× example.com" && echo "$b" | grep -qF "3× LINK" || fail "browser-history-takeout: sites or transitions missing: $b"
+ok "browser-history-takeout: sites and transitions read, 0 CONNECT"
+b=$(pack_test mac-apps-inventory mac-apps.md)
+echo "$b" | grep -qF "2× Apple" && echo "$b" | grep -qF "1× Identified Developer" || fail "mac-apps-inventory: sources missing: $b"
+echo "$b" | grep -qF "/Users/example" && fail "mac-apps-inventory: a home directory leaked: $b"
+ok "mac-apps-inventory: apps and sources read, home paths not echoed, 0 CONNECT"
+b=$(pack_test mac-launch-items mac-launch-items.md)
+echo "$b" | grep -qF "1× com.example.oldjob" && echo "$b" | grep -qF "1× homebrew.mxcl.postgresql" || fail "mac-launch-items: third-party labels missing: $b"
+ok "mac-launch-items: third-party labels and non-zero statuses read, 0 CONNECT"
+b=$(pack_test windows-services windows-services.md)
+echo "$b" | grep -qF "Running (3)" && echo "$b" | grep -qF "Automatic (3)" || fail "windows-services: status or start type missing: $b"
+ok "windows-services: status and start types counted, 0 CONNECT"
+b=$(pack_test windows-scheduled-tasks scheduled-tasks.md)
+echo "$b" | grep -qF "SYSTEM (3)" && echo "$b" | grep -qF "Enabled (2)" || fail "windows-scheduled-tasks: accounts or states missing: $b"
+echo "$b" | grep -qF "EXAMPLE-PC" && fail "windows-scheduled-tasks: the host name leaked: $b"
+ok "windows-scheduled-tasks: states and accounts read, host name not echoed, 0 CONNECT"
+
+for p in expense-sheet nda-review receipt-pdf sales-register-sheet inventory-sheet attendance-sheet invoice-model-brief meeting-notes-model; do
   (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "examples/keep-agents/$p") > "$WORK/pack-$p.out" 2>&1 || fail "$p: pack deploy failed: $(cat "$WORK/pack-$p.out")"
 done
 ok "expense-sheet, nda-review, receipt-pdf and both model packs deploy (specs validate on the server)"
@@ -460,13 +515,42 @@ r=$("$KEEPCTL" run nda-review "$WORK/nda.docx") || fail "nda-review run: $r"
 b=$(curl -sf "$BASE/v1/artifacts/$(echo "$r" | json artifacts.0.id)" | json body)
 echo "$b" | grep -qF "governed by the laws of Portugal" && echo "$b" | grep -qF "two (2) years" && echo "$b" | grep -qF "EUR 50,000" || fail "nda-review: clauses, durations or amounts missing: $b"
 ok "nda-review: docx read, governing law, duration and amount found, 0 CONNECT"
+python3 - "$WORK" <<'PY'
+import sys, zipfile
+w = sys.argv[1]
+def mk(path, name, rows):
+    strings, idx = [], {}
+    def si(x):
+        if x not in idx: idx[x] = len(strings); strings.append(x)
+        return idx[x]
+    body = "".join('<row r="%d">' % r + "".join('<c r="%s%d" t="s"><v>%d</v></c>' % ("ABCDEFGH"[c], r, si(str(v))) for c, v in enumerate(row)) + "</row>" for r, row in enumerate(rows, 1))
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("xl/workbook.xml", '<workbook><sheets><sheet name="%s" sheetId="1"/></sheets></workbook>' % name)
+        z.writestr("xl/sharedStrings.xml", "<sst>" + "".join("<si><t>%s</t></si>" % x for x in strings) + "</sst>")
+        z.writestr("xl/worksheets/sheet1.xml", "<worksheet><sheetData>" + body + "</sheetData></worksheet>")
+mk(w + "/sales.xlsx", "Register", [["date","customer","invoice_no","taxable_value","tax","total"],["2026-09-01","Acme Traders","INV-101","10000","1800","11800"],["2026-09-03","Globex Ltd","INV-102","5000","900","5900"],["2026-09-09","Acme Traders","INV-103","2500","450","2950"]])
+mk(w + "/stock.xlsx", "Stock", [["sku","description","qty","location","reorder_level"],["A-100","Widget","40","Warehouse A","20"],["B-220","Bracket","8","Warehouse A","15"],["C-330","Cable set","120","Warehouse B","30"]])
+mk(w + "/attendance.xlsx", "Sept", [["employee","date","status"],["E001","2026-09-01","Present"],["E001","2026-09-02","Leave"],["E002","2026-09-01","Present"],["E002","2026-09-02","Present"]])
+PY
+r=$("$KEEPCTL" run sales-register-sheet "$WORK/sales.xlsx") || fail "sales-register-sheet run: $r"
+b=$(curl -sf "$BASE/v1/artifacts/$(echo "$r" | json artifacts.0.id)" | json body)
+echo "$b" | grep -qF "Acme Traders (2)" || fail "sales-register-sheet: customers not counted: $b"
+ok "sales-register-sheet: xlsx read, rows per customer counted, 0 CONNECT"
+r=$("$KEEPCTL" run inventory-sheet "$WORK/stock.xlsx") || fail "inventory-sheet run: $r"
+b=$(curl -sf "$BASE/v1/artifacts/$(echo "$r" | json artifacts.0.id)" | json body)
+echo "$b" | grep -qF "Warehouse A (2)" || fail "inventory-sheet: locations not counted: $b"
+ok "inventory-sheet: xlsx read, rows per location counted, 0 CONNECT"
+r=$("$KEEPCTL" run attendance-sheet "$WORK/attendance.xlsx") || fail "attendance-sheet run: $r"
+b=$(curl -sf "$BASE/v1/artifacts/$(echo "$r" | json artifacts.0.id)" | json body)
+echo "$b" | grep -qF "E001 (2)" && echo "$b" | grep -qF "Present (3)" || fail "attendance-sheet: employees or statuses not counted: $b"
+ok "attendance-sheet: xlsx read, rows per employee and status counted, 0 CONNECT"
 printf '%%PDF-1.4' > "$WORK/inv.pdf"
 code=$(curl -s -o "$WORK/mb.out" -w '%{http_code}' -X POST -F "file=@$WORK/inv.pdf" "$BASE/v1/demos/invoice-model-brief")
 [[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mb.out" || fail "invoice-model-brief must be refused by the vault out of the box (403): $code $(cat "$WORK/mb.out")"
 code=$(curl -s -o "$WORK/mn.out" -w '%{http_code}' -X POST -F note=none "$BASE/v1/demos/meeting-notes-model")
 [[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mn.out" || fail "meeting-notes-model must be refused by the vault out of the box (403): $code $(cat "$WORK/mn.out")"
 ok "both model packs are refused (403) until an operator allows their endpoint"
-for p in status-page-watch mailbox-triage api-facts chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims expense-sheet nda-review receipt-pdf invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
+for p in status-page-watch mailbox-triage api-facts chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims github-prs github-issues github-actions-log dependabot-alerts git-log-digest xcodebuild-log xcode-crash-log vscode-extensions vscode-settings-audit bookmarks-digest browser-history-takeout mac-apps-inventory mac-launch-items windows-services windows-scheduled-tasks expense-sheet nda-review receipt-pdf sales-register-sheet inventory-sheet attendance-sheet invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
 
 echo "demos-ci: an agent uses the model socket"
 MA="$WORK/model-agent"; cp -R "$ROOT/examples/keep-agents/model-agent" "$MA"
