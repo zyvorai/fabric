@@ -59,7 +59,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'One API, four front doors',
     description:
-      '780+ REST endpoints and 3 WebSocket channels behind a single daemon — CLI, Web console, Kubernetes operator, and Terraform provider all talk to the same API, so nothing drifts between them.',
+      'One daemon, one API. The CLI, web console, Kubernetes operator and Terraform provider all talk to it, so nothing drifts between them.',
     to: '/docs/PRODUCT_OVERVIEW',
     icon: ICONS.grid,
   },
@@ -80,7 +80,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Security-first architecture',
     description:
-      '31-round security audit: 194 issues identified and fixed, 0 outstanding. Zero unsafe Rust, zero shell pipelines, JWT + 3-tier RBAC on every endpoint, audit logging with export.',
+      'Role-based access on every endpoint, audit logging with export, and signed policy for the agents you run.',
     to: '/docs/SECURITY_AUDIT_REPORT',
     icon: ICONS.shield,
   },
@@ -94,7 +94,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: 'Enterprise features, no enterprise complexity',
     description:
-      'HA clustering with etcd leader election, live migration, generic PCI/VFIO GPU passthrough, LDAP/OIDC SSO — one 15MB binary instead of hundreds of packages.',
+      'High availability, GPU passthrough and LDAP/OIDC sign-in, without the weight of a traditional private-cloud stack.',
     to: '/docs/guides/decision-support/comparison-matrix',
     icon: ICONS.layers,
   },

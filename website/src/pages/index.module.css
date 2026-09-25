@@ -1,97 +1,101 @@
-.heroBanner {
-  padding: var(--zv-hero-space) 0 0;
+.hero {
   position: relative;
   overflow: hidden;
+  padding: clamp(4rem, 10vw, 7rem) 1.5rem 0;
+  text-align: center;
+  color: #e8eef5;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(110, 231, 183, 0.12), transparent 55%),
+    linear-gradient(180deg, #0a0e14 0%, #1a2330 60%, #0c1118 100%);
 }
 
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: clamp(3rem, 14vw, 6rem) 1.5rem 0;
-  }
-}
-
-.heroText {
+.heroInner {
   max-width: 46rem;
   margin: 0 auto;
 }
 
+.eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6ee7b7;
+}
+
+.title {
+  margin: 0 0 1.25rem;
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+  color: #fff;
+}
+
+.lede {
+  margin: 0 auto 2rem;
+  max-width: 36rem;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  line-height: 1.5;
+  color: #8b9bb0;
+}
+
 .buttons {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
   flex-wrap: wrap;
-  margin-top: 2.5rem;
+  gap: 0.75rem;
+  justify-content: center;
 }
 
-.heroMediaWrap {
-  max-width: 1100px;
-  margin: clamp(3rem, 7vw, 5.5rem) auto 0;
-  padding: 0 1.5rem;
-}
-
-.heroMedia {
+.cockpit {
   display: block;
-  width: 100%;
-  border-radius: 18px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
-  border: 1px solid var(--ifm-color-emphasis-200);
+  width: min(1000px, 100%);
+  height: auto;
+  margin: clamp(2.5rem, 6vw, 4.5rem) auto 0;
+  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent);
+  mask-image: linear-gradient(180deg, #000 78%, transparent);
 }
 
-.heroMediaCaption {
-  text-align: center;
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin-top: 1rem;
+.platform {
+  padding: clamp(3.5rem, 8vw, 6rem) 0;
 }
 
-.sectionHeading {
-  font-size: clamp(1.75rem, 3vw, 2.5rem);
-  letter-spacing: -0.02em;
-  margin-bottom: 1.25rem;
+.platformEyebrow {
+  margin: 0 0 0.75rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ifm-color-primary);
 }
 
-.problem {
-  padding: var(--zv-section-space) 0;
+.platformTitle {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.8rem, 4.4vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
 }
 
-.trust {
-  padding: var(--zv-section-space) 0;
+.platformLede {
+  margin: 0 auto 2.5rem;
+  max-width: 36rem;
+  font-size: 1.1rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.contact {
+  padding: clamp(3rem, 7vw, 5rem) 0;
   background: var(--ifm-color-emphasis-100);
 }
 
-.trustGrid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 2rem;
-  align-items: center;
+.ghost {
+  border: 1px solid rgba(232, 238, 245, 0.32);
+  background: transparent;
+  color: #e8eef5;
 }
 
-@media screen and (max-width: 768px) {
-  .trustGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.trustBadges {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-@media screen and (max-width: 768px) {
-  .trustBadges {
-    align-items: center;
-  }
-}
-
-.enterprise {
-  padding: var(--zv-section-space) 0;
-}
-
-.enterpriseCopy {
-  max-width: 38rem;
-  margin: 0 auto 2rem;
-  color: var(--ifm-color-emphasis-700);
+.ghost:hover {
+  background: rgba(232, 238, 245, 0.1);
+  color: #fff;
 }

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="../assets/keep/stack.svg" alt="Keep on Fabric on FluxVM" width="560">
+<img src="../assets/keep/cockpit.svg" alt="The Keep cockpit: a sealed cell, zero outbound connections, an approval waiting for you, and split-sight between the agent and you." width="900">
 
 # Keep
 
