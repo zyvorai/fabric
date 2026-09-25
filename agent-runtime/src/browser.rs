@@ -107,11 +107,7 @@ async fn session_agent(
 }
 
 /// Call the guest a11y driver (`POST /v1/tool` on DRIVER_PORT).
-pub async fn driver_call(
-    state: &AppState,
-    session_id: Uuid,
-    body: Value,
-) -> ApiResult<Value> {
+pub async fn driver_call(state: &AppState, session_id: Uuid, body: Value) -> ApiResult<Value> {
     let (session, agent) = session_agent(state, session_id).await?;
     if let Some(reason) = session.agent_paused_reason {
         return Err(ApiError::conflict(format!(
@@ -158,7 +154,9 @@ pub async fn driver_call(
                 .as_ref()
                 .is_none_or(|b| b.block_file_url)
         {
-            return Err(ApiError::forbidden("file:// URLs are denied by browser policy"));
+            return Err(ApiError::forbidden(
+                "file:// URLs are denied by browser policy",
+            ));
         }
         if let Ok(parsed) = url::Url::parse(url) {
             if let Some(host) = parsed.host_str() {
@@ -168,9 +166,7 @@ pub async fn driver_call(
                         if !goal.allow_hosts.is_empty()
                             && !crate::policy::host_matches_list(host, &goal.allow_hosts)
                         {
-                            return Err(ApiError::forbidden(
-                                "host outside goal.allow_hosts",
-                            ));
+                            return Err(ApiError::forbidden("host outside goal.allow_hosts"));
                         }
                     }
                 }
@@ -178,9 +174,7 @@ pub async fn driver_call(
                     if !bp.allow_hosts.is_empty()
                         && !crate::policy::host_matches_list(host, &bp.allow_hosts)
                     {
-                        return Err(ApiError::forbidden(
-                            "host not in browser.allow_hosts",
-                        ));
+                        return Err(ApiError::forbidden("host not in browser.allow_hosts"));
                     }
                     if crate::policy::host_matches_list(host, &bp.high_risk_hosts) {
                         return Err(ApiError::forbidden(
@@ -219,7 +213,8 @@ pub async fn driver_call(
     // IFC: paste/type that carries clipboard into a tab.
     if tool == "act" {
         let op = body.get("op").and_then(|v| v.as_str()).unwrap_or("");
-        if matches!(op, "fill" | "type") && body.get("from_clipboard").and_then(|v| v.as_bool()) == Some(true)
+        if matches!(op, "fill" | "type")
+            && body.get("from_clipboard").and_then(|v| v.as_bool()) == Some(true)
         {
             let tab_id = session
                 .browse
@@ -267,8 +262,7 @@ pub async fn driver_call(
                         .update_session(session_id, |s| {
                             s.browse.limits.taint_events =
                                 s.browse.limits.taint_events.saturating_add(1);
-                            s.agent_paused_reason =
-                                Some(crate::model::AgentPausedReason::Taint);
+                            s.agent_paused_reason = Some(crate::model::AgentPausedReason::Taint);
                         })
                         .await;
                     let _ = state
@@ -367,18 +361,9 @@ async fn after_browser_tool(
                 s.browse.steps.push(crate::browse_ifc::BrowseStep {
                     seq,
                     tool: tool.clone(),
-                    op: body
-                        .get("op")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
-                    url: body
-                        .get("url")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
-                    ref_id: body
-                        .get("ref")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
+                    op: body.get("op").and_then(|v| v.as_str()).map(str::to_string),
+                    url: body.get("url").and_then(|v| v.as_str()).map(str::to_string),
+                    ref_id: body.get("ref").and_then(|v| v.as_str()).map(str::to_string),
                     role: body
                         .get("role")
                         .or_else(|| result.get("role"))
@@ -995,11 +980,15 @@ pub async fn browser_capability(state: &AppState, session_id: Uuid) -> Value {
             "evidence_class": "software-test",
         });
     };
-    let confined = matches!(agent.manifest.confinement, crate::model::Confinement::Strict);
+    let confined = matches!(
+        agent.manifest.confinement,
+        crate::model::Confinement::Strict
+    );
     let cdp = agent.manifest.browser_port.is_some();
     let enabled = agent.manifest.browser.as_ref().is_none_or(|b| b.enabled);
-    let tools_ok = browser_tools_allowed(agent.manifest.confinement, agent.manifest.browser.as_ref()).is_ok()
-        && session.agent_paused_reason.is_none();
+    let tools_ok =
+        browser_tools_allowed(agent.manifest.confinement, agent.manifest.browser.as_ref()).is_ok()
+            && session.agent_paused_reason.is_none();
     let (snp, tdx) = state.launch_verified_flags().await;
     let evidence = if snp || tdx {
         "launch-verified"
@@ -1179,7 +1168,10 @@ pub(crate) async fn profile_inspect(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Value>> {
     let (session, agent) = session_agent(&state, id).await?;
-    let confined = matches!(agent.manifest.confinement, crate::model::Confinement::Strict);
+    let confined = matches!(
+        agent.manifest.confinement,
+        crate::model::Confinement::Strict
+    );
     let mut cookie_hosts: Vec<String> = session
         .browse
         .tabs
@@ -1192,7 +1184,13 @@ pub(crate) async fn profile_inspect(
     let cdp_version = if let Some(port) = agent.manifest.browser_port {
         state
             .fluxvm
-            .guest_request(session.sandbox_id, port, Method::GET, "json/version", None::<&Value>)
+            .guest_request(
+                session.sandbox_id,
+                port,
+                Method::GET,
+                "json/version",
+                None::<&Value>,
+            )
             .await
             .ok()
     } else {
@@ -1219,7 +1217,10 @@ pub(crate) async fn browser_doctor(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Value>> {
     let (session, agent) = session_agent(&state, id).await?;
-    let confined = matches!(agent.manifest.confinement, crate::model::Confinement::Strict);
+    let confined = matches!(
+        agent.manifest.confinement,
+        crate::model::Confinement::Strict
+    );
     let mut warnings = Vec::new();
     if !confined {
         warnings.push("confinement is not strict — guest can bypass HTTPS_PROXY");

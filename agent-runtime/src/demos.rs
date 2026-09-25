@@ -7,9 +7,7 @@ use crate::{
     app::{ApiError, ApiResult},
     audit::AuditPhase,
     goals::{ArtifactRecord, GoalRecord, GoalStatus},
-    model::{
-        SessionRecord, SessionStartMode, SessionStartPolicy, SessionStatus,
-    },
+    model::{SessionRecord, SessionStartMode, SessionStartPolicy, SessionStatus},
     AppState,
 };
 use axum::{
@@ -59,8 +57,7 @@ pub(crate) async fn demo_pdf_brief(
         return Err(ApiError::bad_request("empty PDF"));
     }
 
-    let template = std::env::var("ZYVOR_DEMO_TEMPLATE")
-        .unwrap_or_else(|_| "node22-agent".into());
+    let template = std::env::var("ZYVOR_DEMO_TEMPLATE").unwrap_or_else(|_| "node22-agent".into());
     let id = Uuid::new_v4();
     let sandbox = state
         .fluxvm
@@ -90,10 +87,7 @@ pub(crate) async fn demo_pdf_brief(
                 Some(&id.to_string()),
                 Some("pdf-brief"),
             );
-            let _ = state
-                .fluxvm
-                .set_network_policy(sandbox.id, &policy)
-                .await;
+            let _ = state.fluxvm.set_network_policy(sandbox.id, &policy).await;
         }
     }
 

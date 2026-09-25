@@ -175,20 +175,20 @@ async fn call_tool(state: &Arc<AppState>, params: &Value) -> Result<Value, (i32,
         .and_then(Value::as_str)
         .ok_or((-32602, "tools/call requires name".to_string()))?;
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
-    let value = match name {
-        "list_agents" => json!({"items": state.store.list_agents().await}),
-        "list_executions" => list_executions(state, &args).await?,
-        "chat_with_agent" => chat(state, &args).await?,
-        "browser_open" => {
-            browser_tool_proxy(
-                state,
-                &args,
-                json!({"tool": "open", "url": args.get("url")}),
-            )
-            .await?
-        }
-        "browser_snapshot" => {
-            browser_tool_proxy(
+    let value =
+        match name {
+            "list_agents" => json!({"items": state.store.list_agents().await}),
+            "list_executions" => list_executions(state, &args).await?,
+            "chat_with_agent" => chat(state, &args).await?,
+            "browser_open" => {
+                browser_tool_proxy(
+                    state,
+                    &args,
+                    json!({"tool": "open", "url": args.get("url")}),
+                )
+                .await?
+            }
+            "browser_snapshot" => browser_tool_proxy(
                 state,
                 &args,
                 json!({
@@ -196,31 +196,30 @@ async fn call_tool(state: &Arc<AppState>, params: &Value) -> Result<Value, (i32,
                     "interactive": args.get("interactive").and_then(|v| v.as_bool()).unwrap_or(true)
                 }),
             )
-            .await?
-        }
-        "browser_act" => {
-            // Never forward secret/password to the guest driver — host fill-secret only.
-            let mut body = json!({"tool": "act"});
-            if let Some(obj) = body.as_object_mut() {
-                for key in ["op", "ref", "text", "key", "dy"] {
-                    if let Some(v) = args.get(key) {
-                        obj.insert(key.to_string(), v.clone());
+            .await?,
+            "browser_act" => {
+                // Never forward secret/password to the guest driver — host fill-secret only.
+                let mut body = json!({"tool": "act"});
+                if let Some(obj) = body.as_object_mut() {
+                    for key in ["op", "ref", "text", "key", "dy"] {
+                        if let Some(v) = args.get(key) {
+                            obj.insert(key.to_string(), v.clone());
+                        }
                     }
                 }
+                browser_tool_proxy(state, &args, body).await?
             }
-            browser_tool_proxy(state, &args, body).await?
-        }
-        "browser_tabs" => browser_tool_proxy(state, &args, json!({"tool": "tabs"})).await?,
-        "browser_close" => {
-            browser_tool_proxy(
-                state,
-                &args,
-                json!({"tool": "close", "tab": args.get("tab")}),
-            )
-            .await?
-        }
-        _ => return Err((-32602, format!("unknown tool {name}"))),
-    };
+            "browser_tabs" => browser_tool_proxy(state, &args, json!({"tool": "tabs"})).await?,
+            "browser_close" => {
+                browser_tool_proxy(
+                    state,
+                    &args,
+                    json!({"tool": "close", "tab": args.get("tab")}),
+                )
+                .await?
+            }
+            _ => return Err((-32602, format!("unknown tool {name}"))),
+        };
     Ok(json!({
         "content": [{ "type": "text", "text": value.to_string() }],
         "isError": false

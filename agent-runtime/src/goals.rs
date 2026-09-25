@@ -322,7 +322,8 @@ pub(crate) async fn goal_browse(
         .session_id
         .ok_or_else(|| ApiError::bad_request("goal needs session_id before browse"))?;
     if let Some(host) = crate::browse_ifc::host_from_url(&req.url) {
-        if !goal.allow_hosts.is_empty() && !crate::policy::host_matches_list(&host, &goal.allow_hosts)
+        if !goal.allow_hosts.is_empty()
+            && !crate::policy::host_matches_list(&host, &goal.allow_hosts)
         {
             return Err(ApiError::forbidden("host outside goal.allow_hosts"));
         }

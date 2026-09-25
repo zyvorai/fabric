@@ -116,14 +116,7 @@ mod tests {
 
     #[test]
     fn proxy_port_is_left_out_when_the_proxy_is_off() {
-        let policy = strict_policy(
-            "10.0.2.1".parse().unwrap(),
-            18082,
-            None,
-            &[],
-            None,
-            None,
-        );
+        let policy = strict_policy("10.0.2.1".parse().unwrap(), 18082, None, &[], None, None);
         assert_eq!(policy["allow_ports"], json!(["tcp/18082"]));
     }
 

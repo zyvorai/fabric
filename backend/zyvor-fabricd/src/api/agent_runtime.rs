@@ -28,8 +28,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::{
-    client::IntoClientRequest,
-    http::header::AUTHORIZATION as WS_AUTHORIZATION,
+    client::IntoClientRequest, http::header::AUTHORIZATION as WS_AUTHORIZATION,
     Message as TungsteniteMessage,
 };
 
@@ -490,10 +489,7 @@ pub async fn demo_pdf_brief(
         Err(resp) => return resp,
     };
     let url = format!("{base}/v1/demos/pdf-brief");
-    let ct = request
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .cloned();
+    let ct = request.headers().get(header::CONTENT_TYPE).cloned();
     let body = match axum::body::to_bytes(request.into_body(), 32 * 1024 * 1024).await {
         Ok(b) => b,
         Err(e) => {
@@ -599,11 +595,7 @@ pub async fn session_browser_screencast(
     let ws_base = match http_base_to_ws(&base) {
         Ok(u) => u,
         Err(msg) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": msg })),
-            )
-                .into_response();
+            return (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response();
         }
     };
     let url = format!("{ws_base}/v1/sessions/{id}/browser/screencast");

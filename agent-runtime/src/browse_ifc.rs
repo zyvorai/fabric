@@ -161,9 +161,7 @@ pub fn check_cite_to_model(artifact: &OriginSet, goal_allow: &OriginSet) -> IfcV
 }
 
 pub fn normalize_host(host: &str) -> String {
-    host.trim_end_matches('.')
-        .trim()
-        .to_ascii_lowercase()
+    host.trim_end_matches('.').trim().to_ascii_lowercase()
 }
 
 pub fn host_from_url(url: &str) -> Option<String> {
@@ -216,7 +214,10 @@ pub fn render_browse_script(session_id: Uuid, steps: &[BrowseStep]) -> String {
     out.push_str("  const context = browser.contexts()[0] || await browser.newContext();\n");
     out.push_str("  const page = context.pages()[0] || await context.newPage();\n");
     for step in steps {
-        out.push_str(&format!("  // seq {} tool={} at {}\n", step.seq, step.tool, step.at));
+        out.push_str(&format!(
+            "  // seq {} tool={} at {}\n",
+            step.seq, step.tool, step.at
+        ));
         match step.tool.as_str() {
             "open" => {
                 if let Some(url) = &step.url {

@@ -1223,10 +1223,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/sessions/{id}/cockpit",
             get(api::agent_runtime::session_cockpit),
         )
-        .route(
-            "/demos/pdf-brief",
-            post(api::agent_runtime::demo_pdf_brief),
-        )
+        .route("/demos/pdf-brief", post(api::agent_runtime::demo_pdf_brief))
         .route(
             "/sessions/{id}/host-recover",
             post(api::agent_runtime::session_host_recover),
