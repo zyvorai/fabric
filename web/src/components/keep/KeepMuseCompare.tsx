@@ -1,47 +1,50 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-/** Muse-caliber Muse vs Keep (+ Fabric / FluxVM) comparison — marketing only. */
+/**
+ * Meta Muse vs Keep (+ Fabric / FluxVM) — marketing only. Every row is stated in
+ * docs/keep/KEEP.md; rows with no source for the Muse side are left out.
+ */
 const ROWS: { label: string; muse: string; keep: string }[] = [
   {
     label: 'Where it runs',
-    muse: 'Meta cloud only',
-    keep: 'Your laptop, mini-PC, FluxVM host, or rented SNP/TDX — same API',
+    muse: 'Meta’s cloud only.',
+    keep: 'Your laptop, mini-PC or FluxVM host.',
   },
   {
     label: 'Policy',
-    muse: 'Closed Sentinel',
-    keep: 'Signed keep.policy.yaml you can diff in git',
+    muse: 'A closed policy engine.',
+    keep: 'A signed keep.policy.yaml you can diff in git.',
   },
   {
-    label: 'Cell',
-    muse: 'Often nspawn — shared kernel with Sentinel',
-    keep: 'Firecracker / KVM microVM via FluxVM',
+    label: 'The cell',
+    muse: 'A container-style cell that shares a kernel with its policy engine.',
+    keep: 'A Firecracker/KVM microVM on FluxVM, with its own kernel.',
   },
   {
     label: 'Model',
-    muse: 'Married to Muse Spark',
-    keep: 'BYO model socket',
+    muse: 'Tied to Muse Spark.',
+    keep: 'Bring your own model socket.',
   },
   {
     label: 'Training',
-    muse: 'Trajectories may train after sanitize',
-    keep: 'Default off — export needs a scoped token',
+    muse: 'Trajectories may train after sanitization.',
+    keep: 'Off by default. Export needs a scoped token.',
   },
   {
-    label: 'Host eBPF',
-    muse: 'Not a tenant-owned pin you can show',
-    keep: 'FluxVM TC: deny_udp + gateway-only ports; cockpit CONNECT 0',
+    label: 'Secrets',
+    muse: 'Surrogates swapped in at egress.',
+    keep: 'The same idea: the vault injects on the host, and the agent never sees a real secret.',
   },
   {
-    label: 'Proof on stage',
-    muse: 'Trust Meta’s story',
-    keep: 'Keep audit journal + FluxVM drop_reasons (PacketWolf optional)',
+    label: 'Browser',
+    muse: 'A measured, accessibility-style appliance.',
+    keep: 'The same idea: the agent sees structure, you see pixels.',
   },
   {
-    label: 'Leave',
-    muse: 'Hard',
-    keep: 'keepctl pack / unpack onto another FluxVM',
+    label: 'Honesty',
+    muse: 'A footnote.',
+    keep: 'Up front: measured means software-test until verified hardware.',
   },
 ]
 
@@ -49,38 +52,44 @@ export default function KeepMuseCompare() {
   return (
     <div className="keep-mkt-versus">
       <p className="keep-mkt-stack-lede">
-        Muse got the threat model right. Keep ships the open version Meta cannot — on Fabric and
-        FluxVM, not a third VMM.
+        Muse got the threat model right: treat the model as compromised the moment it reads a
+        webpage. Keep is the version you run, read and take with you.
       </p>
 
-      <ol className="keep-mkt-stack" aria-label="Stack">
+      <ol className="keep-mkt-stack" aria-label="Who does what">
         <li>
-          <span className="keep-mkt-stack-name">Muse</span>
-          <span className="keep-mkt-stack-role">Closed personal agent on Meta’s cloud</span>
+          <span className="keep-mkt-stack-name">Meta Muse</span>
+          <span className="keep-mkt-stack-role">
+            A closed personal-agent product that runs on Meta’s cloud.
+          </span>
         </li>
         <li>
           <span className="keep-mkt-stack-name">Keep</span>
           <span className="keep-mkt-stack-role">
-            Product layer — policy, vault, approvals, browser, demos
+            The open product layer: policy, vault, approvals, browser and demos.
           </span>
         </li>
         <li>
           <span className="keep-mkt-stack-name">Fabric</span>
           <span className="keep-mkt-stack-role">
-            Control plane — console, JWT, Agents / Sessions
+            The control plane: console, sign-in, agents and sessions, and the front door to Keep’s
+            APIs.
           </span>
         </li>
         <li>
           <span className="keep-mkt-stack-name">FluxVM</span>
           <span className="keep-mkt-stack-role">
-            Hypervisor — the cell + host TC/eBPF pin
+            The hypervisor: it runs the cell and enforces the network rules on the host.
           </span>
         </li>
       </ol>
+      <p className="keep-mkt-stage-line">
+        Keep is not a third hypervisor. Keep is Fabric’s agent runtime plus a FluxVM cell.
+      </p>
 
       <div className="keep-mkt-versus-head" aria-hidden>
         <span />
-        <span>Muse</span>
+        <span>Meta Muse</span>
         <span>Keep</span>
       </div>
       <ul className="keep-mkt-versus-rows">
@@ -92,13 +101,6 @@ export default function KeepMuseCompare() {
           </li>
         ))}
       </ul>
-
-      <p className="keep-mkt-stage-line">
-        Muse: agent computer in Meta’s cloud.
-        <br />
-        Keep: same idea on <em>your</em> FluxVM — signed policy, and CONNECT 0 from Keep’s journal +
-        FluxVM’s pin.
-      </p>
     </div>
   )
 }

@@ -27,46 +27,47 @@ function SplitSight(): ReactNode {
   );
 }
 
+// Every row is stated in docs/keep/KEEP.md. Rows with no source for the Muse side are left out.
 const COMPARE_ROWS = [
   {
     label: 'Where it runs',
-    muse: 'Meta cloud only',
-    keep: 'Your laptop, mini-PC, FluxVM host, or rented SNP/TDX — same API',
+    muse: 'Meta’s cloud only.',
+    keep: 'Your laptop, mini-PC or FluxVM host.',
   },
   {
     label: 'Policy',
-    muse: 'Closed Sentinel',
-    keep: 'Signed keep.policy.yaml you can diff in git',
+    muse: 'A closed policy engine.',
+    keep: 'A signed keep.policy.yaml you can diff in git.',
   },
   {
-    label: 'Cell',
-    muse: 'Often nspawn — shared kernel with Sentinel',
-    keep: 'Firecracker / KVM microVM via FluxVM',
+    label: 'The cell',
+    muse: 'A container-style cell that shares a kernel with its policy engine.',
+    keep: 'A Firecracker/KVM microVM on FluxVM, with its own kernel.',
   },
   {
     label: 'Model',
-    muse: 'Married to Muse Spark',
-    keep: 'BYO model socket',
+    muse: 'Tied to Muse Spark.',
+    keep: 'Bring your own model socket.',
   },
   {
     label: 'Training',
-    muse: 'Trajectories may train after sanitize',
-    keep: 'Default off — export needs a scoped token',
+    muse: 'Trajectories may train after sanitization.',
+    keep: 'Off by default. Export needs a scoped token.',
   },
   {
-    label: 'Host eBPF',
-    muse: 'Not a tenant-owned pin you can show',
-    keep: 'FluxVM TC: deny_udp + gateway-only ports; cockpit CONNECT 0',
+    label: 'Secrets',
+    muse: 'Surrogates swapped in at egress.',
+    keep: 'The same idea: the vault injects on the host, and the agent never sees a real secret.',
   },
   {
-    label: 'Proof on stage',
-    muse: 'Trust Meta’s story',
-    keep: 'Keep audit journal + FluxVM drop_reasons (PacketWolf optional)',
+    label: 'Browser',
+    muse: 'A measured, accessibility-style appliance.',
+    keep: 'The same idea: the agent sees structure, you see pixels.',
   },
   {
-    label: 'Leave',
-    muse: 'Hard',
-    keep: 'keepctl pack / unpack onto another FluxVM',
+    label: 'Honesty',
+    muse: 'A footnote.',
+    keep: 'Up front: measured means software-test until verified hardware.',
   },
 ] as const;
 
@@ -74,32 +75,42 @@ function MuseCompare(): ReactNode {
   return (
     <>
       <p className={styles.stackLede}>
-        Muse got the threat model right. Keep ships the open version Meta cannot — on Fabric and
-        FluxVM, not a third VMM.
+        Muse got the threat model right: treat the model as compromised the moment it reads a
+        webpage. Keep is the version you run, read and take with you.
       </p>
-      <ol className={styles.stack} aria-label="Stack">
+      <ol className={styles.stack} aria-label="Who does what">
         <li>
-          <span className={styles.stackName}>Muse</span>
-          <span className={styles.stackRole}>Closed personal agent on Meta’s cloud</span>
+          <span className={styles.stackName}>Meta Muse</span>
+          <span className={styles.stackRole}>
+            A closed personal-agent product that runs on Meta’s cloud.
+          </span>
         </li>
         <li>
           <span className={styles.stackName}>Keep</span>
           <span className={styles.stackRole}>
-            Product layer — policy, vault, approvals, browser, demos
+            The open product layer: policy, vault, approvals, browser and demos.
           </span>
         </li>
         <li>
           <span className={styles.stackName}>Fabric</span>
-          <span className={styles.stackRole}>Control plane — console, JWT, Agents / Sessions</span>
+          <span className={styles.stackRole}>
+            The control plane: console, sign-in, agents and sessions, and the front door to Keep’s
+            APIs.
+          </span>
         </li>
         <li>
           <span className={styles.stackName}>FluxVM</span>
-          <span className={styles.stackRole}>Hypervisor — the cell + host TC/eBPF pin</span>
+          <span className={styles.stackRole}>
+            The hypervisor: it runs the cell and enforces the network rules on the host.
+          </span>
         </li>
       </ol>
+      <p className={styles.stageLine}>
+        Keep is not a third hypervisor. Keep is Fabric’s agent runtime plus a FluxVM cell.
+      </p>
       <div className={styles.versusHead} aria-hidden>
         <span />
-        <span>Muse</span>
+        <span>Meta Muse</span>
         <span>Keep</span>
       </div>
       <ul className={styles.versusRows}>
@@ -111,12 +122,6 @@ function MuseCompare(): ReactNode {
           </li>
         ))}
       </ul>
-      <p className={styles.stageLine}>
-        Muse: agent computer in Meta’s cloud.
-        <br />
-        Keep: same idea on <em>your</em> FluxVM — signed policy, and CONNECT 0 from Keep’s journal +
-        FluxVM’s pin.
-      </p>
     </>
   );
 }
@@ -149,7 +154,7 @@ export default function KeepPage(): ReactNode {
   return (
     <Layout
       title="Keep — your agent gets a real computer"
-      description="Keep: FluxVM cell, signed policy, host eBPF. Stage demo PDF → brief.md with cockpit CONNECT 0. Muse-caliber product story — not Muse consumer chrome.">
+      description="An open-source workstation for an untrusted AI agent: a sealed FluxVM cell, signed policy and network rules enforced on the host, on hardware you control.">
       <main className={styles.page}>
         <header className={styles.hero}>
           <div className={styles.heroInner}>
@@ -160,13 +165,12 @@ export default function KeepPage(): ReactNode {
               You keep the keys.
             </Heading>
             <p className={styles.lede}>
-              A FluxVM cell for an untrusted agent — signed policy, vaulted credentials, and host
-              eBPF so zero CONNECT is a number you can show on stage. Open source in Fabric; no
-              second VMM.
+              Keep gives an untrusted AI agent its own sealed computer on hardware you control, while
+              you hold the policy, the credentials and the approvals. Open source.
             </p>
             <div className={styles.btnrow}>
               <Link className="button button--secondary button--lg" to="/docs/tutorials/keep-pdf-brief">
-                Tutorial 17 — PDF brief
+                Try the PDF demo
               </Link>
               <Link
                 className="button button--outline button--lg button--secondary"
@@ -178,85 +182,80 @@ export default function KeepPage(): ReactNode {
           </div>
         </header>
 
-        <Section eyebrow="Stage demo" title="One click the audience understands">
+        <Section eyebrow="See it work" title="Drop in a PDF. Get a brief.">
           <p className={styles.body}>
-            Open Keep, drop a vendor PDF, click Brief this PDF. Three chips flip — cell up, extract,
-            brief.md — and the cockpit shows CONNECT 0. No browser. No hope-based firewall.
+            Give Keep a vendor PDF and it hands back a one-page brief. The agent works inside its cell
+            with no browser, and the cockpit shows zero outbound connections.
           </p>
-          <div className={styles.storyboard} aria-hidden>
+          <div className={styles.storyboard}>
             <div className={styles.chips}>
-              {['cell up', 'extract', 'brief.md'].map((c) => (
+              {['Cell up', 'Extract', 'Brief ready'].map((c) => (
                 <span key={c} className={`${styles.chip} ${styles.chipOn}`}>
                   {c}
                 </span>
               ))}
             </div>
             <div className={styles.connect}>
-              <span className={styles.connectLabel}>CONNECT</span>
+              <span className={styles.connectLabel}>Outbound connections</span>
               <span className={styles.connectNum}>0</span>
             </div>
             <p className={styles.storyNote}>
-              Zero CONNECT from Keep’s journal + FluxVM pin — PacketWolf optional.
+              Counted from Keep’s own audit log and enforced on the host.
             </p>
           </div>
           <p className={styles.crumb}>
-            ./scripts/keep-demo-pdf.sh · POST /v1/demos/pdf-brief ·{' '}
-            <Link to="/docs/tutorials/keep-pdf-brief">Tutorial 17</Link>
+            <Link to="/docs/tutorials/keep-pdf-brief">Run it yourself →</Link>
           </p>
         </Section>
 
-        <Section eyebrow="Host eBPF" title="The layer Muse cannot give a tenant" tint>
+        <Section eyebrow="Enforced by the host" title="The agent never polices itself." tint>
           <p className={styles.body}>
-            Policy lives on the FluxVM veth: gateway-only broker ports, deny_udp for QUIC and WebRTC,
-            metadata and public DNS on the deny list. The guest never gets to be the enforcer.
-            Cockpit egress proof — freeze on ebpf_deny when CONNECT slips.
+            The network rules live on the host, outside the agent’s reach. Only the gateway is
+            reachable, QUIC and WebRTC are blocked, and cloud metadata and public DNS are denied. If a
+            connection slips through anyway, the session freezes.
           </p>
           <p className={styles.crumb}>
-            <Link to="/docs/keep/confine">docs/keep/confine</Link> · keepctl cockpit · curl
-            --noproxy &apos;*&apos; should fail
+            <Link to="/docs/keep/confine">How host confinement works →</Link>
           </p>
         </Section>
 
-        <Section eyebrow="Day to day" title="Goal · approval · artifact">
+        <Section eyebrow="Day to day" title="Set a goal. Approve what matters.">
           <p className={styles.body}>
-            Deploy a pack, start a session, work the loop. Operate from the Keep cockpit — honesty
-            badge, CONNECT count, browser tabs when you need them. Sessions keep running after you
-            close the console.
+            Deploy a ready-made agent, start a session and follow it from the cockpit: what the agent
+            is doing, what it touched, and what is waiting for your approval.
           </p>
           <p className={styles.crumb}>
-            ./scripts/keep-pack-demo.sh · <Link to="/docs/tutorials/keep-workstation">Tutorial 16</Link>
+            <Link to="/docs/tutorials/keep-workstation">Hands-on tutorial →</Link>
           </p>
         </Section>
 
-        <Section
-          eyebrow="Brokered browser"
-          title="Measured appliance — not a tool the model “has”"
-          tint>
+        <Section eyebrow="The browser" title="The agent sees structure. You see the page." tint>
           <p className={styles.body}>
-            The model proposes open, snapshot, act. Chromium, CDP, and the proxy stay host objects.
-            Agent sees a11y refs; you see pixels and screencast. Pause for vault fill or operator
-            watch — first-class session state.
+            When the agent needs a browser, the model proposes and Keep’s host-side browser acts. The
+            agent reads an accessibility outline of the page. You watch the real pixels, and you can
+            pause a session to step in yourself.
           </p>
           <p className={styles.crumb}>
-            <Link to="/docs/keep/browser/BROWSER-0.3">Browser 0.3</Link> · keepctl browser tabs|shot
+            <Link to="/docs/keep/browser/BROWSER-0.3">Browser 0.3 →</Link>
           </p>
         </Section>
 
-        <Section
-          eyebrow="Muse · Keep · Fabric · FluxVM"
-          title="Same threat model. You keep the host.">
+        <Section eyebrow="Meta Muse vs Keep" title="Same threat model. Different owner.">
           <MuseCompare />
           <p className={styles.honesty}>
-            Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class stays{' '}
-            <code>software-test</code> — never marketed as “the operator cannot read this.” Muse
-            Secure VM has the same limit today; they put it in a footnote. We put it here.
+            Honest about the limits: Keep runs on measured VMs today, and its evidence class is{' '}
+            <code>software-test</code>. Until it runs on verified confidential hardware with a key
+            only you hold, the host can still see inside the VM, and we will not claim otherwise.
           </p>
           <div className={styles.btnrowEnd}>
             <Link className="button button--primary button--lg" to="/docs/tutorials/keep-pdf-brief">
-              Run Tutorial 17
+              Try the PDF demo
             </Link>
             <Link className="button button--outline button--lg" to="/docs/keep/demos/pdf-brief">
               PDF brief demo docs
+            </Link>
+            <Link className="button button--outline button--lg" to="/compare">
+              Full comparison →
             </Link>
           </div>
         </Section>

@@ -8,6 +8,8 @@ import KeepDemoStoryboard from '../../components/keep/KeepDemoStoryboard'
 import KeepSplitSight from '../../components/keep/KeepSplitSight'
 import KeepMuseCompare from '../../components/keep/KeepMuseCompare'
 
+const DOCS = 'https://github.com/zyvorai/fabric/blob/main/docs'
+
 export default function Keep() {
   const { isAuthenticated } = useAuth()
   const primaryTo = isAuthenticated ? '/app/keep' : '/sign-in'
@@ -24,8 +26,8 @@ export default function Keep() {
             You keep the keys.
           </h1>
           <p className="lede mkt-reveal-delay">
-            A FluxVM cell for an untrusted agent — signed policy, vaulted credentials, and host eBPF
-            so zero CONNECT is a number you can show on stage.
+            Keep gives an untrusted AI agent its own sealed computer on hardware you control, while
+            you hold the policy, the credentials and the approvals. Open source.
           </p>
           <div className="mkt-cta-row mkt-reveal-delay-2">
             <Link to={primaryTo} className="zf-btn zf-btn-primary">
@@ -41,95 +43,94 @@ export default function Keep() {
         </section>
 
         <section className="keep-mkt-section">
-          <p className="keep-mkt-eyebrow">Stage demo</p>
-          <h2>One click the audience understands</h2>
+          <p className="keep-mkt-eyebrow">See it work</p>
+          <h2>Drop in a PDF. Get a brief.</h2>
           <p>
-            Open Keep, drop a vendor PDF, click Brief this PDF. Three chips flip — cell up, extract,
-            brief.md — and the cockpit shows CONNECT 0. No browser. No hope-based firewall.
+            Give Keep a vendor PDF and it hands back a one-page brief. The agent works inside its
+            cell with no browser, and the cockpit shows zero outbound connections.
           </p>
           <KeepDemoStoryboard />
           <p className="keep-mkt-crumb">
-            ./scripts/keep-demo-pdf.sh · POST /v1/demos/pdf-brief · Tutorial 17
+            <a href={`${DOCS}/tutorials/17-keep-pdf-brief.md`} target="_blank" rel="noreferrer">
+              Run it yourself →
+            </a>
           </p>
         </section>
 
         <section className="keep-mkt-section">
-          <p className="keep-mkt-eyebrow">Host eBPF</p>
-          <h2>The layer Muse cannot give a tenant</h2>
+          <p className="keep-mkt-eyebrow">Enforced by the host</p>
+          <h2>The agent never polices itself.</h2>
           <p>
-            Policy lives on the FluxVM veth: gateway-only broker ports, deny_udp for QUIC and
-            WebRTC, metadata and public DNS on the deny list. The guest never gets to be the
-            enforcer. Open the cockpit egress proof — or freeze on ebpf_deny when CONNECT slips.
+            The network rules live on the host, outside the agent’s reach. Only the gateway is
+            reachable, QUIC and WebRTC are blocked, and cloud metadata and public DNS are denied. If
+            a connection slips through anyway, the session freezes.
           </p>
           <p className="keep-mkt-crumb">
-            /app/keep/:id · keepctl cockpit · curl --noproxy &apos;*&apos; should fail
+            <a href={`${DOCS}/keep/confine.md`} target="_blank" rel="noreferrer">
+              How host confinement works →
+            </a>
           </p>
         </section>
 
         <section className="keep-mkt-section">
           <p className="keep-mkt-eyebrow">Day to day</p>
-          <h2>Goal · approval · artifact</h2>
+          <h2>Set a goal. Approve what matters.</h2>
           <p>
-            Deploy a pack, start a session, work the loop. Operate from the Keep cockpit — honesty
-            badge, CONNECT count, browser tabs when you need them. Sessions keep running after you
-            close the console.
+            Deploy a ready-made agent, start a session and follow it from the cockpit: what the
+            agent is doing, what it touched, and what is waiting for your approval.
           </p>
           <p className="keep-mkt-crumb">
-            ./scripts/keep-pack-demo.sh infra-ops · Agents → Sessions · Tutorial 16
+            <a href={`${DOCS}/tutorials/16-keep-workstation.md`} target="_blank" rel="noreferrer">
+              Hands-on tutorial →
+            </a>
           </p>
         </section>
 
         <section className="keep-mkt-section">
-          <p className="keep-mkt-eyebrow">Brokered browser</p>
-          <h2>Measured appliance — not a tool the model “has”</h2>
+          <p className="keep-mkt-eyebrow">The browser</p>
+          <h2>The agent sees structure. You see the page.</h2>
           <p>
-            The model proposes open, snapshot, act. Chromium, CDP, and the proxy stay host objects.
-            Agent sees a11y refs; you see pixels and screencast. Pause for vault fill or operator
-            watch — first-class session state, not a chat sidebar.
-          </p>
-          <p className="keep-mkt-crumb">
-            browser-agent · keepctl browser tabs|shot · keepctl session pause
+            When the agent needs a browser, the model proposes and Keep’s host-side browser acts.
+            The agent reads an accessibility outline of the page. You watch the real pixels, and you
+            can pause a session to step in yourself.
           </p>
         </section>
 
         <section className="keep-mkt-section">
-          <p className="keep-mkt-eyebrow">Muse · Keep · Fabric · FluxVM</p>
-          <h2>Same threat model. You keep the host.</h2>
+          <p className="keep-mkt-eyebrow">Meta Muse vs Keep</p>
+          <h2>Same threat model. Different owner.</h2>
           <KeepMuseCompare />
           <p className="keep-mkt-honesty">
-            Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class stays{' '}
-            <code className="font-mono text-[13px]">software-test</code> — never marketed as “the
-            operator cannot read this.” Muse Secure VM has the same limit today; they put it in a
-            footnote. We put it here.
+            Honest about the limits: Keep runs on measured VMs today, and its evidence class is{' '}
+            <code className="font-mono text-[13px]">software-test</code>. Until it runs on verified
+            confidential hardware with a key only you hold, the host can still see inside the VM,
+            and we will not claim otherwise.
           </p>
         </section>
 
         <section className="mkt-band">
-          <h2>Run the stage demo</h2>
-          <p>
-            Sign in, open Keep, brief a PDF — zero CONNECT from Keep’s journal and FluxVM’s pin.
-            PacketWolf optional.
-          </p>
+          <h2>Try Keep on Fabric</h2>
+          <p>Brief a PDF and watch the cockpit stay at zero outbound connections.</p>
           <div className="flex flex-wrap gap-3 mt-6 justify-center">
             <Link to={primaryTo} className="zf-btn mkt-band-cta">
               {isAuthenticated ? 'Open Keep' : 'Sign in'}
             </Link>
             <a
-              href="https://github.com/zyvorai/fabric/blob/main/docs/tutorials/17-keep-pdf-brief.md"
+              href={`${DOCS}/tutorials/17-keep-pdf-brief.md`}
               className="zf-btn zf-btn-secondary"
               target="_blank"
               rel="noreferrer"
             >
-              Tutorial 17 →
+              PDF demo tutorial →
             </a>
             <a
-              href="https://github.com/zyvorai/fabric/blob/main/docs/tutorials/16-keep-workstation.md"
+              href={`${DOCS}/keep/KEEP.md`}
               className="zf-btn zf-btn-ghost"
               target="_blank"
               rel="noreferrer"
               style={{ color: 'inherit', borderColor: 'rgba(255,255,255,0.25)' }}
             >
-              Tutorial 16
+              Keep docs
             </a>
           </div>
         </section>
