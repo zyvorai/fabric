@@ -16,6 +16,29 @@ keepctl export-token 'trajectory:read:7d' 3600
 keepctl cockpit <session-uuid>
 ```
 
+Run a use case and look back at what it produced:
+
+```bash
+keepctl list                                      # use cases this runtime can run
+keepctl run csv-clean ./orders.csv                # exits 2 if the cell made an outbound connection
+keepctl artifacts --use-case csv-clean --since 2026-09-01T00:00:00Z
+keepctl diff <older-artifact-id> <newer-artifact-id>   # what changed between two runs
+keepctl audit <session-uuid> --limit 20           # journal rows; the hash-chain check goes to stderr
+keepctl approvals pending                         # pending | approved | denied, or none for all
+```
+
+Batches and triggers ([TRIGGERS.md](../TRIGGERS.md)):
+
+```bash
+keepctl run csv-clean jan.csv feb.csv            # one cell per file
+keepctl trigger add-webhook csv-clean            # prints a secret once
+keepctl trigger fire <id> <secret> ./orders.csv  # a signed call, as a webhook sender would make
+keepctl trigger add-folder log-triage inbox 30   # needs ZYVOR_AGENT_WATCH_ROOT on the runtime
+keepctl trigger list
+```
+
+The console shows the same three views at `/app/keep/history` (Runs, Audit, Approvals).
+
 Lab live gate (stub + FluxVM proof):
 
 ```bash

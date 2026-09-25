@@ -34,14 +34,31 @@ A `pack.json` with no `kind` (the older `name` + `manifest` + `goal` shape) is a
 | Field | Notes |
 |---|---|
 | `name` | 1-40 lowercase letters, digits, `-`. Becomes the use-case id. Cannot be a built-in id. |
-| `accepts` | 1-6 lowercase extensions. `pdftotext` accepts only `pdf`; `text` cannot read `pdf`. |
-| `extract` | `pdftotext` (needs poppler in the template) or `text`. **A fixed list, never a command.** |
-| `max_bytes` | Upload limit. Text: up to 300 000 (default 200 000). PDF: up to 32 MiB (default 8 MiB). |
+| `accepts` | 1-6 lowercase extensions. Each fixed-format extractor takes only its own (table below); `text` cannot read binary formats. |
+| `extract` | One of the extractors below. **A fixed list, never a command.** |
+| `max_bytes` | Upload limit, per extractor (table below). |
 | `summary` | 1-20 rules (below). |
 | `artifact_title` | Ends in `.md`; default `summary.md`. |
-| `sample` / `sample_file` | Optional sample text (text extractors only, up to 200 KB) so the use case runs in one click. |
+| `model` | Optional model step: the host sends the extracted text to one endpoint. See [MODEL.md](MODEL.md). |
+| `sample` / `sample_file` | Optional sample text (`text`, `html` and `eml` only, up to 200 KB) so the use case runs in one click. |
 
-Rules (all bounded, evaluated on the host over the extracted text, no regex engine, no I/O):
+Extractors:
+
+| `extract` | Reads | Upload limit (default / largest) | Notes |
+|---|---|---|---|
+| `text` | Any text file | 200 KB / 300 KB | Not `pdf`, `docx`, `xlsx` or `zip` |
+| `pdftotext` | `.pdf` | 8 MiB / 32 MiB | Needs poppler in the template. A scan has no text layer and is refused: Keep does no OCR |
+| `docx` | `.docx` | 4 MiB / 16 MiB | Paragraph and table text |
+| `xlsx` | `.xlsx` | 4 MiB / 16 MiB | First sheet only, as CSV (up to 5000 rows), so `csv_columns` and `table` read it |
+| `html` | `.html`, `.htm` | 2 MiB / 8 MiB | Visible text; scripts and styles are dropped |
+| `eml` | `.eml`, `.mbox` | 2 MiB / 8 MiB | From, Date, Subject and the text body of up to 500 messages |
+
+`docx`, `xlsx`, `html` and `eml` run a fixed Node script that Keep writes into the cell; it needs
+`node` in the template (the agent templates have it). A damaged file is refused with a 400, never
+summarised. A **zip** upload is a container for any use case: the files inside it that the use case
+accepts each run in their own cell, as a batch (see [TRIGGERS.md](TRIGGERS.md)).
+
+Rules (all bounded, evaluated on the host over the extracted text, no I/O):
 
 | `kind` | Fields | Output |
 |---|---|---|
@@ -49,6 +66,13 @@ Rules (all bounded, evaluated on the host over the extracted text, no regex engi
 | `top_repeated_lines` | `title`, `top` (1-20, default 5) | Most repeated lines, digits collapsed so near-duplicates group |
 | `stats` | `title` (optional) | Line, non-empty line, word and character counts |
 | `csv_columns` | `title`, `columns` (1-10), `top` (1-10, default 5) | Distinct count and most common values per column |
+| `regex_extract` | `title`, `pattern`, `group` (optional), `max_matches` (1-50, default 10) | Matched values (or one capture group), most frequent first |
+| `json_path` | `title`, `paths` (1-10) | Values at paths like `vendor.name`, `items[0].id`, `items[*].sku` |
+| `table` | `title`, `max_rows` (1-50, default 10) | The first rows of a CSV as a Markdown table |
+
+`regex_extract` uses Rust's `regex`: matching is linear in the input, and backreferences and
+look-around are refused, so a pattern cannot hang the host. A pattern is at most 200 characters and is
+compiled when you deploy, so a bad one fails then. Output cells are defanged (no markup, no `|`).
 
 Unknown fields and unknown rule kinds are rejected. At most 50 custom use cases per runtime;
 the whole spec is at most 64 KB.

@@ -113,7 +113,7 @@ Security profiles (FluxVM Phase 6):
 
 ## Keep 0.1 — shipped
 
-1. **BYO model socket** — Grok / local GGUF / vLLM / Muse-class API; cell unchanged.
+1. **BYO model** — a manifest's `model_socket` names an OpenAI-compatible endpoint and travels with pack / unpack. One-click use cases can also opt in to a host-side model step, gated by the vault and an approval: see [MODEL.md](MODEL.md).
 2. **Signed YAML Sentinel** — Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) fail-closed; `sentinel/keep.policy.yaml`.
 3. **Firecracker / measured cell** — agent kernel ≠ host kernel intent; `security_profile: measured` → evidence `software-test`.
 4. **Phone-only high-risk approvals** — buy / send / delete via webhook / `/v1/approvals`, never in chat.

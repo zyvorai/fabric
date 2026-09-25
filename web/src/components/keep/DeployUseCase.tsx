@@ -130,6 +130,10 @@ export default function DeployUseCase({ onDeployed, onError }: Props) {
               >
                 <option value="text">Text files</option>
                 <option value="pdftotext">PDF (text layer)</option>
+                <option value="docx">Word (.docx)</option>
+                <option value="xlsx">Excel (.xlsx, first sheet)</option>
+                <option value="html">HTML page</option>
+                <option value="eml">Email (.eml / .mbox)</option>
               </select>
             </label>
             {draft.extract === 'text' && (

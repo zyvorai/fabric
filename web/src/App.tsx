@@ -37,6 +37,7 @@ const AiWorkloads = lazy(() => import('./pages/AiWorkloads'))
 const Sessions = lazy(() => import('./pages/Sessions'))
 const KeepHome = lazy(() => import('./pages/KeepHome'))
 const KeepSession = lazy(() => import('./pages/KeepSession'))
+const KeepHistory = lazy(() => import('./pages/KeepHistory'))
 const Schedules = lazy(() => import('./pages/Schedules'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
 const Analytics = lazy(() => import('./pages/Analytics'))
@@ -151,6 +152,7 @@ function ConsoleRoutes() {
             <Route path="sessions" element={<Sessions />} />
             <Route path="sessions/:id" element={<Sessions />} />
             <Route path="keep" element={<KeepHome />} />
+            <Route path="keep/history" element={<KeepHistory />} />
             <Route path="keep/:sessionId" element={<KeepSession />} />
             <Route path="schedules" element={<Schedules />} />
             <Route path="autoscale" element={<AutoscalePage />} />

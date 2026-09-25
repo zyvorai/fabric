@@ -429,6 +429,7 @@ async fn upsert_browse_script_artifact(
             agent: Some(agent.to_string()),
             metadata: json!({ "format": "playwright-core" }),
             created_at: now,
+            expires_at: None,
         }
     };
     state

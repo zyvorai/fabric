@@ -729,7 +729,7 @@ fn approval_timeout(manifest: &AgentManifest) -> std::time::Duration {
 /// returns `Ok`; a denial, timeout, or the session ending refuses with 403.
 /// A decision and a timeout can land at the same instant: whichever transition
 /// reaches the store first wins, and the loser re-reads the result.
-async fn wait_for_decision(
+pub(crate) async fn wait_for_decision(
     state: &AppState,
     session: &SessionRecord,
     approval: &ApprovalRecord,

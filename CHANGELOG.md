@@ -3,6 +3,38 @@
 ## 0.3.0
 
 ### Added
+- **`scripts/keep-live-scenarios.sh`** runs the built-ins, the scenario packs, batch, zip, a webhook trigger and
+  history against a live runtime in real cells (18 checks).
+- **The cell template and seven scenario packs, in the repo.** `agent-runtime/templates/node22-agent/`
+  (Ubuntu 24.04, Node 22, poppler, the guest agent) with a one-command bake,
+  `./scripts/keep-bake-node22-agent.sh` (`--dry-run` shows what is missing). New use-case packs under
+  `examples/keep-agents/`: `status-page-watch`, `mailbox-triage`, `api-facts`, `expense-sheet`,
+  `nda-review`, and two model-assisted ones, `invoice-model-brief` and `meeting-notes-model`. Docs:
+  [SCENARIOS.md](docs/keep/SCENARIOS.md).
+- **Model-assisted use cases.** A use case can declare one `model` step: after the cell
+  extracts the text, the host sends it to a single OpenAI-compatible endpoint and adds the
+  reply to the artifact. The cell stays offline (0 CONNECT); the vault decides whether the
+  endpoint is reachable, the first use needs an out-of-band approval, every call is audited
+  (sizes and a digest, never the text or the key), and the reply is sanitised. New
+  `GET/DELETE /v1/model-grants`, `keepctl grants`. Docs: [MODEL.md](docs/keep/MODEL.md).
+- **More Keep file types and rules.** Use cases can read `.docx`, `.xlsx` (first sheet),
+  `.html`, and `.eml` / `.mbox` (fixed Node scripts run in the cell), and a zip upload fans
+  out to one cell per accepted file. New rules: `regex_extract` (linear-time `regex`),
+  `json_path`, `table`. A scanned PDF now says plainly that Keep does no OCR. Docs:
+  [PACKS.md](docs/keep/PACKS.md).
+- **Keep triggers and batch.** `POST /v1/demos/{id}` takes several files (one cell each,
+  one `batch_id`, 207 when some fail). Signed webhook triggers
+  (`POST /v1/triggers/{id}/hook`) and watched-folder triggers (under
+  `ZYVOR_AGENT_WATCH_ROOT`) start a use case without an upload. `keepctl run` takes
+  several files and `keepctl trigger list|add-webhook|add-folder|rm|fire`; the console
+  uploads several files and has a Triggers tab. Docs: [TRIGGERS.md](docs/keep/TRIGGERS.md).
+- **Keep run history.** Artifacts can carry `ttl_seconds` (hidden at once, swept on
+  the next write); `GET /v1/artifacts` filters by `use_case` and `since`;
+  `GET /v1/artifacts/{a}/diff/{b}` returns a line diff of two runs. The approval
+  webhook also sends `run.finished` / `run.failed`. New `keepctl`
+  `list | run | artifacts | diff | audit | approvals`, fabricd `GET /api/artifacts`
+  and `/api/artifacts/{a}/diff/{b}` (admin), and a console page at
+  `/app/keep/history` (Runs with diff, Audit with the hash-chain check, Approvals).
 - **Keep use cases you build yourself.** A declarative `pack.json` (an extractor
   plus bounded summary rules, no code) is deployed from the console
   (`/app/keep` → **Deploy your own use case**) or with `keepctl deploy`;

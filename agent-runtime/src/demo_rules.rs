@@ -5,9 +5,10 @@
 //!
 //! A [`CustomDemoSpec`] is data. The guest extractor is one of a short enum
 //! (never a command string), and the summary is a bounded list of rules that
-//! the host evaluates over text the guest already extracted. There is no regex
-//! engine, no I/O, and nothing found in the input is executed. Anything that is
-//! real code belongs in a TypeScript agent that runs inside the cell.
+//! the host evaluates over text the guest already extracted. The only pattern
+//! language is Rust's `regex`, which runs in linear time and cannot execute
+//! anything; there is no I/O, and nothing found in the input is executed.
+//! Anything that is real code belongs in a TypeScript agent that runs inside the cell.
 
 use crate::demo_builders::{clean_line, parse_csv, DemoArtifact};
 use chrono::{DateTime, Utc};
@@ -34,6 +35,85 @@ pub enum Extractor {
     Pdftotext,
     /// Read the file as text (`head -c`).
     Text,
+    /// Visible text of an HTML page (scripts and styles dropped).
+    Html,
+    /// Headers and text bodies of an `.eml` message or an `.mbox` export.
+    Eml,
+    /// Paragraph text of a Word `.docx`.
+    Docx,
+    /// Cells of the first sheet of an Excel `.xlsx`, as CSV (up to 5000 rows).
+    Xlsx,
+}
+
+/// The fixed Node scripts the guest runs for the non-PDF extractors. They are part
+/// of this binary; a spec only picks one by name.
+const HTML_SCRIPT: &str = concat!(
+    include_str!("extractors/common.mjs"),
+    include_str!("extractors/html.mjs")
+);
+const EML_SCRIPT: &str = concat!(
+    include_str!("extractors/common.mjs"),
+    include_str!("extractors/eml.mjs")
+);
+const DOCX_SCRIPT: &str = concat!(
+    include_str!("extractors/common.mjs"),
+    include_str!("extractors/docx.mjs")
+);
+const XLSX_SCRIPT: &str = concat!(
+    include_str!("extractors/common.mjs"),
+    include_str!("extractors/xlsx.mjs")
+);
+
+impl Extractor {
+    /// Fixed file name inside the guest. Never derived from the upload.
+    pub fn guest_file(self) -> &'static str {
+        match self {
+            Extractor::Pdftotext => "input.pdf",
+            Extractor::Text => "input.txt",
+            Extractor::Html => "input.html",
+            Extractor::Eml => "input.eml",
+            Extractor::Docx => "input.docx",
+            Extractor::Xlsx => "input.xlsx",
+        }
+    }
+
+    /// The script the guest runs, for the extractors that have one.
+    pub fn script(self) -> Option<&'static str> {
+        match self {
+            Extractor::Html => Some(HTML_SCRIPT),
+            Extractor::Eml => Some(EML_SCRIPT),
+            Extractor::Docx => Some(DOCX_SCRIPT),
+            Extractor::Xlsx => Some(XLSX_SCRIPT),
+            Extractor::Pdftotext | Extractor::Text => None,
+        }
+    }
+
+    /// (default, largest) upload size in bytes.
+    fn size_limits(self) -> (usize, usize) {
+        match self {
+            Extractor::Pdftotext => (PDF_DEFAULT, PDF_MAX),
+            Extractor::Text => (TEXT_DEFAULT, TEXT_MAX),
+            Extractor::Html | Extractor::Eml => (2 * 1024 * 1024, 8 * 1024 * 1024),
+            Extractor::Docx | Extractor::Xlsx => (4 * 1024 * 1024, 16 * 1024 * 1024),
+        }
+    }
+
+    /// Extensions this extractor can read. `None` means any text-like extension.
+    fn readable(self) -> Option<&'static [&'static str]> {
+        match self {
+            Extractor::Pdftotext => Some(&["pdf"]),
+            Extractor::Text => None,
+            Extractor::Html => Some(&["html", "htm"]),
+            Extractor::Eml => Some(&["eml", "mbox"]),
+            Extractor::Docx => Some(&["docx"]),
+            Extractor::Xlsx => Some(&["xlsx"]),
+        }
+    }
+
+    /// A bundled sample is plain text, so only text-based extractors can carry one.
+    fn allows_sample(self) -> bool {
+        matches!(self, Extractor::Text | Extractor::Html | Extractor::Eml)
+    }
 }
 
 /// One summary section. Everything is bounded and pure.
@@ -65,6 +145,143 @@ pub enum Rule {
         #[serde(default)]
         top: Option<usize>,
     },
+    /// Values found by a regular expression (Rust `regex`: linear time, no backreferences),
+    /// most frequent first. `group` picks a capture group instead of the whole match.
+    RegexExtract {
+        title: String,
+        pattern: String,
+        #[serde(default)]
+        group: Option<usize>,
+        #[serde(default)]
+        max_matches: Option<usize>,
+    },
+    /// Values at simple paths in a JSON file: `a.b`, `items[0].id`, `items[*].name`.
+    JsonPath { title: String, paths: Vec<String> },
+    /// The first rows of a CSV, as a table.
+    Table {
+        title: String,
+        #[serde(default)]
+        max_rows: Option<usize>,
+    },
+}
+
+/// An optional model-assisted step. After the cell has extracted the text, the **host** sends that
+/// text to one declared endpoint and appends the reply to the artifact. The cell still has no
+/// network at all, so the cell's connection count stays 0.
+///
+/// The pack names the endpoint; the operator's vault decides whether it may be used. `credential`
+/// must exist in the vault, and its host, method, path and port limits apply unchanged. The first
+/// use of an endpoint by a use case also needs an out-of-band approval, and every call is audited.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModelSpec {
+    /// Vault credential that holds the API key. It pins the host this call may reach.
+    pub credential: String,
+    /// OpenAI-compatible base URL, e.g. `https://api.example.com/v1`. The call goes to
+    /// `<base_url>/chat/completions`. `https`, or `http` for a loopback address.
+    pub base_url: String,
+    /// Model id the provider expects.
+    pub model: String,
+    /// What to do with the text. The document text is sent as untrusted data, not as instructions.
+    pub instruction: String,
+    /// Characters of extracted text to send (1000..=100000, default 24000). The rest is dropped.
+    #[serde(default)]
+    pub max_input_chars: Option<usize>,
+    /// Upper bound on the reply (50..=4000 tokens, default 800).
+    #[serde(default)]
+    pub max_output_tokens: Option<u32>,
+}
+
+impl ModelSpec {
+    pub fn input_cap(&self) -> usize {
+        self.max_input_chars.unwrap_or(24_000)
+    }
+
+    pub fn output_cap(&self) -> u32 {
+        self.max_output_tokens.unwrap_or(800)
+    }
+
+    /// The parsed `base_url`, checked: no credentials, query or fragment in it, and
+    /// TLS unless the host is a loopback address.
+    pub fn base(&self) -> Result<url::Url, String> {
+        let u = url::Url::parse(&self.base_url).map_err(|e| format!("base_url: {e}"))?;
+        if !u.username().is_empty()
+            || u.password().is_some()
+            || u.query().is_some()
+            || u.fragment().is_some()
+        {
+            return Err("base_url must not carry credentials, a query or a fragment".into());
+        }
+        let loopback = match u.host() {
+            Some(url::Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
+            Some(url::Host::Ipv4(a)) => a.is_loopback(),
+            Some(url::Host::Ipv6(a)) => a.is_loopback(),
+            None => return Err("base_url needs a host".into()),
+        };
+        match u.scheme() {
+            "https" => {}
+            "http" if loopback => {}
+            _ => return Err("base_url must be https (http only for localhost)".into()),
+        }
+        if u.path().len() > 100 {
+            return Err("base_url path is too long".into());
+        }
+        Ok(u)
+    }
+
+    /// The URL the host will POST to.
+    pub fn endpoint(&self) -> Result<url::Url, String> {
+        let mut u = self.base()?;
+        let path = format!("{}/chat/completions", u.path().trim_end_matches('/'));
+        u.set_path(&path);
+        Ok(u)
+    }
+
+    pub fn host(&self) -> String {
+        self.base()
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+            .unwrap_or_default()
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        let cred_ok = !self.credential.is_empty()
+            && self.credential.len() <= 64
+            && self
+                .credential
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'));
+        if !cred_ok {
+            return Err("model.credential must be 1-64 letters, digits, '-', '_' or '.'".into());
+        }
+        self.base()?;
+        if !plain(&self.model, 80) {
+            return Err("model.model must be 1-80 plain characters".into());
+        }
+        let n = self.instruction.chars().count();
+        if n == 0
+            || n > 1000
+            || self
+                .instruction
+                .chars()
+                .any(|c| c.is_control() && c != '\n')
+        {
+            return Err("model.instruction must be 1-1000 characters".into());
+        }
+        if self
+            .max_input_chars
+            .is_some_and(|n| !(1000..=100_000).contains(&n))
+        {
+            return Err("model.max_input_chars must be 1000..=100000".into());
+        }
+        if self
+            .max_output_tokens
+            .is_some_and(|n| !(50..=4000).contains(&n))
+        {
+            return Err("model.max_output_tokens must be 50..=4000".into());
+        }
+        Ok(())
+    }
 }
 
 /// Built-in sample text shipped with a spec (text extractors only).
@@ -93,6 +310,9 @@ pub struct CustomDemoSpec {
     pub artifact_title: Option<String>,
     #[serde(default)]
     pub sample: Option<SampleSpec>,
+    /// Optional model-assisted step (see [`ModelSpec`]). Off unless declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelSpec>,
 }
 
 /// A stored custom spec.
@@ -120,10 +340,7 @@ fn plain(s: &str, max: usize) -> bool {
 impl CustomDemoSpec {
     /// Effective upload limit in bytes.
     pub fn max_bytes(&self) -> usize {
-        match self.extract {
-            Extractor::Pdftotext => self.max_bytes.unwrap_or(PDF_DEFAULT),
-            Extractor::Text => self.max_bytes.unwrap_or(TEXT_DEFAULT),
-        }
+        self.max_bytes.unwrap_or(self.extract.size_limits().0)
     }
 
     pub fn artifact_title(&self) -> &str {
@@ -132,10 +349,7 @@ impl CustomDemoSpec {
 
     /// Fixed file name inside the guest. Never derived from the upload.
     pub fn guest_file(&self) -> &'static str {
-        match self.extract {
-            Extractor::Pdftotext => "input.pdf",
-            Extractor::Text => "input.txt",
-        }
+        self.extract.guest_file()
     }
 
     /// Reject anything a user could use to widen what the host does.
@@ -169,20 +383,29 @@ impl CustomDemoSpec {
                 ));
             }
         }
-        let has_pdf = self.accepts.iter().any(|e| e == "pdf");
-        match self.extract {
-            Extractor::Pdftotext if self.accepts.iter().any(|e| e != "pdf") => {
-                return Err("the pdftotext extractor accepts only pdf".into());
+        match self.extract.readable() {
+            Some(ok) => {
+                if let Some(bad) = self.accepts.iter().find(|e| !ok.contains(&e.as_str())) {
+                    return Err(format!(
+                        "the {} extractor reads only .{}, not .{bad}",
+                        serde_json::to_value(self.extract)
+                            .ok()
+                            .and_then(|v| v.as_str().map(str::to_string))
+                            .unwrap_or_default(),
+                        ok.join(" / .")
+                    ));
+                }
             }
-            Extractor::Text if has_pdf => {
-                return Err("the text extractor cannot read pdf; use pdftotext".into());
+            None => {
+                const BINARY: [&str; 6] = ["pdf", "docx", "xlsx", "zip", "png", "jpg"];
+                if let Some(bad) = self.accepts.iter().find(|e| BINARY.contains(&e.as_str())) {
+                    return Err(format!(
+                        "the text extractor cannot read .{bad}; use the extractor made for it"
+                    ));
+                }
             }
-            _ => {}
         }
-        let (default, max) = match self.extract {
-            Extractor::Pdftotext => (PDF_DEFAULT, PDF_MAX),
-            Extractor::Text => (TEXT_DEFAULT, TEXT_MAX),
-        };
+        let (default, max) = self.extract.size_limits();
         let limit = self.max_bytes.unwrap_or(default);
         if limit == 0 || limit > max {
             return Err(format!("max_bytes must be 1..={max} for this extractor"));
@@ -253,12 +476,55 @@ impl CustomDemoSpec {
                         return Err("top must be 1..=10".into());
                     }
                 }
+                Rule::RegexExtract {
+                    title,
+                    pattern,
+                    group,
+                    max_matches,
+                } => {
+                    if !plain(title, 80) {
+                        return Err("rule title must be 1-80 plain characters".into());
+                    }
+                    let re = compile_pattern(pattern)?;
+                    if group.is_some_and(|g| g >= re.captures_len()) {
+                        return Err(format!(
+                            "group {} does not exist in the pattern",
+                            group.unwrap_or_default()
+                        ));
+                    }
+                    if max_matches.is_some_and(|n| n == 0 || n > 50) {
+                        return Err("max_matches must be 1..=50".into());
+                    }
+                }
+                Rule::JsonPath { title, paths } => {
+                    if !plain(title, 80) {
+                        return Err("rule title must be 1-80 plain characters".into());
+                    }
+                    if paths.is_empty() || paths.len() > 10 {
+                        return Err("json_path needs 1-10 paths".into());
+                    }
+                    for p in paths {
+                        parse_json_path(p)?;
+                    }
+                }
+                Rule::Table { title, max_rows } => {
+                    if !plain(title, 80) {
+                        return Err("rule title must be 1-80 plain characters".into());
+                    }
+                    if max_rows.is_some_and(|n| n == 0 || n > 50) {
+                        return Err("max_rows must be 1..=50".into());
+                    }
+                }
             }
         }
+        if let Some(m) = &self.model {
+            m.validate()?;
+        }
         if let Some(s) = &self.sample {
-            if self.extract == Extractor::Pdftotext {
+            if !self.extract.allows_sample() {
                 return Err(
-                    "a sample is supported for text extractors only; upload a PDF to run it".into(),
+                    "a sample is supported for text, html and eml extractors only; upload a file to run it"
+                        .into(),
                 );
             }
             let ext = s
@@ -410,7 +676,188 @@ fn eval_rule(rule: &Rule, text: &str) -> Result<String, String> {
             }
             out
         }
+        Rule::RegexExtract {
+            title,
+            pattern,
+            group,
+            max_matches,
+        } => {
+            let re = compile_pattern(pattern)?;
+            let mut counts: BTreeMap<String, u64> = BTreeMap::new();
+            for caps in re.captures_iter(text) {
+                let m = caps.get(group.unwrap_or(0));
+                if let Some(m) = m {
+                    let v = clean_line(m.as_str());
+                    if !v.is_empty() {
+                        *counts.entry(v).or_default() += 1;
+                    }
+                }
+            }
+            let mut rows: Vec<(&String, &u64)> = counts.iter().collect();
+            rows.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+            let list = if rows.is_empty() {
+                "- (no matches)".to_string()
+            } else {
+                rows.iter()
+                    .take(max_matches.unwrap_or(10).min(50))
+                    .map(|(v, n)| format!("- {n}× {v}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            format!("## {}\n{list}\n", clean_line(title))
+        }
+        Rule::JsonPath { title, paths } => {
+            let doc: serde_json::Value = serde_json::from_str(text.trim()).map_err(|e| {
+                format!(
+                    "the file is not valid JSON ({e}); a very large file may have been cut short"
+                )
+            })?;
+            let mut out = format!("## {}\n", clean_line(title));
+            for p in paths {
+                let found = json_path_values(&doc, &parse_json_path(p)?);
+                let shown: Vec<String> = found.iter().take(10).map(|v| json_scalar(v)).collect();
+                let more = found.len().saturating_sub(10);
+                out.push_str(&format!(
+                    "- `{}`: {}{}\n",
+                    clean_line(p),
+                    if shown.is_empty() {
+                        "(not found)".to_string()
+                    } else {
+                        shown.join("; ")
+                    },
+                    if more > 0 {
+                        format!(" (+{more} more)")
+                    } else {
+                        String::new()
+                    }
+                ));
+            }
+            out
+        }
+        Rule::Table { title, max_rows } => {
+            let rows = parse_csv(text);
+            if rows.is_empty() {
+                return Err("the file has no CSV rows".into());
+            }
+            let width = rows[0].len().clamp(1, 12);
+            let cell =
+                |row: &Vec<String>, i: usize| clean_line(row.get(i).map_or("", |c| c.trim()));
+            let mut out = format!("## {}\n", clean_line(title));
+            out.push_str(&format!(
+                "| {} |\n|{}\n",
+                (0..width)
+                    .map(|i| cell(&rows[0], i))
+                    .collect::<Vec<_>>()
+                    .join(" | "),
+                "---|".repeat(width)
+            ));
+            for row in rows.iter().skip(1).take(max_rows.unwrap_or(10).min(50)) {
+                out.push_str(&format!(
+                    "| {} |\n",
+                    (0..width)
+                        .map(|i| cell(row, i))
+                        .collect::<Vec<_>>()
+                        .join(" | ")
+                ));
+            }
+            let total = rows.len() - 1;
+            let shown = total.min(max_rows.unwrap_or(10).min(50));
+            if total > shown {
+                out.push_str(&format!("\n*{shown} of {total} rows shown.*\n"));
+            }
+            out
+        }
     })
+}
+
+/// A pattern the host will run: bounded in size, linear-time by construction.
+fn compile_pattern(pattern: &str) -> Result<regex::Regex, String> {
+    if pattern.is_empty() || pattern.len() > 200 || pattern.chars().any(char::is_control) {
+        return Err("pattern must be 1-200 plain characters".into());
+    }
+    regex::RegexBuilder::new(pattern)
+        .size_limit(1 << 20)
+        .dfa_size_limit(1 << 20)
+        .build()
+        .map_err(|e| format!("bad pattern: {e}"))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PathSeg {
+    Key(String),
+    Index(usize),
+    All,
+}
+
+/// `a.b[0].c`, `items[*].name`, with an optional leading `$`.
+fn parse_json_path(path: &str) -> Result<Vec<PathSeg>, String> {
+    let p = path.trim().trim_start_matches('$').trim_start_matches('.');
+    if p.is_empty() || p.len() > 100 || p.chars().any(char::is_control) {
+        return Err(format!("bad json path {path:?}"));
+    }
+    let mut segs = Vec::new();
+    for part in p.split('.') {
+        let (key, mut rest) = match part.find('[') {
+            Some(i) => (&part[..i], &part[i..]),
+            None => (part, ""),
+        };
+        if key.is_empty() && rest.is_empty() {
+            return Err(format!("bad json path {path:?}"));
+        }
+        if !key.is_empty() {
+            segs.push(PathSeg::Key(key.to_string()));
+        }
+        while !rest.is_empty() {
+            let end = rest
+                .find(']')
+                .ok_or_else(|| format!("bad json path {path:?}: missing ]"))?;
+            let inner = &rest[1..end];
+            segs.push(if inner == "*" {
+                PathSeg::All
+            } else {
+                PathSeg::Index(
+                    inner
+                        .parse()
+                        .map_err(|_| format!("bad json path {path:?}: index {inner:?}"))?,
+                )
+            });
+            rest = &rest[end + 1..];
+            if !rest.is_empty() && !rest.starts_with('[') {
+                return Err(format!("bad json path {path:?}"));
+            }
+        }
+    }
+    Ok(segs)
+}
+
+fn json_path_values<'a>(
+    doc: &'a serde_json::Value,
+    segs: &[PathSeg],
+) -> Vec<&'a serde_json::Value> {
+    let mut cur = vec![doc];
+    for seg in segs {
+        let mut next = Vec::new();
+        for v in cur {
+            match (seg, v) {
+                (PathSeg::Key(k), serde_json::Value::Object(m)) => next.extend(m.get(k)),
+                (PathSeg::Index(i), serde_json::Value::Array(a)) => next.extend(a.get(*i)),
+                (PathSeg::All, serde_json::Value::Array(a)) => next.extend(a.iter()),
+                _ => {}
+            }
+        }
+        cur = next;
+        if cur.len() > 1000 {
+            cur.truncate(1000);
+        }
+    }
+    cur
+}
+
+fn json_scalar(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => clean_line(s),
+        other => clean_line(&other.to_string()),
+    }
 }
 
 #[cfg(test)]
@@ -557,5 +1004,308 @@ mod tests {
         let line = format!("x {}\n", "y".repeat(200));
         let out = s.render("f.txt", &line.repeat(100)).unwrap();
         assert!(out[0].body.len() <= MAX_OUTPUT_BYTES + 64);
+    }
+
+    fn spec_with(extract: &str, accepts: &[&str], rule: serde_json::Value) -> CustomDemoSpec {
+        serde_json::from_value(serde_json::json!({
+            "id": "t", "title": "T", "accepts": accepts, "extract": extract, "summary": [rule]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn new_extractors_accept_only_their_own_file_types() {
+        let stats = serde_json::json!({"kind": "stats"});
+        for (extract, ok, bad) in [
+            ("html", "html", "txt"),
+            ("eml", "mbox", "csv"),
+            ("docx", "docx", "doc"),
+            ("xlsx", "xlsx", "csv"),
+        ] {
+            assert!(
+                spec_with(extract, &[ok], stats.clone())
+                    .validate(&[])
+                    .is_ok(),
+                "{extract}"
+            );
+            let err = spec_with(extract, &[bad], stats.clone())
+                .validate(&[])
+                .unwrap_err();
+            assert!(err.contains(&format!(".{bad}")), "{extract}: {err}");
+        }
+        // The plain text extractor must not be pointed at a binary format.
+        for bin in ["docx", "xlsx", "zip"] {
+            assert!(
+                spec_with("text", &[bin], stats.clone())
+                    .validate(&[])
+                    .is_err(),
+                "{bin}"
+            );
+        }
+    }
+
+    #[test]
+    fn script_extractors_have_fixed_guest_files_and_scripts() {
+        assert_eq!(Extractor::Docx.guest_file(), "input.docx");
+        assert_eq!(Extractor::Eml.guest_file(), "input.eml");
+        for e in [
+            Extractor::Html,
+            Extractor::Eml,
+            Extractor::Docx,
+            Extractor::Xlsx,
+        ] {
+            assert!(e.script().unwrap().contains("process.argv[2]"));
+        }
+        assert!(Extractor::Pdftotext.script().is_none() && Extractor::Text.script().is_none());
+        // Binary formats cannot carry a text sample.
+        let mut s = spec_with("docx", &["docx"], serde_json::json!({"kind": "stats"}));
+        s.sample = Some(SampleSpec {
+            filename: "a.docx".into(),
+            text: "x".into(),
+        });
+        assert!(s.validate(&[]).unwrap_err().contains("sample"));
+    }
+
+    fn render(rule: serde_json::Value, text: &str) -> Result<String, String> {
+        let s = spec_with("text", &["txt"], rule);
+        s.validate(&[])?;
+        Ok(s.render("f.txt", text)?.remove(0).body)
+    }
+
+    #[test]
+    fn regex_extract_counts_values_and_honours_the_group() {
+        let text = "Invoice INV-001 total 5\nInvoice INV-002\nagain INV-001\n";
+        let out = render(
+            serde_json::json!({"kind": "regex_extract", "title": "Ids", "pattern": "INV-(\\d+)", "group": 1}),
+            text,
+        )
+        .unwrap();
+        assert!(out.contains("- 2× 001"), "{out}");
+        assert!(out.contains("- 1× 002"), "{out}");
+        let none = render(
+            serde_json::json!({"kind": "regex_extract", "title": "X", "pattern": "zzz"}),
+            text,
+        )
+        .unwrap();
+        assert!(none.contains("(no matches)"));
+    }
+
+    #[test]
+    fn regex_patterns_are_bounded_and_cannot_backtrack() {
+        for (pattern, why) in [
+            ("(a", "unbalanced"),
+            ("(a)\\1", "backreference"),
+            ("(?=x)", "lookahead"),
+            (&"a".repeat(201), "too long"),
+            ("", "empty"),
+        ] {
+            let err = render(
+                serde_json::json!({"kind": "regex_extract", "title": "X", "pattern": pattern}),
+                "a",
+            )
+            .unwrap_err();
+            assert!(err.contains("pattern"), "{why}: {err}");
+        }
+        // A classic catastrophic pattern is fine here: matching is linear.
+        let t = std::time::Instant::now();
+        render(
+            serde_json::json!({"kind": "regex_extract", "title": "X", "pattern": "(a+)+$"}),
+            &format!("{}b", "a".repeat(50_000)),
+        )
+        .unwrap();
+        assert!(t.elapsed() < std::time::Duration::from_secs(5));
+        // A group that the pattern does not have is refused at deploy time.
+        assert!(render(
+            serde_json::json!({"kind": "regex_extract", "title": "X", "pattern": "a", "group": 2}),
+            "a"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn json_path_reads_keys_indexes_and_wildcards() {
+        let doc = r#"{"vendor":{"name":"Acme"},"items":[{"id":1,"sku":"a"},{"id":2,"sku":"b"}]}"#;
+        let out = render(
+            serde_json::json!({"kind": "json_path", "title": "Facts",
+                "paths": ["vendor.name", "items[*].sku", "$.items[1].id", "missing.x"]}),
+            doc,
+        )
+        .unwrap();
+        assert!(out.contains("`vendor.name`: Acme"), "{out}");
+        assert!(out.contains("`items[*].sku`: a; b"), "{out}");
+        assert!(out.contains("`$.items[1].id`: 2"), "{out}");
+        assert!(out.contains("`missing.x`: (not found)"), "{out}");
+    }
+
+    #[test]
+    fn json_path_rejects_bad_paths_and_bad_json() {
+        for p in ["", "a[", "a[x]", "a..b", "a[0]b"] {
+            assert!(
+                render(
+                    serde_json::json!({"kind": "json_path", "title": "X", "paths": [p]}),
+                    "{}"
+                )
+                .is_err(),
+                "{p:?}"
+            );
+        }
+        let err = render(
+            serde_json::json!({"kind": "json_path", "title": "X", "paths": ["a"]}),
+            "not json",
+        )
+        .unwrap_err();
+        assert!(err.contains("not valid JSON"), "{err}");
+    }
+
+    #[test]
+    fn table_shows_the_first_rows_and_defangs_cells() {
+        let csv = "name,note\nAnn,=cmd|calc\nBob,<b>x</b>\nCy,3\n";
+        let out = render(
+            serde_json::json!({"kind": "table", "title": "Rows", "max_rows": 2}),
+            csv,
+        )
+        .unwrap();
+        assert!(out.contains("| name | note |"), "{out}");
+        assert!(out.contains("| Ann | =cmd/calc |"), "{out}");
+        assert!(!out.contains('<'), "markup must be defanged: {out}");
+        assert!(!out.contains("Cy"), "{out}");
+        assert!(out.contains("2 of 3 rows shown"), "{out}");
+    }
+
+    /// The guest scripts run on untrusted files. Run them here when Node is present.
+    #[test]
+    fn the_guest_scripts_extract_text() {
+        if std::process::Command::new("node")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("node not installed; skipping guest script test");
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("zyvor-extract-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let run = |e: Extractor, name: &str, bytes: &[u8]| -> (String, bool) {
+            let script = dir.join(format!("{name}.mjs"));
+            let input = dir.join(name);
+            std::fs::write(&script, e.script().unwrap()).unwrap();
+            std::fs::write(&input, bytes).unwrap();
+            let out = std::process::Command::new("node")
+                .arg(&script)
+                .arg(&input)
+                .output()
+                .unwrap();
+            (
+                String::from_utf8_lossy(&out.stdout).into_owned(),
+                out.status.success(),
+            )
+        };
+
+        let (html, ok) = run(
+            Extractor::Html,
+            "a.html",
+            b"<h1>Hi &amp; bye</h1><script>alert(1)</script><p>one<br>two</p>",
+        );
+        assert!(
+            ok && html.contains("# Hi & bye") && html.contains("one\ntwo"),
+            "{html}"
+        );
+        assert!(!html.contains("alert"), "scripts must be dropped: {html}");
+
+        let (eml, ok) = run(
+            Extractor::Eml,
+            "a.mbox",
+            b"From a@x Mon\nFrom: A <a@x>\nSubject: Pay =?utf-8?Q?caf=C3=A9?=\n\nSend 50 today\nFrom b@x Tue\nSubject: Two\n\nbody two\n",
+        );
+        assert!(
+            ok && eml.contains("Subject: Pay café") && eml.contains("Send 50 today"),
+            "{eml}"
+        );
+        assert!(
+            eml.contains("Subject: Two") && eml.contains("body two"),
+            "{eml}"
+        );
+
+        let (_, ok) = run(Extractor::Docx, "bad.docx", b"this is not a zip");
+        assert!(!ok, "a damaged docx must fail, not print garbage");
+    }
+}
+
+#[cfg(test)]
+mod model_spec_tests {
+    use super::*;
+
+    fn with_model(model: serde_json::Value) -> Result<(), String> {
+        let s: CustomDemoSpec = serde_json::from_value(serde_json::json!({
+            "id": "m", "title": "M", "accepts": ["txt"], "extract": "text",
+            "summary": [{"kind": "stats"}], "model": model
+        }))
+        .map_err(|e| e.to_string())?;
+        s.validate(&[])
+    }
+
+    fn ok_model() -> serde_json::Value {
+        serde_json::json!({
+            "credential": "llm", "base_url": "https://api.example.com/v1",
+            "model": "m-1", "instruction": "Summarise."
+        })
+    }
+
+    #[test]
+    fn a_model_step_validates_and_names_its_endpoint() {
+        assert!(with_model(ok_model()).is_ok());
+        let m: ModelSpec = serde_json::from_value(ok_model()).unwrap();
+        assert_eq!(m.host(), "api.example.com");
+        assert_eq!(
+            m.endpoint().unwrap().as_str(),
+            "https://api.example.com/v1/chat/completions"
+        );
+        assert_eq!(m.input_cap(), 24_000);
+        assert_eq!(m.output_cap(), 800);
+    }
+
+    #[test]
+    fn the_endpoint_must_be_tls_or_loopback_and_carry_nothing_extra() {
+        let with = |url: &str| {
+            let mut m = ok_model();
+            m["base_url"] = url.into();
+            with_model(m)
+        };
+        assert!(with("http://127.0.0.1:8080/v1").is_ok());
+        assert!(with("http://localhost:8080/v1").is_ok());
+        for bad in [
+            "http://api.example.com/v1",
+            "http://192.168.1.5/v1",
+            "https://user:pw@api.example.com/v1",
+            "https://api.example.com/v1?key=abc",
+            "https://api.example.com/v1#frag",
+            "ftp://api.example.com/v1",
+            "not a url",
+        ] {
+            assert!(with(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn model_fields_are_bounded_and_unknown_fields_rejected() {
+        let tweak = |k: &str, v: serde_json::Value| {
+            let mut m = ok_model();
+            m[k] = v;
+            with_model(m)
+        };
+        assert!(tweak("credential", "".into()).is_err());
+        assert!(tweak("credential", "a b".into()).is_err());
+        assert!(tweak("model", "".into()).is_err());
+        assert!(tweak("instruction", "".into()).is_err());
+        assert!(tweak("instruction", "x".repeat(1001).into()).is_err());
+        assert!(tweak("max_input_chars", 10.into()).is_err());
+        assert!(tweak("max_input_chars", 200_000.into()).is_err());
+        assert!(tweak("max_output_tokens", 10.into()).is_err());
+        assert!(tweak("max_output_tokens", 9_000.into()).is_err());
+        assert!(tweak("max_output_tokens", 500.into()).is_ok());
+        assert!(
+            tweak("api_key", "sk-live".into()).is_err(),
+            "no place to put a key in a pack"
+        );
     }
 }

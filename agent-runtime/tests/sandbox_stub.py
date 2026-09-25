@@ -190,6 +190,7 @@ class Handler(BaseHTTPRequestHandler):
         allowed = (
             re.fullmatch(rf"pdftotext -layout {re.escape(guest)}/input\.pdf - 2>/dev/null \| head -c \d+", command)
             or re.fullmatch(rf"head -c \d+ {re.escape(guest)}/input\.(txt|log|json|csv)", command)
+            or re.fullmatch(rf"node {re.escape(guest)}/extract\.mjs {re.escape(guest)}/input\.(html|eml|docx|xlsx)", command)
         )
         if not allowed:
             return None

@@ -7,11 +7,13 @@ import { FileText, Shield, Trash2 } from 'lucide-react'
 import {
   deleteDemo,
   DemoInfo,
+  BatchResult,
   DemoResult,
   keepStatus,
   KeepStatus,
   listDemos,
   runDemo,
+  runDemoBatch,
 } from '../api/agents'
 import DeployPack from '../components/keep/DeployPack'
 import DeployUseCase from '../components/keep/DeployUseCase'
@@ -39,7 +41,9 @@ export default function KeepHome() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [demos, setDemos] = useState<DemoInfo[]>(FALLBACK_DEMOS)
   const [demoId, setDemoId] = useState(FALLBACK_DEMOS[0].id)
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const file = files[0] ?? null
+  const [batch, setBatch] = useState<BatchResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [chip, setChip] = useState<Chip>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -72,9 +76,10 @@ export default function KeepHome() {
 
   const pick = (id: string) => {
     setDemoId(id)
-    setFile(null)
+    setFiles([])
     setError(null)
     setResult(null)
+    setBatch(null)
     setChip('idle')
   }
 
@@ -106,8 +111,24 @@ export default function KeepHome() {
     setBusy(true)
     setError(null)
     setResult(null)
+    setBatch(null)
     setChip('cell')
     try {
+      if (files.length > 1) {
+        const out = await runDemoBatch(demo.id, files)
+        setBatch(out)
+        const bad = out.failed > 0 || out.egress_connects !== 0
+        setChip(bad ? 'fail' : 'done')
+        if (out.egress_connects !== 0) {
+          setError(`egress_connects=${out.egress_connects} — expected 0`)
+          toastFailure(toast, 'Batch failed closed', new Error('CONNECT events seen'))
+        } else if (out.failed > 0) {
+          setError(`${out.failed} of ${out.count} files failed. See the list below.`)
+        } else {
+          toast.success(`${out.ok} files done · 0 CONNECT`)
+        }
+        return
+      }
       // Progress is host-orchestrated; flip chips on the way to the response.
       const t1 = window.setTimeout(() => setChip('extract'), 400)
       const out = await runDemo(demo.id, file)
@@ -158,9 +179,14 @@ export default function KeepHome() {
         title="Keep"
         description="Personal workstation for an untrusted agent — FluxVM cell, Sentinel egress, audit you can read."
         actions={
-          <Link to="/app/agents" className="zf-btn zf-btn-ghost">
-            Agents
-          </Link>
+          <>
+            <Link to="/app/keep/history" className="zf-btn zf-btn-ghost">
+              History
+            </Link>
+            <Link to="/app/agents" className="zf-btn zf-btn-ghost">
+              Agents
+            </Link>
+          </>
         }
       />
 
@@ -173,6 +199,18 @@ export default function KeepHome() {
               <p className="text-sm text-[var(--zf-muted)] mt-1">
                 {demo.description} No browser. Cockpit must show <strong>0 CONNECT</strong>.
               </p>
+              {demo.model && (
+                <p className="text-sm mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-2">
+                  <strong>Sends text out.</strong> After the cell extracts the text, this host sends it to{' '}
+                  <code className="font-mono text-xs">{demo.model.host}</code> (model{' '}
+                  <code className="font-mono text-xs">{demo.model.model}</code>). The cell itself stays
+                  offline. The first run waits for your approval. It is listed under{' '}
+                  <Link to="/app/keep/history" className="underline">
+                    History → Approvals
+                  </Link>
+                  , and you decide it from that run&apos;s cockpit.
+                </p>
+              )}
             </div>
           </div>
 
@@ -221,7 +259,8 @@ export default function KeepHome() {
               type="file"
               accept={accept}
               className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              multiple
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             />
             <button
               type="button"
@@ -229,7 +268,7 @@ export default function KeepHome() {
               onClick={() => inputRef.current?.click()}
               disabled={busy}
             >
-              {file ? file.name : needsFile ? `Pick a ${accept} file` : `Pick a ${accept} file (or use the sample)`}
+              {files.length > 1 ? `${files.length} files` : file ? file.name : needsFile ? `Pick a ${accept} file` : `Pick a ${accept} file (or use the sample)`}
             </button>
             <button
               type="button"
@@ -247,10 +286,45 @@ export default function KeepHome() {
             </p>
           )}
 
+          {batch && (
+            <div className="text-sm space-y-2 border-t border-[var(--zf-hairline)] pt-3">
+              <div>
+                {batch.ok} of {batch.count} done · CONNECT:{' '}
+                <code className="font-mono">{batch.egress_connects}</code>
+                <span className="text-[var(--zf-muted)]"> · one sealed cell per file</span>
+              </div>
+              <ul className="space-y-1">
+                {batch.results.map((r, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-2">
+                    <span className={r.ok ? 'text-emerald-700' : 'text-red-600'}>{r.ok ? 'done' : 'failed'}</span>
+                    <span className="font-mono text-xs">{r.filename || '(unnamed)'}</span>
+                    {r.ok && r.result ? (
+                      <button
+                        type="button"
+                        className="zf-btn zf-btn-ghost zf-btn-sm"
+                        onClick={() => navigate(`/app/keep/${r.result?.session_id}`)}
+                      >
+                        Open cockpit
+                      </button>
+                    ) : (
+                      <span className="text-xs text-[var(--zf-muted)]">{r.error}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {result && !error && (
             <div className="text-sm space-y-2 border-t border-[var(--zf-hairline)] pt-3">
               <div>
-                CONNECT: <code className="font-mono">{result.egress_connects ?? 0}</code>
+                CONNECT from the cell: <code className="font-mono">{result.egress_connects ?? 0}</code>
+                {result.model ? (
+                  <span>
+                    {' '}
+                    · text sent to <code className="font-mono">{result.model.host}</code>
+                  </span>
+                ) : null}
                 {result.honesty ? (
                   <span className="text-[var(--zf-muted)]"> · {result.honesty}</span>
                 ) : null}
@@ -330,7 +404,8 @@ export default function KeepHome() {
         <Card className="p-4 text-sm text-[var(--zf-muted)] flex gap-3">
           <Shield className="w-4 h-4 mt-0.5 shrink-0" />
           <p>
-            Summaries are extractive: no model is called and nothing found in the file is run. Proof
+            Built-in summaries are extractive: no model is called and nothing found in the file is run.
+            A use case that has a model step says so above. Proof
             without PacketWolf: Keep audit journal + FluxVM host{' '}
             <code className="font-mono text-[12px]">deny_udp</code> / gateway-only L4. Evidence class
             stays <code className="font-mono text-[12px]">software-test</code>.

@@ -89,4 +89,26 @@ describe('useCaseSpec', () => {
     )
     expect(ok.spec?.id).toBe('x')
   })
+
+  it('fixes the extensions for each fixed-format extractor', () => {
+    const d = emptyDraft()
+    d.title = 'Sheets'
+    for (const [extract, accepts] of [
+      ['docx', ['docx']],
+      ['xlsx', ['xlsx']],
+      ['html', ['html', 'htm']],
+      ['eml', ['eml', 'mbox']],
+    ] as const) {
+      d.extract = extract
+      d.accepts = 'txt'
+      expect(draftToSpec(d).accepts).toEqual(accepts)
+    }
+  })
+
+  it('flags an extension the fixed extractor cannot read', () => {
+    const spec = parseSpecJson(
+      '{"id":"x","title":"X","accepts":["csv"],"extract":"xlsx","summary":[{"kind":"stats"}]}',
+    ).spec!
+    expect(validateSpec(spec).join(' ')).toContain('reads only .xlsx, not .csv')
+  })
 })

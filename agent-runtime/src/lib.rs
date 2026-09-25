@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod app;
+pub mod artifact_diff;
 pub mod attestation;
 pub mod audit;
 pub mod browse_ifc;
@@ -21,6 +22,7 @@ pub mod l7;
 pub mod mcp;
 pub mod mitm;
 pub mod model;
+pub mod model_call;
 pub mod notify;
 pub mod policy;
 pub mod pool;
@@ -29,6 +31,7 @@ pub mod schedules;
 pub mod sentinel;
 pub mod skills;
 pub mod store;
+pub mod triggers;
 pub mod unwrap_tokens;
 pub mod workstations;
 

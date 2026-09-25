@@ -174,6 +174,9 @@ impl ApiError {
     pub(crate) fn message(&self) -> &str {
         &self.message
     }
+    pub(crate) fn status(&self) -> StatusCode {
+        self.status
+    }
     pub(crate) fn bad_request(e: impl std::fmt::Display) -> Self {
         Self {
             status: StatusCode::BAD_REQUEST,
@@ -355,13 +358,34 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/v1/demos/{id}",
-            post(crate::demos::demo_run).delete(crate::demos::demo_delete),
+            post(crate::demos::demo_run)
+                .layer(axum::extract::DefaultBodyLimit::max(
+                    crate::demos::MAX_BATCH_BYTES + 1024 * 1024,
+                ))
+                .delete(crate::demos::demo_delete),
+        )
+        .route("/v1/model-grants", get(crate::model_call::list_grants))
+        .route(
+            "/v1/model-grants/{key}",
+            axum::routing::delete(crate::model_call::revoke_grant),
+        )
+        .route(
+            "/v1/triggers",
+            get(crate::triggers::list_triggers).post(crate::triggers::create_trigger),
+        )
+        .route(
+            "/v1/triggers/{id}",
+            axum::routing::delete(crate::triggers::delete_trigger),
         )
         .route(
             "/v1/artifacts",
             get(crate::goals::list_artifacts).post(crate::goals::create_artifact),
         )
         .route("/v1/artifacts/{id}", get(crate::goals::get_artifact))
+        .route(
+            "/v1/artifacts/{a}/diff/{b}",
+            get(crate::goals::diff_artifacts),
+        )
         .route("/v1/approvals", get(list_approvals).post(create_approval))
         .route("/v1/approvals/{id}", post(decide_approval))
         .route("/v1/audit", get(list_audit))
@@ -386,6 +410,12 @@ pub fn public_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(|| async { Json(json!({"ok": true})) }))
         .route("/v1/hooks/{id}", post(crate::schedules::webhook_ingress))
+        .route(
+            "/v1/triggers/{id}/hook",
+            post(crate::triggers::trigger_hook).layer(axum::extract::DefaultBodyLimit::max(
+                crate::demos::MAX_BATCH_BYTES,
+            )),
+        )
         .route("/keep/cockpit", get(cockpit_page))
         .route("/keep/browser", get(crate::browser::browser_page))
         .merge(protected)

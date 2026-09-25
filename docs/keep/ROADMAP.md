@@ -16,6 +16,15 @@ Where each piece stands. Sources: [STATUS.md](STATUS.md), [KEEP-0.2.md](KEEP-0.2
 | Keep 0.1 | BYO model socket, signed Sentinel policy, measured cell, phone approvals, pack / unpack, cockpit, PDF brief, host eBPF pin |
 | Keep Browser 0.3 | Split-sight pause, trajectory-as-code, origin taint lattice, vault-typed fill, goal-bound tabs, honesty badge |
 
+## Planned product surface
+
+Phased, in this order. All four phases are done.
+
+1. **Run history and visibility** (shipped in this branch): artifact TTL and diff, run notifications, console and `keepctl` views.
+2. **Triggers and batch** (done): signed webhook and watched-folder triggers, multi-file upload. See [TRIGGERS.md](TRIGGERS.md).
+3. **More file types** (done, except OCR): docx, xlsx, html, eml/mbox, zip fan-out, and regex / JSON-path / table rules. OCR needs tesseract baked into the cell template and is not built.
+4. **Model-assisted use cases** (done): a pack declares one model endpoint; the host makes the call, so the cell stays at 0 connections. See [MODEL.md](MODEL.md).
+
 ## Gated on hardware
 
 **Keep 0.2.** The soft scaffolding is complete (attestation receipt, no host recover on

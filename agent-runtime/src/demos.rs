@@ -53,7 +53,10 @@ pub(crate) struct DemoSpec {
 }
 
 const PDF_CMD: &str = "pdftotext -layout {path} - 2>/dev/null | head -c 24000";
-const PDF_EMPTY: &str = "No text layer — host OCR, don't send pixels to the model";
+const PDF_EMPTY: &str =
+    "No text layer: this looks like a scan. Keep does not do OCR yet, and it never sends page images to a model";
+/// Where a script extractor is written inside the cell.
+const GUEST_EXTRACT_SCRIPT: &str = "/home/agent/work/extract.mjs";
 const TEXT_LIMIT: usize = 200_000;
 const JSON_LIMIT: usize = 300_000;
 const PDF_LIMIT: usize = 32 * 1024 * 1024;
@@ -245,6 +248,10 @@ struct Resolved {
     accepts: Vec<String>,
     guest_file: String,
     extract_cmd: String,
+    /// A fixed script written into the cell before extraction (never from a spec).
+    extract_script: Option<&'static str>,
+    /// Optional model step, run on the host after extraction.
+    model: Option<crate::demo_rules::ModelSpec>,
     max_bytes: usize,
     empty_msg: String,
     goal_title: String,
@@ -261,6 +268,8 @@ impl Resolved {
             accepts: d.accepts.iter().map(|e| e.to_string()).collect(),
             guest_file: d.guest_file.into(),
             extract_cmd: d.extract_cmd.into(),
+            extract_script: None,
+            model: None,
             max_bytes: d.max_bytes,
             empty_msg: d.empty_msg.into(),
             goal_title: d.goal_title.into(),
@@ -276,12 +285,18 @@ impl Resolved {
         let (extract_cmd, empty_msg) = match spec.extract {
             Extractor::Pdftotext => (PDF_CMD.to_string(), PDF_EMPTY),
             Extractor::Text => (format!("head -c {max_bytes} {{path}}"), "The file is empty"),
+            Extractor::Html | Extractor::Eml | Extractor::Docx | Extractor::Xlsx => (
+                format!("node {GUEST_EXTRACT_SCRIPT} {{path}}"),
+                "No text could be extracted: the file is empty, damaged, or not what its extension says",
+            ),
         };
         Self {
             id: spec.id.clone(),
             accepts: spec.accepts.clone(),
             guest_file: guest.into(),
             extract_cmd,
+            extract_script: spec.extract.script(),
+            model: spec.model.clone(),
             max_bytes,
             empty_msg: empty_msg.into(),
             goal_title: spec.title.clone(),
@@ -303,6 +318,11 @@ impl Resolved {
             ResolvedBuild::Rules(spec) => spec.render(filename, extract),
         }
     }
+}
+
+/// What a trigger needs to pre-filter files: accepted extensions and the size cap.
+pub(crate) async fn use_case_limits(state: &AppState, id: &str) -> Option<(Vec<String>, usize)> {
+    resolve(state, id).await.map(|r| (r.accepts, r.max_bytes))
 }
 
 /// Built-ins first, then user-defined use cases.
@@ -332,6 +352,7 @@ pub(crate) async fn demo_list(State(state): State<Arc<AppState>>) -> Json<Value>
                 "egress": "deny",
                 "builtin": true,
                 "has_sample": true,
+                "model": Value::Null,
             })
         })
         .collect();
@@ -347,6 +368,7 @@ pub(crate) async fn demo_list(State(state): State<Arc<AppState>>) -> Json<Value>
             "egress": "deny",
             "builtin": false,
             "has_sample": s.sample.is_some(),
+            "model": s.model.as_ref().map(|m| json!({ "host": m.host(), "model": m.model })),
             "updated_at": r.updated_at,
         }));
     }
@@ -453,12 +475,11 @@ pub(crate) async fn demo_run(
     Path(demo_id): Path<String>,
     mut multipart: Multipart,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
-    let spec = resolve(&state, &demo_id)
-        .await
-        .ok_or_else(|| ApiError::not_found(format!("no demo named {demo_id:?}")))?;
-
-    let mut upload: Option<Vec<u8>> = None;
-    let mut filename: Option<String> = None;
+    if resolve(&state, &demo_id).await.is_none() {
+        return Err(ApiError::not_found(format!("no demo named {demo_id:?}")));
+    }
+    let mut files: Vec<Upload> = Vec::new();
+    let mut total = 0usize;
     while let Some(field) = multipart
         .next_field()
         .await
@@ -466,16 +487,262 @@ pub(crate) async fn demo_run(
     {
         let name = field.name().unwrap_or("").to_string();
         if name == "file" || name == "pdf" {
-            filename = field.file_name().map(str::to_string);
-            upload = Some(
-                field
-                    .bytes()
-                    .await
-                    .map_err(|e| ApiError::bad_request(e.to_string()))?
-                    .to_vec(),
-            );
+            let filename = field.file_name().map(str::to_string);
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| ApiError::bad_request(e.to_string()))?
+                .to_vec();
+            total += bytes.len();
+            if files.len() >= MAX_BATCH_FILES || total > MAX_BATCH_BYTES {
+                return Err(ApiError::bad_request(format!(
+                    "a batch takes at most {MAX_BATCH_FILES} files and {} MiB in total",
+                    MAX_BATCH_BYTES / (1024 * 1024)
+                )));
+            }
+            files.push(Upload { filename, bytes });
         }
     }
+    // A zip is a container: unpack what this use case accepts and run each file in its own cell.
+    if files.len() == 1
+        && files[0]
+            .filename
+            .as_deref()
+            .is_some_and(|n| extension(n) == "zip")
+    {
+        if let Some((accepts, max_bytes)) = use_case_limits(&state, &demo_id).await {
+            if !accepts.iter().any(|e| e == "zip") {
+                let inner = expand_zip(&files[0].bytes, &accepts, max_bytes)
+                    .map_err(ApiError::bad_request)?;
+                return run_batch(state, demo_id, inner).await;
+            }
+        }
+    }
+    match files.len() {
+        0 => run_use_case(state, demo_id, None, None, None).await,
+        1 => {
+            let f = files.remove(0);
+            run_use_case(state, demo_id, f.filename, Some(f.bytes), None).await
+        }
+        _ => run_batch(state, demo_id, files).await,
+    }
+}
+
+/// Files inside a zip that the use case accepts, read into memory. Nothing is written to disk
+/// and no path from the archive is used: only its base name, for the extension check.
+/// Limits: 20 files, 64 MiB in total, each within the use case's size cap;
+/// sizes are enforced on what is actually read, not on what the archive claims.
+pub(crate) fn expand_zip(
+    bytes: &[u8],
+    accepts: &[String],
+    max_bytes: usize,
+) -> Result<Vec<Upload>, String> {
+    use std::io::Read;
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|e| format!("not a readable zip file: {e}"))?;
+    let mut out: Vec<Upload> = Vec::new();
+    let mut total = 0usize;
+    let mut skipped = 0usize;
+    for i in 0..archive.len().min(2000) {
+        let Ok(mut entry) = archive.by_index(i) else {
+            skipped += 1;
+            continue;
+        };
+        let Some(path) = entry.enclosed_name() else {
+            skipped += 1;
+            continue;
+        };
+        let Some(name) = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        if entry.is_dir()
+            || name.starts_with('.')
+            || path.components().any(|c| c.as_os_str() == "__MACOSX")
+            || !accepts.contains(&extension(&name))
+        {
+            continue;
+        }
+        if entry.size() as usize > max_bytes {
+            skipped += 1;
+            continue;
+        }
+        let mut data = Vec::new();
+        if entry
+            .by_ref()
+            .take(max_bytes as u64 + 1)
+            .read_to_end(&mut data)
+            .is_err()
+            || data.is_empty()
+            || data.len() > max_bytes
+        {
+            skipped += 1;
+            continue;
+        }
+        total += data.len();
+        if out.len() >= MAX_BATCH_FILES || total > MAX_BATCH_BYTES {
+            return Err(format!(
+                "the zip holds more than {MAX_BATCH_FILES} usable files or {} MiB; split it",
+                MAX_BATCH_BYTES / (1024 * 1024)
+            ));
+        }
+        out.push(Upload {
+            filename: Some(name),
+            bytes: data,
+        });
+    }
+    if out.is_empty() {
+        return Err(format!(
+            "the zip has no .{} files this use case can read{}",
+            accepts.join(" / ."),
+            if skipped > 0 {
+                format!(" ({skipped} entries were skipped as too big, unsafe or unreadable)")
+            } else {
+                String::new()
+            }
+        ));
+    }
+    Ok(out)
+}
+
+/// One uploaded file, before it is checked against the use case.
+pub(crate) struct Upload {
+    pub filename: Option<String>,
+    pub bytes: Vec<u8>,
+}
+
+pub(crate) const MAX_BATCH_FILES: usize = 20;
+pub(crate) const MAX_BATCH_BYTES: usize = 64 * 1024 * 1024;
+
+/// Several files, one sealed cell each, grouped under one `batch_id`. The batch
+/// stops at the first frozen session (a 409): something reached for the network.
+async fn run_batch(
+    state: Arc<AppState>,
+    demo_id: String,
+    files: Vec<Upload>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let batch_id = Uuid::new_v4();
+    let count = files.len();
+    let (mut ok, mut failed, mut connects) = (0usize, 0usize, 0u64);
+    let mut results: Vec<Value> = Vec::with_capacity(count);
+    let mut stopped = false;
+    for f in files {
+        let name = f.filename.clone().unwrap_or_default();
+        if stopped {
+            failed += 1;
+            results.push(json!({
+                "filename": name, "ok": false, "skipped": true,
+                "error": "skipped: an earlier file froze its session"
+            }));
+            continue;
+        }
+        match run_use_case(
+            state.clone(),
+            demo_id.clone(),
+            f.filename,
+            Some(f.bytes),
+            Some(batch_id),
+        )
+        .await
+        {
+            Ok((_, Json(v))) => {
+                ok += 1;
+                connects += v["egress_connects"].as_u64().unwrap_or(0);
+                results.push(json!({ "filename": name, "ok": true, "result": v }));
+            }
+            Err(e) => {
+                failed += 1;
+                stopped = e.status() == StatusCode::CONFLICT;
+                results.push(json!({
+                    "filename": name, "ok": false,
+                    "status": e.status().as_u16(), "error": e.message()
+                }));
+            }
+        }
+    }
+    let status = if failed == 0 {
+        StatusCode::CREATED
+    } else {
+        StatusCode::MULTI_STATUS
+    };
+    Ok((
+        status,
+        Json(json!({
+            "batch_id": batch_id,
+            "demo": demo_id,
+            "count": count,
+            "ok": ok,
+            "failed": failed,
+            "egress_connects": connects,
+            "results": results,
+        })),
+    ))
+}
+
+/// Run one use case on one file (or its sample) and tell the operator how it went.
+/// Shared by the upload route, batches and triggers.
+pub(crate) async fn run_use_case(
+    state: Arc<AppState>,
+    demo_id: String,
+    filename: Option<String>,
+    upload: Option<Vec<u8>>,
+    batch_id: Option<Uuid>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let result = run_demo(state.clone(), demo_id.clone(), filename, upload, batch_id).await;
+    match &result {
+        Ok((_, Json(v))) => {
+            let artifacts = v["artifacts"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| {
+                            Some((
+                                x["id"].as_str()?.parse().ok()?,
+                                x["title"].as_str()?.to_string(),
+                            ))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            crate::notify::run_finished(
+                &state,
+                crate::notify::RunNotice {
+                    demo: demo_id,
+                    session_id: v["session_id"].as_str().and_then(|s| s.parse().ok()),
+                    outcome: Ok((artifacts, v["egress_connects"].as_u64().unwrap_or(0))),
+                },
+            );
+        }
+        // A rejected upload or unknown id is the caller's mistake, not a failed run.
+        Err(e) if !matches!(e.status(), StatusCode::BAD_REQUEST | StatusCode::NOT_FOUND) => {
+            crate::notify::run_finished(
+                &state,
+                crate::notify::RunNotice {
+                    demo: demo_id,
+                    session_id: None,
+                    outcome: Err(e.message().to_string()),
+                },
+            );
+        }
+        Err(_) => {}
+    }
+    result
+}
+
+async fn run_demo(
+    state: Arc<AppState>,
+    demo_id: String,
+    filename: Option<String>,
+    upload: Option<Vec<u8>>,
+    batch_id: Option<Uuid>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let spec = resolve(&state, &demo_id)
+        .await
+        .ok_or_else(|| ApiError::not_found(format!("no demo named {demo_id:?}")))?;
+
     let (filename, input) = match upload {
         Some(bytes) => (
             filename.unwrap_or_else(|| spec.guest_file.to_string()),
@@ -510,6 +777,11 @@ pub(crate) async fn demo_run(
             spec.accepts.join(" / ."),
             if ext.is_empty() { "(none)" } else { &ext }
         )));
+    }
+
+    // A model step the vault would refuse fails now, before a cell is created.
+    if let Some(ms) = &spec.model {
+        crate::model_call::preflight(&state, ms)?;
     }
 
     // Validate the input before touching FluxVM: bad uploads fail fast and cheap.
@@ -560,7 +832,7 @@ pub(crate) async fn demo_run(
         agent_version: "demo".into(),
         sandbox_id: sandbox.id,
         status: SessionStatus::Running,
-        input: json!({ "demo": spec.id, "filename": filename }),
+        input: json!({ "demo": spec.id, "filename": filename, "batch_id": batch_id }),
         created_at: now,
         updated_at: now,
         last_event_seq: 0,
@@ -622,6 +894,14 @@ pub(crate) async fn demo_run(
         .await
         .map_err(|e| ApiError::bad_gateway(format!("put-file: {e:#}")))?;
 
+    if let Some(script) = spec.extract_script {
+        state
+            .fluxvm
+            .fs_write(sandbox.id, GUEST_EXTRACT_SCRIPT, script.as_bytes(), 0o644)
+            .await
+            .map_err(|e| ApiError::bad_gateway(format!("put-script: {e:#}")))?;
+    }
+
     let extract = match state
         .fluxvm
         .process(
@@ -682,9 +962,24 @@ pub(crate) async fn demo_run(
         }
     };
 
-    let built = spec
+    let mut built = spec
         .build(&filename, &extract)
         .map_err(ApiError::bad_request)?;
+    // The model step runs here on the host. The cell is finished and never had a path to it.
+    let mut model_outcome: Option<crate::model_call::ModelOutcome> = None;
+    if let Some(ms) = &spec.model {
+        let out = crate::model_call::call(&state, &session, &spec.id, ms, &extract).await?;
+        if let Some(first) = built.first_mut() {
+            first.body.push_str(&format!(
+                "\n## Model summary\n*Generated by `{}` at {} from the extracted text. Unlike the \
+                 sections above, this part is not extractive.*\n\n{}\n",
+                crate::demo_builders::clean_line(&out.model),
+                out.host,
+                out.text
+            ));
+        }
+        model_outcome = Some(out);
+    }
     let mut goal = goal;
     let mut saved: Vec<ArtifactRecord> = Vec::new();
     for a in &built {
@@ -701,8 +996,11 @@ pub(crate) async fn demo_run(
                 "filename": filename,
                 "extract_chars": extract.chars().count(),
                 "demo": spec.id,
+                "batch_id": batch_id,
+                "model_host": model_outcome.as_ref().map(|m| m.host.clone()),
             }),
             created_at: Utc::now(),
+            expires_at: None,
         };
         state
             .store
@@ -752,6 +1050,7 @@ pub(crate) async fn demo_run(
         StatusCode::CREATED,
         Json(json!({
             "demo": spec.id,
+            "batch_id": batch_id,
             "session_id": id,
             "agent": spec.id,
             "goal_id": goal.id,
@@ -772,8 +1071,23 @@ pub(crate) async fn demo_run(
                 "operator_can_read": true,
                 "proxy": "strict",
                 "browser": "none",
+                "model": model_outcome.as_ref().map(|m| m.host.clone()),
             },
-            "honesty": "software-test · operator can read · 0 CONNECT",
+            "model_calls": u32::from(model_outcome.is_some()),
+            "model": model_outcome.as_ref().map(|m| json!({
+                "host": m.host,
+                "model": m.model,
+                "request_bytes": m.request_bytes,
+                "response_bytes": m.response_bytes,
+                "first_use_approved": m.approved_now,
+            })),
+            "honesty": match &model_outcome {
+                Some(m) => format!(
+                    "software-test · operator can read · 0 CONNECT from the cell · extracted text sent to {}",
+                    m.host
+                ),
+                None => "software-test · operator can read · 0 CONNECT".to_string(),
+            },
         })),
     ))
 }
@@ -1249,5 +1563,69 @@ mod tests {
         assert_eq!(extension("A.PDF"), "pdf");
         assert_eq!(extension("noext"), "");
         assert_eq!(extension("a.tar.gz"), "gz");
+    }
+
+    fn zip_of(files: &[(&str, &[u8])]) -> Vec<u8> {
+        use std::io::Write;
+        let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let opts = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (name, bytes) in files {
+            w.start_file(*name, opts).unwrap();
+            w.write_all(bytes).unwrap();
+        }
+        w.finish().unwrap().into_inner()
+    }
+
+    fn csv_only() -> Vec<String> {
+        vec!["csv".into()]
+    }
+
+    #[test]
+    fn zip_expansion_keeps_only_accepted_safe_files() {
+        let z = zip_of(&[
+            ("a.csv", b"x\n1\n"),
+            ("nested/dir/b.CSV", b"y\n2\n"),
+            ("notes.txt", b"ignored"),
+            (".hidden.csv", b"ignored"),
+            ("__MACOSX/c.csv", b"ignored"),
+            ("../../evil.csv", b"unsafe path"),
+        ]);
+        let out = expand_zip(&z, &csv_only(), 1024).unwrap();
+        let names: Vec<_> = out.iter().map(|u| u.filename.clone().unwrap()).collect();
+        // Only the base name is used, so a hostile path can never reach a file system.
+        assert_eq!(names, ["a.csv", "b.CSV"]);
+        assert_eq!(out[1].bytes, b"y\n2\n");
+    }
+
+    #[test]
+    fn zip_expansion_enforces_sizes_on_what_is_read() {
+        let big = vec![b'x'; 2000];
+        let z = zip_of(&[("big.csv", &big), ("ok.csv", b"a\n1\n")]);
+        let out = expand_zip(&z, &csv_only(), 1000).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].filename.as_deref(), Some("ok.csv"));
+        let err = expand_zip(&zip_of(&[("big.csv", &big)]), &csv_only(), 1000)
+            .err()
+            .unwrap();
+        assert!(
+            err.contains("no .csv files") && err.contains("skipped"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn zip_expansion_refuses_too_many_files_and_non_zips() {
+        let many: Vec<(String, Vec<u8>)> = (0..=MAX_BATCH_FILES)
+            .map(|i| (format!("f{i}.csv"), b"a\n1\n".to_vec()))
+            .collect();
+        let refs: Vec<(&str, &[u8])> = many
+            .iter()
+            .map(|(n, b)| (n.as_str(), b.as_slice()))
+            .collect();
+        let err = expand_zip(&zip_of(&refs), &csv_only(), 1024).err().unwrap();
+        assert!(err.contains("more than 20"), "{err}");
+        assert!(expand_zip(b"PK not really", &csv_only(), 1024).is_err());
+        assert!(expand_zip(&zip_of(&[]), &csv_only(), 1024).is_err());
     }
 }

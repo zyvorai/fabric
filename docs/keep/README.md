@@ -177,7 +177,7 @@ cargo test --manifest-path agent-runtime/Cargo.toml --lib
 # 2. End to end: live runtime + FluxVM sandbox stub + keepctl
 ./scripts/keep-e2e.sh          # ends with: passed=40 failed=0
 
-# 3. On a FluxVM host with a node22-agent template
+# 3. On a FluxVM host with a node22-agent template (./scripts/keep-bake-node22-agent.sh builds it)
 ./scripts/keep-live-lab.sh
 ```
 
@@ -284,7 +284,7 @@ Sources for the Muse column: [MarkTechPost, 2026-09-08](https://www.marktechpost
 
 ## FAQ
 
-**Does Keep need a model?** Keep has a model socket, so you choose: a hosted API, a local model or your own inference service. The built-in demos call no model at all.
+**Does Keep need a model?** No. The built-in demos call no model at all. A use case you write can opt in to one host-side model step (a hosted API, a local model or your own service) that needs the vault to allow the endpoint and your approval on first use: see [MODEL.md](MODEL.md).
 
 **Can I try it without KVM?** Yes. Steps 1 and 2 of [Try it](#try-it-in-60-seconds) run against a FluxVM stand-in. A real cell needs a FluxVM host.
 

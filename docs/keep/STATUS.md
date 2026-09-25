@@ -15,6 +15,11 @@
 | Host eBPF (FluxVM only) | `deny_udp` + gateway pin; audit `egress_connects`; freeze on deny | FluxVM TC + agent-runtime confine |
 | One-click use cases | Table-driven demos (7): drop a file, get an artifact; expect 0 CONNECT | [`demos/`](demos/README.md) · `examples/keep-agents/<id>/` · `keep-demo.sh` |
 | Your own use cases | Declarative `pack.json` (no code) deployed from the console or `keepctl deploy`; TypeScript agent packs signed with Node and deployed in one command | [`PACKS.md`](PACKS.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) · [Tutorial 20: mail export digest](../tutorials/20-sort-a-mail-export.md) |
+| Run history | Artifact TTL, per-use-case history, line diff between runs, `run.finished` / `run.failed` webhook, console `/app/keep/history`, `keepctl run\|list\|artifacts\|diff\|audit\|approvals` | [`keepctl/README.md`](keepctl/README.md) |
+| Triggers and batch | Multi-file runs (one cell each), signed webhook and watched-folder triggers, `keepctl trigger` | [`TRIGGERS.md`](TRIGGERS.md) |
+| More file types | `docx`, `xlsx`, `html`, `eml`/`mbox` extractors, zip fan-out, `regex_extract` / `json_path` / `table` rules | [`PACKS.md`](PACKS.md) |
+| Model-assisted use cases | Opt-in host-side model step: vault-gated endpoint, first-use approval, audited calls, sanitised reply, `keepctl grants` | [`MODEL.md`](MODEL.md) |
+| Scenarios and the cell template | Seven scenario packs; `node22-agent` template and `keep-bake-node22-agent.sh` | [`SCENARIOS.md`](SCENARIOS.md) |
 | Install Keep | `./scripts/deploy keep user@host` (needs FluxVM on the host); `keepctl doctor` | [`PRODUCTION.md`](PRODUCTION.md) · `scripts/deploy-keep.sh` |
 | CI | Keep workflow: unit tests, **demos e2e** (7 built-ins, a custom use case, signed pack deploy in Keep mode, against the real runtime and the FluxVM stand-in), stub e2e | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
 | Tutorial | Hands-on + pack appendix + demos + your own | [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17](../tutorials/17-keep-pdf-brief.md) · [Tutorial 18](../tutorials/18-keep-use-cases.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) |

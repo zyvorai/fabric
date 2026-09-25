@@ -91,10 +91,95 @@ pub fn payload(record: &ApprovalRecord, agent: Option<&str>, user_id: Option<&st
     serde_json::to_vec(&value).unwrap_or_default()
 }
 
+/// Tell the operator's device that a use case run finished or failed, in the
+/// background. Same channel, signature and retry rules as approvals.
+pub fn run_finished(state: &AppState, run: RunNotice) {
+    let Some(webhook) = state.config.approval_webhook.clone() else {
+        return;
+    };
+    let http = state.egress_http.clone();
+    let store = state.store.clone();
+    tokio::spawn(async move {
+        let event = run.event();
+        let body = run_payload(&run);
+        if let Err(error) = deliver_event(&http, &webhook, event, &body, &RETRY_DELAYS).await {
+            tracing::warn!(%error, demo = %run.demo, "run notification failed");
+            let _ = store
+                .audit
+                .append(
+                    run.session_id,
+                    AuditPhase::Failed,
+                    "run.notify",
+                    Some(run.demo.clone()),
+                    json!({"event": event, "error": error.to_string()}),
+                )
+                .await;
+        }
+    });
+}
+
+/// What a run notification says. Never carries the extracted text or file name.
+#[derive(Clone, Debug)]
+pub struct RunNotice {
+    pub demo: String,
+    pub session_id: Option<uuid::Uuid>,
+    /// `Ok((artifact ids and titles, egress connects))` or `Err(reason)`.
+    pub outcome: Result<(Vec<(uuid::Uuid, String)>, u64), String>,
+}
+
+impl RunNotice {
+    pub fn event(&self) -> &'static str {
+        if self.outcome.is_ok() {
+            "run.finished"
+        } else {
+            "run.failed"
+        }
+    }
+}
+
+pub fn run_payload(run: &RunNotice) -> Vec<u8> {
+    let (title, body, detail) = match &run.outcome {
+        Ok((artifacts, connects)) => (
+            format!("{} finished", run.demo),
+            format!(
+                "{} artifact(s), {connects} outbound connection(s)",
+                artifacts.len()
+            ),
+            json!({
+                "artifacts": artifacts.iter().map(|(id, title)| json!({"id": id, "title": title})).collect::<Vec<_>>(),
+                "egress_connects": connects,
+            }),
+        ),
+        Err(reason) => (
+            format!("{} failed", run.demo),
+            reason.clone(),
+            json!({ "error": reason }),
+        ),
+    };
+    let value: Value = json!({
+        "event": run.event(),
+        "channel": "out_of_band",
+        "ui": { "title": title, "body": body },
+        "run": { "demo": run.demo, "session_id": run.session_id, "detail": detail },
+    });
+    serde_json::to_vec(&value).unwrap_or_default()
+}
+
 /// POST `body`, retrying after each delay in `retry_delays` on any failure.
 pub async fn deliver(
     http: &reqwest::Client,
     webhook: &ApprovalWebhook,
+    body: &[u8],
+    retry_delays: &[Duration],
+) -> Result<()> {
+    deliver_event(http, webhook, "approval.requested", body, retry_delays).await
+}
+
+/// [`deliver`] with an explicit `x-zyvor-event` name.
+pub async fn deliver_event(
+    http: &reqwest::Client,
+    webhook: &ApprovalWebhook,
+    event: &str,
     body: &[u8],
     retry_delays: &[Duration],
 ) -> Result<()> {
@@ -108,7 +193,7 @@ pub async fn deliver(
             .post(&webhook.url)
             .timeout(ATTEMPT_TIMEOUT)
             .header("content-type", "application/json")
-            .header("x-zyvor-event", "approval.requested")
+            .header("x-zyvor-event", event)
             .header("x-zyvor-signature", format!("sha256={signature}"))
             .body(body.to_vec())
             .send()
@@ -190,6 +275,48 @@ mod tests {
         assert_eq!(value["approval"]["user_id"], "alice");
         assert_eq!(value["approval"]["kind"], "send");
         assert_eq!(value["decide"]["path"], format!("/v1/approvals/{}", r.id));
+    }
+
+    #[test]
+    fn run_payload_names_the_event_and_omits_file_names() {
+        let id = uuid::Uuid::new_v4();
+        let ok = RunNotice {
+            demo: "pdf-brief".into(),
+            session_id: Some(id),
+            outcome: Ok((vec![(id, "brief.md".into())], 0)),
+        };
+        let v: Value = serde_json::from_slice(&run_payload(&ok)).unwrap();
+        assert_eq!(v["event"], "run.finished");
+        assert_eq!(v["run"]["detail"]["egress_connects"], 0);
+        assert_eq!(v["run"]["detail"]["artifacts"][0]["title"], "brief.md");
+
+        let bad = RunNotice {
+            demo: "pdf-brief".into(),
+            session_id: None,
+            outcome: Err("session frozen".into()),
+        };
+        let v: Value = serde_json::from_slice(&run_payload(&bad)).unwrap();
+        assert_eq!(v["event"], "run.failed");
+        assert_eq!(v["ui"]["body"], "session frozen");
+    }
+
+    #[tokio::test]
+    async fn delivery_sends_the_named_event_header() {
+        let (url, seen) = receiver(0).await;
+        let webhook = ApprovalWebhook {
+            url,
+            secret: "k".into(),
+        };
+        deliver_event(
+            &reqwest::Client::new(),
+            &webhook,
+            "run.finished",
+            b"{}",
+            &[],
+        )
+        .await
+        .unwrap();
+        assert_eq!(seen.lock().unwrap().len(), 1);
     }
 
     #[tokio::test]

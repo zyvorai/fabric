@@ -175,7 +175,7 @@ Every egress control above is moot if the sandbox can reach the internet itself.
 
 ### Approvals that reach a person
 
-Set `ZYVOR_AGENT_APPROVAL_WEBHOOK` and `ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET` and every new approval is POSTed there, signed `x-zyvor-signature: sha256=<HMAC-SHA256 of the body>`, with the approval's kind, subject, prompt, `planned_action`, agent and `user_id` (so a receiver can route it to the right device) and the path to decide it. Delivery retries twice and is journaled as `approval.notify` if it finally fails; it never blocks the request. The receiver answers through the operator API (`POST /v1/approvals/{id}`). The agent cannot: the operator routes sit behind `ZYVOR_AGENT_API_TOKEN` on the public listener, and the broker and proxy listeners that the sandbox can reach serve nothing else (both are tested).
+Set `ZYVOR_AGENT_APPROVAL_WEBHOOK` and `ZYVOR_AGENT_APPROVAL_WEBHOOK_SECRET` and every new approval is POSTed there, signed `x-zyvor-signature: sha256=<HMAC-SHA256 of the body>`, with the approval's kind, subject, prompt, `planned_action`, agent and `user_id` (so a receiver can route it to the right device) and the path to decide it. Delivery retries twice and is journaled as `approval.notify` if it finally fails; it never blocks the request. The same webhook also receives `run.finished` and `run.failed` when a one-click use case ends (`x-zyvor-event` names the event): the use case, session, artifact titles and connection count, never the file name or extracted text. A rejected upload or unknown use case (400/404) is not a failed run and sends nothing. The receiver answers approvals through the operator API (`POST /v1/approvals/{id}`). The agent cannot: the operator routes sit behind `ZYVOR_AGENT_API_TOKEN` on the public listener, and the broker and proxy listeners that the sandbox can reach serve nothing else (both are tested).
 
 A credential descriptor can require a decision per request: `"requires_approval": ["POST"]` (methods, or `"*"`) and `"approval_kind": "send"` (default) or `"purchase"`. The broker then holds the request after every other check and opens an approval showing the method, the URL without its query string, the credential name, and the body's length and SHA-256, never the body or a header. Each request needs its own decision; nothing is remembered.
 
@@ -195,7 +195,7 @@ With `"browser_port": 9222` (Chromium started with remote debugging on that port
 - `GET /v1/sessions/{id}/browser/view` — Keep 0.1 live tab summary (title + URL)
 - `GET /keep/browser?session=<uuid>` — HTML that polls the live view
 
-Only listing paths are forwarded. **Screencast and input takeover are not implemented** (need a WebSocket bridge to the guest).
+Only listing paths are forwarded, plus a screenshot and a read-only screencast through the host CDP bridge. **Input takeover is not implemented.**
 
 ### Confidential VMs, when the host has them
 
