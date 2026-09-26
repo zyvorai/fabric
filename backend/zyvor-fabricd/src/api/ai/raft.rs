@@ -103,9 +103,7 @@ fn peer_spec() -> Option<PeerSpec> {
         if item.is_empty() {
             continue;
         }
-        let Some((id_text, addr)) = item.split_once('@') else {
-            return None;
-        };
+        let (id_text, addr) = item.split_once('@')?;
         let Ok(peer_id) = id_text.parse::<NodeId>() else {
             return None;
         };
@@ -363,6 +361,8 @@ pub async fn limit_write(
 struct HttpNetwork;
 
 impl HttpNetwork {
+    // `RPCError` is openraft's own error type; it is returned as the network trait requires.
+    #[allow(clippy::result_large_err)]
     async fn send<Req, Resp, Err>(
         &self,
         target: NodeId,
@@ -488,6 +488,8 @@ impl LogStore {
         }
     }
 
+    // `StorageError` is openraft's own error type; boxing it would change the trait the store implements.
+    #[allow(clippy::result_large_err)]
     fn flush(path: &Option<PathBuf>, disk: &DiskLog) -> Result<(), StorageError<NodeId>> {
         let Some(path) = path else {
             return Ok(());
@@ -524,10 +526,10 @@ impl RaftLogStorage<TypeConfig> for LogStore {
             .log
             .iter()
             .next_back()
-            .map(|(_, entry)| entry.get_log_id().clone());
-        let last_purged = inner.last_purged_log_id.clone();
+            .map(|(_, entry)| *entry.get_log_id());
+        let last_purged = inner.last_purged_log_id;
         Ok(LogState {
-            last_purged_log_id: last_purged.clone(),
+            last_purged_log_id: last_purged,
             last_log_id: last.or(last_purged),
         })
     }
@@ -542,17 +544,17 @@ impl RaftLogStorage<TypeConfig> for LogStore {
     }
 
     async fn read_committed(&mut self) -> Result<Option<LogId<NodeId>>, StorageError<NodeId>> {
-        Ok(self.inner.lock().await.committed.clone())
+        Ok(self.inner.lock().await.committed)
     }
 
     async fn save_vote(&mut self, vote: &Vote<NodeId>) -> Result<(), StorageError<NodeId>> {
         let mut inner = self.inner.lock().await;
-        inner.vote = Some(vote.clone());
+        inner.vote = Some(*vote);
         Self::flush(&self.path, &inner)
     }
 
     async fn read_vote(&mut self) -> Result<Option<Vote<NodeId>>, StorageError<NodeId>> {
-        Ok(self.inner.lock().await.vote.clone())
+        Ok(self.inner.lock().await.vote)
     }
 
     async fn append<I>(
@@ -591,7 +593,7 @@ impl RaftLogStorage<TypeConfig> for LogStore {
 
     async fn purge(&mut self, log_id: LogId<NodeId>) -> Result<(), StorageError<NodeId>> {
         let mut inner = self.inner.lock().await;
-        inner.last_purged_log_id = Some(log_id.clone());
+        inner.last_purged_log_id = Some(log_id);
         let keys: Vec<u64> = inner
             .log
             .range(..=log_id.index)
@@ -697,11 +699,14 @@ struct MachineData {
     audit_tip: String,
 }
 
+/// The snapshot the state machine last built: its metadata and bytes.
+type CurrentSnapshot = Option<(SnapshotMeta<NodeId, BasicNode>, Vec<u8>)>;
+
 #[derive(Debug, Default)]
 struct StateMachineStore {
     state_machine: RwLock<MachineData>,
     snapshot_idx: AtomicU64,
-    current_snapshot: RwLock<Option<(SnapshotMeta<NodeId, BasicNode>, Vec<u8>)>>,
+    current_snapshot: RwLock<CurrentSnapshot>,
     path: Option<PathBuf>,
 }
 
@@ -725,6 +730,8 @@ impl StateMachineStore {
         Arc::new(Self::default())
     }
 
+    // `StorageError` is openraft's own error type; boxing it would change the trait the store implements.
+    #[allow(clippy::result_large_err)]
     fn flush(&self, data: &MachineData) -> Result<(), StorageError<NodeId>> {
         let Some(path) = &self.path else {
             return Ok(());

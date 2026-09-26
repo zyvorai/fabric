@@ -1205,6 +1205,8 @@ fn limit_reply(
     }
 }
 
+// One argument per limit the caller already has; a params struct would only move the list.
+#[allow(clippy::too_many_arguments)]
 async fn admit_scope_routed(
     state: &AppState,
     remote: &mut Option<String>,

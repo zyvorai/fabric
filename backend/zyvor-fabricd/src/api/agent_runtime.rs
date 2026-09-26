@@ -210,6 +210,8 @@ fn json_response(status: StatusCode, value: Value) -> Response {
     (status, Json(value)).into_response()
 }
 
+// The error is a ready-to-send axum `Response` (large by design), returned straight to the client.
+#[allow(clippy::result_large_err)]
 async fn proxy_json(
     state: &AppState,
     method: Method,
@@ -352,6 +354,8 @@ pub async fn create_session(
     }
 }
 
+// The error is a ready-to-send axum `Response` (large by design), returned straight to the client.
+#[allow(clippy::result_large_err)]
 async fn session_owned(state: &AppState, claims: &Claims, id: &str) -> Result<Value, Response> {
     let (status, value) = proxy_json(
         state,
