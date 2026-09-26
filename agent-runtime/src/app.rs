@@ -254,6 +254,8 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/sessions",
             get(list_sessions).post(create_session_route),
         )
+        // AG-UI: a chat client's run becomes a Keep session (see agui.rs). It cannot approve or deny anything.
+        .route("/v1/agui", post(crate::agui::agui_run))
         .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
         .route("/v1/sessions/{id}/steer", post(steer_session))
         .route("/v1/sessions/{id}/cancel", post(cancel_session))
@@ -663,7 +665,7 @@ async fn reconcile_warm_pool(
 }
 
 /// `POST /v1/sessions`. A user token can only start a session for itself.
-async fn create_session_route(
+pub(crate) async fn create_session_route(
     State(state): State<Arc<AppState>>,
     Extension(principal): Extension<Principal>,
     Json(mut req): Json<CreateSessionRequest>,

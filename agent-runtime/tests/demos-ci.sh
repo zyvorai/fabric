@@ -649,6 +649,33 @@ assert "sk-e2e-secret-key" not in json.dumps(rows), "no key belongs in this requ
 PY
 ok "an agent called ctx.model.chat(): runtime env -> worker -> egress broker -> the socket's endpoint, and the reply came back"
 
+echo "demos-ci: AG-UI (a chat client's run over a Keep session)"
+agui() { curl -sN --max-time 90 -X POST -H 'content-type: application/json' -d "$1" "$BASE/v1/agui"; }
+AGUI_BODY='{"threadId":"t-1","runId":"r-1","messages":[{"id":"m1","role":"user","content":"What is the total due?"}],"state":{},"tools":[],"context":[],"forwardedProps":{"agent":"model-agent"}}'
+agui "$AGUI_BODY" > "$WORK/agui.sse" || fail "the AG-UI run failed"
+python3 - "$WORK/agui.sse" <<'PY' || fail "the AG-UI stream is wrong: $(head -c 800 "$WORK/agui.sse")"
+import json, sys
+ev = [json.loads(l[5:]) for l in open(sys.argv[1]) if l.startswith("data:")]
+types = [e["type"] for e in ev]
+assert types[0] == "RUN_STARTED" and ev[0]["threadId"] == "t-1" and ev[0]["runId"] == "r-1", types
+assert types[-1] == "RUN_FINISHED" and ev[-1]["threadId"] == "t-1" and ev[-1]["runId"] == "r-1", types
+assert "4,200 EUR" in json.dumps(ev[-1].get("result")), ev[-1]
+PY
+ok "an AG-UI run starts a session, streams its events and finishes with the agent's result"
+if npm install --prefix "$WORK/agui" @ag-ui/core@1 zod@3 --no-audit --no-fund >/dev/null 2>&1; then
+  node "$ROOT/agent-runtime/tests/agui-conformance.mjs" "$WORK/agui" < "$WORK/agui.sse" || fail "the AG-UI stream does not conform to @ag-ui/core"
+  ok "the AG-UI stream validates against the official @ag-ui/core event schemas"
+else
+  echo "  skip AG-UI schema conformance (@ag-ui/core could not be installed: no network?)"
+fi
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"threadId":"t-2","runId":"r-2","messages":[{"role":"user","content":"hi"}],"forwardedProps":{}}' "$BASE/v1/agui")
+[[ "$code" == "400" ]] || fail "a run with no forwardedProps.agent must be 400, got $code"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"threadId":"t-2","runId":"r-2","messages":[{"role":"assistant","content":"hi"}],"forwardedProps":{"agent":"model-agent"}}' "$BASE/v1/agui")
+[[ "$code" == "400" ]] || fail "a run with no user message must be 400, got $code"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d "$AGUI_BODY" "$BASE/v1/agui")
+[[ "$code" == "409" ]] || fail "a message on a thread whose session has ended must be 409, got $code"
+ok "AG-UI input errors: no agent 400, no user message 400, an ended thread 409"
+
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")
 [[ "$code" == "400" ]] || fail "wrong extension should be 400, got $code"; ok "wrong file type refused (400)"
