@@ -1119,3 +1119,169 @@ async fn threads_are_private_to_their_owner() {
         "message text must never reach the journal"
     );
 }
+
+#[tokio::test]
+async fn memory_is_private_opt_in_and_decided_by_the_user() {
+    let w = world().await;
+    let (ana, ben) = (Some(w.ana.token.as_str()), Some(w.ben.token.as_str()));
+    let opt = op();
+    let operator = Some(opt.as_str());
+
+    // off by default: nothing can be added
+    let (_, v) = call(&w.app, "GET", "/v1/memory", ana, None).await;
+    assert_eq!(v["enabled"], false);
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/memory",
+        ana,
+        Some(json!({"text": "likes tea"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "memory is off");
+    let (st, v) = call(
+        &w.app,
+        "PUT",
+        "/v1/memory/settings",
+        ana,
+        Some(json!({"enabled": true})),
+    )
+    .await;
+    assert_eq!((st, v["enabled"].clone()), (StatusCode::OK, json!(true)));
+    let (st, item) = call(
+        &w.app,
+        "POST",
+        "/v1/memory",
+        ana,
+        Some(json!({"text": "vegetarian", "kind": "fact", "pinned": true})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{item}");
+    assert_eq!(
+        (item["origin"].as_str(), item["status"].as_str()),
+        (Some("user"), Some("active"))
+    );
+    let mid = item["id"].as_str().unwrap().to_string();
+
+    // a credential is refused and the answer names the shape, not the text
+    let (st, v) = call(
+        &w.app,
+        "POST",
+        "/v1/memory",
+        ana,
+        Some(json!({"text": "token ghp_abcdefghijklmnopqrstuvwxyz0123456789"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    assert!(
+        v.to_string().contains("github-token") && !v.to_string().contains("ghp_abc"),
+        "{v}"
+    );
+
+    // another user has their own, empty and off; they cannot see, edit, delete, accept or reject ana's
+    let (_, v) = call(&w.app, "GET", "/v1/memory", ben, None).await;
+    assert_eq!(
+        (v["enabled"].clone(), v["items"].as_array().unwrap().len()),
+        (json!(false), 0)
+    );
+    let (_, v) = call(&w.app, "GET", "/v1/memory?user_id=ana", ben, None).await;
+    assert!(
+        v["items"].as_array().unwrap().is_empty(),
+        "a user token ignores user_id"
+    );
+    for (method, path) in [
+        ("PATCH", format!("/v1/memory/{mid}")),
+        ("DELETE", format!("/v1/memory/{mid}")),
+        ("POST", format!("/v1/memory/{mid}/accept")),
+        ("POST", format!("/v1/memory/{mid}/reject")),
+    ] {
+        let (st, _) = call(
+            &w.app,
+            method,
+            &path,
+            ben,
+            Some(json!({"text": "hijacked"})),
+        )
+        .await;
+        assert_eq!(st, StatusCode::NOT_FOUND, "{method} {path}");
+    }
+    assert_eq!(
+        w.state.store.memory.get("ana").await.items[0].text,
+        "vegetarian",
+        "nothing of ana's changed"
+    );
+
+    // an agent's proposal waits: not an item, not context, until the user accepts it
+    let p = w
+        .state
+        .store
+        .memory
+        .propose(
+            "ana",
+            "prefers window seats",
+            "preference",
+            crate::memory::Source::default(),
+            true,
+        )
+        .await
+        .unwrap();
+    let (_, v) = call(&w.app, "GET", "/v1/memory", ana, None).await;
+    assert_eq!(v["proposals"][0]["id"], p.id.to_string());
+    assert_eq!(v["proposals"][0]["tainted"], true);
+    assert_eq!(v["items"].as_array().unwrap().len(), 1);
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/memory/{}/accept", p.id),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let (_, v) = call(&w.app, "GET", "/v1/memory", ana, None).await;
+    assert_eq!(
+        (
+            v["items"].as_array().unwrap().len(),
+            v["proposals"].as_array().unwrap().len()
+        ),
+        (2, 0)
+    );
+
+    // edit, then the operator: must name the user, and every access is journaled without the text
+    let (st, v) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/memory/{mid}"),
+        ana,
+        Some(json!({"text": "vegan", "pinned": false})),
+    )
+    .await;
+    assert_eq!((st, v["text"].as_str()), (StatusCode::OK, Some("vegan")));
+    let (st, _) = call(&w.app, "GET", "/v1/memory", operator, None).await;
+    assert_eq!(
+        st,
+        StatusCode::BAD_REQUEST,
+        "the operator must name whose memory"
+    );
+    let (st, v) = call(&w.app, "GET", "/v1/memory?user_id=ana", operator, None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(v["items"].as_array().unwrap().len(), 2);
+    let (_, audit) = call(&w.app, "GET", "/v1/audit", operator, None).await;
+    let text = audit.to_string();
+    assert!(
+        text.contains("keep.memory.operator_access"),
+        "the operator's read is journaled"
+    );
+    assert!(
+        !text.contains("vegan") && !text.contains("window seats"),
+        "memory text never reaches the journal"
+    );
+
+    // forgetting everything keeps the on/off choice; without a token nothing works
+    let (st, v) = call(&w.app, "DELETE", "/v1/memory", ana, None).await;
+    assert_eq!((st, v["removed"].clone()), (StatusCode::OK, json!(2)));
+    let (_, v) = call(&w.app, "GET", "/v1/memory", ana, None).await;
+    assert!(v["items"].as_array().unwrap().is_empty() && v["enabled"] == true);
+    let (st, _) = call(&w.app, "GET", "/v1/memory", None, None).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+}

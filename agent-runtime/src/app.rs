@@ -368,6 +368,22 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/threads/{id}/messages",
             get(crate::threads::thread_messages),
         )
+        .route(
+            "/v1/memory",
+            get(crate::memory::get_memory)
+                .post(crate::memory::add_memory)
+                .delete(crate::memory::forget_all),
+        )
+        .route(
+            "/v1/memory/settings",
+            axum::routing::put(crate::memory::put_settings),
+        )
+        .route(
+            "/v1/memory/{id}",
+            axum::routing::patch(crate::memory::patch_memory).delete(crate::memory::delete_memory),
+        )
+        .route("/v1/memory/{id}/accept", post(crate::memory::accept_memory))
+        .route("/v1/memory/{id}/reject", post(crate::memory::reject_memory))
         .route("/v1/goals/{id}/browse", post(crate::goals::goal_browse))
         .route("/v1/keep/status", get(crate::demos::keep_status))
         .route(
