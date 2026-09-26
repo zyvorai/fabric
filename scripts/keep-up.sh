@@ -60,6 +60,15 @@ kvm_ok()  { if [[ -n "${KEEP_UP_KVM:-}" ]]; then [[ "$KEEP_UP_KVM" == 1 ]]; else
 systemd_ok() { if [[ -n "${KEEP_UP_SYSTEMD:-}" ]]; then [[ "$KEEP_UP_SYSTEMD" == 1 ]]; else [[ -d /run/systemd/system ]]; fi; }
 SUDO=""; [[ "$(id -u)" == 0 ]] || SUDO="sudo"
 SUDO="${KEEP_SUDO-$SUDO}"   # KEEP_SUDO="" disables sudo (used by the tests)
+# A Rust installed with rustup lives in the login user's home; under sudo, HOME and PATH point at root's, so
+# cargo is either not found or "could not choose a version". Use the login user's toolchain (read only here).
+if [[ "$(id -u)" == 0 && -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]]; then
+  USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+  if [[ -x "$USER_HOME/.cargo/bin/cargo" ]]; then
+    case ":$PATH:" in *":$USER_HOME/.cargo/bin:"*) ;; *) export PATH="$USER_HOME/.cargo/bin:$PATH" ;; esac
+    if [[ -z "${RUSTUP_HOME:-}" && -d "$USER_HOME/.rustup" ]]; then export RUSTUP_HOME="$USER_HOME/.rustup"; fi
+  fi
+fi
 
 preflight() {
   step "Preflight"
@@ -70,7 +79,7 @@ preflight() {
   local mem; mem=$(mem_kb); (( mem >= 3800000 )) && ok "memory $((mem / 1024)) MiB" || bad "memory $((mem / 1024)) MiB: at least 4 GiB (the Rust build and a cell need it)"
   local disk; disk=$(disk_kb); (( disk >= 20000000 )) && ok "free disk $((disk / 1048576)) GiB" || bad "free disk $((disk / 1048576)) GiB under /var/lib: at least 20 GiB (cell images and the build)"
   if [[ "$(id -u)" == 0 ]] || command -v sudo >/dev/null 2>&1; then ok "root or sudo"; else bad "run as root or install sudo"; fi
-  local c; for c in git curl python3 openssl node cargo; do
+  local c; for c in git curl python3 openssl node cargo cc; do
     if command -v "$c" >/dev/null 2>&1; then ok "$c"; else bad "$c is missing ($(hint "$c"))"; fi
   done
   if command -v node >/dev/null 2>&1; then
@@ -82,7 +91,8 @@ preflight() {
 }
 hint() {
   case "$1" in
-    cargo) echo "install Rust from https://rustup.rs. If it is installed for your user, sudo may not see it: run sudo env \"PATH=\$PATH\" $0" ;;
+    cargo) echo "install Rust from https://rustup.rs (a rustup install in your home is found under sudo automatically; a Rust installed elsewhere: run sudo env \"PATH=\$PATH\" $0)" ;;
+    cc) echo "a C compiler and linker: sudo apt-get install -y build-essential (Fedora: sudo dnf groupinstall \"Development Tools\"); Rust cannot link without one" ;;
     node) echo "install Node 20 or newer, for example from https://nodejs.org" ;;
     *) echo "for example: sudo apt-get install -y $1" ;;
   esac
