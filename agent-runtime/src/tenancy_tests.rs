@@ -1530,3 +1530,82 @@ async fn goals_are_private_bounded_and_only_cancelled_or_paused_by_their_owner()
     let (st, _) = call(&w.app, "GET", "/v1/goals", None, None).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn receipts_are_listed_per_person_and_carry_no_body() {
+    let w = world().await;
+    let (ana, ben) = (Some(w.ana.token.as_str()), Some(w.ben.token.as_str()));
+    let opt = op();
+    let operator = Some(opt.as_str());
+    let make = |user: &str, status: u16| crate::receipts::Receipt {
+        id: Uuid::new_v4(),
+        at: Utc::now(),
+        user_id: Some(user.into()),
+        session_id: Uuid::new_v4(),
+        agent: "mail".into(),
+        credential: Some("mail".into()),
+        method: "POST".into(),
+        url: "https://mail.example/send".into(),
+        body_bytes: 12,
+        body_sha256: "digest".into(),
+        approval_id: Some(Uuid::new_v4()),
+        idempotency_key: Some(format!("{user}-key")),
+        status,
+        fingerprint: "fp".into(),
+    };
+    w.state
+        .store
+        .receipts
+        .record(make("ana", 200))
+        .await
+        .unwrap();
+    w.state
+        .store
+        .receipts
+        .record(make("ben", 201))
+        .await
+        .unwrap();
+    w.state
+        .store
+        .receipts
+        .record(make("ana", 202))
+        .await
+        .unwrap();
+
+    let (st, v) = call(&w.app, "GET", "/v1/receipts", ana, None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(
+        v["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["status"].as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        [202, 200],
+        "hers, newest first"
+    );
+    assert!(!v.to_string().contains("ben-key"), "nothing of ben's");
+    let (_, v) = call(&w.app, "GET", "/v1/receipts?user_id=ana", ben, None).await;
+    assert_eq!(ids(&v, "user_id"), ["ben"], "a user token ignores user_id");
+    assert!(
+        !v.to_string().contains("body\":"),
+        "a receipt has a digest and a size, never the body"
+    );
+    let (_, v) = call(&w.app, "GET", "/v1/receipts", operator, None).await;
+    assert_eq!(v["items"].as_array().unwrap().len(), 3);
+    let (_, v) = call(
+        &w.app,
+        "GET",
+        "/v1/receipts?user_id=ben&limit=1",
+        operator,
+        None,
+    )
+    .await;
+    assert_eq!(ids(&v, "user_id"), ["ben"]);
+    for method in ["POST", "DELETE", "PUT"] {
+        let (st, _) = call(&w.app, method, "/v1/receipts", ana, Some(json!({}))).await;
+        assert_eq!(st, StatusCode::FORBIDDEN, "{method}");
+    }
+    let (st, _) = call(&w.app, "GET", "/v1/receipts", None, None).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+}

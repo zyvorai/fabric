@@ -72,7 +72,7 @@ pub enum Begin {
     /// Send it. Drop the guard when done (it releases the key for a concurrent request).
     Proceed(InFlight),
     /// The same request was already performed: answer from this receipt.
-    Replay(Receipt),
+    Replay(Box<Receipt>),
     /// The key belongs to a different request, or the first is still running.
     Conflict(String),
 }
@@ -159,7 +159,7 @@ impl ReceiptStore {
     pub async fn begin(&self, scope: &str, fp: &str) -> Begin {
         if let Some(found) = self.by_key.read().await.get(scope) {
             return if found.fingerprint == fp {
-                Begin::Replay(found.clone())
+                Begin::Replay(Box::new(found.clone()))
             } else {
                 Begin::Conflict(
                     "this idempotency key was already used for a different request".into(),
@@ -182,7 +182,7 @@ impl ReceiptStore {
                 .unwrap_or_else(|e| e.into_inner())
                 .remove(scope);
             return if found.fingerprint == fp {
-                Begin::Replay(found.clone())
+                Begin::Replay(Box::new(found.clone()))
             } else {
                 Begin::Conflict(
                     "this idempotency key was already used for a different request".into(),
