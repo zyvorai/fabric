@@ -61,6 +61,8 @@ pub struct Store {
     pub memory: crate::memory::MemoryStore,
     /// Receipts for approved actions, and the answers to repeated keyed requests.
     pub receipts: crate::receipts::ReceiptStore,
+    /// A person's own connections to outside accounts (refresh tokens, write-only).
+    pub connections: crate::connections::ConnectionStore,
 }
 
 impl Store {
@@ -73,6 +75,8 @@ impl Store {
         let threads = crate::threads::ThreadStore::open(root.join("threads")).await?;
         let memory = crate::memory::MemoryStore::open(root.join("memory")).await?;
         let receipts = crate::receipts::ReceiptStore::open(root.join("receipts")).await?;
+        let connections =
+            crate::connections::ConnectionStore::open(root.join("connections")).await?;
 
         let store = Self {
             audit,
@@ -80,6 +84,7 @@ impl Store {
             threads,
             memory,
             receipts,
+            connections,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
@@ -808,6 +813,20 @@ impl Store {
         out
     }
 
+    /// The approvals of one session, oldest first (a read of the map, not a copy of every approval).
+    pub async fn approvals_of_session(&self, session_id: Uuid) -> Vec<ApprovalRecord> {
+        let mut out: Vec<_> = self
+            .approvals
+            .read()
+            .await
+            .values()
+            .filter(|a| a.session_id == session_id)
+            .cloned()
+            .collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
     pub async fn get_approval(&self, id: Uuid) -> Option<ApprovalRecord> {
         self.approvals.read().await.get(&id).cloned()
     }
@@ -1073,6 +1092,8 @@ impl Store {
         record.status = status;
         record.comment = comment;
         record.decided_at = Some(Utc::now());
+        // What the person was shown lives only while the question is open.
+        record.preview = None;
         record.grant_scope = if status == ApprovalStatus::Approved {
             scope
         } else {

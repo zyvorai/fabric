@@ -120,7 +120,7 @@ impl Mitm {
     }
 
     /// A TLS server configuration presenting a certificate for `host`, cached.
-    fn server_config(&self, host: &str) -> Result<Arc<ServerConfig>> {
+    pub(crate) fn server_config(&self, host: &str) -> Result<Arc<ServerConfig>> {
         if let Some(found) = self
             .configs
             .lock()

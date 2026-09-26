@@ -67,6 +67,32 @@ function note(kind, text) {
   place(el("li", "note " + kind, text)); lastSide = null; refreshHello();
   if (stick) toBottom();
 }
+// An approval the host is holding for the agent: what would be sent, as the host read it from the request. This page can show it and can
+// never decide it; the person does that on their own device.
+const cards = new Map();
+function approvalCard(v) {
+  const stick = nearBottom();
+  const card = el("li", "note approval");
+  card.appendChild(el("strong", "", "Waiting for your phone"));
+  const preview = v.preview && Array.isArray(v.preview.fields) ? v.preview.fields : [];
+  if (preview.length) {
+    const dl = el("dl");
+    for (const f of preview.slice(0, 24)) { dl.appendChild(el("dt", "", String(f.label ?? ""))); dl.appendChild(el("dd", "", String(f.value ?? ""))); }
+    card.appendChild(dl);
+  } else if (v.prompt) card.appendChild(el("p", "", String(v.prompt)));
+  const state = el("p", "state", "Approve or deny it on your device. This chat cannot.");
+  card.appendChild(state);
+  cards.set(v.approval_id, { card, state });
+  place(card); lastSide = null; refreshHello();
+  if (stick) toBottom();
+}
+function approvalDecided(v) {
+  const c = cards.get(v.approval_id);
+  if (!c) return;
+  c.state.textContent = { approved: "Approved on your device.", denied: "Denied on your device.", expired: "Not decided in time, so it was not done." }[v.decision] || "Decided.";
+  c.card.classList.add(v.decision === "approved" ? "yes" : "no");
+  cards.delete(v.approval_id);
+}
 function markMine(state) {   // ✓ sent, ✓✓ the agent took it, blue ✓✓ the agent answered
   for (const li of lastMine) { li.tick.textContent = state === "sent" ? "✓" : "✓✓"; li.tick.classList.toggle("read", state === "read"); }
   if (state === "read") lastMine = [];
@@ -174,7 +200,12 @@ async function run(text, retried) {
       }
       case "TEXT_MESSAGE_END": bubbleEl = null; break;
       case "CUSTOM":
-        if (e.name === "keep.approval_requested") { showTyping(false); note("notice", "Waiting for your approval: " + String((e.value || {}).prompt ?? "") + "\nDecide it on your device; this chat cannot approve or deny."); setBusy(true, "waiting for your approval", true); }
+        if (e.name === "keep.approval_requested") {
+          showTyping(false); setBusy(true, "waiting for your approval", true);
+          if ((e.value || {}).approval_id) approvalCard(e.value);   // held by the host, with a preview
+          else note("notice", "Waiting for your approval: " + String((e.value || {}).prompt ?? "") + "\nDecide it on your device; this chat cannot approve or deny.");
+        }
+        else if (e.name === "keep.approval_decided") { approvalDecided(e.value || {}); showTyping(true); setBusy(true, "working…", true); }
         else if (e.name === "keep.waiting") setBusy(true, "waiting…", true);
         else if (e.name === "keep.event") note("meta", String((e.value || {}).kind ?? "event"));
         break;

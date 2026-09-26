@@ -423,6 +423,12 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         .route("/v1/usage", get(usage_route))
         .route("/v1/inbox", get(inbox))
         .route("/v1/receipts", get(crate::receipts::list_receipts))
+        .route("/v1/connections", get(crate::connections::list_connections))
+        .route(
+            "/v1/connections/{name}",
+            axum::routing::put(crate::connections::put_connection)
+                .delete(crate::connections::delete_connection),
+        )
         .route("/v1/whoami", get(whoami))
         .route("/v1/model-grants", get(crate::model_call::list_grants))
         .route(
@@ -2156,6 +2162,7 @@ async fn record_approval_request(
         decided_at: None,
         source_seq: Some(seq),
         grant_scope: None,
+        preview: None,
         broker_held: false,
     };
     state.store.save_approval(record.clone()).await?;
@@ -3410,6 +3417,7 @@ async fn create_approval(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        preview: None,
         broker_held: false,
     };
     state

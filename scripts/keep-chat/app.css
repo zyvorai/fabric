@@ -74,6 +74,15 @@ button { font: inherit; color: inherit; }
 .note { align-self: center; max-width: 90%; margin: 6px 0; padding: 8px 14px; border-radius: 14px; font-size: .88rem; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
 .note.notice { color: var(--warn); background: var(--warn-bg); }
 .note.error { color: var(--err); background: var(--err-bg); }
+.note.approval { text-align: left; width: min(92%, 460px); color: var(--ink); background: var(--warn-bg); border: 1px solid var(--warn); }
+.note.approval strong { display: block; color: var(--warn); margin-bottom: 4px; }
+.note.approval dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 4px 0 8px; }
+.note.approval dt { color: var(--muted); }
+.note.approval dd { margin: 0; white-space: pre-wrap; }
+.note.approval p { margin: 0; }
+.note.approval .state { color: var(--muted); font-size: .8rem; }
+.note.approval.yes { border-color: #2e7d32; }
+.note.approval.no { border-color: var(--err); }
 .note.meta { color: var(--muted); background: var(--glass); padding: 2px 10px; font-size: .75rem; }
 
 /* bubbles: grouped when the same side speaks again */

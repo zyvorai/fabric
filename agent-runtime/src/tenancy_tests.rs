@@ -90,6 +90,7 @@ async fn fixture(state: &Arc<AppState>, base: &SessionRecord, app: &Router, user
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        preview: None,
         broker_held: true,
     };
     state.store.save_approval(approval.clone()).await.unwrap();
@@ -1623,6 +1624,212 @@ async fn receipts_are_listed_per_person_and_carry_no_body() {
         assert_eq!(st, StatusCode::FORBIDDEN, "{method}");
     }
     let (st, _) = call(&w.app, "GET", "/v1/receipts", None, None).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn connections_are_private_write_only_and_offered_only_by_the_host() {
+    // a token endpoint on loopback, so the test can mint a real access token and see disconnecting drop it
+    let token_app = Router::new().route(
+        "/token",
+        axum::routing::post(|| async {
+            axum::Json(json!({"access_token": "at-live", "expires_in": 3600}))
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let token_url = format!("http://{}/token", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, token_app).await.unwrap() });
+    std::env::set_var("TEN_ID", "cid");
+    std::env::set_var("TEN_SECRET", "csecret");
+    let file = std::env::temp_dir().join(format!("zyvor-conn-{}.json", Uuid::new_v4()));
+    std::fs::write(
+        &file,
+        json!({"gmail-read": {
+            "host": "gmail.googleapis.com", "header": "authorization", "kind": "oauth-refresh", "allowed_methods": ["GET"],
+            "oauth": {"token_url": token_url, "client_id_env": "TEN_ID", "client_secret_env": "TEN_SECRET", "connection": "google"}
+        }})
+        .to_string(),
+    )
+    .unwrap();
+    let (state, base) = state_and_session_cfg(|c| {
+        c.api_token = Some(op());
+        c.credentials_file = Some(file);
+    })
+    .await;
+    let app = public_router(state.clone());
+    let mint = |user: &str| {
+        let (app, user) = (app.clone(), user.to_string());
+        async move {
+            let (_, v) = call(
+                &app,
+                "POST",
+                "/v1/user-tokens",
+                Some(op().as_str()),
+                Some(json!({"user_id": user, "ttl_seconds": 600})),
+            )
+            .await;
+            v["token"].as_str().unwrap().to_string()
+        }
+    };
+    let _ = base;
+    let (ana_t, ben_t) = (mint("ana").await, mint("ben").await);
+    let (ana, ben) = (Some(ana_t.as_str()), Some(ben_t.as_str()));
+    let opt = op();
+    let operator = Some(opt.as_str());
+    let secret = "1//ana-very-secret-refresh-token";
+
+    // the host offers "google"; nobody is connected
+    let (st, v) = call(&app, "GET", "/v1/connections", ana, None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(
+        (
+            v["items"][0]["name"].clone(),
+            v["items"][0]["connected"].clone()
+        ),
+        (json!("google"), json!(false))
+    );
+    // only names the host's credentials ask for; and the token must look like one
+    let (st, _) = call(
+        &app,
+        "PUT",
+        "/v1/connections/dropbox",
+        ana,
+        Some(json!({"refresh_token": secret})),
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::NOT_FOUND,
+        "the host offers no such connection"
+    );
+    for bad in ["", "short", "has spaces in it here"] {
+        let (st, _) = call(
+            &app,
+            "PUT",
+            "/v1/connections/google",
+            ana,
+            Some(json!({"refresh_token": bad})),
+        )
+        .await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "{bad:?}");
+    }
+    // connect: the answer never contains the token, and neither does anything read afterwards
+    let (st, v) = call(
+        &app,
+        "PUT",
+        "/v1/connections/google",
+        ana,
+        Some(json!({"refresh_token": secret})),
+    )
+    .await;
+    assert_eq!((st, v["connected"].clone()), (StatusCode::OK, json!(true)));
+    let mut everything = v.to_string();
+    let (_, v) = call(&app, "GET", "/v1/connections", ana, None).await;
+    assert_eq!(v["items"][0]["connected"], true);
+    assert!(v["items"][0]["connected_at"].is_string());
+    everything += &v.to_string();
+    let (_, audit) = call(&app, "GET", "/v1/audit", operator, None).await;
+    everything += &audit.to_string();
+    assert!(
+        everything.contains("keep.connection.connected"),
+        "the connection is journaled"
+    );
+    assert!(
+        !everything.contains(secret) && !everything.contains("very-secret"),
+        "the refresh token is write-only"
+    );
+
+    // the person's access token is minted from it, and replacing the connection drops the old one
+    let http = reqwest::Client::new();
+    let ana_token = state.store.connections.refresh_token("ana", "google").await;
+    state
+        .credentials
+        .ensure_user_token("gmail-read", "ana", ana_token.as_deref(), &http)
+        .await
+        .unwrap();
+    assert!(state
+        .credentials
+        .resolve_for("gmail-read", Some("ana"))
+        .is_ok());
+    let (st, _) = call(
+        &app,
+        "PUT",
+        "/v1/connections/google",
+        ana,
+        Some(json!({"refresh_token": "1//ana-a-replacement-token"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(
+        state
+            .credentials
+            .resolve_for("gmail-read", Some("ana"))
+            .is_err(),
+        "a new connection drops the access token minted from the old one"
+    );
+    let ana_token = state.store.connections.refresh_token("ana", "google").await;
+    state
+        .credentials
+        .ensure_user_token("gmail-read", "ana", ana_token.as_deref(), &http)
+        .await
+        .unwrap();
+
+    // another person is unaffected and cannot disconnect ana's
+    let (_, v) = call(&app, "GET", "/v1/connections", ben, None).await;
+    assert_eq!(v["items"][0]["connected"], false);
+    let (st, _) = call(&app, "DELETE", "/v1/connections/google", ben, None).await;
+    assert_eq!(st, StatusCode::NOT_FOUND, "ben has nothing to disconnect");
+    assert_eq!(
+        state
+            .store
+            .connections
+            .refresh_token("ana", "google")
+            .await
+            .as_deref(),
+        Some("1//ana-a-replacement-token"),
+        "ana's is untouched"
+    );
+    let (_, v) = call(&app, "GET", "/v1/connections?user_id=ana", ben, None).await;
+    assert_eq!(
+        v["items"][0]["connected"], false,
+        "a user token ignores user_id"
+    );
+
+    // the operator must name the person, and each access is journaled without the token
+    let (st, _) = call(&app, "GET", "/v1/connections", operator, None).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, v) = call(&app, "GET", "/v1/connections?user_id=ana", operator, None).await;
+    assert_eq!(
+        (st, v["items"][0]["connected"].clone()),
+        (StatusCode::OK, json!(true))
+    );
+    let (_, audit) = call(&app, "GET", "/v1/audit", operator, None).await;
+    assert!(
+        audit
+            .to_string()
+            .contains("keep.connection.operator_access")
+            && !audit.to_string().contains(secret)
+    );
+
+    // disconnect: gone at once; the routes need a token
+    let (st, _) = call(&app, "DELETE", "/v1/connections/google", ana, None).await;
+    assert_eq!(st, StatusCode::NO_CONTENT);
+    assert!(state
+        .store
+        .connections
+        .refresh_token("ana", "google")
+        .await
+        .is_none());
+    assert!(
+        state
+            .credentials
+            .resolve_for("gmail-read", Some("ana"))
+            .is_err(),
+        "disconnecting drops the cached access token at once"
+    );
+    let (st, _) = call(&app, "DELETE", "/v1/connections/google", ana, None).await;
+    assert_eq!(st, StatusCode::NOT_FOUND, "already disconnected");
+    let (st, _) = call(&app, "GET", "/v1/connections", None, None).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
 

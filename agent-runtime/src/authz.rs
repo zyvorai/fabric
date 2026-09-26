@@ -253,6 +253,18 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
         },
         // What was done after you approved: a person reads their own receipts (the handler scopes them).
         ["v1", "receipts"] if read => UserRoute::Open(Scope::Read),
+        // A person's own outside-account connections (write-only tokens; the handlers scope them to the caller).
+        ["v1", "connections"] if read => UserRoute::Open(Scope::Read),
+        ["v1", "connections", name]
+            if (*method == Method::PUT || *method == Method::DELETE)
+                && !name.is_empty()
+                && name.len() <= 32
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') =>
+        {
+            UserRoute::Open(Scope::Run)
+        }
         ["v1", "whoami"] if read => UserRoute::Open(Scope::Read),
         // Ask for a plan, and accept or reject the one an agent proposed (nothing in a proposal runs until the person accepts it).
         ["v1", "goals", gid, "plan"] if *method == Method::POST => match id(gid) {
@@ -505,6 +517,32 @@ mod tests {
             ),
             (Method::POST, "/v1/receipts".into(), UserRoute::Denied),
             (Method::DELETE, "/v1/receipts".into(), UserRoute::Denied),
+            (
+                Method::GET,
+                "/v1/connections".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (
+                Method::PUT,
+                "/v1/connections/google".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::DELETE,
+                "/v1/connections/google".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::GET,
+                "/v1/connections/google".into(),
+                UserRoute::Denied,
+            ),
+            (
+                Method::PUT,
+                "/v1/connections/Bad_Name".into(),
+                UserRoute::Denied,
+            ),
+            (Method::POST, "/v1/connections".into(), UserRoute::Denied),
             (
                 Method::GET,
                 "/v1/threads".into(),
