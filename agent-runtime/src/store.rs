@@ -505,6 +505,36 @@ impl Store {
         Ok(event)
     }
 
+    /// Deletes the event log (`events.jsonl`) of sessions that ended before `cutoff`. The session record stays, and reading events
+    /// of such a session returns none. Safe to repeat. Returns how many logs were deleted.
+    pub async fn purge_ended_session_events(
+        &self,
+        cutoff: chrono::DateTime<chrono::Utc>,
+    ) -> Result<usize> {
+        let ended: Vec<Uuid> = self
+            .sessions
+            .read()
+            .await
+            .values()
+            .filter(|s| s.status.is_terminal() && s.updated_at < cutoff)
+            .map(|s| s.id)
+            .collect();
+        let mut purged = 0;
+        for id in ended {
+            let path = self
+                .root
+                .join("sessions")
+                .join(id.to_string())
+                .join("events.jsonl");
+            match fs::remove_file(&path).await {
+                Ok(()) => purged += 1,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(purged)
+    }
+
     pub async fn events_after(&self, id: Uuid, after: u64) -> Result<Vec<SessionEvent>> {
         let path = self
             .root

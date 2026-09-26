@@ -30,6 +30,7 @@ pub mod notify;
 pub mod policy;
 pub mod pool;
 pub mod proxy;
+pub mod retention;
 pub mod schedules;
 pub mod sentinel;
 pub mod skills;

@@ -280,6 +280,30 @@ impl ThreadStore {
         Ok(())
     }
 
+    /// Forgets every thread not touched since `cutoff` that `keep` does not protect (a thread whose session is still running, say).
+    /// Returns what was forgotten, so the caller can journal counts (never text).
+    pub async fn purge_idle(
+        &self,
+        cutoff: DateTime<Utc>,
+        keep: impl Fn(&ThreadRecord) -> bool,
+    ) -> Result<Vec<ThreadRecord>> {
+        let idle: Vec<ThreadRecord> = self
+            .threads
+            .read()
+            .await
+            .values()
+            .filter(|t| t.updated_at < cutoff && !keep(t))
+            .cloned()
+            .collect();
+        let mut gone = Vec::new();
+        for t in idle {
+            if self.delete(t.id).await? {
+                gone.push(t);
+            }
+        }
+        Ok(gone)
+    }
+
     /// Forgets a thread and every message in it. Returns whether it existed.
     pub async fn delete(&self, thread_id: Uuid) -> Result<bool> {
         let _guard = self.write.lock().await;

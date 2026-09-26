@@ -45,6 +45,10 @@ pub struct Config {
     pub egress_advertise_host: Option<String>,
     pub sync_interval_ms: u64,
     pub guest_start_timeout_secs: u64,
+    /// Forget threads idle this many days (`ZYVOR_AGENT_THREAD_RETENTION_DAYS`); `None` keeps them until the user forgets them.
+    pub thread_retention_days: Option<u64>,
+    /// Delete the event log of sessions that ended this many days ago (`ZYVOR_AGENT_EVENT_RETENTION_DAYS`); `None` keeps it.
+    pub event_retention_days: Option<u64>,
     pub idle_scan_interval_ms: u64,
     pub warm_pool_reconcile_interval_ms: u64,
     pub warm_pool_max_create_per_tick: usize,
@@ -110,6 +114,8 @@ impl Config {
             egress_advertise_host: env_opt("ZYVOR_AGENT_EGRESS_ADVERTISE_HOST"),
             sync_interval_ms: env_parse("ZYVOR_AGENT_SYNC_INTERVAL_MS", "300")?,
             guest_start_timeout_secs: env_parse("ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS", "30")?,
+            thread_retention_days: env_days("ZYVOR_AGENT_THREAD_RETENTION_DAYS")?,
+            event_retention_days: env_days("ZYVOR_AGENT_EVENT_RETENTION_DAYS")?,
             idle_scan_interval_ms: env_parse("ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS", "1000")?,
             warm_pool_reconcile_interval_ms: env_parse(
                 "ZYVOR_AGENT_WARM_POOL_RECONCILE_INTERVAL_MS",
@@ -183,6 +189,21 @@ fn env_or(name: &str, default: &str) -> String {
 
 fn env_opt(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.trim().is_empty())
+}
+
+/// A retention period in days: unset or 0 means "keep", otherwise 1 to 3650.
+fn env_days(name: &str) -> Result<Option<u64>> {
+    parse_days(env_opt(name).as_deref()).with_context(|| format!("invalid {name}"))
+}
+
+pub(crate) fn parse_days(value: Option<&str>) -> Result<Option<u64>> {
+    let Some(v) = value else { return Ok(None) };
+    let days: u64 = v.trim().parse().context("not a whole number of days")?;
+    match days {
+        0 => Ok(None),
+        1..=3650 => Ok(Some(days)),
+        _ => anyhow::bail!("at most 3650 days"),
+    }
 }
 
 fn env_parse<T>(name: &str, default: &str) -> Result<T>
