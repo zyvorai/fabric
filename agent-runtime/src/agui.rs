@@ -14,6 +14,9 @@
 //! * a user token needs the `run` scope, like starting a session;
 //! * an approval the agent asks for appears as a `CUSTOM` event carrying the prompt. **There is no way to approve or deny from this
 //!   endpoint**: an approval is decided on the user's device, through `/v1/approvals`, and nothing a chat client sends can do it.
+//! * so is one the host is holding for the agent (a request that needs a person, such as sending mail): `keep.approval_requested` when it
+//!   opens, with the host's `preview` of what would be sent, and `keep.approval_decided` when it is decided or expires. Without this the
+//!   chat would show only a spinner while the agent waits for a phone. The stream belongs to the session's owner, and the preview is not stored.
 
 use crate::{
     app::{self, ApiError, ApiResult},
@@ -31,7 +34,41 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{convert::Infallible, sync::Arc, time::Duration};
+use std::{collections::HashSet, convert::Infallible, sync::Arc, time::Duration};
+
+/// Approvals the host is holding for the run's session, announced to the chat as they open and as they close.
+#[derive(Default)]
+struct ApprovalWatch {
+    open: HashSet<uuid::Uuid>,
+}
+
+impl ApprovalWatch {
+    /// The events for what changed since the last call, given every approval of the session.
+    fn changes(&mut self, approvals: &[crate::model::ApprovalRecord]) -> Vec<Value> {
+        use crate::model::ApprovalStatus;
+        let mut out = Vec::new();
+        for a in approvals.iter().filter(|a| a.broker_held) {
+            if a.status == ApprovalStatus::Pending {
+                if self.open.insert(a.id) {
+                    let mut value = json!({
+                        "approval_id": a.id,
+                        "kind": a.kind.as_str(),
+                        "prompt": a.prompt,
+                        "decide": "on your device: this endpoint cannot approve or deny",
+                    });
+                    if let Some(preview) = &a.preview {
+                        value["preview"] = preview.clone();
+                    }
+                    out.push(json!({"type": "CUSTOM", "name": "keep.approval_requested", "value": value}));
+                }
+            } else if self.open.remove(&a.id) {
+                out.push(json!({"type": "CUSTOM", "name": "keep.approval_decided",
+                    "value": {"approval_id": a.id, "decision": a.status}}));
+            }
+        }
+        out
+    }
+}
 
 /// The longest user message accepted from a chat client.
 const MAX_MESSAGE_BYTES: usize = 16 * 1024;
@@ -347,7 +384,9 @@ pub(crate) async fn agui_run(
             yield Ok(sse(&json!({"type": "MESSAGES_SNAPSHOT", "messages": snapshot})));
         }
         let mut mapper = Mapper::default();
+        let mut watch = ApprovalWatch::default();
         loop {
+            for v in watch.changes(&state.store.approvals_of_session(session_id).await) { yield Ok(sse(&v)); }
             match state.store.events_after(session_id, cursor).await {
                 Ok(events) => {
                     for ev in events {
@@ -678,5 +717,61 @@ mod tests {
         let (a, done) = m.map(&ev("session.waiting", json!({"timeout_ms": 5})), "t", "r");
         assert!(!done);
         assert_eq!(a[0]["name"], "keep.waiting");
+    }
+
+    #[test]
+    fn an_approval_the_host_holds_is_announced_once_with_its_preview_and_again_when_decided() {
+        use crate::model::{ApprovalKind, ApprovalRecord, ApprovalStatus};
+        let mk = |broker_held: bool| ApprovalRecord {
+            id: uuid::Uuid::new_v4(),
+            session_id: uuid::Uuid::new_v4(),
+            kind: ApprovalKind::Send,
+            subject: Some("gmail.googleapis.com".into()),
+            planned_action: Some(json!({"body_sha256": "abc"})),
+            prompt: "Agent wants to POST".into(),
+            status: ApprovalStatus::Pending,
+            comment: None,
+            created_at: chrono::Utc::now(),
+            decided_at: None,
+            source_seq: None,
+            broker_held,
+            grant_scope: None,
+            preview: Some(
+                json!({"kind": "gmail-message", "fields": [{"label": "To", "value": "ana@example.com"}]}),
+            ),
+        };
+        let mut watch = ApprovalWatch::default();
+        let mut held = mk(true);
+        let agent_asked = mk(false);
+        let first = watch.changes(&[held.clone(), agent_asked.clone()]);
+        assert_eq!(
+            first.len(),
+            1,
+            "only the host-held one; the agent's own request comes from its events"
+        );
+        assert_eq!(first[0]["name"], "keep.approval_requested");
+        assert_eq!(
+            first[0]["value"]["preview"]["fields"][0]["value"],
+            "ana@example.com"
+        );
+        assert!(
+            first[0]["value"].get("planned_action").is_none(),
+            "no request details beyond the preview"
+        );
+        assert!(watch.changes(&[held.clone()]).is_empty(), "announced once");
+        held.status = ApprovalStatus::Denied;
+        held.preview = None;
+        let closed = watch.changes(&[held.clone()]);
+        assert_eq!(closed.len(), 1);
+        assert_eq!(closed[0]["name"], "keep.approval_decided");
+        assert_eq!(closed[0]["value"]["decision"], "denied");
+        assert!(watch.changes(&[held]).is_empty(), "and closed once");
+        let mut fresh = ApprovalWatch::default();
+        let mut never_seen = mk(true);
+        never_seen.status = ApprovalStatus::Approved;
+        assert!(
+            fresh.changes(&[never_seen]).is_empty(),
+            "one decided before the chat looked says nothing"
+        );
     }
 }

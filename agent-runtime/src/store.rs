@@ -809,6 +809,20 @@ impl Store {
         out
     }
 
+    /// The approvals of one session, oldest first (a read of the map, not a copy of every approval).
+    pub async fn approvals_of_session(&self, session_id: Uuid) -> Vec<ApprovalRecord> {
+        let mut out: Vec<_> = self
+            .approvals
+            .read()
+            .await
+            .values()
+            .filter(|a| a.session_id == session_id)
+            .cloned()
+            .collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
     pub async fn get_approval(&self, id: Uuid) -> Option<ApprovalRecord> {
         self.approvals.read().await.get(&id).cloned()
     }

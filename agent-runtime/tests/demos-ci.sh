@@ -1219,6 +1219,53 @@ wait "$CPID" || fail "the event run failed"
 grep -q '"path": "/calendar/v3/calendars/primary/events?sendUpdates=all"' "$G/api.log" || fail "the event should have been created with guest emails on"
 ok "a calendar event waits for the phone and shows who is invited and that they are emailed"
 
+# A chat client sees the held approval, with the host's preview, while the agent waits (AG-UI), and the decision when it comes.
+PROBE="$G/chat-probe"; mkdir -p "$PROBE"
+cat > "$PROBE/agent.ts" <<TS
+import { defineAgent } from "@zyvor/fabric-agent";
+export default defineAgent({ async run(ctx) {
+  const raw = Buffer.from("To: ana@example.com\r\nSubject: From chat\r\n\r\nHello from the chat", "utf8").toString("base64url");
+  try {
+    const res = await ctx.fetch("$GH/gmail/v1/users/me/drafts", { method: "POST", credential: "gmail-draft", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: { raw } }) });
+    return res.ok ? "drafted" : "Google said " + res.status;
+  } catch (e) { return "Not saved: " + e.message; }
+} });
+TS
+cat > "$PROBE/pack.json" <<JSON
+{ "kind": "agent", "name": "chat-probe",
+  "manifest": { "template": "ci", "egress_mode": "deny", "egress_allow_hosts": ["127.0.0.1"], "allow_private_networks": true, "egress_approval_timeout_seconds": 60, "credentials": ["gmail-draft"], "confinement": "strict" },
+  "goal": { "title": "Draft from chat", "text": "Save a fixed draft." } }
+JSON
+cp "$G/mail-compose/keep.policy.yaml" "$PROBE/keep.policy.yaml"
+KEEP_POLICY_SEED="$SEED" FABRIC_AGENT_URL="$GBASE" node "$CLI" pack deploy "$PROBE" >"$G/probe.out" 2>&1 || fail "chat-probe deploy failed: $(cat "$G/probe.out")"
+PB=$(python3 -c 'import json; print(json.dumps({"threadId":"probe-1","runId":"r-probe-1","messages":[{"id":"m","role":"user","content":"draft it"}],"forwardedProps":{"agent":"chat-probe"}}))')
+curl -sN --max-time 120 -X POST -H "Authorization: Bearer $GINA" -H 'content-type: application/json' -d "$PB" "$GBASE/v1/agui" > "$G/probe.sse" &
+CHPID=$!
+wait_pending || fail "the chat-driven draft did not open an approval"
+for _ in $(seq 1 50); do grep -q keep.approval_requested "$G/probe.sse" && break; sleep 0.2; done
+python3 - "$G/probe.sse" <<'PY' || fail "the chat stream should announce the held approval with its preview"
+import json, sys
+ev = [json.loads(l[5:]) for l in open(sys.argv[1]) if l.startswith("data:")]
+req = [e for e in ev if e.get("name") == "keep.approval_requested"]
+assert len(req) == 1, ev
+v = req[0]["value"]
+f = {x["label"]: x["value"] for x in v["preview"]["fields"]}
+assert f["To"] == "ana@example.com" and f["Subject"] == "From chat" and f["Message"] == "Hello from the chat", f
+assert "planned_action" not in v and "sign" not in v, v
+PY
+[[ "$(decide approved)" == "200" ]] || fail "the signed approval of the chat-driven draft was refused"
+wait "$CHPID" || fail "the chat stream did not finish"
+python3 - "$G/probe.sse" <<'PY' || fail "the chat stream should report the decision and finish with the result"
+import json, sys
+ev = [json.loads(l[5:]) for l in open(sys.argv[1]) if l.startswith("data:")]
+names = [e.get("name") or e["type"] for e in ev]
+assert names.index("keep.approval_requested") < names.index("keep.approval_decided") < names.index("RUN_FINISHED"), names
+dec = [e for e in ev if e.get("name") == "keep.approval_decided"][0]["value"]
+assert dec["decision"] == "approved" and "preview" not in dec, dec
+assert ev[-1]["type"] == "RUN_FINISHED" and ev[-1]["result"] == "drafted", ev[-1]
+PY
+ok "a chat client is shown the held approval with the host's preview while the agent waits, then the decision, and never a way to decide it"
+
 [[ "$(gas "$GINA" -X DELETE -o /dev/null -w '%{http_code}' "$GBASE/v1/connections/google")" =~ ^20 ]] || fail "gina could not disconnect"
 r=$(g_run "$GINA" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "the run after disconnecting failed"
 [[ "$r" == *"connect your google account first"* ]] || fail "after disconnecting, the agent must be refused again: $r"
