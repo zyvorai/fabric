@@ -17,6 +17,8 @@ tools/gen_catalog.py     regenerates Sources/KeepKit/CatalogData.swift from exam
 
 ## Build and run
 
+`make help` lists the shortcuts: `make build`, `make test`, `make run` (add `KEEP_HOST=... KEEP_TOKEN=...` for a debug login without the Keychain), `make project`, `make catalog`, `make icon`, `make clean`.
+
 ```bash
 open Solvor.xcodeproj        # or: xcodebuild -project Solvor.xcodeproj -scheme Solvor build
 ```
