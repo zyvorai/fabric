@@ -6,7 +6,8 @@
     KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=... ./scripts/keep-chat.py --agent echo-agent      # then open http://127.0.0.1:8787
 
 It serves one static page, forwards the chat run (POST /agui) and lets the page list, reopen and forget this agent's conversations
-(GET /threads, GET /threads/<id>/messages, DELETE /threads/<id>). Your token stays in this process: the browser never sees it. The agent is
+(GET /threads, GET /threads/<id>/messages, DELETE /threads/<id>), manage the person's memory (/memory: read, turn on or off, add, delete, accept or
+refuse an agent's proposal) and their goals for this agent (/goals: list, create, pause or resume, cancel). Your token stays in this process: the browser never sees it. The agent is
 fixed by --agent (the page cannot choose another), and a conversation is reachable only if the Keep host itself lists it for this agent (and,
 with the operator token, for --user): the page cannot name any other thread. Nothing else on the Keep host is reachable through it, it listens
 on 127.0.0.1 only, and it refuses requests whose Host or Origin is not itself (DNS rebinding and cross-site posts). A chat cannot approve
@@ -48,12 +49,55 @@ def project_threads(listing, agent: str):
     return out
 
 
+MEMORY_KINDS = ("preference", "fact", "note")
+
+
+def _item(i):
+    return {k: i.get(k) for k in ("id", "text", "kind", "pinned", "tainted", "origin")}
+
+
+def project_memory(view):
+    """What the page needs of the host's memory view: the switch, the accepted entries and the proposals waiting for review."""
+    view = view or {}
+    return {
+        "enabled": bool(view.get("enabled")),
+        "items": [_item(i) for i in view.get("items", []) if isinstance(i, dict) and UUID.fullmatch(str(i.get("id", "")))],
+        "proposals": [_item(i) for i in view.get("proposals", []) if isinstance(i, dict) and UUID.fullmatch(str(i.get("id", "")))],
+    }
+
+
+def project_goal(g):
+    return {
+        "id": g.get("id"), "title": g.get("title"), "status": g.get("status"), "autorun": bool(g.get("autorun")), "updated_at": g.get("updated_at"),
+        "plan": [{k: st.get(k) for k in ("id", "title", "status", "detail", "attempts")} for st in g.get("plan", []) if isinstance(st, dict)],
+    }
+
+
+def project_goals(listing, agent: str):
+    """This agent's goals, as the page shows them."""
+    return [project_goal(g) for g in (listing or {}).get("items", []) if isinstance(g, dict) and g.get("agent") == agent and UUID.fullmatch(str(g.get("id", "")))]
+
+
+def clean_goal_request(data):
+    """The browser's goal, reduced to a title, up to 20 step titles and the run-automatically switch. Raises ValueError otherwise."""
+    if not isinstance(data, dict):
+        raise ValueError("the request must be a JSON object")
+    title = str(data.get("title", "")).strip()
+    steps = [str(x).strip() for x in data.get("steps", []) if str(x).strip()] if isinstance(data.get("steps", []), list) else None
+    if not title or len(title) > 120:
+        raise ValueError("a goal needs a title of at most 120 characters")
+    if not steps or len(steps) > 20 or any(len(x) > 200 for x in steps):
+        raise ValueError("a goal needs 1 to 20 steps of at most 200 characters")
+    return {"title": title, "steps": steps, "autorun": bool(data.get("autorun"))}
+
+
 def allowed_host(host_header: str, port: int) -> bool:
     return host_header in (f"127.0.0.1:{port}", f"localhost:{port}")
 
 
 def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "operator"):
     up = urllib.parse.urlparse(upstream)
+    ident = {}   # who the token is, learned once from the host
     if up.scheme not in ("http", "https") or not up.hostname:
         raise SystemExit("KEEP_API must be an http(s) URL")
 
@@ -76,7 +120,7 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             self.end_headers()
             self.wfile.write(body)
 
-        def _upstream(self, method, path):
+        def _upstream(self, method, path, body=None):
             """One short call to the Keep host with the token; returns (status, parsed JSON or None)."""
             conn_cls = http.client.HTTPSConnection if up.scheme == "https" else http.client.HTTPConnection
             conn = conn_cls(up.hostname, up.port or (443 if up.scheme == "https" else 80), timeout=30)
@@ -84,7 +128,11 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
                 headers = {"Accept": "application/json"}
                 if token:
                     headers["Authorization"] = "Bearer " + token
-                conn.request(method, path, headers=headers)
+                payload = None
+                if body is not None:
+                    payload = json.dumps(body).encode()
+                    headers["Content-Type"] = "application/json"
+                conn.request(method, path, body=payload, headers=headers)
                 resp = conn.getresponse()
                 raw = resp.read(4 * 1024 * 1024)
                 try:
@@ -138,6 +186,124 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             except (OSError, http.client.HTTPException) as e:
                 self._send(502, ("could not reach the Keep host: %s" % e).encode())
 
+        def _owner(self):
+            """Whose data this page shows: the user the host says the token is, or --user for the operator token (learned once)."""
+            if "owner" not in ident:
+                status, who = self._upstream("GET", "/v1/whoami")
+                if status == 200 and isinstance(who, dict) and who.get("role") == "user" and who.get("user_id"):
+                    ident.update(owner=who["user_id"], role="user")
+                elif status == 200 and isinstance(who, dict) and who.get("role") == "operator":
+                    ident.update(owner=user, role="operator")
+                else:
+                    return None
+            return ident["owner"]
+
+        def _json_body(self):
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                length = 0
+            if length <= 0 or length > MAX_BODY:
+                self._send(413, b"the request is empty or too large")
+                return None
+            try:
+                return json.loads(self.rfile.read(length))
+            except ValueError:
+                self._send(400, b"bad json")
+                return None
+
+        def _memory_view(self, owner):
+            status, view = self._upstream("GET", "/v1/memory?" + urllib.parse.urlencode({"user_id": owner}))
+            return project_memory(view) if status == 200 else None
+
+        def _my_goals(self, owner):
+            status, listing = self._upstream("GET", "/v1/goals?" + urllib.parse.urlencode({"agent": agent, "user_id": owner}))
+            return project_goals(listing, agent) if status == 200 else None
+
+        def _person_route(self, method, path):
+            """/memory... and /goals...: the person's own memory and this agent's goals for them. An id must be one the host itself lists."""
+            try:
+                owner = self._owner()
+                if owner is None:
+                    return self._send(502, b"the Keep host did not say who this is")
+                q = "?" + urllib.parse.urlencode({"user_id": owner})
+                if path == "/memory" and method == "GET":
+                    view = self._memory_view(owner)
+                    return self._json(200, view) if view is not None else self._send(502, b"the Keep host did not return memory")
+                if path == "/memory/settings" and method == "PUT":
+                    data = self._json_body()
+                    if data is None:
+                        return
+                    if not isinstance(data, dict) or not isinstance(data.get("enabled"), bool):
+                        return self._send(400, b"enabled must be true or false")
+                    st, _ = self._upstream("PUT", "/v1/memory/settings" + q, {"enabled": data["enabled"]})
+                    return self._send(204 if st == 200 else 502)
+                if path == "/memory" and method == "POST":
+                    data = self._json_body()
+                    if data is None:
+                        return
+                    text, kind = (data.get("text") if isinstance(data, dict) else None), (data.get("kind", "note") if isinstance(data, dict) else None)
+                    if not isinstance(text, str) or not text.strip() or len(text) > 2000 or kind not in MEMORY_KINDS:
+                        return self._send(400, b"text (up to 2000 characters) and a kind of preference, fact or note are required")
+                    st, item = self._upstream("POST", "/v1/memory" + q, {"text": text, "kind": kind, "pinned": bool(data.get("pinned"))})
+                    if st == 201 and isinstance(item, dict):
+                        return self._json(201, _item(item))
+                    return self._send(400 if st == 400 else 502, (json.dumps(item) if isinstance(item, dict) else "the Keep host refused").encode(), "application/json")
+                m = re.fullmatch(r"/memory/([0-9a-f-]{36})(?:/(accept|reject))?", path)
+                if m and UUID.fullmatch(m.group(1)):
+                    mid, action = m.group(1), m.group(2)
+                    if (action and method != "POST") or (not action and method != "DELETE"):
+                        return self._send(404, b"not found")
+                    view = self._memory_view(owner)
+                    if view is None:
+                        return self._send(502, b"the Keep host did not return memory")
+                    pool = view["proposals"] if action else view["items"] + view["proposals"]
+                    if mid not in {i["id"] for i in pool}:
+                        return self._send(404, b"not found")
+                    if action:
+                        st, _ = self._upstream("POST", f"/v1/memory/{mid}/{action}" + q)
+                        return self._send(204 if st == 200 else 502)
+                    st, _ = self._upstream("DELETE", f"/v1/memory/{mid}" + q)
+                    return self._send(204 if st == 204 else 502)
+                if path == "/goals" and method == "GET":
+                    goals = self._my_goals(owner)
+                    return self._json(200, {"items": goals}) if goals is not None else self._send(502, b"the Keep host did not list goals")
+                if path == "/goals" and method == "POST":
+                    data = self._json_body()
+                    if data is None:
+                        return
+                    try:
+                        want = clean_goal_request(data)
+                    except ValueError as e:
+                        return self._send(400, str(e).encode())
+                    body = {"title": want["title"], "agent": agent, "autorun": want["autorun"], "plan": [{"title": t} for t in want["steps"]]}
+                    if ident["role"] == "operator":
+                        body["user_id"] = owner
+                    st, goal = self._upstream("POST", "/v1/goals", body)
+                    if st == 201 and isinstance(goal, dict):
+                        return self._json(201, project_goal(goal))
+                    return self._send(429 if st == 429 else 400 if st in (400, 404) else 502, (json.dumps(goal) if isinstance(goal, dict) else "the Keep host refused").encode(), "application/json")
+                m = re.fullmatch(r"/goals/([0-9a-f-]{36})", path)
+                if m and UUID.fullmatch(m.group(1)) and method == "PATCH":
+                    data = self._json_body()
+                    if data is None:
+                        return
+                    allowed = isinstance(data, dict) and len(data) == 1 and (isinstance(data.get("autorun"), bool) or data.get("status") == "cancelled")
+                    if not allowed:
+                        return self._send(400, b"only autorun (true or false) or status cancelled can be changed here")
+                    goals = self._my_goals(owner)
+                    if goals is None:
+                        return self._send(502, b"the Keep host did not list goals")
+                    if m.group(1) not in {g["id"] for g in goals}:
+                        return self._send(404, b"not found")
+                    st, goal = self._upstream("PATCH", f"/v1/goals/{m.group(1)}", data)
+                    if st == 200 and isinstance(goal, dict):
+                        return self._json(200, project_goal(goal))
+                    return self._send(409 if st == 409 else 429 if st == 429 else 502, (json.dumps(goal) if isinstance(goal, dict) else "the Keep host refused").encode(), "application/json")
+                self._send(404, b"not found")
+            except (OSError, http.client.HTTPException) as e:
+                self._send(502, ("could not reach the Keep host: %s" % e).encode())
+
         def _host_ok(self):
             if not allowed_host(self.headers.get("Host", ""), port):
                 self._send(421, b"misdirected request")
@@ -150,6 +316,8 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             path = self.path.split("?", 1)[0]
             if path == "/threads" or path.startswith("/threads/"):
                 return self._thread_route("GET", path)
+            if path in ("/memory", "/goals"):
+                return self._person_route("GET", path)
             item = STATIC.get(path)
             if not item:
                 return self._send(404, b"not found")
@@ -166,11 +334,33 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             path = self.path.split("?", 1)[0]
             if path.startswith("/threads/"):
                 return self._thread_route("DELETE", path)
+            if path.startswith("/memory/"):
+                return self._person_route("DELETE", path)
             self._send(404, b"not found")
+
+        def _change(self, method):
+            """PUT and PATCH: only the person routes."""
+            if not self._host_ok() or not self._origin_ok():
+                return
+            path = self.path.split("?", 1)[0]
+            if path.startswith("/memory") or path.startswith("/goals"):
+                return self._person_route(method, path)
+            self._send(404, b"not found")
+
+        def do_PUT(self):
+            self._change("PUT")
+
+        def do_PATCH(self):
+            self._change("PATCH")
 
         def do_POST(self):
             if not self._host_ok():
                 return
+            path = self.path.split("?", 1)[0]
+            if path in ("/memory", "/goals") or (path.startswith("/memory/") and path.endswith(("/accept", "/reject"))):
+                if not self._origin_ok():
+                    return
+                return self._person_route("POST", path)
             if self.path != "/agui":
                 return self._send(404, b"not found")
             if not self._origin_ok():

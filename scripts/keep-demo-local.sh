@@ -74,6 +74,9 @@ curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/healthz" || { echo "the runtim
 # an agent to chat with (no model, no credentials): the simulator runs it like any other cell, unsigned because Keep mode is off here
 FABRIC_AGENT_URL="http://127.0.0.1:$API_PORT" FABRIC_AGENT_TOKEN="$OP_TOKEN" node "$ROOT/sdk/agent-runtime/src/cli.js" pack deploy "$ROOT/examples/keep-agents/echo-agent" >"$WORK/echo-agent.out" 2>&1 \
   || { echo "could not deploy echo-agent:"; tail -5 "$WORK/echo-agent.out"; }
+# an agent that uses your memory and goals (see docs/keep/memory/README.md): say "remember ..." to it
+FABRIC_AGENT_URL="http://127.0.0.1:$API_PORT" FABRIC_AGENT_TOKEN="$OP_TOKEN" node "$ROOT/sdk/agent-runtime/src/cli.js" pack deploy "$ROOT/examples/keep-agents/memory-agent" >"$WORK/memory-agent.out" 2>&1 \
+  || { echo "could not deploy memory-agent:"; tail -5 "$WORK/memory-agent.out"; }
 
 USER_TOKEN="$(curl -fsS -X POST -H "Authorization: Bearer $OP_TOKEN" -H 'content-type: application/json' \
   -d '{"user_id":"demo","scopes":["read","run","approve"],"ttl_seconds":86400}' "http://127.0.0.1:$API_PORT/v1/user-tokens" \
@@ -97,6 +100,7 @@ cat <<OUT
   Chat with the example agent in a browser (a token stays on your machine; the page never sees it):
 
     KEEP_API=http://127.0.0.1:$API_PORT KEEP_TOKEN=$USER_TOKEN $ROOT/scripts/keep-chat.py --agent echo-agent      # then open http://127.0.0.1:8787
+    (use --agent memory-agent to try Goals and Memory in the page: say "remember I like aisle seats" and review the suggestion under Memory)
 
   Solvor shows an amber "Simulated, not sealed" notice instead of the proof pill.
   For a real sealed cell, set up a host: scripts/keep-up.sh (needs Linux with KVM).
