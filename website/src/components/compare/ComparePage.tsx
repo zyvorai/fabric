@@ -92,7 +92,7 @@ const GROUPS: Group[] = [
     rows: [
       {
         label: 'The cell',
-        muse: c('Often nspawn — shared kernel with Sentinel', 'part'),
+        muse: c('Its own cloud VM; Sentinel on the same machine, kept apart at the system level', 'part'),
         keep: c('Firecracker / KVM microVM via FluxVM'),
         fabric: NA_FABRIC,
         flux: c('Firecracker, Cloud Hypervisor, QEMU/KVM or in-tree — one trait'),
