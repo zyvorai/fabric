@@ -15,6 +15,8 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **`keepctl init <name>`**, a one-command start for a new use-case pack: scaffolds a valid pack (rules, a synthetic sample, a README) from `docs/keep/pack-template`, refuses to overwrite and refuses bad names. Tested in `demos-ci.sh`: the scaffold
+  deploys and passes its own sample with no edits.
 - **`scripts/keep-demo-local.sh`, a two-minute local demo that is honest about what it is.** Starts the FluxVM simulator (`agent-runtime/tests/sandbox_stub.py`) and the runtime on loopback with no KVM, Docker or root, mints a 1-day
   user token and prints how to try a use case and how to connect Solvor. It is **not sealed**: the simulator marks its sandboxes `simulated`, and the runtime then reports `badge.evidence: "simulated"`,
   `badge.sealed: false` and an honesty line that starts `SIMULATED, not sealed` (never the software-test wording). Solvor shows an amber "Simulated, not sealed" pill instead of the proof pill, the console shows a warning,

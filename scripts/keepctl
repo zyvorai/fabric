@@ -5,6 +5,7 @@
 # keepctl — Keep product CLI (Fabric). Talks to agent-runtime REST; FluxVM is
 # the cell backend. Same verbs as the API. Not a separate repo.
 #
+#   keepctl init <name> [--dir <dir>]   # start a new use-case pack from the template (valid, with a sample); then edit, deploy --dry-run, deploy --test
 #   keepctl deploy <pack-dir> [--run] [--test] [--dry-run]
 #                                   # one command: build, sign (KEEP_POLICY_SEED), deploy a pack.json
 #   keepctl bundle <pack-dir>        # write <name>.keeppack.json for the console's Deploy a pack
@@ -48,7 +49,7 @@ else
   AUTH_TOKEN=""
 fi
 usage() {
-  sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -372,6 +373,41 @@ PY
     }
     api GET "/v1/sessions/${id}/browser/script"
     echo
+    ;;
+
+  init)
+    name="${1:-}"; shift || true
+    dest=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --dir) dest="${2:?--dir needs a path}"; shift ;;
+        *) echo "unknown option: $1" >&2; exit 64 ;;
+      esac
+      shift
+    done
+    [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]] || { echo "usage: keepctl init <name> [--dir <dir>]   (name: lowercase letters, digits and '-', at most 40 characters)" >&2; exit 64; }
+    tpl="$(cd "$(dirname "$0")/.." && pwd)/docs/keep/pack-template"
+    [[ -f "$tpl/pack.json" ]] || { echo "the pack template is not at $tpl (run keepctl from a checkout of the repository)" >&2; exit 1; }
+    dest="${dest:-./$name}"
+    [[ ! -e "$dest" ]] || { echo "$dest already exists" >&2; exit 1; }
+    mkdir -p "$dest"
+    cp "$tpl"/pack.json "$tpl"/sample.txt "$tpl"/README.md "$dest"/
+    python3 - "$dest/pack.json" "$dest/README.md" "$name" <<'PY'
+import json, sys
+pack_path, readme_path, name = sys.argv[1:]
+p = json.load(open(pack_path))
+p["name"] = name
+p["title"] = name.replace("-", " ").capitalize()
+p["artifact_title"] = name + ".md"
+json.dump(p, open(pack_path, "w"), indent=2, ensure_ascii=False)
+open(pack_path, "a").write("\n")
+r = open(readme_path).read().replace("my-pack", name)
+open(readme_path, "w").write(r)
+PY
+    echo "created $dest (a valid use-case pack for text files, with a synthetic sample)"
+    echo "  1. edit $dest/pack.json (accepts, extract and the summary rules; see docs/keep/CONTRIBUTING-PACKS.md) and replace $dest/sample.txt"
+    echo "  2. keepctl deploy $dest --dry-run      # validate"
+    echo "  3. keepctl deploy $dest --test         # run its sample in a real cell (needs a Keep host)"
     ;;
 
   list)
