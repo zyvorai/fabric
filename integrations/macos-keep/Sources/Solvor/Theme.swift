@@ -84,7 +84,25 @@ extension View { func card(hover: Bool = false) -> some View { modifier(Card(hov
 struct ProofPill: View {
     let egress: Int
     var evidence: String?
+    /// The run happened in the local simulator: show a warning instead of the proof.
+    var simulated = false
     var body: some View {
+        if simulated {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("Simulated, not sealed").fontWeight(.semibold)
+                Text("· no VM, no network policy").opacity(0.75)
+            }
+            .font(.callout).padding(.horizontal, 12).padding(.vertical, 6)
+            .foregroundStyle(.orange)
+            .background(Color.orange.opacity(0.16), in: Capsule())
+            .help("This host is the local simulator (scripts/keep-demo-local.sh). Your file ran as an ordinary process on the host, so the connection count is not evidence. Use a Keep host with FluxVM for a sealed cell.")
+        } else {
+            sealedPill
+        }
+    }
+
+    private var sealedPill: some View {
         HStack(spacing: 8) {
             Image(systemName: egress == 0 ? "lock.shield.fill" : "exclamationmark.shield.fill")
             Text(egress == 0 ? "0 outbound connections" : "\(egress) outbound connections").fontWeight(.semibold)

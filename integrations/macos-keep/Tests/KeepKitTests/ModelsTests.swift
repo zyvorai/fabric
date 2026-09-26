@@ -22,6 +22,20 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(r.artifacts.map(\.title), ["clean.csv", "report.md"])
     }
 
+    func testASimulatedRunIsNeverPresentedAsProof() throws {
+        let sim = Data(#"""
+        {"demo":"csv-clean","session_id":"s1","filename":"a.csv","bytes":10,"artifacts":[{"id":"a1","kind":"csv","title":"clean.csv"}],
+         "egress_connects":0,"badge":{"evidence":"simulated","sealed":false,"operator_can_read":true,"proxy":"strict"}}
+        """#.utf8)
+        let outcome = try KeepClient.decodeRun(sim)
+        XCTAssertTrue(outcome.isSimulated)
+        XCTAssertEqual(outcome.egressConnects, 0, "the count is still shown, but never as evidence")
+        // a real cell (and an older host with no `sealed` field) is not simulated
+        let real = try KeepClient.decodeRun(Fixture.data("run_single.json"))
+        XCTAssertFalse(real.isSimulated)
+        XCTAssertNil((try Fixture.decode(RunResult.self, "run_single.json")).badge?.sealed)
+    }
+
     func testABatchWithOneFailureIsDecodedNotThrown() throws {
         let outcome = try KeepClient.decodeRun(Fixture.data("run_batch_partial.json"))
         guard case .batch(let b) = outcome else { return XCTFail("expected a batch") }

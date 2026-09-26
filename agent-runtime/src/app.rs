@@ -3554,6 +3554,7 @@ mod tests {
     fn sandbox(status: Option<crate::model::ConfidentialStatus>) -> crate::fluxvm::SandboxRecord {
         crate::fluxvm::SandboxRecord {
             id: Uuid::new_v4(),
+            simulated: false,
             guest_ip: None,
             status: None,
             confidential: status,

@@ -166,7 +166,19 @@ The cockpit reports `egress_connects` from Keep's own audit journal, and the dem
 
 ## Try it in 60 seconds
 
-No KVM needed for the first two steps.
+**See what the use cases give you, on this laptop, with no KVM, Docker or root** (a macOS or Linux machine with Python, Node 20 and Rust):
+
+```bash
+git clone https://github.com/zyvorai/fabric && cd fabric
+./scripts/keep-demo-local.sh            # prints a token and a first command; Ctrl-C stops it and deletes its state
+```
+
+**This is a simulator, not a sealed cell.** There is no VM and no network policy: the fixed extractors run as ordinary processes on your machine, so nothing
+is isolated and the connection count means nothing. Every result says `SIMULATED, not sealed` (evidence class `simulated`), and Solvor and the console show that
+instead of the proof. It is only for looking at the output of a use case before you set up a host. For a real cell use [`scripts/keep-up.sh`](#install-it-on-a-host)
+on Linux with KVM. Do not feed the simulator files you would not run a script on.
+
+**Or the developer path.** No KVM needed for the first two steps.
 
 ```bash
 git clone https://github.com/zyvorai/fabric && cd fabric
