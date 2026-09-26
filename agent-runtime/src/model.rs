@@ -82,6 +82,10 @@ pub struct AgentManifest {
     /// deployment that does not set it serializes exactly as before.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub memory: bool,
+    /// The agent may propose [suggestions](crate::suggestions) (`suggestion.propose` events) to the person it runs for, if they turned
+    /// suggestions on. Off by default; a deployment that does not set it serializes exactly as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub suggestions: bool,
     #[serde(default)]
     pub ttl_seconds: Option<u64>,
     /// Maximum number of non-terminal sessions for this agent deployment.
@@ -1223,6 +1227,7 @@ mod home_volume_tests {
             allow_private_networks: false,
             runtime_port: 8080,
             memory: false,
+            suggestions: false,
             ttl_seconds: None,
             max_concurrent_sessions: Some(1),
             idle_hibernate_seconds: None,

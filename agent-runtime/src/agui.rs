@@ -141,7 +141,7 @@ fn history_for_input(prior: &[MessageRecord]) -> Vec<Value> {
 }
 
 /// The same shape as a pack name: `^[a-z0-9][a-z0-9-]{0,39}$`.
-fn valid_agent_name(name: &str) -> bool {
+pub(crate) fn valid_agent_name(name: &str) -> bool {
     let b = name.as_bytes();
     !b.is_empty()
         && b.len() <= 40
