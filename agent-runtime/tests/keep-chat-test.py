@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""scripts/keep-chat.py: the chat proxy forwards the chat run and the conversation list with the token added server-side, fixes the agent, streams,
-reaches a thread only if the host lists it for this agent and user, and refuses foreign hosts and origins. Runs against a fake Keep host; needs no runtime."""
+"""scripts/keep-chat.py: the chat proxy forwards the chat run, the conversation list, the person's memory and their goals with the token added server-side, fixes the
+agent, streams, reaches a thread, memory entry or goal only if the host lists it for this agent and user, allows only a few fields through, and refuses foreign hosts
+and origins. Runs against a fake Keep host; needs no runtime."""
 import http.client
 import importlib.util
 import json
@@ -27,11 +28,27 @@ THREADS = {"items": [
     {"id": NO_CLIENT_ID, "agent": "echo-agent", "user_id": "operator", "client_thread_id": None, "title": "api-made", "updated_at": "x", "message_count": 0},
 ]}
 LIST_STATUS = [200]
+MEM_ITEM = "55555555-5555-4555-8555-555555555555"
+MEM_PROPOSAL = "66666666-6666-4666-8666-666666666666"
+GOAL_MINE = "77777777-7777-4777-8777-777777777777"
+GOAL_OTHER_AGENT = "88888888-8888-4888-8888-888888888888"
+MEMORY = {"enabled": True,
+          "items": [{"id": MEM_ITEM, "text": "vegetarian", "kind": "fact", "pinned": True, "tainted": False, "origin": "user", "source": {"session_id": "s"}, "created_at": "x"}],
+          "proposals": [{"id": MEM_PROPOSAL, "text": "likes aisles", "kind": "note", "pinned": False, "tainted": True, "origin": "agent"}]}
+GOALS = {"items": [
+    {"id": GOAL_MINE, "agent": "echo-agent", "user_id": "ana", "title": "Trip", "status": "open", "autorun": True, "updated_at": "t", "max_attempts": 3, "session_id": "leak",
+     "plan": [{"id": "s1", "title": "a", "status": "done", "detail": "done", "attempts": 1, "input": {"secret": 1}, "session_id": "s"}]},
+    {"id": GOAL_OTHER_AGENT, "agent": "someone-else", "user_id": "ana", "title": "No", "status": "open", "autorun": False, "plan": []},
+    {"id": "not-a-uuid", "agent": "echo-agent", "title": "bad", "plan": []},
+]}
+BODIES = []   # (method, path, body) of every write the proxy made to the host
 FIRST_SENT = threading.Event()
 RELEASE = threading.Event()
 
 
 class Upstream(BaseHTTPRequestHandler):
+    who = {"role": "user", "user_id": "ana", "scopes": ["read", "run"]}
+
     def log_message(self, *a):
         pass
 
@@ -45,6 +62,12 @@ class Upstream(BaseHTTPRequestHandler):
 
     def do_GET(self):
         CALLS.append(("GET", self.path, self.headers.get("Authorization")))
+        if self.path == "/v1/whoami":
+            return self._json(200, self.who)
+        if self.path.startswith("/v1/memory?"):
+            return self._json(200, MEMORY)
+        if self.path.startswith("/v1/goals?"):
+            return self._json(LIST_STATUS[0], GOALS)
         if self.path.startswith("/v1/threads?"):
             return self._json(LIST_STATUS[0], THREADS)
         if self.path == f"/v1/threads/{MINE}/messages":
@@ -59,7 +82,38 @@ class Upstream(BaseHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def _write(self, method):
+        body = self.rfile.read(int(self.headers.get("Content-Length", "0")) or 0)
+        data = json.loads(body) if body else None
+        BODIES.append((method, self.path, data))
+        CALLS.append((method, self.path, self.headers.get("Authorization")))
+        if self.path.startswith("/v1/memory/settings"):
+            return self._json(200, {"enabled": data["enabled"]})
+        if self.path.startswith("/v1/memory/") and self.path.split("?")[0].endswith(("/accept", "/reject")):
+            return self._json(200, {"id": self.path.split("/")[3]})
+        if self.path.startswith("/v1/memory"):
+            if data["text"] == "token ghp_x":
+                return self._json(400, {"error": "looks like a secret"})
+            return self._json(201, {"id": MEM_ITEM, "text": data["text"], "kind": data["kind"], "pinned": data.get("pinned", False), "tainted": False, "origin": "user", "source": {}})
+        if self.path == "/v1/goals":
+            if data["title"] == "quota":
+                return self._json(429, {"error": "at most 5"})
+            return self._json(201, {"id": GOAL_MINE, "agent": data["agent"], "title": data["title"], "status": "open", "autorun": data["autorun"], "plan": [{"id": f"s{i+1}", "title": p["title"], "status": "pending", "attempts": 0} for i, p in enumerate(data["plan"])], "user_id": data.get("user_id", "ana")})
+        if self.path.startswith("/v1/goals/"):
+            if data.get("autorun") is True and GOALS["items"][0].get("_conflict"):
+                return self._json(409, {"error": "cancelled"})
+            return self._json(200, {**GOALS["items"][0], **data})
+        self._json(404, {"error": "no"})
+
+    def do_PUT(self):
+        self._write("PUT")
+
+    def do_PATCH(self):
+        self._write("PATCH")
+
     def do_POST(self):
+        if self.path.startswith("/v1/memory") or self.path.startswith("/v1/goals"):
+            return self._write("POST")
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         data = json.loads(body)
         SEEN["auth"] = self.headers.get("Authorization")
@@ -103,13 +157,21 @@ class ChatProxy(unittest.TestCase):
         cls.proxy.shutdown()
         cls.up.shutdown()
 
-    def req(self, method, path, body=None, headers=None):
-        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
-        h = {"Host": f"127.0.0.1:{self.port}"}
+    def req(self, method, path, body=None, headers=None, port=None):
+        port = port or self.port
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        h = {"Host": f"127.0.0.1:{port}"}
         h.update(headers or {})
+        if isinstance(body, (dict, list)):
+            body = json.dumps(body).encode()
+            h.setdefault("Content-Length", str(len(body)))
+            h.setdefault("Content-Type", "application/json")
         c.request(method, path, body=body, headers=h)
         r = c.getresponse()
         return r, r.read(), c
+
+    def sent(self, method, path_prefix):
+        return [b for b in BODIES if b[0] == method and b[1].startswith(path_prefix)]
 
     def test_the_page_is_served_with_the_agent_and_a_strict_csp(self):
         r, body, _ = self.req("GET", "/")
@@ -243,6 +305,135 @@ class ChatProxy(unittest.TestCase):
             self.assertFalse([c for c in CALLS if c[0] == "DELETE" or "messages" in c[1]])
         finally:
             LIST_STATUS[0] = 200
+
+    def test_memory_is_read_as_the_person_the_host_names_and_only_allowed_fields_reach_the_page(self):
+        CALLS.clear()
+        r, body, _ = self.req("GET", "/memory")
+        self.assertEqual(r.status, 200)
+        v = json.loads(body)
+        self.assertEqual((v["enabled"], [i["id"] for i in v["items"]], [i["id"] for i in v["proposals"]]), (True, [MEM_ITEM], [MEM_PROPOSAL]))
+        self.assertEqual(set(v["items"][0]), {"id", "text", "kind", "pinned", "tainted", "origin"}, "no source, no timestamps")
+        self.assertTrue(v["proposals"][0]["tainted"])
+        mem = [c for c in CALLS if c[1].startswith("/v1/memory")]
+        self.assertIn("user_id=ana", mem[0][1], "the owner is the user the host says the token is (learned once from /v1/whoami)")
+        self.assertEqual(mem[0][2], "Bearer SECRET-TOKEN")
+        self.assertNotIn(b"SECRET-TOKEN", body)
+
+    def test_memory_changes_are_validated_and_only_named_fields_are_forwarded(self):
+        BODIES.clear()
+        r, _, _ = self.req("PUT", "/memory/settings", {"enabled": False})
+        self.assertEqual(r.status, 204)
+        self.assertEqual(self.sent("PUT", "/v1/memory/settings")[0][2], {"enabled": False})
+        for bad in ({"enabled": "yes"}, {}, {"enabled": 1}):
+            self.assertEqual(self.req("PUT", "/memory/settings", bad)[0].status, 400, bad)
+        r, body, _ = self.req("POST", "/memory", {"text": "prefers window seats", "kind": "preference", "pinned": True, "user_id": "evil", "origin": "agent", "tainted": False})
+        self.assertEqual(r.status, 201)
+        self.assertEqual(self.sent("POST", "/v1/memory")[0][2], {"text": "prefers window seats", "kind": "preference", "pinned": True}, "nothing but text, kind and pinned goes on")
+        for bad in ({"text": "  "}, {"text": "x", "kind": "mood"}, {"text": "y" * 2001}, {"kind": "note"}, [1]):
+            self.assertEqual(self.req("POST", "/memory", bad)[0].status, 400, bad)
+        r, body, _ = self.req("POST", "/memory", {"text": "token ghp_x"})
+        self.assertEqual(r.status, 400, "the host's refusal of a credential is passed on")
+        self.assertEqual(self.req("POST", "/memory", b"not json", {"Content-Length": "8"})[0].status, 400)
+
+    def test_a_memory_entry_is_touched_only_if_the_host_lists_it_and_accepting_needs_a_proposal(self):
+        BODIES.clear(); CALLS.clear()
+        self.assertEqual(self.req("DELETE", f"/memory/{MEM_ITEM}")[0].status, 204)
+        self.assertEqual(self.req("DELETE", f"/memory/{MEM_PROPOSAL}")[0].status, 204, "a proposal can be deleted too")
+        self.assertEqual(self.req("POST", f"/memory/{MEM_PROPOSAL}/accept")[0].status, 204)
+        self.assertEqual(self.req("POST", f"/memory/{MEM_PROPOSAL}/reject")[0].status, 204)
+        CALLS.clear()
+        for path, method in [(f"/memory/{NEVER_LISTED}", "DELETE"), (f"/memory/{NEVER_LISTED}/accept", "POST"), (f"/memory/{MEM_ITEM}/accept", "POST"), (f"/memory/{MEM_ITEM}/reject", "POST")]:
+            self.assertEqual(self.req(method, path)[0].status, 404, path)
+        self.assertFalse([c for c in CALLS if c[0] in ("DELETE", "POST")], "nothing unlisted (or already accepted) reached the host")
+        for path, method in [("/memory/not-a-uuid", "DELETE"), (f"/memory/{MEM_ITEM}/other", "POST"), (f"/memory/{MEM_ITEM}", "GET"), (f"/memory/{MEM_ITEM}", "PATCH")]:
+            self.assertEqual(self.req(method, path, {} if method in ("PATCH", "POST") else None)[0].status, 404, path)
+
+    def test_goals_are_listed_for_this_agent_with_only_what_the_page_shows(self):
+        CALLS.clear()
+        r, body, _ = self.req("GET", "/goals")
+        self.assertEqual(r.status, 200)
+        items = json.loads(body)["items"]
+        self.assertEqual([g["id"] for g in items], [GOAL_MINE], "another agent's goal and one with a bad id are not shown")
+        self.assertEqual(set(items[0]), {"id", "title", "status", "autorun", "updated_at", "plan"})
+        self.assertEqual(set(items[0]["plan"][0]), {"id", "title", "status", "detail", "attempts"}, "no step input, no session id")
+        g = [c for c in CALLS if c[1].startswith("/v1/goals?")][0][1]
+        self.assertIn("agent=echo-agent", g)
+
+    def test_a_goal_is_created_for_this_agent_from_a_title_and_steps(self):
+        BODIES.clear()
+        r, body, _ = self.req("POST", "/goals", {"title": " Weekend trip ", "steps": ["Find flights", "", "Book"], "autorun": True, "agent": "other", "user_id": "evil", "plan": [{"input": 1}], "session_id": "x", "allow_hosts": ["a"]})
+        self.assertEqual(r.status, 201)
+        sent = self.sent("POST", "/v1/goals")[0][2]
+        self.assertEqual(sent, {"title": "Weekend trip", "agent": "echo-agent", "autorun": True, "plan": [{"title": "Find flights"}, {"title": "Book"}]}, "agent fixed, user token sends no user_id, nothing else forwarded")
+        self.assertEqual(json.loads(body)["plan"][1]["title"], "Book")
+        for bad in ({"title": "", "steps": ["a"]}, {"title": "t", "steps": []}, {"title": "t", "steps": ["a"] * 21}, {"title": "t", "steps": ["a" * 201]}, {"title": "t" * 121, "steps": ["a"]}, {"title": "t", "steps": "a"}, [1]):
+            self.assertEqual(self.req("POST", "/goals", bad)[0].status, 400, bad)
+        self.assertEqual(self.req("POST", "/goals", {"title": "quota", "steps": ["a"], "autorun": True})[0].status, 429, "the host's limit is passed on")
+
+    def test_a_goal_can_only_be_paused_resumed_or_cancelled_and_only_if_listed(self):
+        BODIES.clear(); CALLS.clear()
+        self.assertEqual(self.req("PATCH", f"/goals/{GOAL_MINE}", {"autorun": False})[0].status, 200)
+        self.assertEqual(self.req("PATCH", f"/goals/{GOAL_MINE}", {"status": "cancelled"})[0].status, 200)
+        self.assertEqual([b[2] for b in self.sent("PATCH", "/v1/goals/")], [{"autorun": False}, {"status": "cancelled"}])
+        BODIES.clear()
+        for bad in ({"status": "done"}, {"plan": []}, {"autorun": True, "plan": []}, {"autorun": "yes"}, {}, {"session_id": "x"}, {"allow_hosts": ["x"]}):
+            self.assertEqual(self.req("PATCH", f"/goals/{GOAL_MINE}", bad)[0].status, 400, bad)
+        for other in (GOAL_OTHER_AGENT, NEVER_LISTED):
+            self.assertEqual(self.req("PATCH", f"/goals/{other}", {"autorun": False})[0].status, 404, other)
+        self.assertFalse(BODIES, "nothing else reached the host")
+        self.assertEqual(self.req("DELETE", f"/goals/{GOAL_MINE}")[0].status, 404, "the page cannot delete goals")
+        self.assertEqual(self.req("GET", f"/goals/{GOAL_MINE}")[0].status, 404)
+
+    def test_every_write_needs_the_same_origin_and_host(self):
+        for method, path, body in [("PUT", "/memory/settings", {"enabled": True}), ("POST", "/memory", {"text": "x"}), ("POST", f"/memory/{MEM_PROPOSAL}/accept", {}),
+                                   ("DELETE", f"/memory/{MEM_ITEM}", None), ("POST", "/goals", {"title": "t", "steps": ["a"]}), ("PATCH", f"/goals/{GOAL_MINE}", {"autorun": False})]:
+            r, _, _ = self.req(method, path, body, {"Origin": "http://evil.example"})
+            self.assertEqual(r.status, 403, f"{method} {path} cross-site")
+            r, _, _ = self.req(method, path, body, {"Host": "evil.example"})
+            self.assertEqual(r.status, 421, f"{method} {path} rebinding")
+
+    def test_with_the_operator_token_the_page_is_scoped_to_the_named_user_and_creates_goals_for_them(self):
+        class OpUpstream(Upstream):
+            who = {"role": "operator"}
+        op_up = serve(OpUpstream)
+        probe = ThreadingHTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
+        port = probe.server_address[1]
+        probe.server_close()
+        proxy = serve(keep_chat.make_handler(f"http://127.0.0.1:{op_up.server_address[1]}", "OP-TOKEN", "echo-agent", port, "dana"), port)
+        try:
+            CALLS.clear(); BODIES.clear()
+            self.assertEqual(self.req("GET", "/memory", port=port)[0].status, 200)
+            self.assertIn("user_id=dana", [c for c in CALLS if c[1].startswith("/v1/memory")][0][1], "the operator token is scoped to --user")
+            self.assertEqual(self.req("POST", "/goals", {"title": "t", "steps": ["a"]}, port=port)[0].status, 201)
+            self.assertEqual(self.sent("POST", "/v1/goals")[0][2]["user_id"], "dana", "the goal is created for that user")
+            CALLS.clear()
+            self.assertEqual(self.req("GET", "/goals", port=port)[0].status, 200)
+            listed = [c for c in CALLS if c[1].startswith("/v1/goals?")]
+            self.assertTrue(listed and "user_id=dana" in listed[0][1], "the operator token lists only that user's goals")
+            self.assertEqual(listed[0][2], "Bearer OP-TOKEN")
+        finally:
+            proxy.shutdown(); op_up.shutdown()
+
+    def test_a_host_that_cannot_say_who_the_token_is_is_a_502(self):
+        class Anonymous(Upstream):
+            who = {"role": "nobody"}
+        up = serve(Anonymous)
+        probe = ThreadingHTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
+        port = probe.server_address[1]
+        probe.server_close()
+        proxy = serve(keep_chat.make_handler(f"http://127.0.0.1:{up.server_address[1]}", "T", "echo-agent", port), port)
+        try:
+            self.assertEqual(self.req("GET", "/memory", port=port)[0].status, 502)
+            self.assertEqual(self.req("GET", "/goals", port=port)[0].status, 502)
+        finally:
+            proxy.shutdown(); up.shutdown()
+
+    def test_the_goal_and_memory_projections(self):
+        self.assertEqual(keep_chat.project_memory(None), {"enabled": False, "items": [], "proposals": []})
+        self.assertEqual(keep_chat.project_goals({"items": [{"id": "x"}]}, "a"), [])
+        with self.assertRaises(ValueError):
+            keep_chat.clean_goal_request({"title": "t", "steps": []})
+        self.assertEqual(keep_chat.clean_goal_request({"title": "t", "steps": ["a", " "]}), {"title": "t", "steps": ["a"], "autorun": False})
 
     def test_force_agent_and_host_checks(self):
         self.assertEqual(json.loads(keep_chat.force_agent(b'{"a":1,"forwardedProps":{"agent":"z"}}', "y")), {"a": 1, "forwardedProps": {"agent": "y"}})

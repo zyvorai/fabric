@@ -9,15 +9,65 @@
 </head>
 <body>
   <div class="app" id="app">
-    <aside class="list" aria-label="Chats">
+    <aside class="list" aria-label="Chats, goals and memory">
       <header class="list-head">
-        <h2>Chats</h2>
+        <div class="tabs" role="tablist" aria-label="Sections">
+          <button id="tab-chats" type="button" role="tab" aria-selected="true" aria-controls="pane-chats" class="tab active">Chats</button>
+          <button id="tab-goals" type="button" role="tab" aria-selected="false" aria-controls="pane-goals" class="tab">Goals</button>
+          <button id="tab-memory" type="button" role="tab" aria-selected="false" aria-controls="pane-memory" class="tab">Memory</button>
+        </div>
         <button id="new" type="button" class="icon" aria-label="New chat" title="New chat">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         </button>
       </header>
-      <ul id="threads" class="threads"></ul>
-      <p id="threads-empty" class="list-empty" hidden>No chats yet.<br>Say hello to start one.</p>
+
+      <section id="pane-chats" class="pane" role="tabpanel" aria-labelledby="tab-chats">
+        <ul id="threads" class="threads"></ul>
+        <p id="threads-empty" class="list-empty" hidden>No chats yet.<br>Say hello to start one.</p>
+      </section>
+
+      <section id="pane-goals" class="pane" role="tabpanel" aria-labelledby="tab-goals" hidden>
+        <form id="goal-form" class="card form" autocomplete="off">
+          <label class="sr" for="goal-title">Goal</label>
+          <input id="goal-title" type="text" placeholder="A goal, e.g. Plan the weekend trip" maxlength="120" required>
+          <label class="sr" for="goal-steps">Steps, one per line</label>
+          <textarea id="goal-steps" rows="3" placeholder="One step per line" required></textarea>
+          <label class="check"><input id="goal-auto" type="checkbox"> Run the steps automatically</label>
+          <button type="submit" class="primary">Add goal</button>
+          <p id="goal-msg" class="msgline" role="status"></p>
+        </form>
+        <ul id="goals" class="goals"></ul>
+        <p id="goals-empty" class="list-empty" hidden>No goals yet.<br>Add one above.</p>
+      </section>
+
+      <section id="pane-memory" class="pane" role="tabpanel" aria-labelledby="tab-memory" hidden>
+        <div class="card">
+          <div class="switch-row">
+            <div>
+              <strong id="mem-state">Memory is off</strong>
+              <p class="fine-print">Off: your agent remembers nothing about you. On: only what you add or accept below.</p>
+            </div>
+            <button id="mem-toggle" type="button" class="primary small" aria-pressed="false">Turn on</button>
+          </div>
+        </div>
+        <div id="mem-body" hidden>
+          <form id="mem-form" class="card form" autocomplete="off">
+            <label class="sr" for="mem-text">A note to remember</label>
+            <input id="mem-text" type="text" placeholder="e.g. I prefer window seats" maxlength="2000" required>
+            <div class="row">
+              <label class="sr" for="mem-kind">Kind</label>
+              <select id="mem-kind"><option value="preference">Preference</option><option value="fact">Fact</option><option value="note" selected>Note</option></select>
+              <button type="submit" class="primary small">Remember</button>
+            </div>
+            <p id="mem-msg" class="msgline" role="status"></p>
+          </form>
+          <h3 id="mem-props-h" class="sub-h" hidden>Suggested by your agent</h3>
+          <ul id="mem-props" class="mem"></ul>
+          <h3 class="sub-h">What it remembers</h3>
+          <ul id="mem-items" class="mem"></ul>
+          <p id="mem-empty" class="list-empty" hidden>Nothing yet.</p>
+        </div>
+      </section>
     </aside>
 
     <main class="chat" aria-label="Chat with {{AGENT}}">
