@@ -64,3 +64,16 @@ Packaged agents: [`examples/keep-agents/`](../../examples/keep-agents/).
 Demo: [`./scripts/keep-pack-demo.sh`](../../scripts/keep-pack-demo.sh).
 
 See also [PRODUCTION.md](../PRODUCTION.md) and [Tutorial 16](../../tutorials/16-keep-workstation.md).
+
+## Plans an agent proposes, and you accept
+
+A goal can start with no plan (`POST /v1/goals` with just a `title`, a `description` and the `agent` that will do the work). Then:
+
+1. `POST /v1/goals/{id}/plan` (optionally `{"planner": "<agent>"}`; otherwise the host's `ZYVOR_AGENT_PLANNER_AGENT`) runs a **planner agent** as an ordinary session for the goal's user, given the goal's title and description. `202` with the session id. The example [`goal-planner`](../../../examples/keep-agents/goal-planner/) asks its model socket for one step per line.
+2. The planner answers by emitting a `goal.plan_proposed` event with `{steps: [{title, input?, requires_approval?}]}`. The host stores it on the goal as `proposed_plan`. **The plan stays empty and nothing runs.**
+3. You read `GET /v1/goals/{id}` and either `POST /v1/goals/{id}/plan/accept` (the steps become the plan, ids `s1`, `s2`, ...; optionally `{"autorun": true}` to let the [worker](#the-goal-worker-opt-in) run them, which is still the goal's own opt-in) or `POST /v1/goals/{id}/plan/reject`.
+
+What keeps a model's plan from being a back door: only the planning session started for that goal can propose, and only once; a proposal is bounded (1 to 10 steps, titles of at most 120 plain-text characters with control, zero-width and direction-changing characters removed, a step input that is an object of at most 4 KiB); a planner that had read untrusted content is marked `tainted` and its plan needs `{"confirm_tainted": true}` to accept; a goal that already has a plan is not planned again and a late proposal never replaces it; an earlier proposal stays until the new one arrives or you decide. Accepting changes nothing else: each step still runs as an ordinary session with every policy, quota and approval of one, and a step that sends or spends still waits for your phone. The audit journal records that a plan was requested, proposed (with the number of steps) and accepted or rejected, never the steps.
+
+A user token can do all three for its own goals (another user's goal is a 404); the planner runs with the user's identity, so the user's run quota applies.
+

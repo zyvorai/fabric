@@ -955,6 +955,8 @@ async fn run_demo_inner(
         artifact_ids: vec![],
         allow_hosts: vec![],
         autorun: false,
+        planning_session_id: None,
+        proposed_plan: None,
         max_attempts: 3,
         created_at: now,
         updated_at: now,
