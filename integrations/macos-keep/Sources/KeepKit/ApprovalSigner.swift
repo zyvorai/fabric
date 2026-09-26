@@ -25,7 +25,7 @@ public enum SignerError: Error, Equatable, LocalizedError {
         switch self {
         case .noChallenge: return "This approval carries no signing challenge (the host is not set up for device signatures)."
         case .expired: return "The signing window for this approval has passed."
-        case .secureEnclaveUnavailable: return "This Mac has no Secure Enclave available to the app."
+        case .secureEnclaveUnavailable: return "This device has no Secure Enclave available to the app."
         case .keychain(let s): return "Keychain error \(s)."
         }
     }

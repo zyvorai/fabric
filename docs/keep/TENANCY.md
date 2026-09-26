@@ -37,7 +37,7 @@ query string is refused.**
 Only: their own sessions (and everything under them: events, cockpit, browser view, steering), their own approvals
 (list and decide), their own artifacts (list, read, diff), their own slice of the audit journal, `GET /v1/demos`
 and `POST /v1/demos/{id}` (a run is stamped with their id), `GET /v1/usage` and `GET /v1/inbox`, their own conversation
-threads (`/v1/threads`: list, create, read, page messages, forget; see [threads](threads/README.md)), their own opt-in [memory](memory/README.md) (`/v1/memory`), their own [goals](goals/README.md) (`/v1/goals`: create for themselves, read, cancel or pause; not `advance`), and their own [action receipts](receipts/README.md) (`GET /v1/receipts`).
+threads (`/v1/threads`: list, create, read, page messages, forget; see [threads](threads/README.md)), their own opt-in [memory](memory/README.md) (`/v1/memory`), their own [goals](goals/README.md) (`/v1/goals`: create for themselves, read, cancel or pause, ask for a plan and accept or reject the proposed one; not `advance`), and their own [action receipts](receipts/README.md) (`GET /v1/receipts`).
 
 Everything else is **403** by default, including agents, policy, the vault, triggers, model grants, exports, MCP and
 minting tokens. A new operator route is closed to users until someone lists it in `authz::user_route`.

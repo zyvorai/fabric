@@ -425,7 +425,39 @@ async fn apply(
     }
     let _ = idx;
     refresh_status(&mut fresh);
-    let _ = state.store.save_goal(fresh).await;
+    let (now_status, user) = (fresh.status.clone(), fresh.user_id.clone());
+    let saved = state.store.save_goal(fresh.clone()).await.is_ok();
+    // tell the person when a goal stops on a problem or finishes (an approval has its own signed message)
+    if let (true, Some(user)) = (saved, user) {
+        let blocked_now = matches!(mv, Move::Block { .. }) && now_status == GoalStatus::Blocked;
+        let finished_now = now_status == GoalStatus::Done && goal.status != GoalStatus::Done;
+        if blocked_now || finished_now {
+            let reason = match mv {
+                Move::Block { reason, .. } => reason.clone(),
+                _ => "all steps are done".to_string(),
+            };
+            crate::notify::notify_user(
+                state,
+                &user,
+                crate::notify::Notice {
+                    event: if blocked_now {
+                        "goal.blocked"
+                    } else {
+                        "goal.done"
+                    },
+                    title: if blocked_now {
+                        "A goal needs your attention".into()
+                    } else {
+                        "A goal is done".into()
+                    },
+                    body: "Open Keep to see what happened.".into(),
+                    detail_title: fresh.title.clone(),
+                    detail_body: reason,
+                    data: json!({ "goal_id": fresh.id, "step_id": step_id }),
+                },
+            );
+        }
+    }
 }
 
 async fn start_session(

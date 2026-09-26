@@ -1034,6 +1034,7 @@ pub(crate) mod ask_tests {
             thread_retention_days: None,
             goal_tick_ms: 5000,
             goal_retry_base_secs: 15,
+            planner_agent: None,
             event_retention_days: None,
             idle_scan_interval_ms: 1000,
             warm_pool_reconcile_interval_ms: 2000,
