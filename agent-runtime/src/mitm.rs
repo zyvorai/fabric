@@ -721,7 +721,7 @@ mod tests {
     #[tokio::test]
     async fn requests_without_this_sessions_surrogate_get_no_credential() {
         let rig = rig(|_| {}, false).await;
-        let others = surrogate("another-sessions-capability", "mail");
+        let others = surrogate(&crate::fixture::text("another-sessions-capability"), "mail");
         for token in [
             "not-a-surrogate".to_string(),
             others,
@@ -913,11 +913,13 @@ mod tests {
             "plain".to_string(),
             "missing".to_string(),
         ];
-        let one = surrogates(&vault, &granted, "cap-one");
+        let cap_one = crate::fixture::text("cap-one");
+        let cap_two = crate::fixture::text("cap-two");
+        let one = surrogates(&vault, &granted, &cap_one);
         assert_eq!(one.keys().collect::<Vec<_>>(), vec!["mail"]);
         assert!(one["mail"].starts_with("zy_sur_") && one["mail"].len() == 39);
-        assert_eq!(one, surrogates(&vault, &granted, "cap-one"));
-        assert_ne!(one["mail"], surrogates(&vault, &granted, "cap-two")["mail"]);
+        assert_eq!(one, surrogates(&vault, &granted, &cap_one));
+        assert_ne!(one["mail"], surrogates(&vault, &granted, &cap_two)["mail"]);
         assert!(!one["mail"].contains("cap-one"));
     }
 

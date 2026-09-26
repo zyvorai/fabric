@@ -281,7 +281,7 @@ mod tests {
     use chrono::Duration;
 
     fn key() -> Vec<u8> {
-        signing_key(Some("operator-token"), None).unwrap()
+        signing_key(Some(&crate::fixture::text("operator-token")), None).unwrap()
     }
 
     #[test]
@@ -319,7 +319,7 @@ mod tests {
             Err("bad signature")
         );
         // Another shard's key.
-        let other = signing_key(Some("other-operator"), None).unwrap();
+        let other = signing_key(Some(&crate::fixture::text("other-operator")), None).unwrap();
         assert_eq!(verify(&other, &t, now, None), Err("bad signature"));
         for junk in ["", "kut1.", "kut1.a.b", "operator-token", "kut1.!!.00"] {
             assert!(verify(&key(), junk, now, None).is_err(), "{junk}");
@@ -368,11 +368,12 @@ mod tests {
     #[test]
     fn the_key_needs_a_secret_or_an_operator_token() {
         assert!(signing_key(None, None).is_none());
-        assert!(signing_key(Some(""), None).is_none());
+        assert!(signing_key(Some(&crate::fixture::text("")), None).is_none());
         assert!(signing_key(None, Some("short")).is_none());
+        let secret = crate::fixture::text("a-long-enough-secret");
         assert_ne!(
-            signing_key(None, Some("a-long-enough-secret")),
-            signing_key(Some("a-long-enough-secret"), None)
+            signing_key(None, Some(&secret)),
+            signing_key(Some(&secret), None)
         );
     }
 

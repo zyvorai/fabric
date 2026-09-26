@@ -714,9 +714,11 @@ pub async fn demo_run(
         Ok(v) => v,
         Err(resp) => return resp,
     };
-    let path = format!("/v1/demos/{demo_id}");
-    // CodeQL SSRF barrier: path must pass the same allowlist as `proxy`.
-    if path.contains("..") || !input_guard::COMMAND_ARGS.contains(&path) {
+    let path_owned = format!("/v1/demos/{demo_id}");
+    let path: &str = path_owned.as_str();
+    // CodeQL SSRF barrier: the same check, on the same `&str` shape, as `proxy`. Passing `&path` (a reference to a
+    // `String`) hides the guarded value from the barrier model, so the finding stayed open.
+    if !path.starts_with('/') || path.contains("..") || !input_guard::COMMAND_ARGS.contains(path) {
         return bad_demo_id();
     }
     let url = format!("{base}{path}");

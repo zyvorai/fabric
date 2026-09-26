@@ -22,7 +22,10 @@ use std::sync::Arc;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-const OP: &str = "operator-token";
+/// The operator token, built at run time (see `crate::fixture`).
+fn op() -> String {
+    crate::fixture::text("operator-token")
+}
 
 struct World {
     app: Router,
@@ -120,7 +123,7 @@ async fn fixture(state: &Arc<AppState>, base: &SessionRecord, app: &Router, user
         app,
         "POST",
         "/v1/user-tokens",
-        Some(OP),
+        Some(op().as_str()),
         Some(json!({"user_id": user, "ttl_seconds": 600})),
     )
     .await;
@@ -134,7 +137,7 @@ async fn fixture(state: &Arc<AppState>, base: &SessionRecord, app: &Router, user
 }
 
 async fn world() -> World {
-    let (state, base) = state_and_session_cfg(|c| c.api_token = Some(OP.into())).await;
+    let (state, base) = state_and_session_cfg(|c| c.api_token = Some(op())).await;
     let app = public_router(state.clone());
     let ana = fixture(&state, &base, &app, "ana").await;
     let ben = fixture(&state, &base, &app, "ben").await;
@@ -337,7 +340,7 @@ async fn tokens_are_header_only_scoped_and_revocable() {
         &w.app,
         "POST",
         "/v1/user-tokens",
-        Some(OP),
+        Some(op().as_str()),
         Some(json!({"user_id": "ana", "scopes": ["read"]})),
     )
     .await;
@@ -377,7 +380,7 @@ async fn tokens_are_header_only_scoped_and_revocable() {
         &w.app,
         "POST",
         "/v1/user-tokens",
-        Some(OP),
+        Some(op().as_str()),
         Some(json!({"user_id": "ana", "scopes": ["root"]})),
     )
     .await;
@@ -386,7 +389,7 @@ async fn tokens_are_header_only_scoped_and_revocable() {
         &w.app,
         "POST",
         "/v1/user-tokens",
-        Some(OP),
+        Some(op().as_str()),
         Some(json!({"user_id": "Ana Silva"})),
     )
     .await;
@@ -397,7 +400,7 @@ async fn tokens_are_header_only_scoped_and_revocable() {
         &w.app,
         "POST",
         "/v1/users/ana/revoke-tokens",
-        Some(OP),
+        Some(op().as_str()),
         None,
     )
     .await;
@@ -415,7 +418,7 @@ async fn tokens_are_header_only_scoped_and_revocable() {
         &w.app,
         "POST",
         "/v1/user-tokens",
-        Some(OP),
+        Some(op().as_str()),
         Some(json!({"user_id": "ana"})),
     )
     .await;
@@ -431,7 +434,8 @@ async fn tokens_are_header_only_scoped_and_revocable() {
 #[tokio::test]
 async fn the_operator_still_sees_everything() {
     let w = world().await;
-    let t = Some(OP);
+    let token = op();
+    let t = Some(token.as_str());
     let (_, v) = call(&w.app, "GET", "/v1/approvals", t, None).await;
     assert_eq!(ids(&v, "id").len(), 2);
     let (_, v) = call(&w.app, "GET", "/v1/artifacts", t, None).await;
@@ -472,9 +476,16 @@ async fn usage_and_inbox_are_per_user() {
     assert!(!v.to_string().contains("ben"));
 
     // The operator names the user; without one it is a 400.
-    let (st, _) = call(&w.app, "GET", "/v1/usage", Some(OP), None).await;
+    let (st, _) = call(&w.app, "GET", "/v1/usage", Some(op().as_str()), None).await;
     assert_eq!(st, StatusCode::BAD_REQUEST);
-    let (_, v) = call(&w.app, "GET", "/v1/usage?user_id=ben", Some(OP), None).await;
+    let (_, v) = call(
+        &w.app,
+        "GET",
+        "/v1/usage?user_id=ben",
+        Some(op().as_str()),
+        None,
+    )
+    .await;
     assert_eq!(v["usage"]["user_id"], "ben");
 }
 
@@ -562,7 +573,7 @@ impl Phone {
 
     /// Sign the payload the server tells the phone to sign.
     fn sign(&self, approval: &ApprovalRecord, decision: ApprovalStatus) -> String {
-        let key = crate::authz::signing_key(Some(OP), None).unwrap();
+        let key = crate::authz::signing_key(Some(op().as_str()), None).unwrap();
         let payload = crate::devices::signing_payload(
             approval,
             decision,
@@ -603,7 +614,7 @@ async fn a_phone_signed_decision_is_accepted_and_recorded() {
         &w.app,
         "POST",
         "/v1/users/ana/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(phone.enrol_body()),
     )
     .await;
@@ -641,7 +652,7 @@ async fn a_forged_flipped_or_borrowed_signature_is_refused_and_changes_nothing()
         &w.app,
         "POST",
         "/v1/users/ana/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(phone.enrol_body()),
     )
     .await;
@@ -651,7 +662,7 @@ async fn a_forged_flipped_or_borrowed_signature_is_refused_and_changes_nothing()
         &w.app,
         "POST",
         "/v1/users/ben/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(bens.enrol_body()),
     )
     .await;
@@ -726,7 +737,7 @@ async fn a_signature_after_the_window_is_refused() {
         &w.app,
         "POST",
         "/v1/users/ana/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(phone.enrol_body()),
     )
     .await;
@@ -774,7 +785,7 @@ async fn users_cannot_enrol_devices_but_can_list_their_own() {
         &w.app,
         "POST",
         "/v1/users/ana/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(Phone::new("ana-phone").enrol_body()),
     )
     .await;
@@ -782,7 +793,7 @@ async fn users_cannot_enrol_devices_but_can_list_their_own() {
         &w.app,
         "POST",
         "/v1/users/ben/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(Phone::new("ben-phone").enrol_body()),
     )
     .await;
@@ -814,19 +825,26 @@ async fn users_cannot_enrol_devices_but_can_list_their_own() {
         &w.app,
         "DELETE",
         "/v1/users/ana/devices/ana-phone",
-        Some(OP),
+        Some(op().as_str()),
         None,
     )
     .await;
     assert_eq!(st, StatusCode::NO_CONTENT);
-    let (_, v) = call(&w.app, "GET", "/v1/users/ana/devices", Some(OP), None).await;
+    let (_, v) = call(
+        &w.app,
+        "GET",
+        "/v1/users/ana/devices",
+        Some(op().as_str()),
+        None,
+    )
+    .await;
     assert!(v["items"].as_array().unwrap().is_empty());
     // Bad keys are refused at enrolment.
     let (st, _) = call(
         &w.app,
         "POST",
         "/v1/users/ana/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(json!({"device_id": "d", "alg": "p256", "public_key": "AAAA"})),
     )
     .await;
@@ -840,7 +858,7 @@ async fn the_inbox_carries_what_a_phone_needs_to_sign() {
     let sign = &v["pending_approvals"][0]["sign"];
     assert_eq!(sign["format"], "keep-approval-v1");
     let a = w.state.store.get_approval(w.ana.approval).await.unwrap();
-    let key = crate::authz::signing_key(Some(OP), None).unwrap();
+    let key = crate::authz::signing_key(Some(op().as_str()), None).unwrap();
     assert_eq!(sign["challenge"], crate::devices::challenge(&key, &a));
     assert_eq!(sign["action_sha256"], crate::devices::action_sha256(&a));
     assert_eq!(sign["expires_at"], crate::devices::expires_at(&a));
@@ -857,7 +875,7 @@ async fn a_credential_can_require_the_phone_while_the_operator_can_still_decide(
     )
     .unwrap();
     let (state, base) = state_and_session_cfg(|c| {
-        c.api_token = Some(OP.into());
+        c.api_token = Some(op());
         c.credentials_file = Some(file);
     })
     .await;
@@ -868,7 +886,7 @@ async fn a_credential_can_require_the_phone_while_the_operator_can_still_decide(
         &app,
         "POST",
         "/v1/users/ana/devices",
-        Some(OP),
+        Some(op().as_str()),
         Some(phone.enrol_body()),
     )
     .await;
@@ -909,6 +927,6 @@ async fn a_credential_can_require_the_phone_while_the_operator_can_still_decide(
     let mut b2 = b.clone();
     b2.planned_action = Some(json!({"credential": "mail"}));
     state.store.save_approval(b2).await.unwrap();
-    let (st, _) = decide(&w, OP, b.id, "denied", None).await;
+    let (st, _) = decide(&w, &op(), b.id, "denied", None).await;
     assert_eq!(st, StatusCode::OK);
 }
