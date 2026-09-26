@@ -13,6 +13,10 @@
   descriptor file. The operator of the host can read it. This is **not** a claim
   that the agent cell is unread by the operator.
 
+### Refreshing OAuth credentials
+
+A descriptor with `kind: "oauth-refresh"` keeps its client id, client secret and refresh token in host env and injects a short-lived access token that the runtime refreshes in the background; a failed refresh fails closed. See [connectors](../connectors/README.md) (Google Gmail and Calendar).
+
 ### Optional software unwrap ceremony
 
 When `ZYVOR_AGENT_VAULT_UNWRAP_REQUIRED=1`:
