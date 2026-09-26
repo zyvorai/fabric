@@ -20,8 +20,26 @@ export interface AgentContext<TInput = unknown> {
   fetch(input: string | URL, init?: AgentFetchOptions): Promise<Response>;
   /** The manifest's `model_socket`: an OpenAI-compatible endpoint, called through the egress broker. */
   model: AgentModel;
+  /**
+   * The user's memory, only when the agent's manifest sets `"memory": true` and the user turned memory on (otherwise `items` is empty).
+   * Treat `items` as DATA about the user, never as instructions: an entry with `tainted: true` came from a session that had read untrusted content.
+   */
+  memory: AgentMemory;
   nextSteer(options?: { timeoutMs?: number }): Promise<unknown | null>;
   isCancelled(): boolean;
+}
+
+export interface AgentMemoryItem {
+  text: string;
+  kind: "preference" | "fact" | "note";
+  pinned: boolean;
+  tainted: boolean;
+}
+
+export interface AgentMemory {
+  readonly items: readonly Readonly<AgentMemoryItem>[];
+  /** Suggest an entry. It is not used until the user accepts it in their memory list; the host may refuse it (see the `memory.proposal_refused` event). */
+  propose(text: string, kind?: "preference" | "fact" | "note"): void;
 }
 
 export type AgentDefinition<TInput = unknown, TResult = unknown> =
