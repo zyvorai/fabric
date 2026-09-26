@@ -1382,7 +1382,7 @@ async fn provision_guest(
         }
     }
     // The user's memory, only for an agent that asked for it (manifest `memory`), goes in the run request, never in the session's stored input.
-    let memory = crate::memory::context_for_session(state, &session, &agent.manifest).await;
+    let memory = crate::memory::context_for_session(state, session, &agent.manifest).await;
     with_timeout(
         HEALTH_CHECK_ATTEMPT_TIMEOUT,
         state.fluxvm.guest_request(
