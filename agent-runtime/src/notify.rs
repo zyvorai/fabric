@@ -219,6 +219,31 @@ pub fn payload(record: &ApprovalRecord, agent: Option<&str>, user_id: Option<&st
 /// Tell the operator's device that a use case run finished or failed, in the
 /// background. Same channel, signature and retry rules as approvals.
 pub fn run_finished(state: &AppState, run: RunNotice) {
+    // the person's own devices, as a notice (generic text unless the operator allows more)
+    let ok = run.outcome.is_ok();
+    notify_session_user(
+        state,
+        run.session_id,
+        Notice {
+            event: run.event(),
+            title: if ok {
+                "A run finished".into()
+            } else {
+                "A run failed".into()
+            },
+            body: "Open Keep to see the result.".into(),
+            detail_title: if ok {
+                format!("{} finished", run.demo)
+            } else {
+                format!("{} failed", run.demo)
+            },
+            detail_body: match &run.outcome {
+                Ok((artifacts, _)) => format!("{} result(s) ready", artifacts.len()),
+                Err(reason) => reason.clone(),
+            },
+            data: json!({ "session_id": run.session_id, "demo": run.demo }),
+        },
+    );
     let Some(webhook) = state.config.approval_webhook.clone() else {
         return;
     };
@@ -288,6 +313,155 @@ pub fn run_payload(run: &RunNotice) -> Vec<u8> {
         "run": { "demo": run.demo, "session_id": run.session_id, "detail": detail },
     });
     serde_json::to_vec(&value).unwrap_or_default()
+}
+
+// ---- notices: things a person should know, on their phone ------------------------------------------------------------------------------
+
+/// A notification to a person's devices that is **only** a notification: nothing can be approved or decided from it (approvals have their own
+/// signed message, [`device_payload`]). It carries a generic title and body and the ids needed to open the right screen. The text the person
+/// wrote (a goal's title, a memory entry) leaves this host for a push vendor's relay only when the operator sets
+/// `ZYVOR_AGENT_PUSH_NOTICE_TEXT=1`, in which case `detail_title` and `detail_body` are used instead.
+#[derive(Clone, Debug)]
+pub struct Notice {
+    /// `goal.blocked`, `goal.done`, `memory.proposed`, `run.finished`, `run.failed`.
+    pub event: &'static str,
+    pub title: String,
+    pub body: String,
+    pub detail_title: String,
+    pub detail_body: String,
+    /// Ids and flags only (goal id, step id, proposal id, tainted), never text.
+    pub data: Value,
+}
+
+/// Whether the operator allows the person's own text in push notices.
+pub fn notice_text_enabled() -> bool {
+    std::env::var("ZYVOR_AGENT_PUSH_NOTICE_TEXT").is_ok_and(|v| v == "1")
+}
+
+/// What a relay receives for one device for a notice.
+pub fn notice_payload(
+    notice: &Notice,
+    device: &crate::devices::DeviceRecord,
+    detailed: bool,
+) -> Vec<u8> {
+    let (title, body) = if detailed {
+        (&notice.detail_title, &notice.detail_body)
+    } else {
+        (&notice.title, &notice.body)
+    };
+    let value = json!({
+        "event": notice.event,
+        "channel": "out_of_band",
+        "kind": "notice",
+        "device": { "id": device.device_id, "user_id": device.user_id, "push": device.push },
+        "ui": { "title": title, "body": body },
+        "data": notice.data,
+        "note": "A notification only: nothing can be approved or decided from it.",
+    });
+    serde_json::to_vec(&value).unwrap_or_default()
+}
+
+/// One message per device of `user` that has a push target with a relay. Delivery is best effort; a final failure is journaled.
+#[allow(clippy::too_many_arguments)]
+pub async fn push_notice(
+    http: &reqwest::Client,
+    store: &crate::store::Store,
+    relays: &std::collections::HashMap<String, String>,
+    secret: &str,
+    user: &str,
+    notice: &Notice,
+    detailed: bool,
+    retry_delays: &[Duration],
+) {
+    for device in store.list_devices(user).await {
+        let Some(target) = device.push.as_ref() else {
+            continue;
+        };
+        let Some(url) = relays.get(&target.kind) else {
+            continue;
+        };
+        let relay = ApprovalWebhook {
+            url: url.clone(),
+            secret: secret.to_string(),
+        };
+        let body = notice_payload(notice, &device, detailed);
+        if let Err(error) = deliver_event(http, &relay, notice.event, &body, retry_delays).await {
+            tracing::warn!(%error, device = %device.device_id, "notice push failed");
+            let _ = store
+                .audit
+                .append(None, AuditPhase::Failed, "notice.push", None, json!({ "event": notice.event, "device_id": device.device_id, "push_kind": target.kind, "error": error.to_string() }))
+                .await;
+        }
+    }
+}
+
+/// The relays and the secret that signs what they receive, or `None` when notices cannot be sent.
+fn relay_setup(state: &AppState) -> Option<(std::collections::HashMap<String, String>, String)> {
+    let relays = push_relays();
+    let secret = std::env::var("ZYVOR_AGENT_PUSH_RELAY_SECRET")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            state
+                .config
+                .approval_webhook
+                .as_ref()
+                .map(|w| w.secret.clone())
+        })?;
+    (!relays.is_empty()).then_some((relays, secret))
+}
+
+/// Tell a person's devices about a notice, in the background. Does nothing without a relay and a signing secret.
+pub fn notify_user(state: &AppState, user: &str, notice: Notice) {
+    let Some((relays, secret)) = relay_setup(state) else {
+        return;
+    };
+    let (http, store, user, detailed) = (
+        state.egress_http.clone(),
+        state.store.clone(),
+        user.to_string(),
+        notice_text_enabled(),
+    );
+    tokio::spawn(async move {
+        push_notice(
+            &http,
+            &store,
+            &relays,
+            &secret,
+            &user,
+            &notice,
+            detailed,
+            &RETRY_DELAYS,
+        )
+        .await;
+    });
+}
+
+/// The same for the person a session belongs to (nothing for a session with no user).
+pub fn notify_session_user(state: &AppState, session: Option<uuid::Uuid>, notice: Notice) {
+    let (Some(sid), Some((relays, secret))) = (session, relay_setup(state)) else {
+        return;
+    };
+    let (http, store, detailed) = (
+        state.egress_http.clone(),
+        state.store.clone(),
+        notice_text_enabled(),
+    );
+    tokio::spawn(async move {
+        if let Some(user) = store.get_session(sid).await.and_then(|s| s.user_id) {
+            push_notice(
+                &http,
+                &store,
+                &relays,
+                &secret,
+                &user,
+                &notice,
+                detailed,
+                &RETRY_DELAYS,
+            )
+            .await;
+        }
+    });
 }
 
 /// POST `body`, retrying after each delay in `retry_delays` on any failure.
@@ -616,5 +790,154 @@ mod tests {
         std::env::remove_var("ZYVOR_AGENT_PUSH_RELAYS");
         kinds.sort();
         assert_eq!(kinds, vec!["fcm", "local"]);
+    }
+
+    fn notice() -> Notice {
+        Notice {
+            event: "goal.blocked",
+            title: "A goal needs your attention".into(),
+            body: "Open Keep to see what happened.".into(),
+            detail_title: "Book the trip to Goa".into(),
+            detail_body: "failed after 3 attempts: boom".into(),
+            data: json!({ "goal_id": "g1", "step_id": "s2" }),
+        }
+    }
+
+    fn device(user: &str, id: &str, kind: Option<&str>) -> crate::devices::DeviceRecord {
+        crate::devices::DeviceRecord {
+            user_id: user.into(),
+            device_id: id.into(),
+            name: None,
+            alg: crate::devices::KeyAlg::Ed25519,
+            public_key: "x".into(),
+            push: kind.map(|k| crate::devices::PushTarget {
+                kind: k.into(),
+                token: format!("tok-{id}"),
+            }),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn a_notice_is_generic_by_default_and_can_never_be_used_to_decide_anything() {
+        let d = device("ana", "a-fcm", Some("fcm"));
+        let generic: Value = serde_json::from_slice(&notice_payload(&notice(), &d, false)).unwrap();
+        assert_eq!(generic["ui"]["title"], "A goal needs your attention");
+        assert!(
+            !generic.to_string().contains("Goa") && !generic.to_string().contains("boom"),
+            "the person's text is not in a generic notice: {generic}"
+        );
+        assert_eq!(
+            generic["data"],
+            json!({ "goal_id": "g1", "step_id": "s2" }),
+            "ids only"
+        );
+        // nothing to approve from it: no signing info, no decide route, no planned action
+        for absent in ["sign", "decide", "approval"] {
+            assert!(
+                generic.get(absent).is_none(),
+                "{absent} must not be in a notice"
+            );
+        }
+        assert!(generic["note"]
+            .as_str()
+            .unwrap()
+            .contains("nothing can be approved"));
+        let detailed: Value = serde_json::from_slice(&notice_payload(&notice(), &d, true)).unwrap();
+        assert_eq!(detailed["ui"]["title"], "Book the trip to Goa");
+        assert!(detailed["ui"]["body"].as_str().unwrap().contains("boom"));
+        assert_eq!(
+            detailed["data"], generic["data"],
+            "the data is the same either way"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_notice_goes_to_that_persons_routable_devices_only_signed() {
+        let (url, seen) = receiver(0).await;
+        let (state, _) = crate::egress::ask_tests::state_and_session_cfg(|_| {}).await;
+        for d in [
+            device("ana", "a-fcm", Some("fcm")),
+            device("ana", "a-none", None),
+            device("ana", "a-hms", Some("hms")),
+            device("ben", "b-fcm", Some("fcm")),
+        ] {
+            state.store.save_device(d).await.unwrap();
+        }
+        let relays = std::collections::HashMap::from([("fcm".to_string(), url)]);
+        push_notice(
+            &state.egress_http,
+            &state.store,
+            &relays,
+            &crate::fixture::text("relay-secret"),
+            "ana",
+            &notice(),
+            false,
+            &[],
+        )
+        .await;
+        let seen = seen.lock().unwrap();
+        assert_eq!(
+            seen.len(),
+            1,
+            "only ana's device that has a push target with a relay"
+        );
+        let (signature, body) = &seen[0];
+        assert!(signature_matches(
+            &crate::fixture::text("relay-secret"),
+            body,
+            signature
+        ));
+        let v: Value = serde_json::from_slice(body).unwrap();
+        assert_eq!(
+            (v["device"]["id"].clone(), v["event"].clone()),
+            (json!("a-fcm"), json!("goal.blocked"))
+        );
+        assert!(!v.to_string().contains("relay-secret") && !v.to_string().contains("b-fcm"));
+    }
+
+    #[tokio::test]
+    async fn a_failing_relay_is_journaled_once_and_does_not_stop_the_others() {
+        let (bad, _) = receiver(usize::MAX).await;
+        let (good, seen) = receiver(0).await;
+        let (state, _) = crate::egress::ask_tests::state_and_session_cfg(|_| {}).await;
+        state
+            .store
+            .save_device(device("ana", "a-hms", Some("hms")))
+            .await
+            .unwrap();
+        state
+            .store
+            .save_device(device("ana", "a-fcm", Some("fcm")))
+            .await
+            .unwrap();
+        let relays =
+            std::collections::HashMap::from([("hms".to_string(), bad), ("fcm".to_string(), good)]);
+        push_notice(
+            &state.egress_http,
+            &state.store,
+            &relays,
+            "s",
+            "ana",
+            &notice(),
+            false,
+            &[],
+        )
+        .await;
+        assert_eq!(
+            seen.lock().unwrap().len(),
+            1,
+            "the working relay still got its message"
+        );
+        let journal =
+            serde_json::to_string(&state.store.audit.list(None, 50).await.unwrap()).unwrap();
+        assert!(
+            journal.contains("notice.push") && journal.contains("a-hms"),
+            "{journal}"
+        );
+        assert!(
+            !journal.contains("Goa") && !journal.contains("boom"),
+            "no text in the journal"
+        );
     }
 }

@@ -719,6 +719,38 @@ assert "sk-e2e-secret-key" not in json.dumps(rows), "no key belongs in this requ
 PY
 ok "an agent called ctx.model.chat(): runtime env -> worker -> egress broker -> the socket's endpoint, and the reply came back"
 
+echo "demos-ci: a goal is planned by an agent, and nothing runs until the person accepts the plan"
+GP="$WORK/goal-planner"; cp -R "$ROOT/examples/keep-agents/goal-planner" "$GP"
+python3 - "$GP/pack.json" "$MODEL_PORT" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+m = p["manifest"]
+m.update({"template": "ci", "credentials": ["llm-local"], "egress_mode": "ask", "egress_allow_hosts": ["127.0.0.1"], "allow_private_networks": True})
+m["model_socket"] = {"base_url": "http://127.0.0.1:%s/v1" % sys.argv[2], "model": "tiny-1", "credential": "llm-local"}
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$GP") >"$WORK/goal-planner.out" 2>&1 || fail "goal-planner deploy failed: $(cat "$WORK/goal-planner.out")"
+PGID=$(curl -sf -X POST -H 'content-type: application/json' -d '{"title":"Sort the invoices","description":"two invoices to check","agent":"model-agent"}' "$BASE/v1/goals" | json id) || fail "create the goal to plan"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/goals/$PGID/plan")" == "400" ]] || fail "planning with no planner named or configured must be refused"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"planner":"goal-planner"}' "$BASE/v1/goals/$PGID/plan")" == "202" ]] || fail "asking the planner should be accepted (202)"
+for _ in $(seq 1 100); do
+  curl -sf "$BASE/v1/goals/$PGID" | python3 -c 'import json,sys; sys.exit(0 if "proposed_plan" in json.load(sys.stdin) else 1)' && break; sleep 0.3
+done
+curl -sf "$BASE/v1/goals/$PGID" | python3 -c 'import json,sys
+g=json.load(sys.stdin)
+p=g["proposed_plan"]
+assert [s["title"] for s in p["steps"]]==["Two invoices found","<b>Total</b> due: 4,200 EUR"], p
+assert p["steps"][0]["input"]=={"message":"Two invoices found"} and p["tainted"] is False, p
+assert g["plan"]==[] and g["autorun"] is False, g' || fail "the goal should hold the planner's proposal and nothing else: $(curl -s "$BASE/v1/goals/$PGID")"
+ok "the planner agent proposed steps (from the model socket) and they wait on the goal; the plan is still empty"
+curl -sf "$BASE/v1/audit?limit=500" | python3 -c 'import sys; t=sys.stdin.read(); assert "keep.goal.plan_requested" in t and "keep.goal.plan_proposed" in t; assert "Two invoices found" not in t.replace("Sort the invoices","")' || fail "the journal should record the request and the proposal, not the steps"
+curl -sf -X POST "$BASE/v1/goals/$PGID/plan/accept" | python3 -c 'import json,sys
+g=json.load(sys.stdin)
+assert len(g["plan"])==2 and g["plan"][0]["id"]=="s1" and g["plan"][0]["status"]=="pending" and "proposed_plan" not in g, g' || fail "accepting should turn the proposal into the plan"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/goals/$PGID/plan/accept")" == "409" ]] || fail "a second accept has nothing to accept"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"planner":"goal-planner"}' "$BASE/v1/goals/$PGID/plan")" == "409" ]] || fail "a goal with a plan cannot be planned again"
+ok "the person accepts: the proposal becomes the plan (pending, not running); a goal with a plan is not planned again"
+
 echo "demos-ci: AG-UI (a chat client's run over a Keep session)"
 agui() { curl -sN --max-time 90 -X POST -H 'content-type: application/json' -d "$1" "$BASE/v1/agui"; }
 AGUI_BODY='{"threadId":"t-1","runId":"r-1","messages":[{"id":"m1","role":"user","content":"What is the total due?"}],"state":{},"tools":[],"context":[],"forwardedProps":{"agent":"model-agent"}}'
@@ -1005,7 +1037,11 @@ ok "bundle bytes verify; a one-byte change is refused"
 echo "demos-ci: personal memory (an agent that asked for it, a user who turned it on, proposals the user decides)"
 # its own runtime: the Keep-mode one above limits each user to 3 runs a day for the quota checks further down
 MEM_PORT=$(free_port); MEM_EGRESS=$(free_port); MEM_BASE="http://127.0.0.1:$MEM_PORT"
-start_runtime mem-runtime "$MEM_PORT" "$MEM_EGRESS" ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
+NOTICE_RELAY_PORT=$(free_port)
+RELAY_STUB_LOG="$WORK/notice-relay.log" python3 "$ROOT/agent-runtime/tests/relay_stub.py" "$NOTICE_RELAY_PORT" >"$WORK/notice-relay-stub.log" 2>&1 &
+PIDS+=($!)
+: >"$WORK/notice-relay.log"
+start_runtime mem-runtime "$MEM_PORT" "$MEM_EGRESS" ZYVOR_AGENT_PUSH_RELAYS="{\"fcm\":\"http://127.0.0.1:$NOTICE_RELAY_PORT/push\"}" ZYVOR_AGENT_PUSH_RELAY_SECRET=notice-relay-secret ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
 wait_http "$MEM_BASE/healthz" || fail "the memory-test runtime did not start: $(tail -5 "$WORK/mem-runtime.log")"
 MEMPACK="$WORK/memory-agent"; cp -R "$ROOT/examples/keep-agents/memory-agent" "$MEMPACK"
 printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$MEMPACK/keep.policy.yaml"
@@ -1048,6 +1084,35 @@ r=$(mem_chat "$DAN" mem-6 "what do you remember?"); [[ "$r" == *"do not remember
 mem_api "$CAM" PUT /v1/memory/settings -d '{"enabled":false}' >/dev/null
 r=$(mem_chat "$CAM" mem-7 "what do you remember?"); [[ "$r" == *"do not remember anything"* ]] || fail "turning memory off must stop it reaching the agent: $r"
 ok "another user gets none of it and cannot touch it; turning memory off stops it reaching the agent"
+
+echo "demos-ci: push notices (a suggestion and a finished goal reach the person's phone, generically, and nothing in them can decide anything)"
+NPHONE="node $ROOT/sdk/agent-runtime/src/phone-cli.js"
+$NPHONE keygen "$WORK/cam.key" p256 >/dev/null
+$NPHONE enrol "$WORK/cam.key" cam-phone --push-kind fcm --push-token CAMTOKEN > "$WORK/cam-enrol.json"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' --data-binary @"$WORK/cam-enrol.json" "$MEM_BASE/v1/users/cam/devices")" == "201" ]] || fail "enrolling cam's phone should be 201"
+: >"$WORK/notice-relay.log"
+mem_api "$CAM" PUT /v1/memory/settings -d '{"enabled":true}' >/dev/null
+r=$(mem_chat "$CAM" mem-notice "remember I like the window seat") || fail "the suggesting run failed"
+GN=$(mem_api "$CAM" POST /v1/goals -d '{"title":"Secret plan for Goa","agent":"memory-agent","autorun":true,"plan":[{"title":"go","input":{"message":"what do you remember?"}}]}' | json id) || fail "goal for the notice check"
+for _ in $(seq 1 100); do grep -q '"goal.done"\|goal.done' "$WORK/notice-relay.log" && grep -q "memory.proposed" "$WORK/notice-relay.log" && break; sleep 0.3; done
+python3 - "$WORK/notice-relay.log" <<'PY' || fail "the phone relay did not get the expected notices: $(cat "$WORK/notice-relay.log")"
+import json, sys, hmac, hashlib
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+got = {r["event"]: r for r in rows}
+assert "memory.proposed" in got and "goal.done" in got, [r["event"] for r in rows]
+for ev in ("memory.proposed", "goal.done"):
+    r = got[ev]
+    want = "sha256=" + hmac.new(b"notice-relay-secret", r["body"].encode(), hashlib.sha256).hexdigest()
+    assert r["sig"] == want, "the notice must be signed with the relay secret"
+    b = json.loads(r["body"])
+    assert b["device"]["id"] == "cam-phone" and b["kind"] == "notice", b
+    for absent in ("sign", "decide", "approval"):
+        assert absent not in b, "a notice must not carry anything to decide with: " + absent
+    text = json.dumps(b["ui"])
+    assert "window seat" not in text and "Goa" not in text, "generic text only: " + text
+assert "proposal_id" in json.loads(got["memory.proposed"]["body"])["data"] and "goal_id" in json.loads(got["goal.done"]["body"])["data"]
+PY
+ok "cam's phone got a signed suggestion notice and a goal-done notice with generic text and only ids; nothing in them can decide anything"
 
 echo "demos-ci: a user's own goals (created with their token, run as them, private, cancellable)"
 GID=$(mem_api "$CAM" POST /v1/goals -d '{"title":"Recall","agent":"memory-agent","autorun":true,"plan":[{"title":"recall","input":{"message":"what do you remember?"}}]}' | json id) || fail "a user could not create a goal"

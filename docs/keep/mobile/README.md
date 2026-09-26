@@ -44,6 +44,23 @@ approval opens, for each of the user's devices whose `push.kind` has a relay, Ke
 Keep does **not** embed FCM, Mi Push, HMS, OPPO or vivo push. The relay is a small service you run that turns this
 message into your platform's push. Retries: twice, then an `approval.push` failure is written to the audit journal.
 
+### Notices (not approvals)
+
+The same relays also get **notices**: things a person should know that are not decisions. `x-zyvor-event` is one of `goal.blocked` (a goal stopped on a problem), `goal.done`, `memory.proposed` (an agent suggested a memory entry to review), `run.finished` or `run.failed`. The body is signed exactly like the approval message and looks like this:
+
+```json
+{ "event": "goal.blocked", "channel": "out_of_band", "kind": "notice",
+  "device": { "id": "ana-phone", "user_id": "ana", "push": { "kind": "fcm", "token": "..." } },
+  "ui": { "title": "A goal needs your attention", "body": "Open Keep to see what happened." },
+  "data": { "goal_id": "...", "step_id": "s2" },
+  "note": "A notification only: nothing can be approved or decided from it." }
+```
+
+- **A notice can never decide anything.** It has no `sign`, `decide` or `approval` part; an approval keeps its own signed message (section 3) and is decided only with the phone's key.
+- **Generic text by default.** The title and body say only that something happened. The person's own words (a goal's title, the suggested memory entry, a run's name) go to a push vendor's relay **only if the operator sets `ZYVOR_AGENT_PUSH_NOTICE_TEXT=1`**, and then `ui` carries them. `data` is always ids and flags, never text.
+- Sent to that person's devices that have a push target with a configured relay; best effort with two retries; a relay that finally fails is journaled (`notice.push`, without any text) and does not stop the others.
+- Verified with unit tests (payload shape, per-person routing, a failing relay) and a `demos-ci.sh` check that a suggestion and a finished goal reach an enrolled phone's relay signed, generic, and with nothing to decide with. **Not verified:** a real FCM/APNs relay, or a phone; this repo still has no APNs/FCM sender (see [TODO.md](../TODO.md)).
+
 ## 3. What to sign
 
 `GET /v1/inbox` (with the user's token) returns the pending approvals; each has a `sign` block:
@@ -101,6 +118,10 @@ keep-phone keygen phone.key p256
 keep-phone enrol phone.key ana-phone --push-kind fcm --push-token T   # body your gateway POSTs
 keep-phone decide phone.key ana-phone approval.json approved          # body the phone POSTs
 ```
+
+## Show what the person is approving
+
+An approval from a credential with a `preview` (see [connectors](../connectors/README.md#what-the-person-sees-before-they-approve)) carries `preview: {kind, fields: [{label, value}]}` in `GET /v1/inbox` (and `GET /v1/approvals`). Show those fields, not only the `prompt`: the host rendered them from the real request body (recipients, subject, text; an event's guests and whether they are emailed). The signed `action-sha256` covers `planned_action.preview_sha256`, so what you display is what is signed. The preview is dropped once the approval is decided. The iPhone app in [`integrations/ios-keep`](../../../integrations/ios-keep/) does this.
 
 ## Android sketch (P-256 in the Keystore)
 

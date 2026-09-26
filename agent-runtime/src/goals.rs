@@ -116,6 +116,12 @@ pub struct GoalRecord {
     /// Let the goal worker run the plan step by step (see [`crate::goal_worker`]). Off unless the goal says so.
     #[serde(default)]
     pub autorun: bool,
+    /// The planning session started for this goal that may still propose a plan (see [`crate::goal_plan`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planning_session_id: Option<Uuid>,
+    /// A plan an agent proposed, waiting for the person to accept or reject it. Nothing in it runs until accepted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposed_plan: Option<crate::goal_plan::ProposedPlan>,
     /// How many sessions the worker may start for one step before it blocks the goal (1 to 10).
     #[serde(default = "default_max_attempts")]
     pub max_attempts: u32,
@@ -138,6 +144,8 @@ pub(crate) fn test_goal(plan: Vec<PlanStep>) -> GoalRecord {
         artifact_ids: vec![],
         allow_hosts: vec![],
         autorun: true,
+        planning_session_id: None,
+        proposed_plan: None,
         max_attempts: 3,
         created_at: now,
         updated_at: now,
@@ -297,7 +305,7 @@ pub const USER_MAX_GOALS: usize = 100;
 pub const USER_MAX_ACTIVE_AUTORUN: usize = 5;
 
 /// A user's non-finished goals that the worker is running.
-async fn active_autorun(state: &AppState, user: &str) -> usize {
+pub(crate) async fn active_autorun(state: &AppState, user: &str) -> usize {
     state
         .store
         .list_goals()
@@ -423,6 +431,8 @@ pub(crate) async fn create_goal(
         artifact_ids: vec![],
         allow_hosts: req.allow_hosts,
         autorun: req.autorun,
+        planning_session_id: None,
+        proposed_plan: None,
         max_attempts,
         created_at: now,
         updated_at: now,
@@ -952,6 +962,7 @@ pub(crate) mod tests {
             thread_retention_days: None,
             goal_tick_ms: 5000,
             goal_retry_base_secs: 15,
+            planner_agent: None,
             event_retention_days: None,
             idle_scan_interval_ms: 1000,
             warm_pool_reconcile_interval_ms: 2000,
