@@ -268,6 +268,9 @@ pub struct ListQuery {
     /// Only artifacts created at or after this instant (RFC 3339).
     #[serde(default)]
     pub since: Option<DateTime<Utc>>,
+    /// Goals of this user only. Honoured for the operator; a user token always sees only its own.
+    #[serde(default)]
+    pub user_id: Option<String>,
 }
 
 pub(crate) async fn list_goals(
@@ -278,6 +281,8 @@ pub(crate) async fn list_goals(
     let mut items = state.store.list_goals().await;
     // A user sees only their own goals.
     if let Some(user) = principal.user() {
+        items.retain(|g| g.user_id.as_deref() == Some(user));
+    } else if let Some(user) = q.user_id.as_deref() {
         items.retain(|g| g.user_id.as_deref() == Some(user));
     }
     if let Some(agent) = q.agent.as_deref() {
@@ -1036,6 +1041,7 @@ pub(crate) mod tests {
                 limit: None,
                 use_case: None,
                 since: None,
+                user_id: None,
             }),
         )
         .await;
@@ -1332,6 +1338,7 @@ pub(crate) mod tests {
             limit: None,
             use_case: use_case.map(String::from),
             since,
+            user_id: None,
         };
         let Json(l) = list_artifacts(
             State(state.clone()),

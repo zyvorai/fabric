@@ -216,6 +216,141 @@ input.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftK
 input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 136) + "px"; });
 $("new").addEventListener("click", () => { if (!busy) newChat(); });
 $("back").addEventListener("click", () => { app.classList.add("show-list"); });
+// ---- tabs: chats, goals, memory ----
+const listEl = document.querySelector(".list");
+const tabs = { chats: $("tab-chats"), goals: $("tab-goals"), memory: $("tab-memory") };
+const panes = { chats: $("pane-chats"), goals: $("pane-goals"), memory: $("pane-memory") };
+let tab = "chats", pollTimer = null;
+function showTab(name) {
+  tab = name;
+  for (const k of Object.keys(tabs)) { const on = k === name; tabs[k].classList.toggle("active", on); tabs[k].setAttribute("aria-selected", String(on)); panes[k].hidden = !on; }
+  listEl.classList.toggle("tab-goals", name === "goals"); listEl.classList.toggle("tab-memory", name === "memory");
+  if (name === "goals") refreshGoals(); if (name === "memory") refreshMemory();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (document.hidden) return; if (tab === "goals") refreshGoals(); if (tab === "memory") refreshMemory(); }, 5000);
+}
+for (const k of Object.keys(tabs)) tabs[k].addEventListener("click", () => showTab(k));
+// coming back to a tab that was in the background: catch up at once instead of waiting for the next tick
+document.addEventListener("visibilitychange", () => { if (document.hidden) return; if (tab === "goals") refreshGoals(); if (tab === "memory") refreshMemory(); });
+
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: body === undefined ? {} : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  let data = null;
+  if (res.status !== 204) { try { data = await res.json(); } catch { data = null; } }
+  return { ok: res.ok, status: res.status, data };
+}
+function why(r) { return (r.data && (r.data.error || r.data.message)) ? String(r.data.error || r.data.message) : "The Keep host answered " + r.status + "."; }
+function twoClick(button, label, action) {   // a stray click changes nothing: the first click asks, the second does it
+  button.addEventListener("click", () => {
+    if (!button.classList.contains("sure")) { button.classList.add("sure"); button.textContent = "Sure?"; setTimeout(() => { button.classList.remove("sure"); button.textContent = label; }, 3000); return; }
+    action();
+  });
+}
+
+// ---- goals ----
+const goalsEl = $("goals"), goalsEmpty = $("goals-empty"), goalMsg = $("goal-msg");
+const STEP_ICON = { done: "✓", running: "…", pending: "○", blocked: "!", skipped: "–" };
+let lastGoals = "";
+async function refreshGoals() {
+  const r = await api("GET", "/goals");
+  if (!r.ok) return;
+  const snap = JSON.stringify(r.data.items || []);
+  if (snap === lastGoals) return;   // nothing changed: leave the list (and any half-done two-click) alone
+  lastGoals = snap;
+  renderGoals(r.data.items || []);
+}
+function renderGoals(items) {
+  goalsEl.textContent = ""; goalsEmpty.hidden = items.length > 0;
+  for (const g of items) {
+    const li = el("li", "goal");
+    const top = el("div", "goal-top");
+    top.append(el("span", "goal-title", g.title || "(untitled)"), el("span", "pill " + (g.status || ""), g.status || ""));
+    const plan = g.plan || [];
+    const finished = plan.filter((s) => s.status === "done" || s.status === "skipped").length;
+    const bar = el("div", "bar"); const fill = el("i"); bar.appendChild(fill);
+    bar.style.setProperty("--p", String(plan.length ? Math.round((finished / plan.length) * 100) : 0));
+    bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", String(plan.length)); bar.setAttribute("aria-valuenow", String(finished));
+    const steps = el("ul", "steps");
+    for (const s of plan) {
+      const row = el("li");
+      row.appendChild(el("span", "st " + (s.status || ""), STEP_ICON[s.status] || "○"));
+      const label = el("span", "", s.title || "");
+      if ((s.status === "blocked") && s.detail) label.appendChild(el("span", "why", s.detail));
+      row.appendChild(label); steps.appendChild(row);
+    }
+    li.append(top, bar, el("div", "fine-print", finished + " of " + plan.length + " steps" + (g.autorun ? " · runs automatically" : " · paused")), steps);
+    if (g.status === "open" || g.status === "blocked") {
+      const actions = el("div", "goal-actions");
+      const toggle = el("button", "ghost-btn", g.autorun ? "Pause" : "Run automatically"); toggle.type = "button";
+      toggle.addEventListener("click", async () => { const r = await api("PATCH", "/goals/" + encodeURIComponent(g.id), { autorun: !g.autorun }); if (!r.ok) goalMsg.textContent = why(r); goalMsg.classList.toggle("bad", !r.ok); lastGoals = ""; refreshGoals(); });
+      const cancel = el("button", "ghost-btn", "Cancel goal"); cancel.type = "button";
+      twoClick(cancel, "Cancel goal", async () => { const r = await api("PATCH", "/goals/" + encodeURIComponent(g.id), { status: "cancelled" }); if (!r.ok) goalMsg.textContent = why(r); goalMsg.classList.toggle("bad", !r.ok); lastGoals = ""; refreshGoals(); });
+      actions.append(toggle, cancel); li.appendChild(actions);
+    }
+    goalsEl.appendChild(li);
+  }
+}
+$("goal-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const title = $("goal-title").value.trim();
+  const steps = $("goal-steps").value.split("\n").map((x) => x.trim()).filter(Boolean);
+  const r = await api("POST", "/goals", { title, steps, autorun: $("goal-auto").checked });
+  goalMsg.classList.toggle("bad", !r.ok); goalMsg.textContent = r.ok ? "Added." : why(r);
+  if (r.ok) { $("goal-title").value = ""; $("goal-steps").value = ""; lastGoals = ""; refreshGoals(); }
+});
+
+// ---- memory ----
+const memItems = $("mem-items"), memProps = $("mem-props"), memMsg = $("mem-msg");
+let memEnabled = false, lastMem = "";
+async function refreshMemory() {
+  const r = await api("GET", "/memory");
+  if (!r.ok) return;
+  const snap = JSON.stringify(r.data);
+  if (snap === lastMem) return;
+  lastMem = snap; memEnabled = !!r.data.enabled;
+  $("mem-state").textContent = memEnabled ? "Memory is on" : "Memory is off";
+  $("mem-toggle").textContent = memEnabled ? "Turn off" : "Turn on"; $("mem-toggle").setAttribute("aria-pressed", String(memEnabled));
+  $("mem-body").hidden = !memEnabled;
+  renderMemory(r.data.items || [], r.data.proposals || []);
+}
+function memRow(m, actions) {
+  const li = el("li", "mem-item");
+  const text = el("span", "mem-text", m.text || "");
+  text.appendChild(el("span", "badge", m.kind || "note"));
+  if (m.origin === "agent") text.appendChild(el("span", "badge", "suggested by your agent"));
+  if (m.tainted) text.appendChild(el("span", "badge warn", "came from unverified content"));
+  const box = el("span", "mem-actions"); box.append(...actions);
+  li.append(text, box); return li;
+}
+function renderMemory(items, proposals) {
+  memItems.textContent = ""; memProps.textContent = "";
+  $("mem-props-h").hidden = proposals.length === 0;
+  for (const p of proposals) {
+    const yes = el("button", "ghost-btn", "Accept"); yes.type = "button";
+    yes.addEventListener("click", async () => { const r = await api("POST", "/memory/" + encodeURIComponent(p.id) + "/accept"); if (!r.ok) memMsg.textContent = why(r); lastMem = ""; refreshMemory(); });
+    const no = el("button", "ghost-btn", "Reject"); no.type = "button";
+    no.addEventListener("click", async () => { await api("POST", "/memory/" + encodeURIComponent(p.id) + "/reject"); lastMem = ""; refreshMemory(); });
+    memProps.appendChild(memRow(p, [yes, no]));
+  }
+  $("mem-empty").hidden = items.length > 0 || proposals.length > 0;
+  for (const m of items) {
+    const del = el("button", "ghost-btn", "Forget"); del.type = "button";
+    twoClick(del, "Forget", async () => { await api("DELETE", "/memory/" + encodeURIComponent(m.id)); lastMem = ""; refreshMemory(); });
+    memItems.appendChild(memRow(m, [del]));
+  }
+}
+$("mem-toggle").addEventListener("click", async () => {
+  const r = await api("PUT", "/memory/settings", { enabled: !memEnabled });
+  memMsg.classList.toggle("bad", !r.ok); memMsg.textContent = r.ok ? "" : why(r);
+  lastMem = ""; refreshMemory();
+});
+$("mem-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const r = await api("POST", "/memory", { text: $("mem-text").value, kind: $("mem-kind").value });
+  memMsg.classList.toggle("bad", !r.ok); memMsg.textContent = r.ok ? "Saved." : why(r);
+  if (r.ok) { $("mem-text").value = ""; lastMem = ""; refreshMemory(); }
+});
+
 input.focus();
 refreshHello();
 // on load: reopen the remembered conversation if the host still has it

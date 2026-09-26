@@ -251,6 +251,7 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
             Some(gid) => UserRoute::Goal(gid, Scope::Run),
             None => UserRoute::Denied,
         },
+        ["v1", "whoami"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),
@@ -582,6 +583,12 @@ mod tests {
                 "/v1/goals".into(),
                 UserRoute::Open(Scope::Read),
             ),
+            (
+                Method::GET,
+                "/v1/whoami".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (Method::POST, "/v1/whoami".into(), UserRoute::Denied),
             (
                 Method::POST,
                 "/v1/goals".into(),

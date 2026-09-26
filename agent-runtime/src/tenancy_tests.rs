@@ -1527,6 +1527,22 @@ async fn goals_are_private_bounded_and_only_cancelled_or_paused_by_their_owner()
     )
     .await;
     assert_eq!(st, StatusCode::OK);
+    // the operator can narrow the list to one user; a user token cannot widen it
+    let (_, v) = call(&w.app, "GET", "/v1/goals?user_id=ben", operator, None).await;
+    assert_eq!(ids(&v, "user_id"), ["ben"]);
+    let (_, v) = call(&w.app, "GET", "/v1/goals?user_id=ben", ana, None).await;
+    assert!(
+        ids(&v, "user_id").iter().all(|u| u == "ana"),
+        "a user token ignores user_id"
+    );
+    // who am I
+    let (_, v) = call(&w.app, "GET", "/v1/whoami", ana, None).await;
+    assert_eq!(
+        (v["role"].clone(), v["user_id"].clone()),
+        (json!("user"), json!("ana"))
+    );
+    let (_, v) = call(&w.app, "GET", "/v1/whoami", operator, None).await;
+    assert_eq!(v["role"], "operator");
     let (st, _) = call(&w.app, "GET", "/v1/goals", None, None).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
