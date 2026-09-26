@@ -9,6 +9,12 @@
 //! * `ZYVOR_AGENT_EVENT_RETENTION_DAYS`: the event log of a session that ended that many days ago is deleted. The session record, its
 //!   artifacts and approvals stay.
 //!
+//! * `ZYVOR_AGENT_RECEIPT_RETENTION_DAYS`: action receipts older than that are forgotten. A forgotten receipt no longer answers a repeat of
+//!   its idempotency key, so keep this longer than any agent retries.
+//! * `ZYVOR_AGENT_MEMORY_PROPOSAL_RETENTION_DAYS`: memory proposals nobody accepted or rejected for that long are dropped.
+//! * Always, with no setting: memory entries whose **expiry** the user set have passed are deleted from disk (until now they were only
+//!   hidden). Accepted entries without an expiry are never removed by the sweep.
+//!
 //! Each sweep that removes something is journaled with counts only (`keep.retention.sweep`), never with names or text.
 
 use crate::{audit::AuditPhase, AppState};
@@ -25,6 +31,9 @@ pub struct Swept {
     pub threads: usize,
     pub messages: u64,
     pub event_logs: usize,
+    pub receipts: usize,
+    pub memory_expired: usize,
+    pub memory_proposals: usize,
 }
 
 /// One sweep as of `now`, using the configured periods. Public so a test (or an operator tool) can run it directly.
@@ -62,6 +71,26 @@ pub async fn sweep(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<Swept
             .purge_ended_session_events(now - Days::days(days as i64))
             .await?;
     }
+    if let Some(days) = state.config.receipt_retention_days {
+        swept.receipts = state
+            .store
+            .receipts
+            .purge_before(now - Days::days(days as i64))
+            .await?;
+    }
+    let (expired, stale) = state
+        .store
+        .memory
+        .purge(
+            now,
+            state
+                .config
+                .memory_proposal_retention_days
+                .map(|d| now - Days::days(d as i64)),
+        )
+        .await?;
+    swept.memory_expired = expired;
+    swept.memory_proposals = stale;
     if swept != Swept::default() {
         let _ = state
             .store
@@ -71,7 +100,7 @@ pub async fn sweep(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<Swept
                 AuditPhase::Performed,
                 "keep.retention.sweep",
                 None,
-                json!({ "threads": swept.threads, "messages": swept.messages, "event_logs": swept.event_logs }),
+                json!({ "threads": swept.threads, "messages": swept.messages, "event_logs": swept.event_logs, "receipts": swept.receipts, "memory_expired": swept.memory_expired, "memory_proposals": swept.memory_proposals }),
             )
             .await;
     }
@@ -79,12 +108,11 @@ pub async fn sweep(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<Swept
 }
 
 pub async fn retention_loop(state: Arc<AppState>) {
-    if state.config.thread_retention_days.is_none() && state.config.event_retention_days.is_none() {
-        return;
-    }
     tracing::info!(
         thread_days = ?state.config.thread_retention_days,
         event_days = ?state.config.event_retention_days,
+        receipt_days = ?state.config.receipt_retention_days,
+        memory_proposal_days = ?state.config.memory_proposal_retention_days,
         "retention sweep enabled"
     );
     tokio::time::sleep(Duration::from_secs(60)).await;
@@ -158,7 +186,7 @@ mod tests {
             Swept {
                 threads: 1,
                 messages: 1,
-                event_logs: 0
+                ..Default::default()
             }
         );
         assert!(threads.get(old.id).await.is_none());
@@ -286,5 +314,169 @@ mod tests {
             Swept::default()
         );
         assert!(state.store.threads.get(t.id).await.is_some());
+    }
+
+    fn receipt(user: &str, key: Option<&str>, at: DateTime<Utc>) -> crate::receipts::Receipt {
+        crate::receipts::Receipt {
+            id: uuid::Uuid::new_v4(),
+            at,
+            user_id: Some(user.into()),
+            session_id: uuid::Uuid::new_v4(),
+            agent: "mail".into(),
+            credential: Some("mail".into()),
+            method: "POST".into(),
+            url: "https://mail.example/send".into(),
+            body_bytes: 3,
+            body_sha256: "digest".into(),
+            approval_id: None,
+            idempotency_key: key.map(str::to_string),
+            status: 200,
+            fingerprint: "fp".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn old_receipts_are_forgotten_and_their_keys_can_be_used_again_but_recent_ones_stay() {
+        let (state, _) = state_and_session_cfg(|c| c.receipt_retention_days = Some(30)).await;
+        let r = &state.store.receipts;
+        let now = Utc::now();
+        r.record(receipt("ana", Some("old-key"), now - Days::days(40)))
+            .await
+            .unwrap();
+        r.record(receipt("ana", Some("new-key"), now - Days::days(5)))
+            .await
+            .unwrap();
+        r.record(receipt("ben", None, now - Days::days(50)))
+            .await
+            .unwrap();
+        let scope = |k: &str| crate::receipts::scope_key(Some("ana"), Some("mail"), k);
+        assert!(matches!(
+            r.begin(&scope("old-key"), "fp").await,
+            crate::receipts::Begin::Replay(_)
+        ));
+
+        let swept = sweep(&state, now).await.unwrap();
+        assert_eq!(swept.receipts, 2);
+        assert_eq!(r.list(None, 10).await.len(), 1);
+        assert!(
+            matches!(
+                r.begin(&scope("new-key"), "fp").await,
+                crate::receipts::Begin::Replay(_)
+            ),
+            "a recent key still answers a repeat"
+        );
+        assert!(
+            matches!(
+                r.begin(&scope("old-key"), "fp").await,
+                crate::receipts::Begin::Proceed(_)
+            ),
+            "a forgotten key is free again"
+        );
+        // it is gone from the file too: a restart does not bring it back
+        let reopened = crate::receipts::ReceiptStore::open(state.config.state_dir.join("receipts"))
+            .await
+            .unwrap();
+        assert_eq!(reopened.list(None, 10).await.len(), 1);
+        assert_eq!(
+            sweep(&state, now).await.unwrap().receipts,
+            0,
+            "repeating removes nothing more"
+        );
+    }
+
+    #[tokio::test]
+    async fn receipts_are_kept_when_no_period_is_set() {
+        let (state, _) = state_and_session_cfg(|_| {}).await;
+        state
+            .store
+            .receipts
+            .record(receipt("ana", Some("k"), Utc::now() - Days::days(3000)))
+            .await
+            .unwrap();
+        assert_eq!(sweep(&state, Utc::now()).await.unwrap().receipts, 0);
+        assert_eq!(state.store.receipts.list(None, 10).await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn memory_that_expired_is_deleted_and_stale_proposals_only_when_asked_but_accepted_entries_stay(
+    ) {
+        let (state, _) = state_and_session_cfg(|_| {}).await;
+        let m = &state.store.memory;
+        m.set_enabled("ana", true).await.unwrap();
+        m.set_enabled("ben", true).await.unwrap();
+        let src = || crate::memory::Source::default();
+        let kept = m
+            .add(
+                "ana",
+                "prefers window seats",
+                "preference",
+                false,
+                None,
+                src(),
+            )
+            .await
+            .unwrap();
+        m.add("ana", "trip on the 5th", "note", false, Some(1), src())
+            .await
+            .unwrap();
+        m.propose("ana", "likes aisle seats", "preference", src(), false)
+            .await
+            .unwrap();
+        m.add("ben", "ben's note", "note", false, Some(1), src())
+            .await
+            .unwrap();
+
+        // no proposal period set: only the expired entries go, on both users
+        let later = Utc::now() + Days::days(400);
+        let swept = sweep(&state, later).await.unwrap();
+        assert_eq!((swept.memory_expired, swept.memory_proposals), (2, 0));
+        let ana = m.get("ana").await;
+        assert_eq!(
+            ana.items.len(),
+            2,
+            "the accepted entry and the proposal remain"
+        );
+        assert!(ana.items.iter().any(|i| i.id == kept.id));
+        assert!(m.get("ben").await.items.is_empty());
+        // the file agrees, so a restart does not bring the expired entry back
+        let reopened = crate::memory::MemoryStore::open(state.config.state_dir.join("memory"))
+            .await
+            .unwrap();
+        assert_eq!(reopened.get("ana").await.items.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn unreviewed_proposals_are_dropped_after_the_period_and_never_accepted_entries() {
+        let (state, _) =
+            state_and_session_cfg(|c| c.memory_proposal_retention_days = Some(30)).await;
+        let m = &state.store.memory;
+        m.set_enabled("ana", true).await.unwrap();
+        let src = || crate::memory::Source::default();
+        let kept = m
+            .add("ana", "accepted long ago", "note", false, None, src())
+            .await
+            .unwrap();
+        m.propose("ana", "nobody looked at this", "note", src(), false)
+            .await
+            .unwrap();
+        assert_eq!(
+            sweep(&state, Utc::now() + Days::days(10)).await.unwrap(),
+            Swept::default(),
+            "too new"
+        );
+        let swept = sweep(&state, Utc::now() + Days::days(31)).await.unwrap();
+        assert_eq!((swept.memory_expired, swept.memory_proposals), (0, 1));
+        let left = m.get("ana").await.items;
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].id, kept.id);
+        // the journal has counts, not text
+        let journal =
+            serde_json::to_string(&state.store.audit.list(None, 50).await.unwrap()).unwrap();
+        assert!(
+            journal.contains("memory_proposals")
+                && !journal.contains("nobody looked")
+                && !journal.contains("accepted long ago"),
+            "{journal}"
+        );
     }
 }
