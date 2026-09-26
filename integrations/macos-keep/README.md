@@ -109,7 +109,7 @@ Liquid Glass throughout (cards, buttons, sidebar) in the system accent colour. T
 Verified against a real Keep host with real cells: connecting and listing, running files, batches, the watched-folder flow end to end, the
 email pipeline (page text to `.eml` to a use case), and approval signing against the runtime's own test vectors.
 
-Built but **not verified** here, because each needs your permission or your hardware: reading a real logged-in webmail page (needs
+Built but **not verified** here, because each needs your permission or your hardware (a step-by-step checklist is in [docs/VERIFY.md](docs/VERIFY.md)): reading a real logged-in webmail page (needs
 macOS Automation permission and the browser's "Allow JavaScript from Apple Events"), Siri and Shortcuts registration, the microphone,
 Speech and Translation, the Services entry, the `keep://` URL scheme, and approving a waiting request.
 
