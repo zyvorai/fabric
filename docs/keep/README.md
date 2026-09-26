@@ -284,7 +284,7 @@ Muse got the threat model right. Keep is the version you run, read and take with
 | | Meta Muse | Keep |
 |---|---|---|
 | Where it runs | Meta's cloud only; not self-hostable. | Your hardware, under Apache-2.0. |
-| The cell | Its own dedicated cloud VM; a separate Sentinel runs on the same machine, kept apart from the agent at the system level. How the agent is separated inside that VM is not stated by Meta. | A Firecracker/KVM microVM per cell on FluxVM, with its own kernel; the network policy is applied by the host, outside the guest. |
+| The cell | Its own dedicated cloud VM; a separate Sentinel runs on the same machine, kept apart from the agent at the system level. Meta's announcement does not describe how the agent is separated inside that VM. | A Firecracker/KVM microVM per cell on FluxVM, with its own kernel; the network policy is applied by the host, outside the guest. |
 | Model | Muse Spark, Meta's proprietary model. | Bring your own model socket. |
 | Training data | Users can opt out of interaction data being used for training. | Off by default. Export needs a scoped token. |
 | Policy | Set by Meta. | A signed `keep.policy.yaml` you can diff in git. |
