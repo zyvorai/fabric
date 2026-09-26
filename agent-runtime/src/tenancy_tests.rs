@@ -1731,4 +1731,19 @@ async fn a_plan_is_proposed_by_the_planner_and_only_the_owner_can_accept_or_reje
     )
     .await;
     assert_eq!(st, StatusCode::CONFLICT);
+    // a late proposal does not replace the accepted plan
+    let mut goal = w.state.store.get_goal(uid).await.unwrap();
+    goal.planning_session_id = Some(ana_session.id);
+    w.state.store.save_goal(goal).await.unwrap();
+    crate::goal_plan::record_proposal(
+        &w.state,
+        &ana_session,
+        &json!({"steps": [{"title": "late"}]}),
+    )
+    .await;
+    let (_, v) = call(&w.app, "GET", &format!("/v1/goals/{gid}"), ana, None).await;
+    assert!(
+        v.get("proposed_plan").is_none() && v["plan"].as_array().unwrap().len() == 2,
+        "{v}"
+    );
 }
