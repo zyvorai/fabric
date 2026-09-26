@@ -6,6 +6,8 @@
   "hostname": "node22-agent",
   "packages": [
     "poppler-utils",
+    "tesseract-ocr",
+    "tesseract-ocr-eng",
     "ca-certificates",
     "xz-utils"
   ],
@@ -17,6 +19,7 @@
     "chown -R agent:agent /home/agent",
     "/usr/local/bin/node --version",
     "command -v pdftotext",
+    "command -v tesseract",
     "rm -f /root/node.tar.xz"
   ],
   "copy_in": [

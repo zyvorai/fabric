@@ -205,6 +205,8 @@ class Handler(BaseHTTPRequestHandler):
             return {"stdout": ""}
         allowed = (
             re.fullmatch(rf"pdftotext -layout {re.escape(guest)}/input\.pdf - 2>/dev/null \| head -c \d+", command)
+            or re.fullmatch(rf"tesseract {re.escape(guest)}/input\.img stdout -l eng --psm 4 2>/dev/null \| head -c \d+", command)
+            or re.fullmatch(r"command -v (pdftotext|tesseract)", command)
             or re.fullmatch(rf"head -c \d+ {re.escape(guest)}/input\.(txt|log|json|csv)", command)
             or re.fullmatch(rf"node {re.escape(guest)}/extract\.mjs {re.escape(guest)}/input\.(html|eml|docx|xlsx|pptx)", command)
         )

@@ -15,6 +15,10 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **OCR for photos and screenshots.** A new `ocr` extractor reads `.png`, `.jpg` and `.tif` with `tesseract` (English) inside the cell, and two packs use it: `receipt-photo`
+  and `bill-photo`. The `node22-agent` template gains `tesseract-ocr`; a template baked earlier refuses an image run with a clear message instead of failing. Quality depends
+  on the picture (check amounts against the original); scanned PDFs, HEIC and other languages are not read. Verified with real tesseract through the runtime (a generated
+  receipt image and a blank one), not yet in a real FluxVM cell.
 - **Solvor**, the Mac app, (`integrations/macos-keep`): a native SwiftUI client. `KeepKit` (API client, Keychain token store, Secure Enclave approval
   signing checked against the runtime's test vectors, secret scan, folder rules, pack catalogue; 33 unit tests, 4 live tests passed against a real
   host) and the app (use cases, runs and compare, approvals, watch folders, menu bar, Services entry, Shortcuts intent, `keep://`). Ad-hoc signed,

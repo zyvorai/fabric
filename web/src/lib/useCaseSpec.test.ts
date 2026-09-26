@@ -97,6 +97,7 @@ describe('useCaseSpec', () => {
       ['docx', ['docx']],
       ['xlsx', ['xlsx']],
       ['pptx', ['pptx']],
+      ['ocr', ['png', 'jpg', 'jpeg', 'tif', 'tiff']],
       ['html', ['html', 'htm']],
       ['eml', ['eml', 'mbox']],
     ] as const) {

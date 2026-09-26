@@ -259,6 +259,28 @@ b=$(body_of pptx-check "$WORK/t.pptx");  echo "$b" | grep -qF "1× 50,000" || fa
 (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy examples/keep-agents/deck-outline) > "$WORK/pack-deck.out" 2>&1 || fail "deck-outline: pack deploy failed: $(cat "$WORK/pack-deck.out")"
 b=$(body_of deck-outline "$WORK/t.pptx"); echo "$b" | grep -qF "2 slides" && echo "$b" | grep -qF "Say the number twice" && echo "$b" | grep -qF "1× 50,000 EUR" || fail "deck-outline: slide count, notes or amount missing: $b"
 ok "deck-outline: slide count, amounts, open points and speaker notes read from a pptx, 0 CONNECT"
+# OCR: needs tesseract and Pillow on the runner (the stub runs the same fixed command a cell would). Skipped where either is missing.
+if command -v tesseract >/dev/null && python3 -c 'import PIL' 2>/dev/null; then
+  python3 - "$WORK/receipt.png" <<'PY'
+import sys
+from PIL import Image, ImageDraw, ImageFont
+lines = ["GREEN LEAF STORES", "Bill no 20481   Date 12/09/2026", "Item 1  Oat milk   Rs 6.40", "Subtotal Rs 416.40", "Total Rs 437.22", "Returns accepted within 14 days"]
+img = Image.new("RGB", (1000, 70 + len(lines) * 52), "white"); d = ImageDraw.Draw(img); f = ImageFont.load_default(34)
+for i, l in enumerate(lines): d.text((30, 30 + i * 52), l, fill="black", font=f)
+img.save(sys.argv[1])
+PY
+  (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy examples/keep-agents/receipt-photo) > "$WORK/pack-ocr.out" 2>&1 || fail "receipt-photo: pack deploy failed: $(cat "$WORK/pack-ocr.out")"
+  b=$(body_of receipt-photo "$WORK/receipt.png"); echo "$b" | grep -qF "437.22" && echo "$b" | grep -qiF "Returns accepted" || fail "receipt-photo: total or return terms not read from the image: $b"
+  ok "receipt-photo: a photo read by OCR in the cell, total and return terms found, 0 CONNECT"
+  # An image that has no text is refused, never guessed.
+  python3 -c 'from PIL import Image; Image.new("RGB",(200,200),"white").save("'"$WORK"'/blank.png")'
+  code=$(curl -s -o "$WORK/blank.json" -w '%{http_code}' -X POST -F "file=@$WORK/blank.png" "$BASE/v1/demos/receipt-photo")
+  [[ "$code" == "400" ]] && grep -q "No text could be read" "$WORK/blank.json" || fail "a blank image should be refused with 400 and a reason (got $code): $(cat "$WORK/blank.json")"
+  ok "receipt-photo: a blank image is refused with a reason, not guessed"
+  curl -sf -X DELETE "$BASE/v1/demos/receipt-photo" >/dev/null || fail "delete receipt-photo"
+else
+  echo "  skip receipt-photo (tesseract or Pillow not installed)"
+fi
 b=$(body_of html-check "$WORK/t.html");  echo "$b" | grep -qi "db-1 is DOWN" || fail "html: $b"; echo "$b" | grep -q "steal" && fail "html script leaked into the summary"; ok "html extracted, script dropped"
 b=$(body_of mbox-check "$WORK/t.mbox");  echo "$b" | grep -qF "Please pay 300 EUR" || fail "mbox: $b"; echo "$b" | grep -qF "1× Lunch" || fail "mbox subjects: $b"; ok "mbox: both messages read, headers and body"
 b=$(body_of json-check "$WORK/t.json");  echo "$b" | grep -qF "vendor.name\`: Acme" || fail "json_path: $b"; echo "$b" | grep -qF "a; b" || fail "json_path wildcard: $b"; ok "json_path reads keys and wildcards"

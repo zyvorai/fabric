@@ -47,7 +47,8 @@ Extractors:
 | `extract` | Reads | Upload limit (default / largest) | Notes |
 |---|---|---|---|
 | `text` | Any text file | 200 KB / 300 KB | Not `pdf`, `docx`, `xlsx`, `pptx` or `zip` |
-| `pdftotext` | `.pdf` | 8 MiB / 32 MiB | Needs poppler in the template. A scan has no text layer and is refused: Keep does no OCR |
+| `pdftotext` | `.pdf` | 8 MiB / 32 MiB | Needs poppler in the template. A scanned PDF has no text layer and is refused; export its pages as images and use `ocr` |
+| `ocr` | `.png`, `.jpg`, `.jpeg`, `.tif`, `.tiff` | 4 MiB / 16 MiB | Photos and screenshots, read by `tesseract` (English, `--psm 4`) in the cell; needs `tesseract-ocr` in the template. Quality depends on the picture, so check amounts against the original. HEIC is not read (share as JPEG). No bundled sample |
 | `docx` | `.docx` | 4 MiB / 16 MiB | Paragraph and table text |
 | `xlsx` | `.xlsx` | 4 MiB / 16 MiB | First sheet only, as CSV (up to 5000 rows), so `csv_columns` and `table` read it |
 | `pptx` | `.pptx` | 4 MiB / 16 MiB | Slide text in presentation order (`## Slide N`) and each slide's speaker notes (`Notes: ...`); slide-number fields dropped. The legacy binary `.ppt` is not read |

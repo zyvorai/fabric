@@ -133,6 +133,7 @@ export default function DeployUseCase({ onDeployed, onError }: Props) {
                 <option value="docx">Word (.docx)</option>
                 <option value="xlsx">Excel (.xlsx, first sheet)</option>
                 <option value="pptx">PowerPoint (.pptx, slides and notes)</option>
+                <option value="ocr">Photo or screenshot (OCR, English)</option>
                 <option value="html">HTML page</option>
                 <option value="eml">Email (.eml / .mbox)</option>
               </select>
