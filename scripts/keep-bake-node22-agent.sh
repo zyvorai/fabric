@@ -8,7 +8,7 @@
 # Run on the FluxVM host, as a user with sudo:
 #   ./scripts/keep-bake-node22-agent.sh              # download Node, build the image, register the template
 #   ./scripts/keep-bake-node22-agent.sh --dry-run    # print the plan and what is missing; change nothing
-#   ./scripts/keep-bake-node22-agent.sh --force      # rebuild even if the image exists
+#   ./scripts/keep-bake-node22-agent.sh --force      # rebuild into a NEW image next to the old one and point the template at it
 #
 # Environment overrides are listed in agent-runtime/templates/node22-agent/README.md.
 set -euo pipefail
@@ -18,11 +18,16 @@ SRC="$ROOT/agent-runtime/templates/node22-agent"
 NODE_VERSION="${KEEP_NODE_VERSION:-22.11.0}"
 NODE_TAR="${KEEP_NODE_TAR:-/tmp/node.tar.xz}"
 NODE_URL="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
-OUT_IMG="${KEEP_NODE_OUT:-/var/lib/fluxvm/images/node22-agent.qcow2}"
+IMG_DIR="${KEEP_NODE_IMAGES_DIR:-/var/lib/fluxvm/images}"
+OUT_IMG_SET="${KEEP_NODE_OUT:-}"
+OUT_IMG="${KEEP_NODE_OUT:-$IMG_DIR/node22-agent.qcow2}"
 TDIR="${KEEP_NODE_TEMPLATE_DIR:-/var/lib/fluxvm/templates/node22-agent}"
 GUEST_AGENT="${KEEP_NODE_GUEST_AGENT:-/usr/local/bin/fluxvm-guest-agent}"
 BASE_IMG="${KEEP_NODE_BASE_IMG:-}"
 FLUX_CONFIG="${KEEP_FLUXVM_CONFIG:-/etc/fluxvm.toml}"
+# sudo unless already root; KEEP_SUDO="" also disables it (used by the tests)
+SUDO="${KEEP_SUDO-sudo}"
+[[ "$(id -u)" == 0 ]] && SUDO=""
 DRY=0
 FORCE=0
 for arg in "$@"; do
@@ -33,6 +38,14 @@ for arg in "$@"; do
     *) echo "unknown option: $arg" >&2; exit 64 ;;
   esac
 done
+
+# --force never rebuilds in place: FluxVM keeps a running or stale qemu-nbd attached to the old image, and qemu-img then fails with
+# 'Failed to get "write" lock'. Build a fresh, timestamped image beside it and re-point the template; the old image stays for rollback.
+PREV_IMG=""
+if [[ "$FORCE" == 1 && -z "$OUT_IMG_SET" && -f "$OUT_IMG" ]]; then
+  PREV_IMG="$OUT_IMG"
+  OUT_IMG="${OUT_IMG%.qcow2}-$(date +%Y%m%d%H%M%S).qcow2"
+fi
 
 FLUX=""
 for c in fluxctl fluxvm; do command -v "$c" >/dev/null 2>&1 && { FLUX=$c; break; }; done
@@ -62,7 +75,8 @@ if [[ ! -f "$NODE_TAR" ]]; then
   echo "    (will download $NODE_URL)"
   command -v curl >/dev/null || need "curl (to fetch Node)"
 fi
-if [[ -f "$OUT_IMG" && "$FORCE" == 0 ]]; then echo "    image exists: the build will be skipped (use --force to rebuild)"; fi
+if [[ -f "$OUT_IMG" && "$FORCE" == 0 ]]; then echo "    image exists: the build will be skipped (use --force to build a new image beside it)"; fi
+if [[ -n "$PREV_IMG" ]]; then echo "    --force: a new image will be built at $OUT_IMG; $PREV_IMG is left untouched"; fi
 
 if (( problems > 0 )); then echo "==> $problems problem(s) above" >&2; exit 1; fi
 if (( DRY )); then echo "==> dry run: nothing changed"; exit 0; fi
@@ -93,15 +107,17 @@ spec["pins"] = {"node": f"v{version}"}
 json.dump(spec, open(dest, "w"), indent=2)
 PY
   echo "==> building the image (a few minutes; needs several GiB free)"
-  sudo "$FLUX" --config "$FLUX_CONFIG" build-image --spec "$BUILD"
+  $SUDO "$FLUX" --config "$FLUX_CONFIG" build-image --spec "$BUILD"
 else
   echo "==> image already present: skipping the build"
 fi
 
 echo "==> registering the template"
-sudo mkdir -p "$TDIR"
-sudo cp "$SRC/spec.json" "$TDIR/spec.json"
-sudo python3 - "$TDIR/spec.json" "$OUT_IMG" <<'PY'
+$SUDO mkdir -p "$TDIR"
+# keep the spec we are replacing, so a bad image can be rolled back by copying it back
+[[ -f "$TDIR/spec.json" ]] && $SUDO cp "$TDIR/spec.json" "$TDIR/spec.json.prev"
+$SUDO cp "$SRC/spec.json" "$TDIR/spec.json"
+$SUDO python3 - "$TDIR/spec.json" "$OUT_IMG" <<'PY'
 import json, sys
 path, image = sys.argv[1:]
 d = json.load(open(path))
@@ -117,5 +133,10 @@ if command -v curl >/dev/null 2>&1; then
     echo "Registered, but FluxVM did not list it yet (restart the control plane if it does not appear):"
     echo "  curl -s http://127.0.0.1:7788/v1/templates"
   fi
+fi
+if [[ -n "$PREV_IMG" ]]; then
+  echo "The previous image is still at $PREV_IMG."
+  echo "  Roll back:  sudo cp $TDIR/spec.json.prev $TDIR/spec.json"
+  echo "  Clean up:   sudo rm $PREV_IMG    (only once no VM or qemu-nbd uses it: lsof $PREV_IMG)"
 fi
 echo "Next: ./scripts/keep-demo.sh csv-clean"
