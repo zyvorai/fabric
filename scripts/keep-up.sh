@@ -12,7 +12,7 @@
 # Options: --user-id ID (default: the login name), --ttl-days N (1-7, default 7), --no-template
 #
 # It does, in order: (1) preflight, (2) FluxVM check (or install), (3) the node22-agent cell template (scripts/keep-bake-node22-agent.sh, with poppler and tesseract),
-# (4) the Keep runtime via `deploy-keep.sh local` (its smoke test needs the template), (5) a scoped user
+# (4) the Keep runtime via `deploy-keep.sh local` (its smoke test needs the template), (5) the SDK's npm packages for `keepctl deploy`, (6) a scoped user
 # token, printed once with the exact Solvor settings. Nothing leaves this machine; the token is not written to disk.
 # The cell is sealed only when KVM is present: the preflight refuses without it rather than pretend.
 # ============================================================================
@@ -164,6 +164,19 @@ phase_runtime() {
   "$SCRIPT_DIR/deploy-keep.sh" local
 }
 
+# keepctl deploy (custom packs and agents) bundles with esbuild from the SDK, which needs its npm packages once.
+# Not needed for the built-in use cases, so a failure here is reported but does not stop the run.
+phase_sdk() {
+  step "SDK for keepctl deploy (your own packs and agents)"
+  local sdk="$SCRIPT_DIR/../sdk/agent-runtime"
+  if [[ -d "$sdk/node_modules/esbuild" ]]; then ok "already installed"; return; fi
+  if [[ "$DRY" == 1 ]]; then info "would run: npm ci in $sdk (as $LOGIN_NAME)"; return; fi
+  local run=(npm ci --no-audit --no-fund)
+  if [[ "$(id -u)" == 0 && -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]]; then run=(sudo -u "$SUDO_USER" -H env "PATH=$PATH" "${run[@]}"); fi
+  if ( cd "$sdk" && "${run[@]}" ) >/dev/null 2>&1; then ok "installed"
+  else info "npm ci failed in $sdk: run it yourself before 'keepctl deploy' (the built-in use cases do not need it)"; fi
+}
+
 fluxctl_profile_enforced() {
   [[ -n "${KEEP_UP_AA_ENFORCED:-}" ]] && { [[ "$KEEP_UP_AA_ENFORCED" == 1 ]]; return; }
   [[ -r /sys/kernel/security/apparmor/profiles ]] && $SUDO grep -q '^fluxctl (enforce)' /sys/kernel/security/apparmor/profiles 2>/dev/null
@@ -220,6 +233,7 @@ if (( PROBLEMS > 0 )); then echo; echo "==> $PROBLEMS problem(s) above; nothing 
 phase_template   # before the runtime: its deploy ends with a smoke test that needs the template
 if (( PROBLEMS > 0 )) && [[ "$DRY" == 0 ]]; then echo; echo "==> $PROBLEMS problem(s) above; the runtime was not deployed" >&2; exit 1; fi
 phase_runtime
+phase_sdk
 phase_token
 (( PROBLEMS == 0 )) || exit 1
 [[ "$DRY" == 1 ]] && echo && echo "==> dry run: nothing changed"

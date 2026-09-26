@@ -43,7 +43,7 @@ ok "too little memory or disk is refused"
 
 # 4. a healthy host: --dry-run prints the whole plan and changes nothing
 out=$(up --dry-run) || fail "dry run on a healthy host failed: $out"
-for want in "FluxVM answers" "deploy-keep.sh local" "node22-agent is already registered" "would mint a 7-day user token" "dry run: nothing changed"; do
+for want in "FluxVM answers" "deploy-keep.sh local" "SDK for keepctl deploy" "node22-agent is already registered" "would mint a 7-day user token" "dry run: nothing changed"; do
   grep -qF "$want" <<<"$out" || fail "dry run is missing '$want': $out"
 done
 [[ ! -e "$FAKE_BODY" ]] || fail "a dry run must not call the token endpoint"
