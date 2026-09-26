@@ -25,7 +25,7 @@ struct ResultView: View {
                 case .failed(let message):
                     Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.red).textSelection(.enabled)
                 case .done(let outcome):
-                    ProofPill(egress: outcome.egressConnects, evidence: outcome.items.first?.result?.badge?.evidence)
+                    ProofPill(egress: outcome.egressConnects, evidence: outcome.items.first?.result?.badge?.evidence, simulated: outcome.isSimulated)
                     ForEach(Array(outcome.items.enumerated()), id: \.offset) { _, item in FileResultCard(item: item) }
                 }
             }

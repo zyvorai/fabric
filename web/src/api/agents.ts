@@ -198,6 +198,8 @@ export interface DemoResult {
   artifacts?: Array<{ id: string; title: string; kind: string }>
   egress_connects?: number
   honesty?: string
+  /** `sealed: false` (evidence `simulated`) means the local simulator ran it: no VM, no network policy. */
+  badge?: { evidence?: string; sealed?: boolean }
   /** 0 or 1: extracted text sent to a model by the host (the cell itself stays offline). */
   model_calls?: number
   model?: { host: string; model: string; first_use_approved: boolean } | null

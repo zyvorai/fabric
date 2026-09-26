@@ -15,6 +15,10 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **`scripts/keep-demo-local.sh`, a two-minute local demo that is honest about what it is.** Starts the FluxVM simulator (`agent-runtime/tests/sandbox_stub.py`) and the runtime on loopback with no KVM, Docker or root, mints a 1-day
+  user token and prints how to try a use case and how to connect Solvor. It is **not sealed**: the simulator marks its sandboxes `simulated`, and the runtime then reports `badge.evidence: "simulated"`,
+  `badge.sealed: false` and an honesty line that starts `SIMULATED, not sealed` (never the software-test wording). Solvor shows an amber "Simulated, not sealed" pill instead of the proof pill, the console shows a warning,
+  and `keep-demo.sh` says so. Tested: runtime unit tests for the badge, a demos-ci check that every simulator run is labelled, a KeepKit test (55 tests) and `keep-demo-local.sh` run end to end on a Mac.
 - **`scripts/keep-up.sh`, a one-command Keep host.** Run on a Linux machine: preflight (Linux, x86_64, KVM, systemd, memory, disk, tools; refuses honestly), FluxVM check
   or `--install-fluxvm` (experimental, from source), the Keep runtime via the new `deploy-keep.sh local`, the cell template, then a scoped 1-7 day user token and the exact Solvor
   settings. `deploy-keep.sh` gains a `local` target and no longer requires fabricd. Tested with fake facts and a fake curl (6 checks); not yet run on a clean machine.

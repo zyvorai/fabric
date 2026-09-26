@@ -117,7 +117,8 @@ class Handler(BaseHTTPRequestHandler):
             record("created", {"vm": sandbox_id, "name": body.get("name", "")})
             self._send(
                 200,
-                {"id": sandbox_id, "guest_ip": "127.0.0.1", "status": "running"},
+                # `simulated` makes the runtime label every run here as not sealed (see agent-runtime/src/demos.rs `run_badge`).
+                {"id": sandbox_id, "guest_ip": "127.0.0.1", "status": "running", "simulated": True},
             )
             return
 

@@ -135,9 +135,17 @@ if [[ "$HAVE_PDF" == "1" ]]; then
   ok "pdf-brief with its built-in sample"
 fi
 out="$("$DEMO" csv-clean 2>&1)" || fail "keep-demo.sh csv-clean: $out"
-echo "$out" | grep -q "0 CONNECT" || fail "keep-demo.sh did not report 0 CONNECT: $out"
+# this script runs against the simulator, which must say so rather than present its count as proof
+echo "$out" | grep -q "SIMULATED, not sealed" || fail "keep-demo.sh did not say the run is simulated: $out"
+echo "$out" | grep -q "0 CONNECT" && fail "keep-demo.sh claimed 0 CONNECT for a simulated run: $out"
 "$DEMO" list | grep -q "^csv-clean" || fail "keep-demo.sh list missing csv-clean"
 ok "keep-demo.sh run and list"
+# every run in the simulator is labelled: evidence 'simulated', not sealed, and an honesty line that does not borrow the sealed wording
+resp=$(curl -sf -X POST -F "note=none" "$BASE/v1/demos/csv-clean") || fail "csv-clean sample run failed"
+[[ "$(echo "$resp" | json badge.evidence)" == "simulated" ]] || fail "a simulated run must not carry software-test evidence: $resp"
+[[ "$(echo "$resp" | json badge.sealed)" == "False" ]] || fail "a simulated run must say sealed=false: $resp"
+echo "$resp" | json honesty | grep -q "^SIMULATED, not sealed" || fail "honesty line does not say SIMULATED: $resp"
+ok "a run in the simulator is labelled simulated and not sealed"
 
 echo "demos-ci: run history, diff and keepctl verbs"
 printf 'name,qty\nAnn,1\nBob,2\n' > "$WORK/h1.csv"

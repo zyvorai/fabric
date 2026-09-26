@@ -29,8 +29,13 @@ struct DemosResponse: Codable { var demos: [Demo] }
 
 public struct Badge: Codable, Equatable, Sendable {
     public var evidence: String?
+    /// `false` for a run in the local simulator (`scripts/keep-demo-local.sh`): no VM, no network policy. Absent on older hosts, which are real cells.
+    public var sealed: Bool?
     public var operatorCanRead: Bool?
     public var proxy: String?
+
+    /// A simulated run must never be presented as proof of anything.
+    public var isSimulated: Bool { sealed == false || evidence == "simulated" }
 }
 
 public struct ArtifactRef: Codable, Equatable, Hashable, Identifiable, Sendable {
@@ -87,6 +92,8 @@ public enum RunOutcome: Equatable, Sendable {
         case .batch(let b): return b.egressConnects
         }
     }
+    /// True when any file ran in the local simulator, which must be shown as "not sealed" instead of the proof.
+    public var isSimulated: Bool { items.contains { $0.result?.badge?.isSimulated == true } }
 }
 
 public struct Artifact: Codable, Equatable, Hashable, Identifiable, Sendable {

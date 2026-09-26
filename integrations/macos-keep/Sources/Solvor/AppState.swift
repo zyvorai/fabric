@@ -161,7 +161,7 @@ final class AppState: ObservableObject {
         jobs[i].state = state
         if notify {
             switch state {
-            case .done(let o): Notifier.post(title: "Keep: \(jobs[i].demo)", body: "\(o.items.filter(\.ok).count) of \(o.items.count) done, \(o.egressConnects) outbound connections")
+            case .done(let o): Notifier.post(title: "Keep: \(jobs[i].demo)", body: "\(o.items.filter(\.ok).count) of \(o.items.count) done, " + (o.isSimulated ? "simulated, not sealed" : "\(o.egressConnects) outbound connections"))
             case .failed(let m): Notifier.post(title: "Keep: run failed", body: m)
             case .running: break
             }

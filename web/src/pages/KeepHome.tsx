@@ -328,6 +328,11 @@ export default function KeepHome() {
 
           {result && !error && (
             <div className="text-sm space-y-2 border-t border-[var(--zf-hairline)] pt-3">
+              {result.badge?.sealed === false ? (
+                <div role="alert" className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+                  <strong>Simulated, not sealed.</strong> {result.honesty}
+                </div>
+              ) : null}
               <div>
                 {t('home.connects')}: <code className="font-mono">{result.egress_connects ?? 0}</code>
                 {result.model ? (

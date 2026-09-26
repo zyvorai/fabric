@@ -888,6 +888,7 @@ async fn run_demo_inner(
         )
         .await
         .map_err(|e| ApiError::bad_gateway(format!("sandbox create: {e:#}")))?;
+    let simulated = sandbox.simulated;
 
     // Confine the cell on the host before any guest work, and fail closed. A use-case cell needs no IP
     // networking (the host reaches it over vsock), so the policy denies everything and needs no gateway.
@@ -1168,13 +1169,7 @@ async fn run_demo_inner(
             })).collect::<Vec<_>>(),
             "egress_connects": connects,
             "cockpit_url": format!("/app/keep/{id}"),
-            "badge": {
-                "evidence": "software-test",
-                "operator_can_read": true,
-                "proxy": "strict",
-                "browser": "none",
-                "model": model_outcome.as_ref().map(|m| m.host.clone()),
-            },
+            "badge": run_badge(simulated, model_outcome.as_ref().map(|m| m.host.as_str())),
             "model_calls": u32::from(model_outcome.is_some()),
             "model": model_outcome.as_ref().map(|m| json!({
                 "host": m.host,
@@ -1183,15 +1178,40 @@ async fn run_demo_inner(
                 "response_bytes": m.response_bytes,
                 "first_use_approved": m.approved_now,
             })),
-            "honesty": match &model_outcome {
-                Some(m) => format!(
-                    "software-test · operator can read · 0 CONNECT from the cell · extracted text sent to {}",
-                    m.host
-                ),
-                None => "software-test · operator can read · 0 CONNECT".to_string(),
-            },
+            "honesty": run_honesty(simulated, model_outcome.as_ref().map(|m| m.host.as_str())),
         })),
     ))
+}
+
+/// The evidence badge of a run. A run in the local simulator is `simulated` and says it is not sealed; nothing else about it is claimed.
+fn run_badge(simulated: bool, model_host: Option<&str>) -> Value {
+    json!({
+        "evidence": if simulated { "simulated" } else { "software-test" },
+        "sealed": !simulated,
+        "operator_can_read": true,
+        "proxy": "strict",
+        "browser": "none",
+        "model": model_host,
+    })
+}
+
+/// The one-line honesty note shown with a result.
+fn run_honesty(simulated: bool, model_host: Option<&str>) -> String {
+    if simulated {
+        let sent = model_host
+            .map(|h| format!(" Extracted text was sent to {h}."))
+            .unwrap_or_default();
+        return format!(
+            "SIMULATED, not sealed: this ran on the operator's own machine with no VM and no network policy. \
+             The connection count is not evidence. Use a Keep host with FluxVM for a sealed cell.{sent}"
+        );
+    }
+    match model_host {
+        Some(host) => format!(
+            "software-test · operator can read · 0 CONNECT from the cell · extracted text sent to {host}"
+        ),
+        None => "software-test · operator can read · 0 CONNECT".to_string(),
+    }
 }
 
 pub async fn session_egress_connects(state: &AppState, session_id: Uuid) -> u64 {
@@ -1383,6 +1403,37 @@ mod tests {
         file: Option<(&str, &[u8])>,
     ) -> Result<(StatusCode, Json<Value>), ApiError> {
         run_in(crate::goals::tests::test_state().await, id, file).await
+    }
+
+    #[test]
+    fn a_simulated_run_never_claims_to_be_sealed() {
+        let b = run_badge(true, None);
+        assert_eq!(b["evidence"], "simulated");
+        assert_eq!(b["sealed"], false);
+        let h = run_honesty(true, Some("api.example"));
+        assert!(h.starts_with("SIMULATED, not sealed"), "{h}");
+        // the simulated line must not borrow the sealed run's wording
+        assert!(
+            !h.contains("software-test") && !h.contains("0 CONNECT"),
+            "{h}"
+        );
+        assert!(
+            h.ends_with("Extracted text was sent to api.example."),
+            "{h}"
+        );
+    }
+
+    #[test]
+    fn a_real_cell_run_keeps_its_software_test_badge() {
+        let b = run_badge(false, None);
+        assert_eq!(b["evidence"], "software-test");
+        assert_eq!(b["sealed"], true);
+        assert_eq!(b["operator_can_read"], true);
+        assert_eq!(
+            run_honesty(false, None),
+            "software-test · operator can read · 0 CONNECT"
+        );
+        assert!(run_honesty(false, Some("m.example")).ends_with("extracted text sent to m.example"));
     }
 
     fn status_of(e: ApiError) -> StatusCode {

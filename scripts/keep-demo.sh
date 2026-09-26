@@ -57,4 +57,10 @@ if [[ "$CONN" != "0" ]]; then
   echo "FAIL: egress_connects=$CONN" >&2
   exit 2
 fi
+SEALED=$(echo "$OUT" | python3 -c "import json,sys; print(str(json.load(sys.stdin).get('badge', {}).get('sealed', True)).lower())")
+if [[ "$SEALED" == "false" ]]; then
+  # a local simulator (scripts/keep-demo-local.sh), not a FluxVM cell: never present its count as proof
+  echo "OK — $ARTS ready. SIMULATED, not sealed: no VM and no network policy, so the connection count is not evidence"
+  exit 0
+fi
 echo "OK — $ARTS ready, 0 CONNECT"
