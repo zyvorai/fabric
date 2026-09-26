@@ -7,7 +7,7 @@
  * agent-runtime/src/demo_rules.rs; the server re-validates everything.
  */
 
-export type Extractor = 'pdftotext' | 'text' | 'html' | 'eml' | 'docx' | 'xlsx' | 'pptx'
+export type Extractor = 'pdftotext' | 'text' | 'html' | 'eml' | 'docx' | 'xlsx' | 'pptx' | 'ocr'
 
 /** Extractors that read one fixed kind of file, and the extensions they take. */
 export const FIXED_ACCEPTS: Partial<Record<Extractor, string[]>> = {
@@ -17,6 +17,7 @@ export const FIXED_ACCEPTS: Partial<Record<Extractor, string[]>> = {
   docx: ['docx'],
   xlsx: ['xlsx'],
   pptx: ['pptx'],
+  ocr: ['png', 'jpg', 'jpeg', 'tif', 'tiff'],
 }
 
 export type Rule =

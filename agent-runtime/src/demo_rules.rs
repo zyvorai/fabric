@@ -45,6 +45,8 @@ pub enum Extractor {
     Xlsx,
     /// Slide text and speaker notes of a PowerPoint `.pptx`, in presentation order.
     Pptx,
+    /// Text in a photo or scan (`.png`, `.jpg`, `.tif`), read by `tesseract` in the cell (needs tesseract in the template).
+    Ocr,
 }
 
 /// The fixed Node scripts the guest runs for the non-PDF extractors. They are part
@@ -81,6 +83,8 @@ impl Extractor {
             Extractor::Docx => "input.docx",
             Extractor::Xlsx => "input.xlsx",
             Extractor::Pptx => "input.pptx",
+            // Tesseract sniffs the format from the bytes, so one fixed name serves every image type.
+            Extractor::Ocr => "input.img",
         }
     }
 
@@ -92,7 +96,7 @@ impl Extractor {
             Extractor::Docx => Some(DOCX_SCRIPT),
             Extractor::Xlsx => Some(XLSX_SCRIPT),
             Extractor::Pptx => Some(PPTX_SCRIPT),
-            Extractor::Pdftotext | Extractor::Text => None,
+            Extractor::Pdftotext | Extractor::Text | Extractor::Ocr => None,
         }
     }
 
@@ -102,7 +106,7 @@ impl Extractor {
             Extractor::Pdftotext => (PDF_DEFAULT, PDF_MAX),
             Extractor::Text => (TEXT_DEFAULT, TEXT_MAX),
             Extractor::Html | Extractor::Eml => (2 * 1024 * 1024, 8 * 1024 * 1024),
-            Extractor::Docx | Extractor::Xlsx | Extractor::Pptx => {
+            Extractor::Docx | Extractor::Xlsx | Extractor::Pptx | Extractor::Ocr => {
                 (4 * 1024 * 1024, 16 * 1024 * 1024)
             }
         }
@@ -118,6 +122,7 @@ impl Extractor {
             Extractor::Docx => Some(&["docx"]),
             Extractor::Xlsx => Some(&["xlsx"]),
             Extractor::Pptx => Some(&["pptx"]),
+            Extractor::Ocr => Some(&["png", "jpg", "jpeg", "tif", "tiff"]),
         }
     }
 
@@ -408,7 +413,9 @@ impl CustomDemoSpec {
                 }
             }
             None => {
-                const BINARY: [&str; 7] = ["pdf", "docx", "xlsx", "pptx", "zip", "png", "jpg"];
+                const BINARY: [&str; 10] = [
+                    "pdf", "docx", "xlsx", "pptx", "zip", "png", "jpg", "jpeg", "tif", "tiff",
+                ];
                 if let Some(bad) = self.accepts.iter().find(|e| BINARY.contains(&e.as_str())) {
                     return Err(format!(
                         "the text extractor cannot read .{bad}; use the extractor made for it"
@@ -1112,6 +1119,37 @@ mod tests {
                 "{bin}"
             );
         }
+    }
+
+    #[test]
+    fn the_ocr_extractor_reads_images_only_and_never_carries_a_sample() {
+        assert_eq!(Extractor::Ocr.guest_file(), "input.img");
+        assert!(Extractor::Ocr.script().is_none());
+        let ok = spec_with(
+            "ocr",
+            &["png", "jpg", "jpeg", "tif", "tiff"],
+            serde_json::json!({"kind": "stats"}),
+        );
+        assert_eq!(ok.validate(&[]), Ok(()));
+        // Not an image: refused at deploy time, with the extractor named.
+        let pdf = spec_with("ocr", &["pdf"], serde_json::json!({"kind": "stats"}));
+        assert!(pdf
+            .validate(&[])
+            .unwrap_err()
+            .contains("ocr extractor reads only"));
+        // The text extractor must not be pointed at a photo either.
+        let text_png = spec_with("text", &["jpeg"], serde_json::json!({"kind": "stats"}));
+        assert!(text_png
+            .validate(&[])
+            .unwrap_err()
+            .contains("use the extractor made for it"));
+        // A bundled sample is text, so an image extractor cannot carry one.
+        let mut with_sample = ok.clone();
+        with_sample.sample = Some(SampleSpec {
+            filename: "a.png".into(),
+            text: "x".into(),
+        });
+        assert!(with_sample.validate(&[]).is_err());
     }
 
     #[test]

@@ -157,6 +157,21 @@ if [[ "$QUICK" == 0 ]]; then
   deploy receipt-pdf && { r=$(run receipt-pdf "$WORK/receipt.pdf"); has "receipt-pdf: real PDF read (poppler in the cell)" "$(body_of "$r" 2>/dev/null)" "Total EUR 10.80"; } || bad "receipt-pdf deploy"
 fi
 
+# receipt-photo: a real image read by OCR. Needs Pillow here and tesseract in the cell template; reported as a skip, not a failure, when the
+# template was baked before OCR existed (rebuild it with scripts/keep-bake-node22-agent.sh).
+if [[ "$QUICK" == 0 ]] && python3 -c 'import PIL' 2>/dev/null; then
+  python3 - "$WORK/receipt.png" <<'PY'
+import sys
+from PIL import Image, ImageDraw, ImageFont
+lines = ["GREEN LEAF STORES", "Bill no 20481   Date 12/09/2026", "Item 1  Oat milk   Rs 6.40", "Subtotal Rs 416.40", "Total Rs 437.22", "Returns accepted within 14 days"]
+img = Image.new("RGB", (1000, 70 + len(lines) * 52), "white"); d = ImageDraw.Draw(img); f = ImageFont.load_default(34)
+for i, l in enumerate(lines): d.text((30, 30 + i * 52), l, fill="black", font=f)
+img.save(sys.argv[1])
+PY
+  CREATED+=(receipt-photo)
+  deploy receipt-photo && { r=$(run receipt-photo "$WORK/receipt.png"); if grep -q "has no tesseract" <<<"$r"; then echo "  skip receipt-photo: the cell template has no tesseract"; else has "receipt-photo: a photo read by OCR in the cell" "$(body_of "$r" 2>/dev/null)" "437.22"; fi; } || bad "receipt-photo deploy"
+fi
+
 deploy expense-sheet && { r=$(run expense-sheet "$WORK/exp.xlsx"); has "expense-sheet: real xlsx read (Node in the cell)" "$(body_of "$r" 2>/dev/null)" "Travel (2)"; } || bad "expense-sheet deploy"
 deploy nda-review && { r=$(run nda-review "$WORK/nda.docx"); has "nda-review: real docx read" "$(body_of "$r" 2>/dev/null)" "governed by the laws of Portugal"; } || bad "nda-review deploy"
 

@@ -42,8 +42,10 @@ reads the file, and the cell reports `0` outbound connections.
 | [`travel-itinerary`](../../examples/keep-agents/travel-itinerary/README.md) | a booking or boarding-pass email (`.eml`, `.mbox`) | flights, stays, booking references, amounts | `eml` | yes |
 | [`subscription-finder`](../../examples/keep-agents/subscription-finder/README.md) | a mail export (`.mbox`, `.eml`) | renewals, trials ending, what will be charged, amounts, who charges | `eml` | yes |
 | [`receipt-pdf`](../../examples/keep-agents/receipt-pdf/README.md) | a receipt or warranty PDF | totals, dates, warranty and return terms, amounts | `pdftotext` | no |
+| [`receipt-photo`](../../examples/keep-agents/receipt-photo/README.md) | a photo or screenshot of a receipt (`.png`, `.jpg`) | totals, dates, warranty and return terms, amounts | `ocr` | no |
+| [`bill-photo`](../../examples/keep-agents/bill-photo/README.md) | a photo or screenshot of a utility, phone or card bill | amount due, due dates, account and reference lines, charges | `ocr` | no |
 
-Not covered: **photos and screenshots** (Keep does no OCR, and a scan has no text layer), and vendor-specific
+Photos are read by OCR (English, `tesseract` in the cell), so check the amounts against the original; a scanned PDF and HEIC are not read. Not covered: vendor-specific
 exports whose layout changes between versions (location history, health, screen time), where a pack would be guessing.
 These packs read personal data. The cell is sealed and reports `0` outbound connections, but the evidence class is
 `software-test`: the host's operator could still read a cell's memory ([VENDORS.md](VENDORS.md)).

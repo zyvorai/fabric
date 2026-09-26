@@ -53,8 +53,12 @@ pub(crate) struct DemoSpec {
 }
 
 const PDF_CMD: &str = "pdftotext -layout {path} - 2>/dev/null | head -c 24000";
+/// Photos and scans: tesseract, English, "single column of text of variable sizes" (receipts and bills). The runtime, not the
+/// pack, chooses the command; the file name is fixed and tesseract sniffs the image format from the bytes.
+const OCR_CMD: &str = "tesseract {path} stdout -l eng --psm 4 2>/dev/null | head -c 24000";
+const OCR_EMPTY: &str = "No text could be read from the image: it may be blank, too blurry or too small. Try a sharper, straight-on photo";
 const PDF_EMPTY: &str =
-    "No text layer: this looks like a scan. Keep does not do OCR yet, and it never sends page images to a model";
+    "No text layer: this looks like a scan. Keep reads photos and screenshots (png, jpg) with OCR, so export the pages as images. It never sends page images to a model";
 /// Where a script extractor is written inside the cell.
 const GUEST_EXTRACT_SCRIPT: &str = "/home/agent/work/extract.mjs";
 const TEXT_LIMIT: usize = 200_000;
@@ -284,6 +288,7 @@ impl Resolved {
         let max_bytes = spec.max_bytes();
         let (extract_cmd, empty_msg) = match spec.extract {
             Extractor::Pdftotext => (PDF_CMD.to_string(), PDF_EMPTY),
+            Extractor::Ocr => (OCR_CMD.to_string(), OCR_EMPTY),
             Extractor::Text => (format!("head -c {max_bytes} {{path}}"), "The file is empty"),
             Extractor::Html
             | Extractor::Eml
@@ -986,7 +991,12 @@ async fn run_demo_inner(
         .process(
             sandbox.id,
             &spec.extract_cmd.replace("{path}", &guest_path),
-            Some(60),
+            // A phone photo can take tesseract tens of seconds; the other extractors finish in one or two.
+            Some(if spec.extract_cmd.starts_with("tesseract") {
+                120
+            } else {
+                60
+            }),
         )
         .await
     {
@@ -1003,12 +1013,15 @@ async fn run_demo_inner(
                 .trim()
                 .to_string();
             if stdout.is_empty() {
-                // pdftotext prints nothing both for a scan and when poppler is not
-                // installed (its stderr is discarded), so tell the two apart.
-                if spec.extract_cmd.starts_with("pdftotext") {
+                // pdftotext and tesseract print nothing both for an unreadable file and when the tool
+                // is not installed (stderr is discarded), so tell the two apart.
+                if let Some(tool) = ["pdftotext", "tesseract"]
+                    .into_iter()
+                    .find(|t| spec.extract_cmd.starts_with(t))
+                {
                     let probe = state
                         .fluxvm
-                        .process(sandbox.id, "command -v pdftotext", Some(10))
+                        .process(sandbox.id, &format!("command -v {tool}"), Some(10))
                         .await
                         .ok()
                         .and_then(|v| {
@@ -1018,10 +1031,13 @@ async fn run_demo_inner(
                         })
                         .unwrap_or_default();
                     if probe.is_empty() {
-                        return Err(ApiError::bad_request(
+                        return Err(ApiError::bad_request(if tool == "tesseract" {
+                            "The template has no tesseract. Use a template with tesseract-ocr \
+                             (set ZYVOR_DEMO_TEMPLATE) or bake one: see templates/node22-agent"
+                        } else {
                             "The template has no pdftotext. Use a template with poppler-utils \
-                             (set ZYVOR_DEMO_TEMPLATE) or bake one: see Tutorial 17",
-                        ));
+                             (set ZYVOR_DEMO_TEMPLATE) or bake one: see Tutorial 17"
+                        }));
                     }
                 }
                 return Err(ApiError::bad_request(spec.empty_msg.clone()));
@@ -1035,6 +1051,13 @@ async fn run_demo_inner(
             {
                 return Err(ApiError::bad_request(
                     "Image missing poppler — bake node22-agent with pdftotext",
+                ));
+            }
+            if spec.extract_cmd.starts_with("tesseract")
+                && (msg.contains("tesseract") || msg.contains("127") || msg.contains("not found"))
+            {
+                return Err(ApiError::bad_request(
+                    "Image missing tesseract — bake node22-agent with tesseract-ocr",
                 ));
             }
             return Err(ApiError::bad_gateway(format!("extract failed: {msg}")));

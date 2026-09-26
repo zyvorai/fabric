@@ -22,7 +22,7 @@ Phased, in this order. All four phases are done.
 
 1. **Run history and visibility** (shipped in this branch): artifact TTL and diff, run notifications, console and `keepctl` views.
 2. **Triggers and batch** (done): signed webhook and watched-folder triggers, multi-file upload. See [TRIGGERS.md](TRIGGERS.md).
-3. **More file types** (done, except OCR): docx, xlsx, pptx, html, eml/mbox, zip fan-out, and regex / JSON-path / table rules. OCR needs tesseract baked into the cell template and is not built.
+3. **More file types** (done): docx, xlsx, pptx, html, eml/mbox, zip fan-out, regex / JSON-path / table rules, and **OCR for photos and screenshots** (`ocr` extractor, English, needs `tesseract-ocr` in the cell template). Not built: OCR of scanned PDFs, other languages, HEIC.
 4. **Model-assisted use cases** (done): a pack declares one model endpoint; the host makes the call, so the cell stays at 0 connections. See [MODEL.md](MODEL.md).
 
 ## Not planned here
