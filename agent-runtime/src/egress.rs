@@ -927,6 +927,8 @@ pub(crate) mod ask_tests {
             sync_interval_ms: 300,
             guest_start_timeout_secs: 30,
             thread_retention_days: None,
+            goal_tick_ms: 5000,
+            goal_retry_base_secs: 15,
             event_retention_days: None,
             idle_scan_interval_ms: 1000,
             warm_pool_reconcile_interval_ms: 2000,

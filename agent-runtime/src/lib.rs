@@ -20,6 +20,7 @@ pub mod devices;
 pub mod egress;
 pub mod export_tokens;
 pub mod fluxvm;
+pub mod goal_worker;
 pub mod goals;
 pub mod l7;
 pub mod mcp;

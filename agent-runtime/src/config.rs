@@ -47,6 +47,10 @@ pub struct Config {
     pub guest_start_timeout_secs: u64,
     /// Forget threads idle this many days (`ZYVOR_AGENT_THREAD_RETENTION_DAYS`); `None` keeps them until the user forgets them.
     pub thread_retention_days: Option<u64>,
+    /// How often the goal worker looks at autorun goals (`ZYVOR_AGENT_GOAL_TICK_MS`, at least 200).
+    pub goal_tick_ms: u64,
+    /// The first retry delay of a failed goal step, doubled each time up to ten minutes (`ZYVOR_AGENT_GOAL_RETRY_BASE_SECS`).
+    pub goal_retry_base_secs: u64,
     /// Delete the event log of sessions that ended this many days ago (`ZYVOR_AGENT_EVENT_RETENTION_DAYS`); `None` keeps it.
     pub event_retention_days: Option<u64>,
     pub idle_scan_interval_ms: u64,
@@ -115,6 +119,8 @@ impl Config {
             sync_interval_ms: env_parse("ZYVOR_AGENT_SYNC_INTERVAL_MS", "300")?,
             guest_start_timeout_secs: env_parse("ZYVOR_AGENT_GUEST_START_TIMEOUT_SECS", "30")?,
             thread_retention_days: env_days("ZYVOR_AGENT_THREAD_RETENTION_DAYS")?,
+            goal_tick_ms: env_parse("ZYVOR_AGENT_GOAL_TICK_MS", "5000")?,
+            goal_retry_base_secs: env_parse("ZYVOR_AGENT_GOAL_RETRY_BASE_SECS", "15")?,
             event_retention_days: env_days("ZYVOR_AGENT_EVENT_RETENTION_DAYS")?,
             idle_scan_interval_ms: env_parse("ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS", "1000")?,
             warm_pool_reconcile_interval_ms: env_parse(

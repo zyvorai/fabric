@@ -44,7 +44,23 @@ pub enum PlanStepStatus {
     Skipped,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Why a plan step is blocked, for the goal worker.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockedOn {
+    /// Waiting for the person's decision on the step's approval.
+    Approval,
+    /// The step's session failed on every attempt.
+    Failure,
+    /// The person refused the approval (or it expired); the worker never goes past it.
+    Rejected,
+}
+
+fn default_max_attempts() -> u32 {
+    3
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlanStep {
     pub id: String,
     pub title: String,
@@ -59,6 +75,22 @@ pub struct PlanStep {
     pub artifact_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// What the goal worker gives the agent for this step (any JSON). Without it the agent gets the goal and step titles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<Value>,
+    /// The session the goal worker started for this step (the latest attempt).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<Uuid>,
+    /// How many sessions the worker has started for this step.
+    #[serde(default)]
+    pub attempts: u32,
+    /// After a failed attempt, the earliest moment the worker tries again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_attempt_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked_on: Option<BlockedOn>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,8 +113,35 @@ pub struct GoalRecord {
     /// Goal-bound tabs: browser open must be ⊆ this list when non-empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allow_hosts: Vec<String>,
+    /// Let the goal worker run the plan step by step (see [`crate::goal_worker`]). Off unless the goal says so.
+    #[serde(default)]
+    pub autorun: bool,
+    /// How many sessions the worker may start for one step before it blocks the goal (1 to 10).
+    #[serde(default = "default_max_attempts")]
+    pub max_attempts: u32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+pub(crate) fn test_goal(plan: Vec<PlanStep>) -> GoalRecord {
+    let now = Utc::now();
+    GoalRecord {
+        id: Uuid::new_v4(),
+        title: "Trip".into(),
+        description: "plan a trip".into(),
+        agent: "chat".into(),
+        user_id: None,
+        session_id: None,
+        status: GoalStatus::Open,
+        plan,
+        artifact_ids: vec![],
+        allow_hosts: vec![],
+        autorun: true,
+        max_attempts: 3,
+        created_at: now,
+        updated_at: now,
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,6 +181,11 @@ pub struct CreateGoalRequest {
     pub plan: Vec<CreatePlanStep>,
     #[serde(default)]
     pub allow_hosts: Vec<String>,
+    /// Let the goal worker run the plan (needs a plan and a deployed agent).
+    #[serde(default)]
+    pub autorun: bool,
+    #[serde(default)]
+    pub max_attempts: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +195,9 @@ pub struct CreatePlanStep {
     pub requires_approval: bool,
     #[serde(default)]
     pub detail: Option<String>,
+    /// What the agent is given for this step when the goal worker runs it (JSON, at most 16 KiB).
+    #[serde(default)]
+    pub input: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,6 +210,11 @@ pub struct PatchGoalRequest {
     pub plan: Option<Vec<PlanStep>>,
     #[serde(default)]
     pub allow_hosts: Option<Vec<String>>,
+    /// Pause (`false`) or resume (`true`) the goal worker for this goal.
+    #[serde(default)]
+    pub autorun: Option<bool>,
+    #[serde(default)]
+    pub max_attempts: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -237,8 +309,34 @@ pub(crate) async fn create_goal(
             approval_id: None,
             artifact_id: None,
             detail: s.detail,
+            input: s.input,
+            ..Default::default()
         })
         .collect();
+    if plan.iter().any(|s| {
+        s.input
+            .as_ref()
+            .is_some_and(|v| v.to_string().len() > 16 * 1024)
+    }) {
+        return Err(ApiError::bad_request("a step input may be at most 16 KiB"));
+    }
+    let max_attempts = req.max_attempts.unwrap_or_else(default_max_attempts);
+    if !(1..=10).contains(&max_attempts) {
+        return Err(ApiError::bad_request("max_attempts must be 1 to 10"));
+    }
+    if req.autorun {
+        if plan.is_empty() {
+            return Err(ApiError::bad_request("an autorun goal needs a plan"));
+        }
+        if state.store.get_agent(req.agent.trim()).await.is_none() {
+            return Err(ApiError::not_found(
+                "an autorun goal needs a deployed agent",
+            ));
+        }
+        if let Some(user) = req.user_id.as_deref() {
+            crate::model::validate_user_id(user).map_err(ApiError::bad_request)?;
+        }
+    }
     let record = GoalRecord {
         id: Uuid::new_v4(),
         title: req.title.trim().to_string(),
@@ -250,6 +348,8 @@ pub(crate) async fn create_goal(
         plan,
         artifact_ids: vec![],
         allow_hosts: req.allow_hosts,
+        autorun: req.autorun,
+        max_attempts,
         created_at: now,
         updated_at: now,
     };
@@ -305,6 +405,15 @@ pub(crate) async fn patch_goal(
     }
     if let Some(hosts) = req.allow_hosts {
         goal.allow_hosts = hosts;
+    }
+    if let Some(autorun) = req.autorun {
+        goal.autorun = autorun;
+    }
+    if let Some(n) = req.max_attempts {
+        if !(1..=10).contains(&n) {
+            return Err(ApiError::bad_request("max_attempts must be 1 to 10"));
+        }
+        goal.max_attempts = n;
     }
     goal.updated_at = Utc::now();
     state
@@ -374,6 +483,11 @@ pub(crate) async fn advance_step(
         .ok_or_else(|| ApiError::not_found("goal not found"))?;
     if goal.status == GoalStatus::Cancelled {
         return Err(ApiError::conflict("the goal is cancelled"));
+    }
+    if goal.autorun {
+        return Err(ApiError::conflict(
+            "the goal worker runs this goal; pause it (autorun false) to advance it by hand",
+        ));
     }
     let step = goal
         .plan
@@ -698,6 +812,8 @@ pub(crate) mod tests {
             sync_interval_ms: 300,
             guest_start_timeout_secs: 30,
             thread_retention_days: None,
+            goal_tick_ms: 5000,
+            goal_retry_base_secs: 15,
             event_retention_days: None,
             idle_scan_interval_ms: 1000,
             warm_pool_reconcile_interval_ms: 2000,
@@ -734,14 +850,18 @@ pub(crate) mod tests {
                         title: "Read alerts".into(),
                         requires_approval: false,
                         detail: None,
+                        input: None,
                     },
                     CreatePlanStep {
                         title: "Restart VM".into(),
                         requires_approval: true,
                         detail: None,
+                        input: None,
                     },
                 ],
                 allow_hosts: vec![],
+                autorun: false,
+                max_attempts: None,
             }),
         )
         .await
@@ -839,8 +959,11 @@ pub(crate) mod tests {
                     title: "Restart".into(),
                     requires_approval: true,
                     detail: None,
+                    input: None,
                 }],
                 allow_hosts: vec![],
+                autorun: false,
+                max_attempts: None,
             }),
         )
         .await
@@ -1116,5 +1239,158 @@ pub(crate) mod tests {
             .await
             .unwrap_err();
         assert!(err.message().contains("not found"));
+    }
+
+    async fn with_agent(state: &Arc<AppState>, name: &str) {
+        state
+            .store
+            .deploy_agent(crate::model::DeployAgentRequest {
+                name: name.into(),
+                bundle_base64: base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    "export default 1",
+                ),
+                manifest: crate::egress::ask_tests::manifest(
+                    crate::model::EgressMode::Deny,
+                    Some(30),
+                ),
+            })
+            .await
+            .unwrap();
+    }
+
+    fn autorun_request(agent: &str, plan: Vec<CreatePlanStep>) -> CreateGoalRequest {
+        CreateGoalRequest {
+            title: "Trip".into(),
+            description: String::new(),
+            agent: agent.into(),
+            user_id: None,
+            session_id: None,
+            plan,
+            allow_hosts: vec![],
+            autorun: true,
+            max_attempts: None,
+        }
+    }
+
+    fn step_of(title: &str) -> CreatePlanStep {
+        CreatePlanStep {
+            title: title.into(),
+            requires_approval: false,
+            detail: None,
+            input: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn an_autorun_goal_needs_a_plan_a_deployed_agent_and_sane_limits() {
+        let state = test_state().await;
+        with_agent(&state, "chat").await;
+        let err = create_goal(State(state.clone()), Json(autorun_request("chat", vec![])))
+            .await
+            .unwrap_err();
+        assert_eq!(err.status(), StatusCode::BAD_REQUEST, "no plan");
+        let err = create_goal(
+            State(state.clone()),
+            Json(autorun_request("nobody", vec![step_of("a")])),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status(), StatusCode::NOT_FOUND, "no such agent");
+        for bad in [0, 11] {
+            let mut r = autorun_request("chat", vec![step_of("a")]);
+            r.max_attempts = Some(bad);
+            assert_eq!(
+                create_goal(State(state.clone()), Json(r))
+                    .await
+                    .unwrap_err()
+                    .status(),
+                StatusCode::BAD_REQUEST,
+                "max_attempts {bad}"
+            );
+        }
+        let mut big = step_of("a");
+        big.input = Some(json!({"x": "y".repeat(17 * 1024)}));
+        assert_eq!(
+            create_goal(
+                State(state.clone()),
+                Json(autorun_request("chat", vec![big]))
+            )
+            .await
+            .unwrap_err()
+            .status(),
+            StatusCode::BAD_REQUEST,
+            "a step input over 16 KiB"
+        );
+        let mut ok = autorun_request(
+            "chat",
+            vec![
+                step_of("Find flights"),
+                CreatePlanStep {
+                    input: Some(json!({"q": "goa"})),
+                    ..step_of("Book")
+                },
+            ],
+        );
+        ok.max_attempts = Some(2);
+        let (st, Json(goal)) = create_goal(State(state.clone()), Json(ok)).await.unwrap();
+        assert_eq!(st, StatusCode::CREATED);
+        assert!(goal.autorun && goal.max_attempts == 2);
+        assert_eq!(goal.plan[1].input, Some(json!({"q": "goa"})));
+        assert_eq!(goal.plan[0].attempts, 0);
+        // a goal that does not say autorun is unchanged: no worker touches it
+        let mut plain = autorun_request("nobody", vec![]);
+        plain.autorun = false;
+        let (_, Json(g)) = create_goal(State(state.clone()), Json(plain))
+            .await
+            .unwrap();
+        assert!(!g.autorun && g.max_attempts == 3);
+    }
+
+    #[tokio::test]
+    async fn an_autorun_goal_is_not_advanced_by_hand_until_it_is_paused() {
+        let state = test_state().await;
+        with_agent(&state, "chat").await;
+        let (_, Json(goal)) = create_goal(
+            State(state.clone()),
+            Json(autorun_request("chat", vec![step_of("a")])),
+        )
+        .await
+        .unwrap();
+        let req = || AdvanceStepRequest {
+            step_id: "s1".into(),
+            status: PlanStepStatus::Done,
+            artifact_id: None,
+            detail: None,
+            approval_prompt: None,
+        };
+        let err = advance_step(State(state.clone()), Path(goal.id), Json(req()))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.status(),
+            StatusCode::CONFLICT,
+            "the worker owns this goal"
+        );
+        let patch = PatchGoalRequest {
+            status: None,
+            session_id: None,
+            plan: None,
+            allow_hosts: None,
+            autorun: Some(false),
+            max_attempts: None,
+        };
+        let Json(paused) = patch_goal(State(state.clone()), Path(goal.id), Json(patch))
+            .await
+            .unwrap();
+        assert!(!paused.autorun);
+        let Json(after) = advance_step(State(state.clone()), Path(goal.id), Json(req()))
+            .await
+            .unwrap();
+        assert_eq!(
+            after.status,
+            GoalStatus::Done,
+            "paused, a person can move it"
+        );
     }
 }

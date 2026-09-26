@@ -95,7 +95,7 @@ cat >"$WORK/creds.json" <<JSON
          "allowed_ports": [$MODEL_PORT], "allowed_methods": ["POST"], "path_prefixes": ["/v1/chat/completions"]},
  "llm-local": {"host": "127.0.0.1", "header": "authorization", "kind": "fabric", "allowed_ports": [$MODEL_PORT]}}
 JSON
-start_runtime runtime "$RT_PORT" "$RT_EGRESS" ZYVOR_AGENT_ALLOW_NO_AUTH=1 ZYVOR_AGENT_WATCH_ROOT="$WORK/watch" ZYVOR_AGENT_CREDENTIALS_FILE="$WORK/creds.json"
+start_runtime runtime "$RT_PORT" "$RT_EGRESS" ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_GOAL_RETRY_BASE_SECS=1 ZYVOR_AGENT_ALLOW_NO_AUTH=1 ZYVOR_AGENT_WATCH_ROOT="$WORK/watch" ZYVOR_AGENT_CREDENTIALS_FILE="$WORK/creds.json"
 wait_http "$BASE/healthz" || fail "runtime did not start"
 export KEEP_API="$BASE"
 
@@ -784,6 +784,119 @@ curl -sN --max-time 60 -X POST "http://127.0.0.1:$CHAT_PORT/agui" -H 'content-ty
 grep -q "You said: hello chat" "$WORK/chat.sse" && grep -q "RUN_FINISHED" "$WORK/chat.sse" || fail "keep-chat did not stream the echo agent's reply: $(head -c 600 "$WORK/chat.sse")"
 [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$CHAT_PORT/v1/agents")" == "404" ]] || fail "keep-chat must not proxy anything but /agui"
 ok "keep-chat: a browser message reaches the echo agent through the proxy (agent fixed server-side) and the reply streams back; other routes are not proxied"
+
+echo "demos-ci: goal worker (a goal that runs its own plan)"
+FAILPACK="$WORK/fail-agent"; mkdir -p "$FAILPACK"
+cat > "$FAILPACK/agent.ts" <<'TS'
+import { defineAgent } from "@zyvor/fabric-agent";
+export default defineAgent({ async run() { throw new Error("boom on purpose"); } });
+TS
+cat > "$FAILPACK/pack.json" <<'JSON'
+{ "kind": "agent", "name": "fail-agent",
+  "manifest": { "template": "node22-agent", "egress_mode": "deny", "confinement": "strict" },
+  "goal": { "title": "Always fail", "text": "Fail on purpose." } }
+JSON
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$FAILPACK") >"$WORK/fail-agent.out" 2>&1 || fail "fail-agent deploy failed: $(cat "$WORK/fail-agent.out")"
+mkgoal() { curl -sf -X POST -H 'content-type: application/json' -d "$1" "$BASE/v1/goals" | json id; }
+goalj() { curl -sf "$BASE/v1/goals/$1"; }
+wait_goal() {   # $1 id, $2 python condition on the goal dict `g`, $3 seconds
+  local end=$((SECONDS + $3))
+  while (( SECONDS < end )); do
+    goalj "$1" | python3 -c 'import json,sys; g=json.load(sys.stdin); sys.exit(0 if ('"$2"') else 1)' && return 0
+    sleep 0.5
+  done
+  return 1
+}
+# 1. a plan that runs itself: two steps, each with its own input, no hand on the goal
+G1=$(mkgoal '{"title":"Two echoes","agent":"echo-agent","autorun":true,"plan":[{"title":"one","input":{"message":"first step"}},{"title":"two","input":{"message":"second step"}}]}')
+wait_goal "$G1" 'g["status"]=="done"' 90 || fail "the goal worker did not finish the plan: $(goalj "$G1")"
+goalj "$G1" | python3 -c '
+import json,sys
+g=json.load(sys.stdin)
+assert [s["status"] for s in g["plan"]]==["done","done"], g
+assert [s["attempts"] for s in g["plan"]]==[1,1], g
+assert g["plan"][0]["session_id"]!=g["plan"][1]["session_id"], g' || fail "the finished goal is wrong: $(goalj "$G1")"
+S1=$(goalj "$G1" | json plan.0.session_id); S2=$(goalj "$G1" | json plan.1.session_id)
+for sid in "$S1:first step" "$S2:second step"; do
+  ev=$(curl -s --max-time 5 "$BASE/v1/sessions/${sid%%:*}/events" || true)
+  [[ "$ev" == *"You said: ${sid#*:}"* ]] || fail "step session ${sid%%:*} did not get its own input: $ev"
+done
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"step_id":"s1","status":"done"}' "$BASE/v1/goals/$G1/advance")" == "409" ]] || fail "a goal run by the worker must not be advanced by hand"
+ok "an autorun goal ran both steps in order with their own inputs, 1 attempt each, and refuses a hand on it"
+
+# 2. a step that keeps failing: retried with a delay, then the goal is blocked with the reason, and the next step never starts
+G2=$(mkgoal '{"title":"Always fails","agent":"fail-agent","autorun":true,"max_attempts":2,"plan":[{"title":"try"},{"title":"never reached"}]}')
+wait_goal "$G2" 'g["status"]=="blocked"' 90 || fail "a failing step should block the goal: $(goalj "$G2")"
+goalj "$G2" | python3 -c '
+import json,sys
+g=json.load(sys.stdin); a,b=g["plan"]
+assert a["status"]=="blocked" and a["attempts"]==2 and a["blocked_on"]=="failure", g
+assert "failed after 2 attempts" in a["detail"] and "boom on purpose" in a["detail"], a
+assert b["status"]=="pending" and b["attempts"]==0 and not b.get("session_id"), b' || fail "the failing goal is wrong: $(goalj "$G2")"
+sleep 3   # a blocked step is not retried
+[[ "$(goalj "$G2" | json plan.0.attempts)" == "2" ]] || fail "the worker must not retry a step it has blocked"
+ok "a failing step was retried once, then blocked with the reason; the next step never started and nothing retried after the block"
+
+# 3. an approval checkpoint: the step runs, then waits for the person; approval moves on
+G3=$(mkgoal '{"title":"Needs a yes","agent":"echo-agent","autorun":true,"plan":[{"title":"draft","requires_approval":true,"input":{"message":"draft"}},{"title":"send","input":{"message":"send"}}]}')
+wait_goal "$G3" 'g["plan"][0]["status"]=="blocked" and g["plan"][0].get("approval_id")' 60 || fail "the step should wait for approval: $(goalj "$G3")"
+goalj "$G3" | python3 -c '
+import json,sys
+g=json.load(sys.stdin); a,b=g["plan"]
+assert a["blocked_on"]=="approval" and b["status"]=="pending" and b["attempts"]==0, g' || fail "waiting state is wrong: $(goalj "$G3")"
+AID=$(goalj "$G3" | json plan.0.approval_id)
+sleep 2
+[[ "$(goalj "$G3" | json plan.1.attempts)" == "0" ]] || fail "the worker must not start the next step while approval is pending"
+curl -sf -X POST -H 'content-type: application/json' -d '{"decision":"approved"}' "$BASE/v1/approvals/$AID" >/dev/null || fail "approve"
+wait_goal "$G3" 'g["status"]=="done"' 60 || fail "approving should let the goal finish: $(goalj "$G3")"
+# and a refusal stops it for good
+G4=$(mkgoal '{"title":"Refused","agent":"echo-agent","autorun":true,"plan":[{"title":"draft","requires_approval":true,"input":{"message":"d"}},{"title":"send","input":{"message":"s"}}]}')
+wait_goal "$G4" 'g["plan"][0]["status"]=="blocked" and g["plan"][0].get("approval_id")' 60 || fail "the refused-goal step should wait: $(goalj "$G4")"
+curl -sf -X POST -H 'content-type: application/json' -d '{"decision":"denied"}' "$BASE/v1/approvals/$(goalj "$G4" | json plan.0.approval_id)" >/dev/null || fail "deny"
+wait_goal "$G4" 'g["plan"][0]["blocked_on"]=="rejected"' 30 || fail "a denial should block the step as rejected: $(goalj "$G4")"
+sleep 2
+goalj "$G4" | python3 -c '
+import json,sys
+g=json.load(sys.stdin); a,b=g["plan"]
+assert g["status"]=="blocked" and a["status"]=="blocked" and b["status"]=="pending" and b["attempts"]==0, g' || fail "a refusal must stop the goal: $(goalj "$G4")"
+ok "an approval step waits for the person after it ran; approved: the goal moves on; denied: it stays blocked and the next step never starts"
+
+# 4. a goal that does not say autorun is left alone; switching it on starts it, switching it off stops it
+G5=$(mkgoal '{"title":"Not automatic","agent":"echo-agent","plan":[{"title":"x","input":{"message":"x"}},{"title":"y","input":{"message":"y"}}]}')
+sleep 3
+[[ "$(goalj "$G5" | json plan.0.attempts)" == "0" && "$(goalj "$G5" | json autorun)" == "False" ]] || fail "a goal without autorun must never be run by the worker: $(goalj "$G5")"
+curl -sf -X PATCH -H 'content-type: application/json' -d '{"autorun":true}' "$BASE/v1/goals/$G5" >/dev/null
+wait_goal "$G5" 'g["status"]=="done"' 90 || fail "switching autorun on should run the plan: $(goalj "$G5")"
+G6=$(mkgoal '{"title":"Paused at once","agent":"echo-agent","autorun":true,"plan":[{"title":"x","input":{"message":"x"}},{"title":"y","input":{"message":"y"}},{"title":"z","input":{"message":"z"}}]}')
+curl -sf -X PATCH -H 'content-type: application/json' -d '{"autorun":false}' "$BASE/v1/goals/$G6" >/dev/null
+sleep 1; before=$(goalj "$G6" | python3 -c 'import json,sys; print(sum(s["attempts"] for s in json.load(sys.stdin)["plan"]))'); sleep 4
+after=$(goalj "$G6" | python3 -c 'import json,sys; print(sum(s["attempts"] for s in json.load(sys.stdin)["plan"]))')
+[[ "$before" == "$after" ]] || fail "a paused goal must not start more steps ($before -> $after)"
+ok "a goal without autorun is left alone, switching it on runs it, and pausing stops further steps"
+
+# 5. cancelling the goal cancels the step's running session
+WAITPACK="$WORK/wait-agent"; mkdir -p "$WAITPACK"
+cat > "$WAITPACK/agent.ts" <<'TS'
+import { defineAgent } from "@zyvor/fabric-agent";
+export default defineAgent({ async run(ctx) { await ctx.nextSteer({ timeoutMs: 120000 }); return "woke"; } });
+TS
+cat > "$WAITPACK/pack.json" <<'JSON'
+{ "kind": "agent", "name": "wait-agent",
+  "manifest": { "template": "node22-agent", "egress_mode": "deny", "confinement": "strict" },
+  "goal": { "title": "Wait", "text": "Wait for a steering message." } }
+JSON
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$WAITPACK") >"$WORK/wait-agent.out" 2>&1 || fail "wait-agent deploy failed: $(cat "$WORK/wait-agent.out")"
+G7=$(mkgoal '{"title":"Waits","agent":"wait-agent","autorun":true,"plan":[{"title":"wait"},{"title":"after"}]}')
+wait_goal "$G7" 'g["plan"][0]["status"]=="running" and g["plan"][0].get("session_id")' 60 || fail "the waiting step should be running: $(goalj "$G7")"
+S7=$(goalj "$G7" | json plan.0.session_id)
+for _ in $(seq 1 40); do [[ "$(curl -s "$BASE/v1/sessions/$S7" | json status)" == "running" ]] && break; sleep 0.3; done
+[[ "$(curl -s "$BASE/v1/sessions/$S7" | json status)" == "running" ]] || fail "the step's session should be running: $(curl -s "$BASE/v1/sessions/$S7")"
+curl -sf -X PATCH -H 'content-type: application/json' -d '{"status":"cancelled"}' "$BASE/v1/goals/$G7" >/dev/null
+for _ in $(seq 1 60); do [[ "$(curl -s "$BASE/v1/sessions/$S7" | json status)" == "cancelled" ]] && break; sleep 0.5; done
+[[ "$(curl -s "$BASE/v1/sessions/$S7" | json status)" == "cancelled" ]] || fail "cancelling the goal should cancel the step's session: $(curl -s "$BASE/v1/sessions/$S7")"
+sleep 2
+[[ "$(goalj "$G7" | json status)" == "cancelled" && "$(goalj "$G7" | json plan.1.attempts)" == "0" ]] || fail "a cancelled goal stays cancelled and starts nothing: $(goalj "$G7")"
+ok "cancelling a goal cancels the running step's session and nothing further starts"
 
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")
