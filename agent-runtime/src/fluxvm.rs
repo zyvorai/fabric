@@ -14,15 +14,15 @@ pub struct FluxVm {
     base: Url,
     http: reqwest::Client,
     token: Option<String>,
-    /// Bounds how many `POST /v1/sandboxes` are in flight at once. FluxVM provisions each VM disk by mounting it through an nbd
-    /// device; two provisions at the same moment can be handed the same device ("/dev/nbd0p1 already mounted") or mix up the guest
-    /// agent token, so about 15% of runs failed at concurrency 4 on the lab host. Creating one VM at a time avoids it; a cell that
-    /// is already running is not affected. `ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY` raises the bound (default 1).
+    /// Bounds how many `POST /v1/sandboxes` are in flight at once. Guestkit ≥1.2.5
+    /// serializes nbd allocate+connect with flock (fluxvm#104), so concurrent creates
+    /// are safe. Default is 4; override with `ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY`
+    /// (1–64). A cell that is already running is not affected.
     create_gate: std::sync::Arc<tokio::sync::Semaphore>,
 }
 
-/// Default and lower bound for concurrent sandbox creations.
-const DEFAULT_CREATE_CONCURRENCY: usize = 1;
+/// Default concurrent sandbox creations (safe after guestkit flock fix).
+const DEFAULT_CREATE_CONCURRENCY: usize = 4;
 
 /// 1 to 64; anything unset, unparsable or below 1 falls back to the default.
 fn parse_create_concurrency(value: Option<&str>) -> usize {
@@ -580,12 +580,12 @@ mod tests {
 
     #[test]
     fn sandbox_create_concurrency_parsing_is_bounded() {
-        assert_eq!(parse_create_concurrency(None), 1);
+        assert_eq!(parse_create_concurrency(None), 4);
         assert_eq!(parse_create_concurrency(Some("4")), 4);
         assert_eq!(parse_create_concurrency(Some(" 2 ")), 2);
         assert_eq!(parse_create_concurrency(Some("0")), 1);
         assert_eq!(parse_create_concurrency(Some("999")), 64);
-        assert_eq!(parse_create_concurrency(Some("not a number")), 1);
+        assert_eq!(parse_create_concurrency(Some("not a number")), 4);
     }
 
     #[test]

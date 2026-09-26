@@ -25,7 +25,7 @@ trust, and easy to talk about ([ROADMAP.md](ROADMAP.md) has the product side).
 
 ## Upstream
 
-- **Report the FluxVM concurrency bug** to `zyvorai/fluxvm` / `guestkit`: two VMs created at the same moment can be handed the same nbd device (`/dev/nbd0p1 already mounted`), and once a guest-agent token did not match. Reproduce with `scripts/keep-bench.sh --runs 20 --concurrency 4` against a runtime built before the create gate (3 of 20 failed in three passes). The runtime works around it by creating one cell at a time (`ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY`); remove the workaround when FluxVM is fixed.
+- ~~**FluxVM concurrent create / nbd race**~~ — fixed in guestkit 1.2.5 ([guestkit#35](https://github.com/zyvorai/guestkit/pull/35), [fluxvm#104](https://github.com/zyvorai/fluxvm/issues/104)). Keep’s create gate default is now 4 (`ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY`); set to 1 only if pinning an older guestkit.
 
 ## Needs you to try it (checklists exist)
 
