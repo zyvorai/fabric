@@ -7,6 +7,7 @@
 #   ./scripts/deploy keep sus@host
 #   ./scripts/deploy keep sus@host --dev        # no Keep mode: unsigned packs allowed
 #   ./scripts/deploy keep sus@host --dry-run    # print the plan, change nothing
+#   ./scripts/deploy-keep.sh local              # this machine is the Keep host (runtime only; used by scripts/keep-up.sh)
 #
 # What it does, in order:
 #   1. makes (or reuses) a Keep signer seed on THIS machine, never sent to the host
@@ -51,14 +52,19 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
-[[ "$TARGET" == *@* ]] || { echo "usage: deploy keep USER@HOST [--dev] [--dry-run]" >&2; exit 64; }
-REMOTE_USER="${TARGET%@*}"
+[[ "$TARGET" == *@* || "$TARGET" == local ]] || { echo "usage: deploy keep USER@HOST|local [--dev] [--dry-run]" >&2; exit 64; }
+if [[ "$TARGET" == local ]]; then
+  SKIP_FABRIC=1                         # `local` installs the Keep runtime only; fabricd and the console are a separate deploy
+  REMOTE_USER="$(id -un)"
+else
+  REMOTE_USER="${TARGET%@*}"
+fi
 
 say() { printf '%s\n' "$*"; }
 step() { printf '\n==> %s\n' "$*"; }
 
 command -v node >/dev/null || { echo "node is required locally (signer key + fabric-agent)" >&2; exit 1; }
-command -v ssh >/dev/null || { echo "ssh is required" >&2; exit 1; }
+[[ "$TARGET" == local ]] || command -v ssh >/dev/null || { echo "ssh is required" >&2; exit 1; }
 
 # ── 1. signer seed (local only) ──────────────────────────────────────────────
 step "Keep signer"
@@ -95,7 +101,7 @@ if [[ "$DRY" == "1" ]]; then
   else
     say "  3. write /etc/zyvor-fabricd/zyvor-fabric-agent.env (API token generated on the host; Keep mode, trusted signer $PUBKEY)"
   fi
-  say "  4. add [agent_runtime] to zyvor-fabricd.toml, restart both services"
+  say "  4. add [agent_runtime] to zyvor-fabricd.toml if fabricd is installed; restart the runtime (and fabricd if present)"
   say "  5. smoke test: keep-demo.sh csv-clean on the host"
   exit 0
 fi
@@ -108,15 +114,25 @@ fi
 
 # ── 3+4. the Keep runtime on the host ───────────────────────────────────────
 step "Keep runtime on ${TARGET#*@}"
-if [[ "$REMOTE_USER" == "root" ]]; then
+if [[ "$TARGET" == local ]]; then
+  REMOTE_DIR="$REPO_DIR"
+elif [[ "$REMOTE_USER" == "root" ]]; then
   REMOTE_DIR="/root/zyvor-fabric"
 else
   REMOTE_DIR="/home/$REMOTE_USER/zyvor-fabric"
 fi
 
+# Run the install script on the host: over ssh, or straight on this machine for `local`.
+run_on_host() {
+  if [[ "$TARGET" == local ]]; then
+    PUBKEY="$PUBKEY" KEEP_DEV="$DEV" DIR="$REMOTE_DIR" bash -s
+  else
+    ssh -o BatchMode=yes "$TARGET" "PUBKEY='$PUBKEY' KEEP_DEV='$DEV' DIR='$REMOTE_DIR' bash -s"
+  fi
+}
+
 set +e
-ssh -o BatchMode=yes "$TARGET" \
-  "PUBKEY='$PUBKEY' KEEP_DEV='$DEV' DIR='$REMOTE_DIR' bash -s" <<'REMOTE'
+run_on_host <<'REMOTE'
 set -euo pipefail
 # Non-interactive ssh has a minimal PATH; the Fabric deploy adds the same directories.
 export PATH="$HOME/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:$PATH"
@@ -175,7 +191,11 @@ printf 'ZYVOR_FABRICD_AGENT_RUNTIME_TOKEN=%s\n' "$TOKEN" | $SUDO tee -a "$FENV" 
 
 $SUDO systemctl daemon-reload
 $SUDO systemctl enable --now zyvor-fabric-agent-runtime >/dev/null 2>&1
-$SUDO systemctl restart zyvor-fabric-agent-runtime zyvor-fabricd
+$SUDO systemctl restart zyvor-fabric-agent-runtime
+# fabricd is optional (a Keep-only host has none): restart it only when it is installed
+if systemctl list-unit-files zyvor-fabricd.service 2>/dev/null | grep -q '^zyvor-fabricd.service'; then
+  $SUDO systemctl restart zyvor-fabricd
+fi
 for i in $(seq 1 30); do
   curl -fsS -m 2 http://127.0.0.1:9096/healthz >/dev/null 2>&1 && break
   sleep 1
