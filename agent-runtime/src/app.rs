@@ -2145,6 +2145,7 @@ async fn record_approval_request(
         decided_at: None,
         source_seq: Some(seq),
         grant_scope: None,
+        preview: None,
         broker_held: false,
     };
     state.store.save_approval(record.clone()).await?;
@@ -3388,6 +3389,7 @@ async fn create_approval(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        preview: None,
         broker_held: false,
     };
     state

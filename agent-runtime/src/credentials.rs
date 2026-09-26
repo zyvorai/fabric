@@ -25,7 +25,8 @@ pub struct CredentialDescriptor {
     /// Optional HTTP method allowlist for this credential. Empty means any method.
     #[serde(default)]
     pub allowed_methods: Vec<String>,
-    /// Optional URL path-prefix allowlist. Empty means any path on the bound host.
+    /// Optional URL path-prefix allowlist. Empty means any path on the bound host. An entry ending in `$` matches that exact path only
+    /// (`/gmail/v1/users/me/drafts$` allows the drafts collection but not `/drafts/send`).
     #[serde(default)]
     pub path_prefixes: Vec<String>,
     /// Additional HTTPS ports that may receive this credential. Port 443 is always allowed.
@@ -56,6 +57,11 @@ pub struct CredentialDescriptor {
     /// token decides them (see `devices.rs`). The operator token can always decide unsigned.
     #[serde(default)]
     pub require_device_signature: bool,
+    /// What the person is shown when they decide a request that uses this credential: the host reads the request body and renders it
+    /// (`gmail-message`, `calendar-event`; see `preview.rs`). A body it cannot render faithfully is refused before anything is sent.
+    /// Only meaningful with `requires_approval`.
+    #[serde(default)]
+    pub preview: Option<String>,
     /// For `kind=oauth-refresh`: how the host mints short-lived access tokens from a long-lived
     /// refresh token (e.g. Google). The access token is what gets injected; the refresh token,
     /// client id and client secret stay in host env and never reach a cell.
@@ -581,6 +587,14 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
             format!("credential '{name}' has invalid allowed method '{method}'")
         })?;
     }
+    if let Some(kind) = &d.preview {
+        if !crate::preview::is_known(kind) {
+            bail!("credential '{name}' has an unknown preview '{kind}'");
+        }
+        if d.requires_approval.is_empty() {
+            bail!("credential '{name}' sets a preview but never asks for approval");
+        }
+    }
     for method in &d.requires_approval {
         if method != "*" {
             reqwest::Method::from_bytes(method.as_bytes()).with_context(|| {
@@ -617,7 +631,10 @@ pub fn credential_allows_request(
         || descriptor
             .path_prefixes
             .iter()
-            .any(|prefix| path.starts_with(prefix));
+            .any(|prefix| match prefix.strip_suffix('$') {
+                Some(exact) => path == exact,
+                None => path.starts_with(prefix),
+            });
     let port_ok = port == 443
         || port == 80
         || descriptor.allowed_ports.contains(&port)
@@ -642,6 +659,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_path_ending_in_a_dollar_sign_matches_that_exact_path_only() {
+        let d: CredentialDescriptor = serde_json::from_value(serde_json::json!({
+            "host": "h", "header": "authorization", "env": "E",
+            "path_prefixes": ["/gmail/v1/users/me/drafts$", "/calendar/"]
+        }))
+        .unwrap();
+        let ok = |p: &str| credential_allows_request(&d, &reqwest::Method::POST, p, 443);
+        assert!(ok("/gmail/v1/users/me/drafts"));
+        assert!(
+            !ok("/gmail/v1/users/me/drafts/send"),
+            "a draft is not sent by this credential"
+        );
+        assert!(!ok("/gmail/v1/users/me/drafts/"));
+        assert!(!ok("/gmail/v1/users/me/messages/send"));
+        assert!(
+            ok("/calendar/v3/anything"),
+            "a plain prefix still matches by prefix"
+        );
+    }
+
+    #[test]
+    fn a_preview_must_be_a_known_kind_and_belong_to_a_credential_that_asks_for_approval() {
+        let make = |preview: &str, approval: bool| {
+            let mut d = serde_json::json!({"host": "h", "header": "authorization", "env": "E", "preview": preview});
+            if approval {
+                d["requires_approval"] = serde_json::json!(["POST"]);
+            }
+            serde_json::from_value::<CredentialDescriptor>(d).unwrap()
+        };
+        assert!(validate_descriptor("m", &make("gmail-message", true)).is_ok());
+        assert!(validate_descriptor("m", &make("calendar-event", true)).is_ok());
+        assert!(validate_descriptor("m", &make("nonsense", true)).is_err());
+        assert!(validate_descriptor("m", &make("gmail-message", false)).is_err());
+    }
+
+    #[test]
     fn host_suffix_is_boundary_safe() {
         assert!(host_matches("openai.com", "api.openai.com"));
         assert!(host_matches("api.openai.com", "api.openai.com"));
@@ -664,6 +717,7 @@ mod tests {
             approval_kind: None,
             intercept: false,
             require_device_signature: false,
+            preview: None,
             oauth: None,
         };
         assert!(credential_allows_request(

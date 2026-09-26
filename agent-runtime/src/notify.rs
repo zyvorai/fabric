@@ -387,7 +387,35 @@ mod tests {
             decided_at: None,
             source_seq: None,
             grant_scope: None,
+            preview: None,
             broker_held: false,
+        }
+    }
+
+    #[test]
+    fn what_the_person_is_shown_never_goes_to_a_webhook_or_a_relay() {
+        let mut r = record();
+        r.preview = Some(
+            json!({"kind": "gmail-message", "fields": [{"label": "To", "value": "ana@example.com"}]}),
+        );
+        let device = crate::devices::DeviceRecord {
+            user_id: "ana".into(),
+            device_id: "d1".into(),
+            name: None,
+            alg: crate::devices::KeyAlg::Ed25519,
+            public_key: "x".into(),
+            push: None,
+            created_at: chrono::Utc::now(),
+        };
+        for body in [
+            payload(&r, Some("mail-agent"), Some("ana")),
+            device_payload(&r, Some("mail-agent"), &device, b"key"),
+        ] {
+            let text = String::from_utf8(body).unwrap();
+            assert!(
+                !text.contains("ana@example.com") && !text.contains("gmail-message"),
+                "{text}"
+            );
         }
     }
 

@@ -32,6 +32,7 @@ pub mod model_call;
 pub mod notify;
 pub mod policy;
 pub mod pool;
+pub mod preview;
 pub mod proxy;
 pub mod retention;
 pub mod schedules;

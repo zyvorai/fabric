@@ -90,6 +90,7 @@ async fn fixture(state: &Arc<AppState>, base: &SessionRecord, app: &Router, user
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        preview: None,
         broker_held: true,
     };
     state.store.save_approval(approval.clone()).await.unwrap();

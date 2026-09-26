@@ -1074,6 +1074,8 @@ impl Store {
         record.status = status;
         record.comment = comment;
         record.decided_at = Some(Utc::now());
+        // What the person was shown lives only while the question is open.
+        record.preview = None;
         record.grant_scope = if status == ApprovalStatus::Approved {
             scope
         } else {

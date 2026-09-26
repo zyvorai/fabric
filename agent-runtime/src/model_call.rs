@@ -267,6 +267,7 @@ pub(crate) async fn call(
             decided_at: None,
             source_seq: None,
             grant_scope: None,
+            preview: None,
             broker_held: true,
         };
         state
