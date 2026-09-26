@@ -59,7 +59,7 @@ run reconnects by posting again; there is no separate resume call.
 ## Prerequisite: agent sessions need IP networking
 
 `/v1/agui` drives an **agent session**, not a one-click use case. Use-case cells talk to the host over vsock and need no IP networking; an agent session reaches the runtime's egress broker over the network, so the host must
-be set up for it (a FluxVM tap+netns network, or `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` set to an address the guest can reach). On a host that is only set up for use cases the run ends with a `RUN_ERROR` carrying the
+be set up for it (a FluxVM tap+netns network with `dnsmasq` installed on the host for the guest DHCP, and a cell image whose NIC is brought up by `systemd-networkd`, as the `node22-agent` template does since it configures DHCP, or `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` set to an address the guest can reach). On a host that is only set up for use cases the run ends with a `RUN_ERROR` carrying the
 runtime's message (`sandbox did not report a default gateway; use tap+netns or set ZYVOR_AGENT_EGRESS_ADVERTISE_HOST`). Try it first with [`echo-agent`](../../examples/keep-agents/echo-agent/README.md), which needs no model or credentials.
 
 ## Verified, and what is not
