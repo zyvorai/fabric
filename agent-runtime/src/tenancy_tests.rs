@@ -1533,12 +1533,24 @@ async fn goals_are_private_bounded_and_only_cancelled_or_paused_by_their_owner()
 
 #[tokio::test]
 async fn connections_are_private_write_only_and_offered_only_by_the_host() {
+    // a token endpoint on loopback, so the test can mint a real access token and see disconnecting drop it
+    let token_app = Router::new().route(
+        "/token",
+        axum::routing::post(|| async {
+            axum::Json(json!({"access_token": "at-live", "expires_in": 3600}))
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let token_url = format!("http://{}/token", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, token_app).await.unwrap() });
+    std::env::set_var("TEN_ID", "cid");
+    std::env::set_var("TEN_SECRET", "csecret");
     let file = std::env::temp_dir().join(format!("zyvor-conn-{}.json", Uuid::new_v4()));
     std::fs::write(
         &file,
         json!({"gmail-read": {
             "host": "gmail.googleapis.com", "header": "authorization", "kind": "oauth-refresh", "allowed_methods": ["GET"],
-            "oauth": {"token_url": "https://oauth2.googleapis.com/token", "client_id_env": "TEN_ID", "client_secret_env": "TEN_SECRET", "connection": "google"}
+            "oauth": {"token_url": token_url, "client_id_env": "TEN_ID", "client_secret_env": "TEN_SECRET", "connection": "google"}
         }})
         .to_string(),
     )
@@ -1631,6 +1643,41 @@ async fn connections_are_private_write_only_and_offered_only_by_the_host() {
         "the refresh token is write-only"
     );
 
+    // the person's access token is minted from it, and replacing the connection drops the old one
+    let http = reqwest::Client::new();
+    let ana_token = state.store.connections.refresh_token("ana", "google").await;
+    state
+        .credentials
+        .ensure_user_token("gmail-read", "ana", ana_token.as_deref(), &http)
+        .await
+        .unwrap();
+    assert!(state
+        .credentials
+        .resolve_for("gmail-read", Some("ana"))
+        .is_ok());
+    let (st, _) = call(
+        &app,
+        "PUT",
+        "/v1/connections/google",
+        ana,
+        Some(json!({"refresh_token": "1//ana-a-replacement-token"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(
+        state
+            .credentials
+            .resolve_for("gmail-read", Some("ana"))
+            .is_err(),
+        "a new connection drops the access token minted from the old one"
+    );
+    let ana_token = state.store.connections.refresh_token("ana", "google").await;
+    state
+        .credentials
+        .ensure_user_token("gmail-read", "ana", ana_token.as_deref(), &http)
+        .await
+        .unwrap();
+
     // another person is unaffected and cannot disconnect ana's
     let (_, v) = call(&app, "GET", "/v1/connections", ben, None).await;
     assert_eq!(v["items"][0]["connected"], false);
@@ -1643,7 +1690,7 @@ async fn connections_are_private_write_only_and_offered_only_by_the_host() {
             .refresh_token("ana", "google")
             .await
             .as_deref(),
-        Some(secret),
+        Some("1//ana-a-replacement-token"),
         "ana's is untouched"
     );
     let (_, v) = call(&app, "GET", "/v1/connections?user_id=ana", ben, None).await;
@@ -1677,6 +1724,13 @@ async fn connections_are_private_write_only_and_offered_only_by_the_host() {
         .refresh_token("ana", "google")
         .await
         .is_none());
+    assert!(
+        state
+            .credentials
+            .resolve_for("gmail-read", Some("ana"))
+            .is_err(),
+        "disconnecting drops the cached access token at once"
+    );
     let (st, _) = call(&app, "DELETE", "/v1/connections/google", ana, None).await;
     assert_eq!(st, StatusCode::NOT_FOUND, "already disconnected");
     let (st, _) = call(&app, "GET", "/v1/connections", None, None).await;
