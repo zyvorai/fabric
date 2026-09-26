@@ -34,6 +34,7 @@ The stub-cell suites run the fixed extractors as ordinary processes: they prove 
 |---|---|---|
 | Every shipped use case and scenario, each in its own cell, egress count asserted | **62 passed, 0 failed** (two earlier full passes: 57/57, 62/62) | `./scripts/keep-live-scenarios.sh` |
 | Two users, real cells: isolation, revocation, operator routes closed to user tokens, the reference gateway | **14 passed**; the phone-signed approval step is skipped without `KEEP_POLICY_SEED` (18 pass with it, earlier run) | `./scripts/keep-live-tenancy.sh` |
+| AG-UI run of `echo-agent` on a real cell (agent session with guest networking) | One run by hand: 7 events, valid against `@ag-ui/core` 1.0.0; not in CI | [AGUI.md](AGUI.md) |
 | OCR of a photo in a real cell | `receipt-photo` read a generated receipt image | part of the scenarios |
 | Concurrency, before the create gate (csv-clean, 20 runs per pass, concurrency 4) | **3, 3 and 3 of 20 failed** in three passes: FluxVM handed two VMs the same nbd device or mismatched a guest-agent token | a one-off loop, see PR #210 |
 | Concurrency, after the create gate (same load, 3 passes) | **0 of 60 failed**, outbound count 0 in every run | same loop |

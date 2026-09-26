@@ -193,7 +193,9 @@ async function bodyJson(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-const server = http.createServer(async (req, res) => {
+// requireHostHeader: false because older FluxVM builds forward proxied requests without a Host header,
+// and Node answers those with 400 (the runtime's health check then never succeeds).
+const server = http.createServer({ requireHostHeader: false }, async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") return json(res, 200, { ok: true });
