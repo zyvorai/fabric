@@ -108,17 +108,17 @@ phase_fluxvm() {
   fi
   info "building FluxVM from source (its README's Quick start; this takes a while and is experimental)"
   if [[ "$DRY" == 1 ]]; then
-    info "would: install build dependencies (C toolchain, pkg-config, libsystemd, clang, libbpf headers), clone zyvorai/fluxvm and zyvorai/guestkit side by side, run scripts/bootstrap-host.sh vmbr0, cargo build --release, install fluxctl and fluxvm-hypervisor and /etc/fluxvm.toml"
+    info "would: install build dependencies (C toolchain, pkg-config, libsystemd, clang, libbpf headers), clone zyvorai/fluxvm and zyvorai/guestkit side by side, run scripts/bootstrap-host.sh vmbr0, cargo build --release, install fluxctl, fluxvm-hypervisor, a static guest agent, /etc/fluxvm.toml and the fluxvm systemd unit, and start it"
     return
   fi
   # Build dependencies found on a clean Ubuntu 24.04 VM: a C toolchain, pkg-config and libsystemd (guestkit),
-  # clang and libbpf (the guest eBPF objects). The Rust code needs no OpenSSL.
+  # clang and libbpf (the guest eBPF objects), musl-tools (a static guest agent). The Rust code needs no OpenSSL.
   . /etc/os-release 2>/dev/null || true
   if [[ "${ID:-}" == "debian" || "${ID:-}" == "ubuntu" || "${ID_LIKE:-}" == *"debian"* ]]; then
     $SUDO apt-get update -qq
-    $SUDO apt-get install -y -qq build-essential pkg-config libsystemd-dev clang libbpf-dev
+    $SUDO apt-get install -y -qq build-essential pkg-config libsystemd-dev clang libbpf-dev musl-tools
   elif command -v dnf >/dev/null; then
-    $SUDO dnf install -y gcc gcc-c++ make pkgconf-pkg-config systemd-devel clang libbpf-devel
+    $SUDO dnf install -y gcc gcc-c++ make pkgconf-pkg-config systemd-devel clang libbpf-devel musl-gcc
   else
     info "unrecognized package manager: install a C toolchain, pkg-config, libsystemd headers, clang and libbpf headers yourself"
   fi
@@ -129,8 +129,33 @@ phase_fluxvm() {
   ( cd "$d/fluxvm" && $SUDO ./scripts/bootstrap-host.sh vmbr0 && ./scripts/preflight.sh && cargo build --release )
   for b in fluxctl fluxvm-hypervisor; do $SUDO install -m 0755 "$d/fluxvm/target/release/$b" "/usr/local/bin/$b"; done
   [[ -f /etc/fluxvm.toml ]] || $SUDO install -m 0644 "$d/fluxvm/config.example.toml" /etc/fluxvm.toml
+  # The guest agent goes into every cell image, so it is built static (musl): a glibc-linked one fails to start
+  # in a guest with an older glibc. The musl target is added as the login user, who owns the rustup home.
+  if [[ ! -x /usr/local/bin/fluxvm-guest-agent ]]; then
+    info "building the static guest agent"
+    if [[ "$(id -u)" == 0 && -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]]; then
+      sudo -u "$SUDO_USER" -H env "PATH=$PATH" rustup target add x86_64-unknown-linux-musl
+    else
+      rustup target add x86_64-unknown-linux-musl
+    fi
+    ( cd "$d/fluxvm" && cargo build --release -p fluxvm-guest-agent --target x86_64-unknown-linux-musl )
+    $SUDO install -m 0755 "$d/fluxvm/target/x86_64-unknown-linux-musl/release/fluxvm-guest-agent" /usr/local/bin/fluxvm-guest-agent
+  fi
+  # Start the control plane with FluxVM's own unit.
+  if ! fluxvm_ready && systemd_ok; then
+    $SUDO install -m 0644 "$d/fluxvm/systemd/fluxvm.service" /etc/systemd/system/fluxvm.service
+    # The unit sandboxes the daemon with ReadWritePaths for directories a clean machine does not have yet: systemd
+    # fails it with 226/NAMESPACE before any start command runs (an ExecStartPre cannot help). /run is a tmpfs, so
+    # tmpfiles.d creates them now and on every boot.
+    printf 'd /run/netns 0755 root root -\nd /var/lib/kubelet 0755 root root -\n' \
+      | $SUDO tee /etc/tmpfiles.d/fluxvm.conf >/dev/null
+    $SUDO systemd-tmpfiles --create /etc/tmpfiles.d/fluxvm.conf
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable --now fluxvm
+    local i; for i in $(seq 1 30); do fluxvm_ready && break; sleep 1; done
+  fi
   if fluxvm_ready; then ok "FluxVM answers at $FLUXVM_URL"
-  else bad "FluxVM is built and installed but is not answering at $FLUXVM_URL: start its control plane (see the FluxVM docs, operations) and re-run"; fi
+  else bad "FluxVM is installed and its unit started but is not answering at $FLUXVM_URL: see journalctl -u fluxvm"; fi
 }
 
 phase_runtime() {
