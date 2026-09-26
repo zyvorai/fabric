@@ -19,7 +19,8 @@ struct ResultView: View {
                 case .running:
                     VStack(spacing: 6) {
                         SealedCellView(fileName: job.files.map(\.lastPathComponent).joined(separator: ", "))
-                        Text("Reading it in a sealed cell that has no network").font(.headline)
+                        // whether the cell is sealed is only known from the result (a local simulator is not), so this claims nothing yet
+                        Text("Reading it in a cell on your Keep host").font(.headline)
                         Text("A cold cell takes about 15 to 25 seconds.").font(.callout).foregroundStyle(.secondary)
                     }.frame(maxWidth: .infinity)
                 case .failed(let message):

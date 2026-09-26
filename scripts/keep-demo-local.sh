@@ -18,7 +18,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BIN="${KEEP_RUNTIME_BIN:-$ROOT/agent-runtime/target/debug/zyvor-fabric-agent-runtime}"
+BUILD=0
+if [[ -n "${KEEP_RUNTIME_BIN:-}" ]]; then BIN="$KEEP_RUNTIME_BIN"; else BIN="$ROOT/agent-runtime/target/debug/zyvor-fabric-agent-runtime"; BUILD=1; fi
 SIM_PORT="${KEEP_SIM_PORT:-17788}"
 API_PORT="${KEEP_LOCAL_PORT:-19096}"
 EGRESS_PORT="${KEEP_LOCAL_EGRESS_PORT:-18082}"
@@ -35,7 +36,7 @@ MISSING=0
 need python3 "install Python 3"
 need curl "install curl"
 need node "install Node 20 or newer: https://nodejs.org"
-if [[ ! -x "$BIN" ]]; then need cargo "install Rust from https://rustup.rs, or set KEEP_RUNTIME_BIN to a built runtime"; fi
+if (( BUILD )) || [[ ! -x "$BIN" ]]; then need cargo "install Rust from https://rustup.rs, or set KEEP_RUNTIME_BIN to a built runtime"; fi
 (( MISSING == 0 )) || exit 1
 if command -v node >/dev/null 2>&1 && (( $(node -p 'process.versions.node.split(".")[0]') < 20 )); then echo "node 20 or newer is required" >&2; exit 1; fi
 for p in "$SIM_PORT" "$API_PORT" "$EGRESS_PORT"; do
@@ -54,7 +55,9 @@ PIDS=()
 cleanup() { for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null || true; done; wait 2>/dev/null || true; rm -rf "$WORK"; echo; echo "keep-demo-local: stopped, temporary state removed"; }
 trap cleanup EXIT INT TERM
 
-[[ -x "$BIN" ]] || { echo "building the runtime (once)..."; cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml" 2>&1 | tail -2; }
+# always an incremental build (a second or two when nothing changed), so the demo never runs a runtime older than this checkout
+if (( BUILD )); then echo "building the runtime (incremental)..."; cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml" 2>&1 | tail -2; fi
+[[ -x "$BIN" ]] || { echo "no runtime at $BIN" >&2; exit 1; }
 [[ -d "$ROOT/sdk/agent-runtime/node_modules" ]] || npm install --prefix "$ROOT/sdk/agent-runtime" --no-audit --no-fund >/dev/null
 
 OP_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
@@ -67,6 +70,10 @@ env ZYVOR_AGENT_API_TOKEN="$OP_TOKEN" ZYVOR_AGENT_LISTEN="127.0.0.1:$API_PORT" Z
 PIDS+=($!)
 for _ in $(seq 1 100); do curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/healthz" && break; sleep 0.2; done
 curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/healthz" || { echo "the runtime did not start:"; tail -20 "$WORK/runtime.log"; exit 1; }
+
+# an agent to chat with (no model, no credentials): the simulator runs it like any other cell, unsigned because Keep mode is off here
+FABRIC_AGENT_URL="http://127.0.0.1:$API_PORT" FABRIC_AGENT_TOKEN="$OP_TOKEN" node "$ROOT/sdk/agent-runtime/src/cli.js" pack deploy "$ROOT/examples/keep-agents/echo-agent" >"$WORK/echo-agent.out" 2>&1 \
+  || { echo "could not deploy echo-agent:"; tail -5 "$WORK/echo-agent.out"; }
 
 USER_TOKEN="$(curl -fsS -X POST -H "Authorization: Bearer $OP_TOKEN" -H 'content-type: application/json' \
   -d '{"user_id":"demo","scopes":["read","run","approve"],"ttl_seconds":86400}' "http://127.0.0.1:$API_PORT/v1/user-tokens" \
@@ -86,6 +93,10 @@ cat <<OUT
 
   Solvor (Mac app): Settings, Host http://127.0.0.1:$API_PORT, User demo, Token above
     or, in the Solvor repo:  make run KEEP_HOST=http://127.0.0.1:$API_PORT KEEP_TOKEN=$USER_TOKEN
+
+  Chat with the example agent in a browser (a token stays on your machine; the page never sees it):
+
+    KEEP_API=http://127.0.0.1:$API_PORT KEEP_TOKEN=$USER_TOKEN $ROOT/scripts/keep-chat.py --agent echo-agent      # then open http://127.0.0.1:8787
 
   Solvor shows an amber "Simulated, not sealed" notice instead of the proof pill.
   For a real sealed cell, set up a host: scripts/keep-up.sh (needs Linux with KVM).
