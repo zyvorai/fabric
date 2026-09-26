@@ -365,6 +365,38 @@ impl MemoryStore {
         .await
     }
 
+    /// Removes, for every user, entries whose expiry has passed (the user chose that) and, when `proposal_cutoff` is given, proposals an agent
+    /// made before it that nobody accepted or rejected. Accepted entries are never removed here. Returns (expired, stale proposals).
+    pub async fn purge(
+        &self,
+        now: DateTime<Utc>,
+        proposal_cutoff: Option<DateTime<Utc>>,
+    ) -> Result<(usize, usize)> {
+        let _guard = self.write.lock().await;
+        let mut changed: Vec<(String, UserMemory)> = Vec::new();
+        let (mut expired, mut stale) = (0usize, 0usize);
+        for (user, memory) in self.users.read().await.iter() {
+            let mut m = memory.clone();
+            let before = m.items.len();
+            m.items.retain(|i| !i.expired(now));
+            let after_expiry = m.items.len();
+            if let Some(cutoff) = proposal_cutoff {
+                m.items
+                    .retain(|i| !(i.status == Status::Proposed && i.created_at < cutoff));
+            }
+            if m.items.len() != before {
+                expired += before - after_expiry;
+                stale += after_expiry - m.items.len();
+                changed.push((user.clone(), m));
+            }
+        }
+        for (user, m) in changed {
+            self.save(&user, &m).await?;
+            self.users.write().await.insert(user, m);
+        }
+        Ok((expired, stale))
+    }
+
     /// Forgets every entry (the on/off choice stays). Returns how many were removed.
     pub async fn forget_all(&self, user: &str) -> Result<usize> {
         self.edit(user, |m| {

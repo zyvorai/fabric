@@ -82,6 +82,8 @@ pub struct ReceiptStore {
     recent: RwLock<Vec<Receipt>>,
     by_key: RwLock<HashMap<String, Receipt>>,
     in_flight: Arc<StdMutex<HashSet<String>>>,
+    /// Held while the file is appended to or rewritten, so a purge cannot drop a receipt recorded meanwhile.
+    file_lock: tokio::sync::Mutex<()>,
 }
 
 /// Holds an idempotency key while its request is in flight.
@@ -152,6 +154,7 @@ impl ReceiptStore {
             recent: RwLock::new(recent),
             by_key: RwLock::new(by_key),
             in_flight: Arc::default(),
+            file_lock: tokio::sync::Mutex::new(()),
         })
     }
 
@@ -199,6 +202,7 @@ impl ReceiptStore {
     pub async fn record(&self, r: Receipt) -> Result<()> {
         let mut line = serde_json::to_vec(&r)?;
         line.push(b'\n');
+        let _file = self.file_lock.lock().await;
         let mut f = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -218,6 +222,32 @@ impl ReceiptStore {
             recent.remove(0);
         }
         Ok(())
+    }
+
+    /// Forgets receipts made before `cutoff` (from the file, the recent list and the key index). Returns how many. A forgotten receipt no
+    /// longer answers a repeat of its idempotency key: that key can be used again.
+    pub async fn purge_before(&self, cutoff: DateTime<Utc>) -> Result<usize> {
+        let _file = self.file_lock.lock().await;
+        let raw = fs::read_to_string(&self.file).await.unwrap_or_default();
+        let mut kept = String::new();
+        let mut removed = 0usize;
+        for line in raw.lines().filter(|l| !l.trim().is_empty()) {
+            let r: Receipt = serde_json::from_str(line)
+                .with_context(|| format!("decoding {}", self.file.display()))?;
+            if r.at < cutoff {
+                removed += 1;
+            } else {
+                kept.push_str(line);
+                kept.push('\n');
+            }
+        }
+        if removed == 0 {
+            return Ok(0);
+        }
+        crate::store::atomic_write(self.file.clone(), kept.as_bytes()).await?;
+        self.recent.write().await.retain(|r| r.at >= cutoff);
+        self.by_key.write().await.retain(|_, r| r.at >= cutoff);
+        Ok(removed)
     }
 
     /// Newest first. `user` limits to one person's receipts; `None` is everyone's.
