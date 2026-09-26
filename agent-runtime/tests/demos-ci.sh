@@ -740,9 +740,36 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: applicat
 [[ "$code" == "400" ]] || fail "a run with no forwardedProps.agent must be 400, got $code"
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"threadId":"t-2","runId":"r-2","messages":[{"role":"assistant","content":"hi"}],"forwardedProps":{"agent":"model-agent"}}' "$BASE/v1/agui")
 [[ "$code" == "400" ]] || fail "a run with no user message must be 400, got $code"
-code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d "$AGUI_BODY" "$BASE/v1/agui")
-[[ "$code" == "409" ]] || fail "a message on a thread whose session has ended must be 409, got $code"
-ok "AG-UI input errors: no agent 400, no user message 400, an ended thread 409"
+ok "AG-UI input errors: no agent 400, no user message 400"
+
+# the thread outlives the session: a second message on t-1, after its session ended, starts a new session under the same thread,
+# and the client is sent the stored conversation first
+AGUI_NEXT='{"threadId":"t-1","runId":"r-1b","messages":[{"id":"m2","role":"user","content":"What is the total due?"}],"forwardedProps":{"agent":"model-agent"}}'
+agui "$AGUI_NEXT" > "$WORK/agui2.sse" || fail "the second AG-UI run failed"
+python3 - "$WORK/agui2.sse" <<'PY' || fail "the continued thread is wrong: $(head -c 900 "$WORK/agui2.sse")"
+import json, sys
+ev = [json.loads(l[5:]) for l in open(sys.argv[1]) if l.startswith("data:")]
+types = [e["type"] for e in ev]
+assert types[0] == "RUN_STARTED" and types[1] == "MESSAGES_SNAPSHOT", types
+users = [m["content"] for m in ev[1]["messages"] if m["role"] == "user"]
+assert users == ["What is the total due?", "What is the total due?"], ev[1]
+assert len({m["id"] for m in ev[1]["messages"]}) == len(ev[1]["messages"]), "message ids must be unique"
+assert types[-1] == "RUN_FINISHED", types
+PY
+if [[ -d "$WORK/agui/node_modules/@ag-ui" ]]; then
+  node "$ROOT/agent-runtime/tests/agui-conformance.mjs" "$WORK/agui" < "$WORK/agui2.sse" || fail "the continued AG-UI stream does not conform to @ag-ui/core"
+fi
+# the same run sent again (a client retry) is the same session and adds nothing twice
+agui "$AGUI_NEXT" > "$WORK/agui3.sse" || fail "the retried AG-UI run failed"
+python3 - <<PY || fail "the thread API does not show the conversation: $(curl -s "$BASE/v1/threads" | head -c 600)"
+import json, urllib.request
+def get(p): return json.load(urllib.request.urlopen("$BASE" + p))
+t = [x for x in get("/v1/threads")["items"] if x.get("client_thread_id") == "t-1"]
+assert len(t) == 1, t
+users = [m["text"] for m in get("/v1/threads/%s/messages" % t[0]["id"])["items"] if m["role"] == "user"]
+assert users == ["What is the total due?", "What is the total due?"], users
+PY
+ok "an AG-UI thread continues after its session ended, sends the stored conversation, keeps it in /v1/threads, and a retried run adds nothing twice"
 
 # keep-chat: the web chat's proxy talks AG-UI to a real runtime and a stub cell, with the agent fixed and no token in the browser's reach
 (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy examples/keep-agents/echo-agent) >"$WORK/echo-agent.out" 2>&1 || fail "echo-agent deploy failed: $(cat "$WORK/echo-agent.out")"

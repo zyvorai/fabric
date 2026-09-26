@@ -6,8 +6,11 @@
 //! Chat frameworks that speak the AG-UI protocol post a `RunAgentInput` and read a stream of events. This maps one run onto a Keep session
 //! and its events, so such a client can talk to an agent that runs in a sealed cell. It adds no new authority:
 //!
-//! * a session is started (or, for a thread that already has one, steered) through the same functions as `POST /v1/sessions` and
+//! * a session is started (or, for a thread whose session is still running, steered) through the same functions as `POST /v1/sessions` and
 //!   `POST /v1/sessions/{id}/steer`, so scopes, quotas, tenancy and the agent's own policy all apply unchanged;
+//! * the conversation is kept in a [thread](crate::threads): both sides' messages are stored on the host, a thread whose session
+//!   has ended simply starts a new session (given the earlier messages as `history`), and a client that reconnects is sent
+//!   the stored conversation as a `MESSAGES_SNAPSHOT`;
 //! * a user token needs the `run` scope, like starting a session;
 //! * an approval the agent asks for appears as a `CUSTOM` event carrying the prompt. **There is no way to approve or deny from this
 //!   endpoint**: an approval is decided on the user's device, through `/v1/approvals`, and nothing a chat client sends can do it.
@@ -16,6 +19,7 @@ use crate::{
     app::{self, ApiError, ApiResult},
     authz::Principal,
     model::{CreateSessionRequest, SessionEvent, SessionStatus, SteerRequest},
+    threads::{MessageRecord, Role, MAX_PAGE},
     AppState,
 };
 use axum::{
@@ -72,14 +76,31 @@ pub fn last_user_text(messages: &[InMessage]) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-/// A thread's session is found again by a request id that depends on the caller, so two users who pick the same thread id never share a session.
-pub fn thread_request_id(user: Option<&str>, thread_id: &str) -> String {
+/// The request id of the session a run starts: it depends on the thread's own id (which belongs to one user) and the run id, so a
+/// client that retries a run gets the same session back and two users who pick the same run id never share one.
+pub fn run_request_id(thread: uuid::Uuid, run_id: &str) -> String {
     let mut h = Sha256::new();
-    h.update(user.unwrap_or("operator").as_bytes());
-    h.update([0]);
-    h.update(thread_id.as_bytes());
+    h.update(run_id.as_bytes());
     let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
-    format!("agui-{}", &hex[..40])
+    format!("thr:{thread}:{}", &hex[..16])
+}
+
+/// How much of the earlier conversation a new session is given as `history`: the most recent messages, within a size budget.
+const HISTORY_MESSAGES: usize = 20;
+const HISTORY_BYTES: usize = 16 * 1024;
+
+fn history_for_input(prior: &[MessageRecord]) -> Vec<Value> {
+    let mut used = 0;
+    let mut out: Vec<Value> = Vec::new();
+    for m in prior.iter().rev().take(HISTORY_MESSAGES) {
+        used += m.text.len();
+        if used > HISTORY_BYTES {
+            break;
+        }
+        out.push(json!({"role": m.role, "text": m.text}));
+    }
+    out.reverse();
+    out
 }
 
 /// The same shape as a pack name: `^[a-z0-9][a-z0-9-]{0,39}$`.
@@ -92,30 +113,42 @@ fn valid_agent_name(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'-')
 }
 
-/// What the stream is doing between events: whether an assistant text message is open.
+/// What the stream is doing between events: whether an assistant text message is open, and the text of the ones already closed.
 #[derive(Debug, Default)]
 pub struct Mapper {
     open: bool,
+    /// The message ids are `<run id>-a<n>`, so every assistant message of a thread has its own.
+    n: usize,
+    id: String,
+    buf: String,
+    closed: Vec<String>,
 }
-
-const MESSAGE_ID: &str = "keep-assistant";
 
 impl Mapper {
     fn close(&mut self, out: &mut Vec<Value>) {
         if self.open {
-            out.push(json!({"type": "TEXT_MESSAGE_END", "messageId": MESSAGE_ID}));
+            out.push(json!({"type": "TEXT_MESSAGE_END", "messageId": self.id}));
             self.open = false;
+            self.closed.push(std::mem::take(&mut self.buf));
         }
     }
 
-    fn text(&mut self, out: &mut Vec<Value>, delta: &str) {
+    fn text(&mut self, out: &mut Vec<Value>, run_id: &str, delta: &str) {
         if !self.open {
+            self.n += 1;
+            self.id = format!("{run_id}-a{}", self.n);
             out.push(
-                json!({"type": "TEXT_MESSAGE_START", "messageId": MESSAGE_ID, "role": "assistant"}),
+                json!({"type": "TEXT_MESSAGE_START", "messageId": self.id, "role": "assistant"}),
             );
             self.open = true;
         }
-        out.push(json!({"type": "TEXT_MESSAGE_CONTENT", "messageId": MESSAGE_ID, "delta": delta}));
+        self.buf.push_str(delta);
+        out.push(json!({"type": "TEXT_MESSAGE_CONTENT", "messageId": self.id, "delta": delta}));
+    }
+
+    /// The text of the assistant messages that have ended since the last call, to be stored in the thread.
+    pub fn take_closed(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.closed)
     }
 
     /// The AG-UI events for one Keep session event, and whether the run is over.
@@ -128,7 +161,7 @@ impl Mapper {
                 if d.get("stream").and_then(Value::as_str) == Some("stderr") {
                     out.push(json!({"type": "CUSTOM", "name": "keep.log", "value": {"stream": "stderr", "line": line}}));
                 } else {
-                    self.text(&mut out, &format!("{line}\n"));
+                    self.text(&mut out, run_id, &format!("{line}\n"));
                 }
             }
             "approval.requested" => {
@@ -143,7 +176,7 @@ impl Mapper {
             "session.result" => {
                 self.close(&mut out);
                 if let Some(text) = d.as_str() {
-                    self.text(&mut out, text);
+                    self.text(&mut out, run_id, text);
                     self.close(&mut out);
                 }
                 out.push(json!({"type": "RUN_FINISHED", "threadId": thread_id, "runId": run_id, "result": d}));
@@ -208,19 +241,41 @@ pub(crate) async fn agui_run(
             "the message is over {MAX_MESSAGE_BYTES} bytes"
         )));
     }
-    let request_id = thread_request_id(principal.user(), &input.thread_id);
-
-    // A thread keeps one session: the first message starts it, later messages steer it while it runs.
-    let (session_id, mut cursor) = match state
+    // The conversation is a thread owned by the caller (the operator uses the name "operator"). The client's thread id finds it
+    // again; a thread belongs to one agent.
+    let owner = principal.user().unwrap_or("operator").to_string();
+    let title: String = text.chars().take(60).collect();
+    let thread = state
         .store
-        .find_session_by_request_id(&agent, &request_id)
+        .threads
+        .get_or_create(&owner, &agent, &title, Some(&input.thread_id))
         .await
-    {
-        Some(existing) if existing.status.is_terminal() => {
-            return Err(ApiError::conflict(
-                "this thread's session has ended; start a new thread",
-            ));
-        }
+        .map_err(ApiError::bad_request)?;
+    if thread.agent != agent {
+        return Err(ApiError::conflict(format!(
+            "this thread belongs to agent '{}'",
+            thread.agent
+        )));
+    }
+    let prior = state
+        .store
+        .threads
+        .messages(thread.id, 0, MAX_PAGE)
+        .await
+        .map_err(ApiError::internal)?;
+
+    // The thread's session is steered while it runs. When there is none, or it has ended, a new session starts under the same thread
+    // and is given the earlier messages. A retried run finds the session it already started (same request id) and adds nothing twice.
+    let running = match thread.session_id {
+        Some(sid) => state
+            .store
+            .get_session(sid)
+            .await
+            .filter(|s| !s.status.is_terminal()),
+        None => None,
+    };
+    let request_id = run_request_id(thread.id, &input.run_id);
+    let (session_id, mut cursor, is_new_message) = match running {
         Some(existing) => {
             let id = existing.id;
             // the reply of a steer is not needed; an error (the session is not running) ends this run with a clear message
@@ -228,16 +283,21 @@ pub(crate) async fn agui_run(
                 State(state.clone()),
                 Path(id),
                 Json(SteerRequest {
-                    message: Value::String(text),
+                    message: Value::String(text.clone()),
                 }),
             )
             .await?;
-            (id, existing.last_event_seq)
+            (id, existing.last_event_seq, true)
         }
         None => {
             let req = CreateSessionRequest {
-                agent,
-                input: json!({"message": text, "threadId": input.thread_id, "state": input.state}),
+                agent: agent.clone(),
+                input: json!({
+                    "message": text,
+                    "threadId": input.thread_id,
+                    "state": input.state,
+                    "history": history_for_input(&prior),
+                }),
                 ttl_seconds: None,
                 request_id: Some(request_id),
                 start_policy: Default::default(),
@@ -252,21 +312,49 @@ pub(crate) async fn agui_run(
                     "unexpected status {status} creating the session"
                 )));
             }
-            (view.id, 0)
+            // 200 is the same run sent again: its message is already in the thread
+            (view.id, 0, status == StatusCode::CREATED)
         }
     };
+    let threads = &state.store.threads;
+    if is_new_message {
+        threads
+            .append(thread.id, Role::User, &text, Some(session_id), None)
+            .await
+            .map_err(ApiError::internal)?;
+    }
+    threads
+        .set_session(thread.id, Some(session_id))
+        .await
+        .map_err(ApiError::internal)?;
+    // what a reconnecting client needs to show the whole conversation
+    let snapshot: Vec<Value> = if prior.is_empty() {
+        Vec::new()
+    } else {
+        threads
+            .messages(thread.id, 0, MAX_PAGE)
+            .await
+            .map_err(ApiError::internal)?
+            .iter()
+            .map(|m| json!({"id": m.id, "role": m.role, "content": m.text}))
+            .collect()
+    };
 
-    let (thread_id, run_id) = (input.thread_id, input.run_id);
+    let (client_thread, run_id, keep_thread) = (input.thread_id, input.run_id, thread.id);
     let stream = async_stream::stream! {
-        yield Ok(sse(&json!({"type": "RUN_STARTED", "threadId": thread_id, "runId": run_id})));
+        yield Ok(sse(&json!({"type": "RUN_STARTED", "threadId": client_thread, "runId": run_id})));
+        if !snapshot.is_empty() {
+            yield Ok(sse(&json!({"type": "MESSAGES_SNAPSHOT", "messages": snapshot})));
+        }
         let mut mapper = Mapper::default();
         loop {
             match state.store.events_after(session_id, cursor).await {
                 Ok(events) => {
                     for ev in events {
                         cursor = ev.seq;
-                        let (out, done) = mapper.map(&ev, &thread_id, &run_id);
+                        let (out, done) = mapper.map(&ev, &client_thread, &run_id);
                         for v in out { yield Ok(sse(&v)); }
+                        store_closed(&state, keep_thread, session_id, cursor, &mut mapper).await;
                         if done { return; }
                     }
                 }
@@ -280,8 +368,10 @@ pub(crate) async fn agui_run(
                 // drain what arrived between the last read and the status change, then stop
                 if let Ok(events) = state.store.events_after(session_id, cursor).await {
                     for ev in events {
-                        let (out, _) = mapper.map(&ev, &thread_id, &run_id);
+                        cursor = ev.seq;
+                        let (out, _) = mapper.map(&ev, &client_thread, &run_id);
                         for v in out { yield Ok(sse(&v)); }
+                        store_closed(&state, keep_thread, session_id, cursor, &mut mapper).await;
                     }
                 }
                 yield Ok(sse(&json!({"type": "RUN_ERROR", "message": "the session ended without a result", "code": "ended"})));
@@ -291,6 +381,41 @@ pub(crate) async fn agui_run(
         }
     };
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
+/// Stores the assistant messages the mapper has finished as messages of the thread. A failure to store is logged, not sent to the
+/// client: the run itself is fine.
+async fn store_closed(
+    state: &AppState,
+    thread: uuid::Uuid,
+    session: uuid::Uuid,
+    event_seq: u64,
+    mapper: &mut Mapper,
+) {
+    for mut text in mapper.take_closed() {
+        if text.len() > crate::threads::MAX_MESSAGE_BYTES {
+            let mut cut = crate::threads::MAX_MESSAGE_BYTES - 16;
+            while !text.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            text.truncate(cut);
+            text.push_str("\n[truncated]");
+        }
+        if let Err(error) = state
+            .store
+            .threads
+            .append(
+                thread,
+                Role::Assistant,
+                &text,
+                Some(session),
+                Some(event_seq),
+            )
+            .await
+        {
+            tracing::warn!(%error, %thread, "could not store an assistant message");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -334,20 +459,88 @@ mod tests {
     }
 
     #[test]
-    fn a_thread_never_shares_a_session_across_users() {
-        let a = thread_request_id(Some("ana"), "t1");
-        let b = thread_request_id(Some("ben"), "t1");
-        let op = thread_request_id(None, "t1");
-        assert_ne!(a, b);
-        assert_ne!(a, op);
+    fn a_run_request_id_is_stable_per_thread_and_run_and_valid_for_the_runtime() {
+        let (t1, t2) = (uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
         assert_eq!(
-            a,
-            thread_request_id(Some("ana"), "t1"),
-            "stable for the same user and thread"
+            run_request_id(t1, "r1"),
+            run_request_id(t1, "r1"),
+            "a retry finds its session"
         );
-        assert!(a.starts_with("agui-") && a.len() == 45);
-        // a valid request id for the runtime: letters, digits and '-' only
-        assert!(a.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'));
+        assert_ne!(run_request_id(t1, "r1"), run_request_id(t1, "r2"));
+        assert_ne!(
+            run_request_id(t1, "r1"),
+            run_request_id(t2, "r1"),
+            "another thread (another user) never shares it"
+        );
+        let id = run_request_id(t1, &"x".repeat(200));
+        assert!(
+            id.len() <= 128
+                && id
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b':')
+        );
+    }
+
+    #[test]
+    fn history_is_the_recent_messages_within_a_budget() {
+        let mk = |seq: u64, role: Role, text: &str| MessageRecord {
+            id: format!("msg-{seq}"),
+            thread_id: uuid::Uuid::nil(),
+            seq,
+            role,
+            text: text.into(),
+            created_at: Utc::now(),
+            session_id: None,
+            event_seq: None,
+        };
+        let few = vec![mk(1, Role::User, "hi"), mk(2, Role::Assistant, "hello")];
+        let h = history_for_input(&few);
+        assert_eq!(h[0]["role"], "user");
+        assert_eq!(h[1]["text"], "hello");
+        let many: Vec<_> = (1..=50)
+            .map(|i| mk(i, Role::User, &format!("m{i}")))
+            .collect();
+        let h = history_for_input(&many);
+        assert_eq!(h.len(), HISTORY_MESSAGES);
+        assert_eq!(
+            h.last().unwrap()["text"],
+            "m50",
+            "the newest are kept, oldest first"
+        );
+        let big = vec![
+            mk(1, Role::User, &"z".repeat(HISTORY_BYTES + 1)),
+            mk(2, Role::User, "small"),
+        ];
+        let h = history_for_input(&big);
+        assert_eq!(h.len(), 1, "an over-budget message is dropped, not cut");
+    }
+
+    #[test]
+    fn each_assistant_message_has_its_own_id_and_its_text_is_kept() {
+        let mut m = Mapper::default();
+        let (a, _) = m.map(
+            &ev("session.log", json!({"stream": "stdout", "line": "one"})),
+            "t",
+            "run7",
+        );
+        assert_eq!(a[0]["messageId"], "run7-a1");
+        m.map(
+            &ev("approval.requested", json!({"prompt": "ok?"})),
+            "t",
+            "run7",
+        );
+        let (b, _) = m.map(
+            &ev("session.log", json!({"stream": "stdout", "line": "two"})),
+            "t",
+            "run7",
+        );
+        assert_eq!(
+            b[0]["messageId"], "run7-a2",
+            "a message after a pause is a new message"
+        );
+        m.map(&ev("session.result", json!({"ok": true})), "t", "run7");
+        assert_eq!(m.take_closed(), ["one\n", "two\n"]);
+        assert!(m.take_closed().is_empty(), "each is handed over once");
     }
 
     #[test]

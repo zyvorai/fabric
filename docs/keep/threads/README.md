@@ -4,8 +4,9 @@ A thread is a person's conversation with one agent. It outlives any single sessi
 the agent's sessions start and end. Threads live on the **host**, under `threads/<id>/` in the runtime's state directory
 (`thread.json` plus an append-only `messages.jsonl`), never inside a cell.
 
-**Status: the store and the HTTP API are built and tested. The AG-UI endpoint and the chat page do not use them yet**, so a
-chat still starts from nothing after a reload (see [AGUI.md](../AGUI.md)). That wiring is the next change.
+**Status: the store, the HTTP API and the AG-UI endpoint are built and tested.** `POST /v1/agui` keeps every conversation as a thread,
+continues it after the agent's session ended, and sends the stored messages to a reconnecting client ([AGUI.md](../AGUI.md)). **The chat page
+does not yet list or reopen earlier threads**: it starts a new conversation on every page load.
 
 | Route | Who | What |
 |---|---|---|
@@ -20,6 +21,5 @@ chat still starts from nothing after a reload (see [AGUI.md](../AGUI.md)). That 
 
 **Limits.** 500 threads per user, 32 KiB per message (refused, not cut), 120-character titles, 500 messages per page.
 
-**Not built yet.** Retention (threads are kept until forgotten), writing messages from a chat run, resuming a conversation
-after the agent's session ended, and memory. Like the vault, the operator of the host can read this data; it is not
+**Not built yet.** Retention (threads are kept until forgotten), a chat page that lists and reopens threads, and memory. Like the vault, the operator of the host can read this data; it is not
 encrypted to the user.
