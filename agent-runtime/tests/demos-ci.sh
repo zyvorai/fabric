@@ -522,7 +522,25 @@ echo "$b" | grep -qF "SYSTEM (3)" && echo "$b" | grep -qF "Enabled (2)" || fail 
 echo "$b" | grep -qF "EXAMPLE-PC" && fail "windows-scheduled-tasks: the host name leaked: $b"
 ok "windows-scheduled-tasks: states and accounts read, host name not echoed, 0 CONNECT"
 
-for p in expense-sheet nda-review receipt-pdf sales-register-sheet inventory-sheet attendance-sheet invoice-model-brief meeting-notes-model; do
+# bank-operations packs: each sample runs, and the summary carries what the pack promises
+b=$(pack_test neft-rtgs-returns returns.md)
+echo "$b" | grep -qF "1× EXMPR22025031200000089" && echo "$b" | grep -qF "3× EXMP0001234" && echo "$b" | grep -qF "1× INR 2,50,000.00" || fail "neft-rtgs-returns: UTR, IFSC or Indian-grouped amount missing: $b"
+echo "$b" | grep -qF "Invalid IFSC" || fail "neft-rtgs-returns: beneficiary problem line missing: $b"
+ok "neft-rtgs-returns: UTRs, IFSCs and amounts counted, 0 CONNECT"
+b=$(pack_test nach-return-report nach-returns.md)
+echo "$b" | grep -qF "Insufficient funds (3)" && echo "$b" | grep -qF "DEMO BANK (4)" || fail "nach-return-report: reasons or sponsors not counted: $b"
+ok "nach-return-report: returns counted by reason and sponsor, 0 CONNECT"
+b=$(pack_test recon-exceptions recon-exceptions.md)
+echo "$b" | grep -qF "Unmatched debit (3)" && echo "$b" | grep -qF "UPI (3)" && echo "$b" | grep -qF "0-2 days (3)" || fail "recon-exceptions: type, channel or ageing not counted: $b"
+ok "recon-exceptions: exceptions counted by type, channel and age, 0 CONNECT"
+b=$(pack_test upi-dispute-mail disputes.md)
+echo "$b" | grep -qF "2× 506712345678" && echo "$b" | grep -qF "1× Rs 4,999.00" || fail "upi-dispute-mail: follow-up reference or amount missing: $b"
+echo "$b" | grep -qF "ombudsman" || fail "upi-dispute-mail: escalation line missing: $b"
+ok "upi-dispute-mail: references (repeats counted), amounts and escalation, 0 CONNECT"
+# the runtime allows 50 custom use cases, and this script deploys close to that many: drop the four sampled bank packs now
+for p in neft-rtgs-returns nach-return-report recon-exceptions upi-dispute-mail; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
+
+for p in expense-sheet nda-review loan-sanction-letter rbi-circular-brief receipt-pdf sales-register-sheet inventory-sheet attendance-sheet invoice-model-brief meeting-notes-model; do
   (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "examples/keep-agents/$p") > "$WORK/pack-$p.out" 2>&1 || fail "$p: pack deploy failed: $(cat "$WORK/pack-$p.out")"
 done
 ok "expense-sheet, nda-review, receipt-pdf and both model packs deploy (specs validate on the server)"
@@ -584,7 +602,7 @@ code=$(curl -s -o "$WORK/mb.out" -w '%{http_code}' -X POST -F "file=@$WORK/inv.p
 code=$(curl -s -o "$WORK/mn.out" -w '%{http_code}' -X POST -F note=none "$BASE/v1/demos/meeting-notes-model")
 [[ "$code" == "403" ]] && grep -q "refused by the vault" "$WORK/mn.out" || fail "meeting-notes-model must be refused by the vault out of the box (403): $code $(cat "$WORK/mn.out")"
 ok "both model packs are refused (403) until an operator allows their endpoint"
-for p in status-page-watch mailbox-triage api-facts chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims github-prs github-issues github-actions-log dependabot-alerts git-log-digest xcodebuild-log xcode-crash-log vscode-extensions vscode-settings-audit bookmarks-digest browser-history-takeout mac-apps-inventory mac-launch-items windows-services windows-scheduled-tasks expense-sheet nda-review receipt-pdf sales-register-sheet inventory-sheet attendance-sheet invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
+for p in status-page-watch mailbox-triage api-facts loan-sanction-letter rbi-circular-brief chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder mac-system-report homebrew-audit mac-log-triage mac-update-history windows-systeminfo windows-hotfixes windows-installed-software windows-event-log receivables-ageing po-line-items employee-ledger reimbursement-claims github-prs github-issues github-actions-log dependabot-alerts git-log-digest xcodebuild-log xcode-crash-log vscode-extensions vscode-settings-audit bookmarks-digest browser-history-takeout mac-apps-inventory mac-launch-items windows-services windows-scheduled-tasks expense-sheet nda-review receipt-pdf sales-register-sheet inventory-sheet attendance-sheet invoice-model-brief meeting-notes-model; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
 
 echo "demos-ci: an agent uses the model socket"
 MA="$WORK/model-agent"; cp -R "$ROOT/examples/keep-agents/model-agent" "$MA"
