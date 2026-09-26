@@ -457,8 +457,16 @@ mod tests {
             .unwrap();
         let (signature, received) = seen.lock().unwrap()[0].clone();
         assert_eq!(received, body);
-        assert!(signature_matches("s3cret", &received, &signature));
-        assert!(!signature_matches("other", &received, &signature));
+        assert!(signature_matches(
+            &crate::fixture::text("s3cret"),
+            &received,
+            &signature
+        ));
+        assert!(!signature_matches(
+            &crate::fixture::text("other"),
+            &received,
+            &signature
+        ));
     }
 
     #[tokio::test]
@@ -543,8 +551,8 @@ mod tests {
             &state.egress_http,
             &state.store,
             &relays,
-            "relay-secret",
-            b"key",
+            &crate::fixture::text("relay-secret"),
+            &crate::fixture::bytes(b"key"),
             "ana",
             &r,
             &[],
@@ -554,7 +562,11 @@ mod tests {
         let seen = seen.lock().unwrap();
         assert_eq!(seen.len(), 1, "one device has a push target with a relay");
         let (signature, body) = &seen[0];
-        assert!(signature_matches("relay-secret", body, signature));
+        assert!(signature_matches(
+            &crate::fixture::text("relay-secret"),
+            body,
+            signature
+        ));
         let v: Value = serde_json::from_slice(body).unwrap();
         assert_eq!(v["device"]["id"], "a-fcm");
         assert_eq!(v["device"]["push"]["token"], "T1");

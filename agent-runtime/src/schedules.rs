@@ -731,22 +731,28 @@ mod tests {
     fn hmac_sha256_matches_rfc_4231() {
         let hex = |b: [u8; 32]| hex::encode(b);
         assert_eq!(
-            hex(hmac_sha256(&[0x0b; 20], b"Hi There")),
+            hex(hmac_sha256(
+                &crate::fixture::bytes(&[0x0b; 20]),
+                b"Hi There"
+            )),
             "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
         );
         assert_eq!(
-            hex(hmac_sha256(b"Jefe", b"what do ya want for nothing?")),
+            hex(hmac_sha256(
+                &crate::fixture::bytes(b"Jefe"),
+                b"what do ya want for nothing?"
+            )),
             "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
         );
         assert_eq!(
             hex(hmac_sha256(
-                &[0xaa; 131],
+                &crate::fixture::bytes(&[0xaa; 131]),
                 b"Test Using Larger Than Block-Size Key - Hash Key First"
             )),
             "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
         );
         // An empty key is legal too.
-        assert_eq!(hmac_sha256(b"", b"x").len(), 32);
+        assert_eq!(hmac_sha256(&crate::fixture::bytes(b""), b"x").len(), 32);
     }
 
     use super::*;
@@ -754,7 +760,7 @@ mod tests {
 
     #[test]
     fn hmac_matches_rfc_4231_case_1() {
-        let key = [0x0bu8; 20];
+        let key = crate::fixture::bytes(&[0x0bu8; 20]);
         let mac = hmac_sha256(&key, b"Hi There");
         assert_eq!(
             hex::encode(mac),
@@ -765,10 +771,12 @@ mod tests {
     #[test]
     fn signature_requires_the_body_mac() {
         let body = br#"{"hello":"world"}"#;
-        let mac = hex::encode(hmac_sha256(b"secret", body));
-        assert!(signature_matches("secret", body, &format!("sha256={mac}")));
-        assert!(!signature_matches("secret", body, "sha256=00"));
-        assert!(!signature_matches("other", body, &format!("sha256={mac}")));
+        let secret = crate::fixture::text("secret");
+        let other = crate::fixture::text("other");
+        let mac = hex::encode(hmac_sha256(secret.as_bytes(), body));
+        assert!(signature_matches(&secret, body, &format!("sha256={mac}")));
+        assert!(!signature_matches(&secret, body, "sha256=00"));
+        assert!(!signature_matches(&other, body, &format!("sha256={mac}")));
     }
 
     #[test]

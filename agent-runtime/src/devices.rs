@@ -436,7 +436,9 @@ mod tests {
         ed25519_dalek::ed25519::signature::rand_core::OsRng
     }
 
-    const KEY: &[u8] = b"server-key-for-tests";
+    fn server_key() -> Vec<u8> {
+        crate::fixture::bytes(b"server-key-for-tests")
+    }
 
     fn sign_p256(
         sk: &p256::ecdsa::SigningKey,
@@ -444,7 +446,7 @@ mod tests {
         d: ApprovalStatus,
         der: bool,
     ) -> String {
-        let payload = signing_payload(a, d, &challenge(KEY, a));
+        let payload = signing_payload(a, d, &challenge(&server_key(), a));
         let sig: p256::ecdsa::Signature = sk.sign(payload.as_bytes());
         let bytes = if der {
             sig.to_der().as_bytes().to_vec()
@@ -461,7 +463,14 @@ mod tests {
         for der in [true, false] {
             let sig = sign_p256(&sk, &a, ApprovalStatus::Approved, der);
             assert_eq!(
-                verify_decision(KEY, &dev, &a, ApprovalStatus::Approved, &sig, Utc::now()),
+                verify_decision(
+                    &server_key(),
+                    &dev,
+                    &a,
+                    ApprovalStatus::Approved,
+                    &sig,
+                    Utc::now()
+                ),
                 Ok(()),
                 "der={der}"
             );
@@ -472,11 +481,18 @@ mod tests {
     fn an_ed25519_signature_verifies() {
         let (dev, sk) = ed_device();
         let a = approval();
-        let payload = signing_payload(&a, ApprovalStatus::Denied, &challenge(KEY, &a));
+        let payload = signing_payload(&a, ApprovalStatus::Denied, &challenge(&server_key(), &a));
         let sig = base64::engine::general_purpose::STANDARD
             .encode(sk.sign(payload.as_bytes()).to_bytes());
         assert_eq!(
-            verify_decision(KEY, &dev, &a, ApprovalStatus::Denied, &sig, Utc::now()),
+            verify_decision(
+                &server_key(),
+                &dev,
+                &a,
+                ApprovalStatus::Denied,
+                &sig,
+                Utc::now()
+            ),
             Ok(())
         );
     }
@@ -488,14 +504,21 @@ mod tests {
         let approved = sign_p256(&sk, &a, ApprovalStatus::Approved, true);
         // Signed "approved", submitted as "denied".
         assert_eq!(
-            verify_decision(KEY, &dev, &a, ApprovalStatus::Denied, &approved, Utc::now()),
+            verify_decision(
+                &server_key(),
+                &dev,
+                &a,
+                ApprovalStatus::Denied,
+                &approved,
+                Utc::now()
+            ),
             Err(SignError::BadSignature)
         );
         // Replayed onto a different approval.
         let other = approval();
         assert_eq!(
             verify_decision(
-                KEY,
+                &server_key(),
                 &dev,
                 &other,
                 ApprovalStatus::Approved,
@@ -509,7 +532,7 @@ mod tests {
         changed.planned_action = Some(json!({"method": "POST", "body_sha256": "different"}));
         assert_eq!(
             verify_decision(
-                KEY,
+                &server_key(),
                 &dev,
                 &changed,
                 ApprovalStatus::Approved,
@@ -521,7 +544,7 @@ mod tests {
         // Another server's key gives another challenge.
         assert_eq!(
             verify_decision(
-                b"other-server-key",
+                &crate::fixture::bytes(b"other-server-key"),
                 &dev,
                 &a,
                 ApprovalStatus::Approved,
@@ -535,7 +558,14 @@ mod tests {
         let forged = sign_p256(&intruder, &a, ApprovalStatus::Approved, true);
         for bad in [forged.as_str(), "AAAA", "", "not base64!!"] {
             assert_eq!(
-                verify_decision(KEY, &dev, &a, ApprovalStatus::Approved, bad, Utc::now()),
+                verify_decision(
+                    &server_key(),
+                    &dev,
+                    &a,
+                    ApprovalStatus::Approved,
+                    bad,
+                    Utc::now()
+                ),
                 Err(SignError::BadSignature),
                 "{bad:?}"
             );
@@ -549,7 +579,14 @@ mod tests {
         let sig = sign_p256(&sk, &a, ApprovalStatus::Approved, true);
         let late = Utc::now() + Duration::seconds(sign_ttl_seconds() + 5);
         assert_eq!(
-            verify_decision(KEY, &dev, &a, ApprovalStatus::Approved, &sig, late),
+            verify_decision(
+                &server_key(),
+                &dev,
+                &a,
+                ApprovalStatus::Approved,
+                &sig,
+                late
+            ),
             Err(SignError::Expired)
         );
     }
@@ -625,7 +662,7 @@ mod tests {
         for want in &wants {
             assert!(p.contains(want.as_str()), "{want}\n{p}");
         }
-        let info = signing_info(KEY, &a);
+        let info = signing_info(&server_key(), &a);
         assert_eq!(info["challenge"].as_str().unwrap().len(), 32);
         assert_eq!(info["action_sha256"], action_sha256(&a));
     }
@@ -648,7 +685,9 @@ mod tests {
 
     fn build_vectors() -> Value {
         let a = vector_approval();
-        let key = crate::authz::signing_key(Some("vector-operator-token"), None).unwrap();
+        let key =
+            crate::authz::signing_key(Some(&crate::fixture::text("vector-operator-token")), None)
+                .unwrap();
         let ch = challenge(&key, &a);
         let p256_sk = p256::ecdsa::SigningKey::from_slice(&[0x42u8; 32]).unwrap();
         let ed_sk = ed25519_dalek::SigningKey::from_bytes(&[0x07u8; 32]);
