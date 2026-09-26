@@ -405,6 +405,33 @@ echo "$b" | grep -qF "Object storage" || fail "status-page-watch: outage line mi
 echo "$b" | grep -qF "pageview" && fail "status-page-watch: page script leaked into the summary"
 echo "$b" | grep -qF "09:40 UTC" || fail "status-page-watch: times not extracted: $b"
 ok "status-page-watch: html sample ran, script dropped, times extracted, 0 CONNECT"
+
+# keep-watch: the page is fetched on this machine, read by a use case, and a change is the runtime's own diff between two summaries
+SITE="$WORK/site"; mkdir -p "$SITE"; SITE_PORT=$(free_port)
+printf '<html><body><h1>Status</h1><p>All systems operational</p></body></html>' > "$SITE/index.html"
+(cd "$SITE" && exec python3 -m http.server "$SITE_PORT" --bind 127.0.0.1 >/dev/null 2>&1) &
+PIDS+=($!)
+wait_http "http://127.0.0.1:$SITE_PORT/index.html" || fail "the watch test page did not start"
+WATCH="$ROOT/scripts/keep-watch.sh"; export KEEP_WATCH_STATE="$WORK/watch-state"; PAGE="http://127.0.0.1:$SITE_PORT/index.html"
+w() { set +e; out=$("$WATCH" "$PAGE" "$@" 2>&1); rc=$?; set -e; }
+w; [[ $rc == 0 ]] && grep -q "^BASELINE" <<<"$out" || fail "keep-watch first run should record a baseline (rc=$rc): $out"
+w; [[ $rc == 0 ]] && grep -q "^UNCHANGED" <<<"$out" || fail "keep-watch on an unchanged page should say UNCHANGED (rc=$rc): $out"
+printf '<html><body><h1>Status</h1><p>Object storage is down since 09:00 UTC</p></body></html>' > "$SITE/index.html"
+w; [[ $rc == 3 ]] && grep -q "^CHANGED" <<<"$out" && grep -q "is down" <<<"$out" || fail "keep-watch should report the change and exit 3 (rc=$rc): $out"
+w; [[ $rc == 0 ]] && grep -q "^UNCHANGED" <<<"$out" || fail "the change should be reported once, not every run (rc=$rc): $out"
+w --match "all systems operational"; [[ $rc == 0 ]] || fail "--match with no change should not alert (rc=$rc): $out"
+printf '<html><body><h1>Status</h1><p>The incident is resolved. All systems operational</p></body></html>' > "$SITE/index.html"
+w --match "all systems operational"; [[ $rc == 3 ]] && grep -q "^MATCH" <<<"$out" || fail "--match should alert when the text newly appears (rc=$rc): $out"
+printf '<html><body><h1>Status</h1><p>Compute: degraded performance</p></body></html>' > "$SITE/index.html"
+w --match "all systems operational"; [[ $rc == 0 ]] && grep -q "did not newly appear" <<<"$out" || fail "--match should not alert on an unrelated change (rc=$rc): $out"
+BAD=$(free_port)
+rc1=0; rc2=0
+KEEP_WATCH_STATE="$WORK/watch-state2" "$WATCH" "http://127.0.0.1:$BAD/x" --max-failures 2 >/dev/null 2>&1 || rc1=$?
+KEEP_WATCH_STATE="$WORK/watch-state2" "$WATCH" "http://127.0.0.1:$BAD/x" --max-failures 2 >/dev/null 2>&1 || rc2=$?
+[[ $rc1 == 2 && $rc2 == 4 ]] || fail "an unreachable page should exit 2, then 4 after --max-failures (got $rc1, $rc2)"
+"$WATCH" "http://user:pw@example.com/" >/dev/null 2>&1 && fail "a URL with credentials must be refused"
+"$WATCH" "ftp://example.com/" >/dev/null 2>&1 && fail "a non-http URL must be refused"
+ok "keep-watch: baseline, unchanged, a change reported once, --match alerts only on new text, repeated failures escalate, bad URLs refused"
 b=$(pack_test mailbox-triage mailbox-triage.md)
 echo "$b" | grep -qF "1× Invoice 2041 is overdue" && echo "$b" | grep -qF "1× ana@example.com" || fail "mailbox-triage: subjects or senders missing: $b"
 echo "$b" | grep -qF "Please reply" || fail "mailbox-triage: reply section missing: $b"

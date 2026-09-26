@@ -15,6 +15,9 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **`scripts/keep-watch.sh`, page-change tracking with no new server capability.** Fetches a public page on the user's own machine (http/https, 2 MiB, 30 s, no credentials in the URL), reads it with a use case in a cell, and
+  reports the runtime's own diff against the last run: BASELINE, UNCHANGED, or CHANGED with the lines (exit 3), `--match TEXT` to alert only when text newly appears, `--notify`, and escalation to exit 4 after repeated failures.
+  Tested against a real runtime in `demos-ci.sh` (127 checks); cron, launchd and notifications not run. Recipe in `docs/keep/RECIPES.md`.
 - **`POST /v1/agui`, an AG-UI endpoint over Keep sessions.** A chat client that speaks the AG-UI protocol can start an agent in a sealed cell and stream its events; later messages on a thread steer the same session. Through
   the same session code as `/v1/sessions`, so scopes, quotas and tenancy apply (a user token needs `run`; threads are per user). **It cannot approve or deny anything**: an approval request is shown as a `CUSTOM` event and is decided on
   the user's device. The stream is validated against the official `@ag-ui/core` 1.0.0 schemas in `demos-ci.sh` (129 checks) with 8 unit tests and authz tests; no tool-call or state events yet, and not tried with a real chat client.

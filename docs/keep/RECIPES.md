@@ -26,6 +26,27 @@ curl -s -H "Authorization: Bearer $KEEP_TOKEN" "$KEEP_API/v1/artifacts/<artifact
 token**, minted per person by your gateway or operator (`POST /v1/user-tokens`, scopes `run` and `read`), not the operator token.
 Use any pack name in place of `pdf-brief`: the [scenario packs](SCENARIOS.md) and your own.
 
+## Watch a page for changes (verified: the script; unverified: cron and launchd)
+
+`scripts/keep-watch.sh` notices when a public page changes. **The script fetches the page on your machine's network** (http or https only, 2 MiB and 30 s at most, no
+login, no JavaScript); the sealed cell never touches the network. The saved page is read by a use case (by default `status-page-watch`), and a change is the runtime's
+own diff between this summary and the last one, so you see the lines that changed, once.
+
+```bash
+export KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=...      # a user token
+./scripts/keep-watch.sh https://status.example.com                          # first run: BASELINE; later: UNCHANGED, or CHANGED with the lines (exit 3)
+./scripts/keep-watch.sh https://shop.example.com/item --match "in stock"    # alert ONLY when "in stock" newly appears in the summary
+./scripts/keep-watch.sh https://status.example.com --notify                 # also a desktop notification (osascript / notify-send)
+```
+
+Exit codes: `0` unchanged (or the first run), `3` changed (or matched), `2` the fetch or run failed, `4` failed `--max-failures` times in a row (default 3). Run it every few
+minutes from cron (`*/10 * * * * KEEP_API=... KEEP_TOKEN=... /path/to/keep-watch.sh URL --notify`) or a launchd `StartInterval` job; a non-zero exit is your alert. The last
+result per URL is kept in `~/.local/state/keep-watch/`. Use a use case that reads what you care about (your own pack works if it accepts `.html`); a page is judged only as
+well as the pack's keywords match its words. Do not put a password or token in the URL: the script refuses `user:pass@`.
+
+Verified by `agent-runtime/tests/demos-ci.sh` against a local page and a real runtime: baseline, unchanged, a change reported once, `--match` alerting only on new text,
+repeated failures escalating to exit 4, and bad URLs refused. Not verified: cron and launchd themselves, and desktop notifications.
+
 ## Siri, through Apple Shortcuts (unverified)
 
 Siri runs a Shortcut by its name, and a Shortcut can send the two calls above. In the Shortcuts app:
