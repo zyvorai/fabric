@@ -99,7 +99,7 @@ jobs:
           FABRIC_URL=http://127.0.0.1:19095 FABRIC_PASS=smoke-pass \
             FABRICD_BIN="$BIN" FABRICD_PIDFILE="$ROOT/pid" FABRICD_LOG="$ROOT/fabricd.log" \
             ./scripts/smoke-ai-workloads-phases.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: fabricd-log
