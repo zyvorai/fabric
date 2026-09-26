@@ -27,14 +27,16 @@ KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=... ./scripts/keep-chat.py --agent ech
 ```
 
 Your token stays in that process; the browser never sees it. The agent is fixed by `--agent` (the page cannot choose another), nothing else on the host is reachable through it, it listens on `127.0.0.1` only and refuses a
-foreign `Host` or `Origin`. The page renders text with `textContent` only, streams the reply as it arrives, starts a new thread when the agent has finished the last one, shows an approval request as a notice, and cannot approve it.
-It is the lightest client, not a product: one agent, one conversation, no history. With `scripts/keep-demo-local.sh` (a simulator, not sealed) the example agent is already deployed.
+foreign `Host` or `Origin`. The page renders text with `textContent` only, streams the reply as it arrives, shows an approval request as a notice, and cannot approve it.
+It is the lightest client, not a product: one agent, and a new conversation on every page load. The conversation is stored on the host (see `/v1/threads`), but the page does not yet list or reopen earlier threads. With `scripts/keep-demo-local.sh` (a simulator, not sealed) the example agent is already deployed.
 
 ## What happens
 
-- **A thread is one session.** The first run on a `threadId` starts the agent's session with `{"message": <latest user text>, "threadId": ..., "state": ...}` as its input. Later runs on the same thread
-  **steer** the running session with the new message. If the thread's session has ended the run is refused (409): start a new thread. A thread belongs to the caller: two users who pick the
-  same `threadId` never share a session.
+- **A thread is a conversation kept on the host** ([threads](threads/README.md)). The first run on a `threadId` creates the thread and starts the agent's session with
+  `{"message": <latest user text>, "threadId": ..., "state": ..., "history": [...]}` as its input (`history` is empty for a new thread). Both sides' messages are stored. Later runs on the same thread
+  **steer** the session while it runs. When the thread's session has ended, the next run starts a **new session under the same thread**, and `history` carries the most recent earlier messages
+  (up to 20, within 16 KiB) so the agent can continue; an agent that ignores `history` simply starts fresh. A thread belongs to one agent (another agent on the same `threadId` is a 409) and to
+  one caller: two users who pick the same `threadId` never share a thread or a session. Sending the same `runId` again (a client retry) returns the session it already started and stores nothing twice.
 - **Events.** The agent's session events become AG-UI events:
 
 | Keep session event | AG-UI events |
@@ -47,14 +49,17 @@ It is the lightest client, not a product: one agent, one conversation, no histor
 | `approval.requested` | `TEXT_MESSAGE_END` if open, then `CUSTOM` `keep.approval_requested` with the prompt |
 | `session.result` | a text message if the result is a string, then `RUN_FINISHED` with `result` |
 | `session.failed`, `cancelled`, `expired`, `deleted` | `RUN_ERROR` with a `code` |
+| (start, when the thread already has messages) | `MESSAGES_SNAPSHOT` right after `RUN_STARTED`: the stored conversation, including the message just sent |
+
+Assistant message ids are `<runId>-a<n>` (one per message, so every message of a thread has its own id in the stream); the stored copies in `GET /v1/threads/{id}/messages` are `msg-<seq>`, and the snapshot uses those.
 
 ## What it cannot do, on purpose
 
 **A chat client cannot approve or deny anything.** An approval the agent asks for is shown as a `CUSTOM` event so the user knows to look, and it is decided on the user's own device through
 `/v1/approvals` (in Solvor: with Touch ID). Nothing sent to this endpoint can decide one.
 
-Not implemented: tool-call events, `STATE_SNAPSHOT` / `STATE_DELTA`, `MESSAGES_SNAPSHOT`, and token-level streaming of a model's reply (text arrives per stdout line or as the final result). A
-run reconnects by posting again; there is no separate resume call.
+Not implemented: tool-call events, `STATE_SNAPSHOT` / `STATE_DELTA`, and token-level streaming of a model's reply (text arrives per stdout line or as the final result). A
+run reconnects by posting again (the stored conversation is sent as a snapshot); there is no separate resume call, and a run that was cut off is not replayed from where it stopped.
 
 ## Prerequisite: agent sessions need IP networking
 
@@ -64,10 +69,11 @@ runtime's message (`sandbox did not report a default gateway; use tap+netns or s
 
 ## Verified, and what is not
 
+- **Threads over AG-UI** (`demos-ci.sh`, real runtime and stub cell): a second message after the first session ended continues the same thread with a `MESSAGES_SNAPSHOT` of the stored messages (the stream validates against `@ag-ui/core`), `/v1/threads` shows the conversation, and a retried run adds nothing twice. Unit tests cover the message ids, the history budget and the request id.
 - The events are validated against the official `@ag-ui/core` 1.0.0 schemas (`EventSchemas`) with ordering checks (RUN_STARTED first, balanced text messages, one terminal event last) in
   `agent-runtime/tests/agui-conformance.mjs`, run by `demos-ci.sh` against a real runtime and a stub cell with a real agent (`model-agent`). Unit tests cover the event mapping, thread isolation and the
   route's authorisation (a user token may POST `/v1/agui`, and nothing else on that path).
 - **The chat page and its proxy:** 8 unit tests against a fake host (`agent-runtime/tests/keep-chat-test.py`: token added server-side, agent fixed, events streamed as they arrive, foreign host and origin refused, size and JSON limits, errors passed through),
-  a `demos-ci.sh` check against a real runtime and a stub cell, and the page driven in a real browser (typed text is shown literally, the agent's progress note and reply appear, a second message after the agent finished starts a new thread).
+  a `demos-ci.sh` check against a real runtime and a stub cell, and the page driven in a real browser (typed text is shown literally, the agent's progress note and reply appear). **Not re-driven in a browser since threads were added**: the page's handling of a finished session changed (it no longer gets a 409).
 - **On the real lab host (FluxVM, Keep mode):** a signed `echo-agent` was deployed and a run posted to `/v1/agui`. The stream from a real cold-started cell (about 20 s) was `RUN_STARTED`, two `CUSTOM` events, `TEXT_MESSAGE_START/CONTENT/END` ("You said: ...") and `RUN_FINISHED`, and it validated against the `@ag-ui/core` 1.0.0 schemas with the same ordering checks (7 events valid). Reaching that took three fixes: the cell image now brings its NIC up with DHCP, the host needs `dnsmasq`, and the worker must accept requests without a `Host` header (the FluxVM build on that host forwards none, and Node answers 400). This was one run by hand; it is not part of `demos-ci.sh`, which uses a stub cell.
 - **Not tested:** an actual CopilotKit or other AG-UI client. Model-backed agents on a real cell (the `echo-agent` needs no model).

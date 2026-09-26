@@ -24,7 +24,7 @@ async function run(text, retried) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ threadId, runId: crypto.randomUUID(), messages: [{ id: crypto.randomUUID(), role: "user", content: text }], state: {}, forwardedProps: {} }),
   });
-  if (res.status === 409 && !retried) { threadId = crypto.randomUUID(); return run(text, true); }   // the agent finished that thread: start a new one
+  if (res.status === 409 && !retried) { threadId = crypto.randomUUID(); return run(text, true); }   // the thread belongs to another agent (the server keeps a thread with one agent): start a new one
   if (!res.ok) { add("error", "The Keep host answered " + res.status + ": " + (await res.text()).slice(0, 300)); return; }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
