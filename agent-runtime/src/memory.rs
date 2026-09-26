@@ -530,6 +530,19 @@ pub async fn record_proposal(
                     json!({ "user_id": user, "proposal_id": item.id, "tainted": tainted }),
                 )
                 .await;
+            // the person is told there is something to review (generic text; the suggestion itself only if the operator allows it)
+            crate::notify::notify_user(
+                state,
+                user,
+                crate::notify::Notice {
+                    event: "memory.proposed",
+                    title: "Your agent has a suggestion".into(),
+                    body: "Review it in Keep before it is remembered.".into(),
+                    detail_title: format!("Suggestion from {}", session.agent),
+                    detail_body: item.text.chars().take(140).collect(),
+                    data: json!({ "proposal_id": item.id, "tainted": tainted }),
+                },
+            );
         }
         Err(error) => refuse(error.to_string()).await,
     }

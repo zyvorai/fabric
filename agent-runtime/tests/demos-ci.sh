@@ -1037,7 +1037,11 @@ ok "bundle bytes verify; a one-byte change is refused"
 echo "demos-ci: personal memory (an agent that asked for it, a user who turned it on, proposals the user decides)"
 # its own runtime: the Keep-mode one above limits each user to 3 runs a day for the quota checks further down
 MEM_PORT=$(free_port); MEM_EGRESS=$(free_port); MEM_BASE="http://127.0.0.1:$MEM_PORT"
-start_runtime mem-runtime "$MEM_PORT" "$MEM_EGRESS" ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
+NOTICE_RELAY_PORT=$(free_port)
+RELAY_STUB_LOG="$WORK/notice-relay.log" python3 "$ROOT/agent-runtime/tests/relay_stub.py" "$NOTICE_RELAY_PORT" >"$WORK/notice-relay-stub.log" 2>&1 &
+PIDS+=($!)
+: >"$WORK/notice-relay.log"
+start_runtime mem-runtime "$MEM_PORT" "$MEM_EGRESS" ZYVOR_AGENT_PUSH_RELAYS="{\"fcm\":\"http://127.0.0.1:$NOTICE_RELAY_PORT/push\"}" ZYVOR_AGENT_PUSH_RELAY_SECRET=notice-relay-secret ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
 wait_http "$MEM_BASE/healthz" || fail "the memory-test runtime did not start: $(tail -5 "$WORK/mem-runtime.log")"
 MEMPACK="$WORK/memory-agent"; cp -R "$ROOT/examples/keep-agents/memory-agent" "$MEMPACK"
 printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$MEMPACK/keep.policy.yaml"
@@ -1080,6 +1084,35 @@ r=$(mem_chat "$DAN" mem-6 "what do you remember?"); [[ "$r" == *"do not remember
 mem_api "$CAM" PUT /v1/memory/settings -d '{"enabled":false}' >/dev/null
 r=$(mem_chat "$CAM" mem-7 "what do you remember?"); [[ "$r" == *"do not remember anything"* ]] || fail "turning memory off must stop it reaching the agent: $r"
 ok "another user gets none of it and cannot touch it; turning memory off stops it reaching the agent"
+
+echo "demos-ci: push notices (a suggestion and a finished goal reach the person's phone, generically, and nothing in them can decide anything)"
+NPHONE="node $ROOT/sdk/agent-runtime/src/phone-cli.js"
+$NPHONE keygen "$WORK/cam.key" p256 >/dev/null
+$NPHONE enrol "$WORK/cam.key" cam-phone --push-kind fcm --push-token CAMTOKEN > "$WORK/cam-enrol.json"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' --data-binary @"$WORK/cam-enrol.json" "$MEM_BASE/v1/users/cam/devices")" == "201" ]] || fail "enrolling cam's phone should be 201"
+: >"$WORK/notice-relay.log"
+mem_api "$CAM" PUT /v1/memory/settings -d '{"enabled":true}' >/dev/null
+r=$(mem_chat "$CAM" mem-notice "remember I like the window seat") || fail "the suggesting run failed"
+GN=$(mem_api "$CAM" POST /v1/goals -d '{"title":"Secret plan for Goa","agent":"memory-agent","autorun":true,"plan":[{"title":"go","input":{"message":"what do you remember?"}}]}' | json id) || fail "goal for the notice check"
+for _ in $(seq 1 100); do grep -q '"goal.done"\|goal.done' "$WORK/notice-relay.log" && grep -q "memory.proposed" "$WORK/notice-relay.log" && break; sleep 0.3; done
+python3 - "$WORK/notice-relay.log" <<'PY' || fail "the phone relay did not get the expected notices: $(cat "$WORK/notice-relay.log")"
+import json, sys, hmac, hashlib
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+got = {r["event"]: r for r in rows}
+assert "memory.proposed" in got and "goal.done" in got, [r["event"] for r in rows]
+for ev in ("memory.proposed", "goal.done"):
+    r = got[ev]
+    want = "sha256=" + hmac.new(b"notice-relay-secret", r["body"].encode(), hashlib.sha256).hexdigest()
+    assert r["sig"] == want, "the notice must be signed with the relay secret"
+    b = json.loads(r["body"])
+    assert b["device"]["id"] == "cam-phone" and b["kind"] == "notice", b
+    for absent in ("sign", "decide", "approval"):
+        assert absent not in b, "a notice must not carry anything to decide with: " + absent
+    text = json.dumps(b["ui"])
+    assert "window seat" not in text and "Goa" not in text, "generic text only: " + text
+assert "proposal_id" in json.loads(got["memory.proposed"]["body"])["data"] and "goal_id" in json.loads(got["goal.done"]["body"])["data"]
+PY
+ok "cam's phone got a signed suggestion notice and a goal-done notice with generic text and only ids; nothing in them can decide anything"
 
 echo "demos-ci: a user's own goals (created with their token, run as them, private, cancellable)"
 GID=$(mem_api "$CAM" POST /v1/goals -d '{"title":"Recall","agent":"memory-agent","autorun":true,"plan":[{"title":"recall","input":{"message":"what do you remember?"}}]}' | json id) || fail "a user could not create a goal"
