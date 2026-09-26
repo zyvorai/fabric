@@ -15,6 +15,8 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **`echo-agent`**, an agent with no model, credentials or network, to try `POST /v1/agui` end to end; AG-UI now also passes on events an agent emits with `ctx.emit` as `CUSTOM` `keep.event`. Docs record a real-host finding: agent sessions need IP
+  networking on the host (`ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` or tap+netns); on the use-case-only lab host the run ended with the runtime's refusal delivered as a valid `RUN_ERROR`, so only AG-UI's error path is verified on a real cell.
 - **`scripts/keep-watch.sh`, page-change tracking with no new server capability.** Fetches a public page on the user's own machine (http/https, 2 MiB, 30 s, no credentials in the URL), reads it with a use case in a cell, and
   reports the runtime's own diff against the last run: BASELINE, UNCHANGED, or CHANGED with the lines (exit 3), `--match TEXT` to alert only when text newly appears, `--notify`, and escalation to exit 4 after repeated failures.
   Tested against a real runtime in `demos-ci.sh` (127 checks); cron, launchd and notifications not run. Recipe in `docs/keep/RECIPES.md`.

@@ -31,6 +31,7 @@ curl -N -X POST "$KEEP_API/v1/agui" -H "Authorization: Bearer $KEEP_TOKEN" -H 'c
 | `session.log`, stdout | `TEXT_MESSAGE_START` (once), `TEXT_MESSAGE_CONTENT` per line |
 | `session.log`, stderr | `CUSTOM` `keep.log` (not assistant text) |
 | `session.waiting`, `session.running` | `CUSTOM` `keep.waiting`, `keep.running` |
+| an event the agent emitted with `ctx.emit` | `CUSTOM` `keep.event` with `{kind, data}` |
 | `approval.requested` | `TEXT_MESSAGE_END` if open, then `CUSTOM` `keep.approval_requested` with the prompt |
 | `session.result` | a text message if the result is a string, then `RUN_FINISHED` with `result` |
 | `session.failed`, `cancelled`, `expired`, `deleted` | `RUN_ERROR` with a `code` |
@@ -43,9 +44,17 @@ curl -N -X POST "$KEEP_API/v1/agui" -H "Authorization: Bearer $KEEP_TOKEN" -H 'c
 Not implemented: tool-call events, `STATE_SNAPSHOT` / `STATE_DELTA`, `MESSAGES_SNAPSHOT`, and token-level streaming of a model's reply (text arrives per stdout line or as the final result). A
 run reconnects by posting again; there is no separate resume call.
 
+## Prerequisite: agent sessions need IP networking
+
+`/v1/agui` drives an **agent session**, not a one-click use case. Use-case cells talk to the host over vsock and need no IP networking; an agent session reaches the runtime's egress broker over the network, so the host must
+be set up for it (a FluxVM tap+netns network, or `ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` set to an address the guest can reach). On a host that is only set up for use cases the run ends with a `RUN_ERROR` carrying the
+runtime's message (`sandbox did not report a default gateway; use tap+netns or set ZYVOR_AGENT_EGRESS_ADVERTISE_HOST`). Try it first with [`echo-agent`](../../examples/keep-agents/echo-agent/README.md), which needs no model or credentials.
+
 ## Verified, and what is not
 
 - The events are validated against the official `@ag-ui/core` 1.0.0 schemas (`EventSchemas`) with ordering checks (RUN_STARTED first, balanced text messages, one terminal event last) in
   `agent-runtime/tests/agui-conformance.mjs`, run by `demos-ci.sh` against a real runtime and a stub cell with a real agent (`model-agent`). Unit tests cover the event mapping, thread isolation and the
   route's authorisation (a user token may POST `/v1/agui`, and nothing else on that path).
-- **Not tested:** against an actual CopilotKit or other AG-UI client, and against a live FluxVM cell.
+- **On the real lab host (FluxVM, Keep mode):** a signed agent was deployed and a run posted. The host is set up only for use cases, so the run ended with the runtime's own refusal, delivered as a valid `RUN_ERROR` (the stream
+  validated against the `@ag-ui/core` schemas). That checks the endpoint, the authorisation and the error path on a real host; **the successful path on a real cell is not tested**, because that host has no agent networking.
+- **Not tested:** an actual CopilotKit or other AG-UI client, and a successful run on a real FluxVM cell.
