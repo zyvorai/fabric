@@ -282,6 +282,10 @@ Muse got the threat model right. Keep is the version you run, read and take with
 
 Full matrix: [homepage matrix](https://zyvorai.github.io/fabric/?t=stack#matrix). Longer read: [Keep vs Meta Muse](https://zyvor.dev/blog/keep-vs-meta-muse).
 
+**Keep and open-source agent apps.** [OpenMuse](https://github.com/CopilotKit/openmuse) (CopilotKit, MIT) is an app: chat on three platforms, connectors, durable tasks. Keep is the sealed
+runtime under such an app: a microVM, a host-enforced deny-all network policy and device-signed approvals. They fit together more than they compete; see
+[Keep and OpenMuse](KEEP-AND-OPENMUSE.md) for a dated, sourced comparison, including where OpenMuse is ahead today.
+
 Sources for the Muse column: [MarkTechPost, 2026-09-08](https://www.marktechpost.com/2026/09/08/meta-introduces-muse-a-personal-ai-agent-that-runs-on-its-own-dedicated-secure-cloud-computer/) · [Vellum, "Official Muse Breakdown"](https://www.vellum.ai/blog/official-muse-breakdown) · [DEV Community, "Meta Muse and the Secure VM Bet"](https://dev.to/ifynx_studio/meta-muse-and-the-secure-vm-bet-personal-agents-that-act-without-owning-your-secrets-1ik4). Zyvor is not affiliated with Meta; if a Muse row is out of date, please open an issue.
 
 ## Where everything lives
