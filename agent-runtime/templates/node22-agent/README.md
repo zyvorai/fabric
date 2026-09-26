@@ -45,3 +45,8 @@ Re-running skips the build if the image already exists (add `--force` to rebuild
 
 - Firecracker cells: `./scripts/keep-bake-fc-rootfs.sh` turns this image into a flat rootfs (`node22-fc`).
 - Browser cells: [`../browser-agent/`](../browser-agent/README.md).
+
+## Guest networking
+
+The image configures its NIC with systemd-networkd and DHCP (`/etc/systemd/network/20-keep.network`, matching `en*`). A cloud image ships **no** network configuration, so before this the interface stayed down: use-case cells never noticed (the host reaches them over
+vsock), but an **agent session** reaches the runtime's egress broker over IP and ended with `sandbox did not report a default gateway`. With the NIC up, FluxVM's tap+netns DHCP gives the guest an address and a default route. A template baked before this change still works for use cases.
