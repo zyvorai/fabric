@@ -251,6 +251,17 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
             Some(gid) => UserRoute::Goal(gid, Scope::Run),
             None => UserRoute::Denied,
         },
+        // Ask for a plan, and accept or reject the one an agent proposed (nothing in a proposal runs until the person accepts it).
+        ["v1", "goals", gid, "plan"] if *method == Method::POST => match id(gid) {
+            Some(gid) => UserRoute::Goal(gid, Scope::Run),
+            None => UserRoute::Denied,
+        },
+        ["v1", "goals", gid, "plan", "accept" | "reject"] if *method == Method::POST => {
+            match id(gid) {
+                Some(gid) => UserRoute::Goal(gid, Scope::Run),
+                None => UserRoute::Denied,
+            }
+        }
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),

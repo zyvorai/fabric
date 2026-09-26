@@ -1530,3 +1530,205 @@ async fn goals_are_private_bounded_and_only_cancelled_or_paused_by_their_owner()
     let (st, _) = call(&w.app, "GET", "/v1/goals", None, None).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn a_plan_is_proposed_by_the_planner_and_only_the_owner_can_accept_or_reject_it() {
+    let w = world().await;
+    let (ana, ben) = (Some(w.ana.token.as_str()), Some(w.ben.token.as_str()));
+    let agent = w
+        .state
+        .store
+        .get_session(w.ana.session)
+        .await
+        .unwrap()
+        .agent;
+    w.state
+        .store
+        .deploy_agent(crate::model::DeployAgentRequest {
+            name: agent.clone(),
+            bundle_base64: base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                "export default 1",
+            ),
+            manifest: crate::egress::ask_tests::manifest(crate::model::EgressMode::Deny, Some(30)),
+        })
+        .await
+        .unwrap();
+    let (st, g) = call(
+        &w.app,
+        "POST",
+        "/v1/goals",
+        ana,
+        Some(json!({"title": "Trip to Lisbon", "agent": agent})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{g}");
+    let gid = g["id"].as_str().unwrap().to_string();
+    let uid: Uuid = gid.parse().unwrap();
+    let plan_path = format!("/v1/goals/{gid}/plan");
+
+    // asking for a plan: refused without a planner, or with one that is not deployed; someone else's goal is a 404
+    let (st, v) = call(&w.app, "POST", &plan_path, ana, None).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &plan_path,
+        ana,
+        Some(json!({"planner": "no-such-planner"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &plan_path,
+        ben,
+        Some(json!({"planner": agent})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::NOT_FOUND, "another user's goal");
+    let (st, _) = call(&w.app, "POST", &plan_path, None, None).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+
+    // a session that was not started to plan this goal cannot propose anything
+    let ana_session = w.state.store.get_session(w.ana.session).await.unwrap();
+    let data = json!({"steps": [{"title": "Find flights", "input": {"message": "flights to Lisbon"}}, {"title": "Book one", "requires_approval": true}]});
+    crate::goal_plan::record_proposal(&w.state, &ana_session, &data).await;
+    let events = w.state.store.events_after(ana_session.id, 0).await.unwrap();
+    assert!(
+        events.iter().any(|e| e.kind == "goal.plan_refused"),
+        "no planning session, no proposal"
+    );
+    let (_, v) = call(&w.app, "GET", &format!("/v1/goals/{gid}"), ana, None).await;
+    assert!(v.get("proposed_plan").is_none());
+
+    // the planning session started for the goal proposes once; a bad plan is refused and stored as nothing
+    let mut goal = w.state.store.get_goal(uid).await.unwrap();
+    goal.planning_session_id = Some(ana_session.id);
+    w.state.store.save_goal(goal).await.unwrap();
+    crate::goal_plan::record_proposal(&w.state, &ana_session, &json!({"steps": []})).await;
+    let (_, v) = call(&w.app, "GET", &format!("/v1/goals/{gid}"), ana, None).await;
+    assert!(
+        v.get("proposed_plan").is_none(),
+        "an empty plan is not a proposal"
+    );
+    crate::goal_plan::record_proposal(&w.state, &ana_session, &data).await;
+    crate::goal_plan::record_proposal(
+        &w.state,
+        &ana_session,
+        &json!({"steps": [{"title": "second try"}]}),
+    )
+    .await;
+    let (_, v) = call(&w.app, "GET", &format!("/v1/goals/{gid}"), ana, None).await;
+    let titles: Vec<&str> = v["proposed_plan"]["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        titles,
+        ["Find flights", "Book one"],
+        "one proposal per planning session"
+    );
+    assert_eq!(
+        v["plan"].as_array().unwrap().len(),
+        0,
+        "nothing is in the plan until it is accepted"
+    );
+
+    // another user sees and decides nothing
+    for path in [
+        format!("/v1/goals/{gid}/plan/accept"),
+        format!("/v1/goals/{gid}/plan/reject"),
+    ] {
+        let (st, _) = call(&w.app, "POST", &path, ben, None).await;
+        assert_eq!(st, StatusCode::NOT_FOUND, "{path}");
+    }
+    let (_, v) = call(&w.app, "GET", "/v1/goals", ben, None).await;
+    assert!(v["items"].as_array().unwrap().is_empty());
+
+    // the journal knows a plan was proposed and how long, not what it said
+    let journal =
+        serde_json::to_string(&w.state.store.audit.list(None, 200).await.unwrap()).unwrap();
+    assert!(
+        journal.contains("keep.goal.plan_proposed")
+            && !journal.contains("Find flights")
+            && !journal.contains("flights to Lisbon"),
+        "{journal}"
+    );
+
+    // a planner that had read untrusted content needs an explicit confirmation
+    w.state
+        .store
+        .update_session(ana_session.id, |s| {
+            s.tainted_by = vec!["evil.example".into()]
+        })
+        .await
+        .unwrap();
+    let mut goal = w.state.store.get_goal(uid).await.unwrap();
+    goal.proposed_plan.as_mut().unwrap().tainted = true;
+    w.state.store.save_goal(goal).await.unwrap();
+    let (st, v) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/goals/{gid}/plan/accept"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT, "{v}");
+    assert!(v["error"].as_str().unwrap().contains("confirm_tainted"));
+    // rejecting throws it away; a new proposal can be accepted, with the goal's own opt-in to run it
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/goals/{gid}/plan/reject"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/goals/{gid}/plan/accept"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT, "nothing left to accept");
+    let mut goal = w.state.store.get_goal(uid).await.unwrap();
+    goal.planning_session_id = Some(ana_session.id);
+    w.state.store.save_goal(goal).await.unwrap();
+    crate::goal_plan::record_proposal(&w.state, &ana_session, &data).await;
+    let (st, v) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/goals/{gid}/plan/accept"),
+        ana,
+        Some(json!({"confirm_tainted": true, "autorun": true})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(v["plan"].as_array().unwrap().len(), 2);
+    assert_eq!(v["plan"][0]["id"], "s1");
+    assert_eq!(
+        v["plan"][0]["input"],
+        json!({"message": "flights to Lisbon"})
+    );
+    assert_eq!(v["plan"][1]["requires_approval"], true);
+    assert_eq!(v["autorun"], true);
+    assert!(v.get("proposed_plan").is_none());
+    // a goal with a plan cannot be planned again
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &plan_path,
+        ana,
+        Some(json!({"planner": agent})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT);
+}

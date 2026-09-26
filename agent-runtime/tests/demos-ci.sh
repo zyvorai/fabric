@@ -719,6 +719,38 @@ assert "sk-e2e-secret-key" not in json.dumps(rows), "no key belongs in this requ
 PY
 ok "an agent called ctx.model.chat(): runtime env -> worker -> egress broker -> the socket's endpoint, and the reply came back"
 
+echo "demos-ci: a goal is planned by an agent, and nothing runs until the person accepts the plan"
+GP="$WORK/goal-planner"; cp -R "$ROOT/examples/keep-agents/goal-planner" "$GP"
+python3 - "$GP/pack.json" "$MODEL_PORT" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+m = p["manifest"]
+m.update({"template": "ci", "credentials": ["llm-local"], "egress_mode": "ask", "egress_allow_hosts": ["127.0.0.1"], "allow_private_networks": True})
+m["model_socket"] = {"base_url": "http://127.0.0.1:%s/v1" % sys.argv[2], "model": "tiny-1", "credential": "llm-local"}
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$GP") >"$WORK/goal-planner.out" 2>&1 || fail "goal-planner deploy failed: $(cat "$WORK/goal-planner.out")"
+PGID=$(curl -sf -X POST -H 'content-type: application/json' -d '{"title":"Sort the invoices","description":"two invoices to check","agent":"model-agent"}' "$BASE/v1/goals" | json id) || fail "create the goal to plan"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/goals/$PGID/plan")" == "400" ]] || fail "planning with no planner named or configured must be refused"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"planner":"goal-planner"}' "$BASE/v1/goals/$PGID/plan")" == "202" ]] || fail "asking the planner should be accepted (202)"
+for _ in $(seq 1 100); do
+  curl -sf "$BASE/v1/goals/$PGID" | python3 -c 'import json,sys; sys.exit(0 if "proposed_plan" in json.load(sys.stdin) else 1)' && break; sleep 0.3
+done
+curl -sf "$BASE/v1/goals/$PGID" | python3 -c 'import json,sys
+g=json.load(sys.stdin)
+p=g["proposed_plan"]
+assert [s["title"] for s in p["steps"]]==["Two invoices found","<b>Total</b> due: 4,200 EUR"], p
+assert p["steps"][0]["input"]=={"message":"Two invoices found"} and p["tainted"] is False, p
+assert g["plan"]==[] and g["autorun"] is False, g' || fail "the goal should hold the planner's proposal and nothing else: $(curl -s "$BASE/v1/goals/$PGID")"
+ok "the planner agent proposed steps (from the model socket) and they wait on the goal; the plan is still empty"
+curl -sf "$BASE/v1/audit?limit=500" | python3 -c 'import sys; t=sys.stdin.read(); assert "keep.goal.plan_requested" in t and "keep.goal.plan_proposed" in t; assert "Two invoices found" not in t.replace("Sort the invoices","")' || fail "the journal should record the request and the proposal, not the steps"
+curl -sf -X POST "$BASE/v1/goals/$PGID/plan/accept" | python3 -c 'import json,sys
+g=json.load(sys.stdin)
+assert len(g["plan"])==2 and g["plan"][0]["id"]=="s1" and g["plan"][0]["status"]=="pending" and "proposed_plan" not in g, g' || fail "accepting should turn the proposal into the plan"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/goals/$PGID/plan/accept")" == "409" ]] || fail "a second accept has nothing to accept"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"planner":"goal-planner"}' "$BASE/v1/goals/$PGID/plan")" == "409" ]] || fail "a goal with a plan cannot be planned again"
+ok "the person accepts: the proposal becomes the plan (pending, not running); a goal with a plan is not planned again"
+
 echo "demos-ci: AG-UI (a chat client's run over a Keep session)"
 agui() { curl -sN --max-time 90 -X POST -H 'content-type: application/json' -d "$1" "$BASE/v1/agui"; }
 AGUI_BODY='{"threadId":"t-1","runId":"r-1","messages":[{"id":"m1","role":"user","content":"What is the total due?"}],"state":{},"tools":[],"context":[],"forwardedProps":{"agent":"model-agent"}}'
