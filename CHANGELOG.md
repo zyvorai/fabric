@@ -15,6 +15,9 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **`scripts/keep-up.sh`, a one-command Keep host.** Run on a Linux machine: preflight (Linux, x86_64, KVM, systemd, memory, disk, tools; refuses honestly), FluxVM check
+  or `--install-fluxvm` (experimental, from source), the Keep runtime via the new `deploy-keep.sh local`, the cell template, then a scoped 1-7 day user token and the exact Solvor
+  settings. `deploy-keep.sh` gains a `local` target and no longer requires fabricd. Tested with fake facts and a fake curl (6 checks); not yet run on a clean machine.
 - **Bank operations packs.** Six declarative packs for a bank's operations teams: `neft-rtgs-returns`,
   `nach-return-report`, `recon-exceptions`, `upi-dispute-mail`, `loan-sanction-letter` and `rbi-circular-brief`, each
   with a README and (except the two PDF ones) a synthetic sample, plus `docs/keep/BANK-OPERATIONS.md`. Declarative, so

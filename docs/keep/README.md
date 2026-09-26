@@ -227,6 +227,21 @@ The extractor is a fixed list (`pdftotext` or `text`), never a command. Referenc
 
 ## Install it on a host
 
+**On the Linux host itself** (KVM, systemd, x86_64, 4 GiB RAM, 20 GiB disk; Rust and Node 20+ installed):
+
+```bash
+sudo ./scripts/keep-up.sh --dry-run    # checks the machine and prints the plan; changes nothing
+sudo ./scripts/keep-up.sh              # FluxVM already installed: runtime, cell template, then a Solvor token
+sudo ./scripts/keep-up.sh --install-fluxvm   # also builds FluxVM from source (experimental, see below)
+```
+
+It ends by printing the exact [Solvor](https://github.com/zyvorai/solvor) settings and a 7-day user token (not the operator token, not saved to disk).
+The preflight refuses a machine without `/dev/kvm` rather than pretend a cell is sealed. **Verified:** the checks, `--dry-run` and the token
+step (fake facts, `agent-runtime/tests/keep-up.sh`), and the runtime and template steps it reuses (they are what the lab host runs). **Not yet verified:**
+a run on a clean machine from nothing, and `--install-fluxvm`, which follows FluxVM's Quick start but has not been run end to end.
+
+**From your laptop, over ssh:**
+
 ```bash
 ./scripts/deploy keep user@host     # needs FluxVM on the host
 keepctl doctor                       # checks the install
