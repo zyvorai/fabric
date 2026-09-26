@@ -349,11 +349,11 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/v1/goals",
-            get(crate::goals::list_goals).post(crate::goals::create_goal),
+            get(crate::goals::list_goals).post(crate::goals::create_goal_route),
         )
         .route(
             "/v1/goals/{id}",
-            get(crate::goals::get_goal).patch(crate::goals::patch_goal),
+            get(crate::goals::get_goal_route).patch(crate::goals::patch_goal_route),
         )
         .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
         .route(
@@ -534,6 +534,7 @@ async fn api_auth(
             UserRoute::Approval(aid, s) => (*s, authz::owns_approval(&state, id, *aid).await),
             UserRoute::OwnUser(uid, s) => (*s, uid == id),
             UserRoute::Thread(tid, s) => (*s, authz::owns_thread(&state, id, *tid).await),
+            UserRoute::Goal(gid, s) => (*s, authz::owns_goal(&state, id, *gid).await),
             UserRoute::Artifacts(ids, s) => {
                 let mut all = true;
                 for a in ids {
