@@ -887,6 +887,9 @@ mod tests {
     #[test]
     fn every_shipped_usecase_pack_validates() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/keep-agents");
+        // the contributor template must stay a valid pack too, or the guide would hand people a broken file
+        let template =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/keep/pack-template");
         let pack_only = [
             "kind",
             "name",
@@ -902,8 +905,9 @@ mod tests {
             .flatten()
             .collect();
         entries.sort_by_key(|e| e.file_name());
-        for entry in entries {
-            let root = entry.path();
+        let mut roots: Vec<std::path::PathBuf> = entries.into_iter().map(|e| e.path()).collect();
+        roots.push(template);
+        for root in roots {
             let Ok(raw) = std::fs::read_to_string(root.join("pack.json")) else {
                 continue;
             };
