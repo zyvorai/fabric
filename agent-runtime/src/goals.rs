@@ -697,6 +697,8 @@ pub(crate) mod tests {
             egress_advertise_host: None,
             sync_interval_ms: 300,
             guest_start_timeout_secs: 30,
+            thread_retention_days: None,
+            event_retention_days: None,
             idle_scan_interval_ms: 1000,
             warm_pool_reconcile_interval_ms: 2000,
             warm_pool_max_create_per_tick: 2,
