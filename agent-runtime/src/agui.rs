@@ -160,6 +160,13 @@ impl Mapper {
                 out.push(json!({"type": "RUN_ERROR", "message": message, "code": code}));
                 return (out, true);
             }
+            // events the agent itself emitted (`ctx.emit`), for a UI that wants progress; the runtime's own lifecycle events are not passed on
+            k if !k.starts_with("session.")
+                && !k.starts_with("runtime.")
+                && !k.starts_with("approval.") =>
+            {
+                out.push(json!({"type": "CUSTOM", "name": "keep.event", "value": {"kind": k, "data": d}}));
+            }
             _ => {}
         }
         (out, false)
@@ -469,6 +476,12 @@ mod tests {
                 "{quiet}"
             );
         }
+        // an event the agent emitted with ctx.emit is passed on as a CUSTOM event
+        let (e, done) = m.map(&ev("echo.received", json!({"chars": 3})), "t", "r");
+        assert!(!done);
+        assert_eq!(e[0]["type"], "CUSTOM");
+        assert_eq!(e[0]["name"], "keep.event");
+        assert_eq!(e[0]["value"]["kind"], "echo.received");
         let (a, done) = m.map(&ev("session.waiting", json!({"timeout_ms": 5})), "t", "r");
         assert!(!done);
         assert_eq!(a[0]["name"], "keep.waiting");
