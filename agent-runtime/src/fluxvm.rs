@@ -534,9 +534,10 @@ mod tests {
         );
     }
 
-    /// FluxVM cannot provision two VM disks at once, so the client must never have two creates in flight.
+    /// The client never has more creates in flight than the gate allows (default `DEFAULT_CREATE_CONCURRENCY`),
+    /// and does run them in parallel up to that limit.
     #[tokio::test]
-    async fn sandbox_creates_are_serialised_by_default() {
+    async fn sandbox_creates_are_capped_by_the_gate() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         let in_flight = std::sync::Arc::new(AtomicUsize::new(0));
         let peak = std::sync::Arc::new(AtomicUsize::new(0));
@@ -575,7 +576,15 @@ mod tests {
         for j in jobs {
             j.await.unwrap().unwrap();
         }
-        assert_eq!(peak.load(Ordering::SeqCst), 1, "creates overlapped");
+        let peak = peak.load(Ordering::SeqCst);
+        assert!(
+            peak <= DEFAULT_CREATE_CONCURRENCY,
+            "more creates in flight than the gate allows: {peak}"
+        );
+        assert!(
+            peak > 1,
+            "the gate serialised creates although it allows {DEFAULT_CREATE_CONCURRENCY}"
+        );
     }
 
     #[test]
