@@ -108,8 +108,19 @@ phase_fluxvm() {
   fi
   info "building FluxVM from source (its README's Quick start; this takes a while and is experimental)"
   if [[ "$DRY" == 1 ]]; then
-    info "would: clone zyvorai/fluxvm and zyvorai/guestkit side by side, run scripts/bootstrap-host.sh vmbr0, cargo build --release, install fluxctl and fluxvm-hypervisor and /etc/fluxvm.toml"
+    info "would: install build dependencies (C toolchain, pkg-config, libsystemd, clang, libbpf headers), clone zyvorai/fluxvm and zyvorai/guestkit side by side, run scripts/bootstrap-host.sh vmbr0, cargo build --release, install fluxctl and fluxvm-hypervisor and /etc/fluxvm.toml"
     return
+  fi
+  # Build dependencies found on a clean Ubuntu 24.04 VM: a C toolchain, pkg-config and libsystemd (guestkit),
+  # clang and libbpf (the guest eBPF objects). The Rust code needs no OpenSSL.
+  . /etc/os-release 2>/dev/null || true
+  if [[ "${ID:-}" == "debian" || "${ID:-}" == "ubuntu" || "${ID_LIKE:-}" == *"debian"* ]]; then
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y -qq build-essential pkg-config libsystemd-dev clang libbpf-dev
+  elif command -v dnf >/dev/null; then
+    $SUDO dnf install -y gcc gcc-c++ make pkgconf-pkg-config systemd-devel clang libbpf-devel
+  else
+    info "unrecognized package manager: install a C toolchain, pkg-config, libsystemd headers, clang and libbpf headers yourself"
   fi
   local d="${KEEP_FLUXVM_SRC:-/opt/fluxvm-src}"
   $SUDO mkdir -p "$d" && $SUDO chown "$(id -un)" "$d"
