@@ -526,7 +526,7 @@ impl RaftLogStorage<TypeConfig> for LogStore {
             .log
             .iter()
             .next_back()
-            .map(|(_, entry)| entry.get_log_id());
+            .map(|(_, entry)| *entry.get_log_id());
         let last_purged = inner.last_purged_log_id;
         Ok(LogState {
             last_purged_log_id: last_purged,
