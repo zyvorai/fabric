@@ -18,12 +18,21 @@ trust, and easy to talk about ([ROADMAP.md](ROADMAP.md) has the product side).
 | **Approvals push relay** | The same Apple account (APNs key) | Approvals that arrive when Solvor is closed; today they are polled every 20 s while the app runs | A phone or Mac receives a push for a waiting approval |
 | **Hardware-attested runs (Keep 0.2)** | Time on an AMD SEV-SNP or Intel TDX host | The evidence class above `software-test`; flips `security.snp_launch_verified` / `tdx_launch_verified` | One verified hardware launch is recorded in [pilot-runs](pilot-runs/README.md) |
 | **Lab deploy job in CI** | A working SSH key/secret for the lab host (the workflow targets `80.79.5.173`; the lab box used for testing is `212.8.248.187`) | A green `Lab deploy` badge | `Lab deploy` passes on `main` |
+| **Sealed cells on Apple Silicon (Lima)** | An arm64 cell template and bake script, and FluxVM confirmed to run on arm64; a Mac with an M3 or later on macOS 15+ (nested virtualization); about 15 GiB free disk | Trying a *sealed* Keep host on a Mac through Lima. Today the template and bake are x86_64 only and FluxVM's README says nothing about arm64. Lima on an M-series Mac would also give a real arm64 Linux to test `keep-up.sh`'s preflight | A `keep-up.sh` run inside a Lima VM ends with a sealed csv-clean |
+| **Gmail and Calendar connectors** | A Google OAuth client (client id and secret) and test accounts, added by the owner | Reading and drafting mail and calendar events from a Keep agent, with the action decided on the user's device; not started because it cannot be tested without those credentials | Contract tests with HTTP fixtures pass, then one live acceptance run on a test account |
 | **A design partner** | An introduction to one phone vendor and one bank operations team | Real feedback; the vendor pilot kit and bank packs are written but unvalidated | A pilot runs with their data shapes |
 | **Real (anonymised) bank exports** | Sample NEFT/RTGS return files, NACH return reports, reconciliation exports, UPI dispute mail from a partner | The four bank packs' patterns are generic and unchecked against any real export | Packs pass against real samples, patterns fixed where they miss |
+
+## Upstream
+
+- **Report the FluxVM concurrency bug** to `zyvorai/fluxvm` / `guestkit`: two VMs created at the same moment can be handed the same nbd device (`/dev/nbd0p1 already mounted`), and once a guest-agent token did not match. Reproduce with `scripts/keep-bench.sh --runs 20 --concurrency 4` against a runtime built before the create gate (3 of 20 failed in three passes). The runtime works around it by creating one cell at a time (`ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY`); remove the workaround when FluxVM is fixed.
 
 ## Needs you to try it (checklists exist)
 
 - **Solvor paths only you can verify**: [browser email on real webmail, Siri and Shortcuts, Talk to Solvor, Services / menu bar / `keep://`, approving with Touch ID](https://github.com/zyvorai/solvor/blob/main/docs/VERIFY.md). Each is built and unit-tested; none is marked verified until it passes on a real Mac.
+- **`keep-watch.sh` on a schedule**: the script is tested against a local page; cron, launchd and desktop notifications are not. Try `--notify` on a page you care about.
+- **An AG-UI client**: `POST /v1/agui` validates against the official `@ag-ui/core` schemas, but has not been tried with a real chat client. Point one at it and report what it needs (tool-call events, state).
+- **The simulator's amber pill in the running app**: `keep-demo-local.sh` then Solvor; the pill is built and unit-tested, not screenshotted.
 - **Photos and scans**: OCR is verified in real cells with generated images. Try real phone photos of receipts and bills and report what it misses (blurry, angled and non-English photos are known weak spots).
 - **PDF packs on real documents**: `loan-sanction-letter` and `rbi-circular-brief` have no sample and have never read a real sanction letter or circular.
 

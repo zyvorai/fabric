@@ -147,6 +147,15 @@ resp=$(curl -sf -X POST -F "note=none" "$BASE/v1/demos/csv-clean") || fail "csv-
 echo "$resp" | json honesty | grep -q "^SIMULATED, not sealed" || fail "honesty line does not say SIMULATED: $resp"
 ok "a run in the simulator is labelled simulated and not sealed"
 
+# keepctl init: the scaffold is a valid pack whose sample runs (in the stub cell) with no edits
+SCAF="$WORK/scaffold"; "$ROOT/scripts/keepctl" init scaffold-pack --dir "$SCAF" >/dev/null || fail "keepctl init failed"
+out=$(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy "$SCAF" --test 2>&1) || fail "the scaffolded pack did not deploy and pass its sample: $out"
+grep -q "test passed: scaffold-pack.md, 0 CONNECT" <<<"$out" || fail "the scaffolded pack's test did not report a pass: $out"
+curl -sf -X DELETE "$BASE/v1/demos/scaffold-pack" >/dev/null || fail "delete scaffold-pack"
+"$ROOT/scripts/keepctl" init scaffold-pack --dir "$SCAF" >/dev/null 2>&1 && fail "keepctl init must not overwrite an existing directory"
+"$ROOT/scripts/keepctl" init "Bad Name" >/dev/null 2>&1 && fail "keepctl init must refuse a bad name"
+ok "keepctl init scaffolds a valid pack that deploys and passes its own sample; it refuses to overwrite and refuses bad names"
+
 echo "demos-ci: run history, diff and keepctl verbs"
 printf 'name,qty\nAnn,1\nBob,2\n' > "$WORK/h1.csv"
 printf 'name,qty\nAnn,1\nBob,3\nCy,4\n' > "$WORK/h2.csv"

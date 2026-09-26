@@ -3,3 +3,5 @@
 *.xcodeproj/project.xcworkspace/xcuserdata/
 DerivedData/
 .swiftpm/
+build/
+.DS_Store
