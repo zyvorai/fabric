@@ -930,3 +930,164 @@ async fn a_credential_can_require_the_phone_while_the_operator_can_still_decide(
     let (st, _) = decide(&w, &op(), b.id, "denied", None).await;
     assert_eq!(st, StatusCode::OK);
 }
+
+#[tokio::test]
+async fn threads_are_private_to_their_owner() {
+    let w = world().await;
+    let agent = w
+        .state
+        .store
+        .get_session(w.ana.session)
+        .await
+        .unwrap()
+        .agent;
+    w.state
+        .store
+        .deploy_agent(crate::model::DeployAgentRequest {
+            name: agent.clone(),
+            bundle_base64: base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                "export default 1",
+            ),
+            manifest: crate::egress::ask_tests::manifest(crate::model::EgressMode::Deny, Some(30)),
+        })
+        .await
+        .unwrap();
+    let (ana, ben) = (Some(w.ana.token.as_str()), Some(w.ben.token.as_str()));
+    let opt = op();
+    let operator = Some(opt.as_str());
+
+    let (st, thread) = call(
+        &w.app,
+        "POST",
+        "/v1/threads",
+        ana,
+        Some(json!({"agent": agent, "title": "Trip to Goa", "client_thread_id": "chat-1"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{thread}");
+    assert_eq!(thread["user_id"], "ana");
+    let tid: Uuid = thread["id"].as_str().unwrap().parse().unwrap();
+    w.state
+        .store
+        .threads
+        .append(
+            tid,
+            crate::threads::Role::User,
+            "book a table for two",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // the owner lists, reads and pages their own thread
+    let (_, v) = call(&w.app, "GET", "/v1/threads", ana, None).await;
+    assert_eq!(ids(&v, "id"), [tid.to_string()]);
+    let (st, v) = call(
+        &w.app,
+        "GET",
+        &format!("/v1/threads/{tid}/messages?after=0"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(v["items"][0]["text"], "book a table for two");
+    let (_, v) = call(
+        &w.app,
+        "GET",
+        &format!("/v1/threads/{tid}/messages?after=1"),
+        ana,
+        None,
+    )
+    .await;
+    assert!(v["items"].as_array().unwrap().is_empty());
+
+    // another user sees nothing, and every probe looks like a thread that does not exist
+    let (_, v) = call(&w.app, "GET", "/v1/threads", ben, None).await;
+    assert!(ids(&v, "id").is_empty());
+    for (method, path) in [
+        ("GET", format!("/v1/threads/{tid}")),
+        ("GET", format!("/v1/threads/{tid}/messages")),
+        ("DELETE", format!("/v1/threads/{tid}")),
+    ] {
+        let (st, _) = call(&w.app, method, &path, ben, None).await;
+        assert_eq!(st, StatusCode::NOT_FOUND, "{method} {path}");
+    }
+    assert!(
+        w.state.store.threads.get(tid).await.is_some(),
+        "another user's delete changed nothing"
+    );
+
+    // a user token may not create a thread for someone else; without the token nothing works
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/threads",
+        ben,
+        Some(json!({"agent": agent, "user_id": "ana"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, _) = call(&w.app, "GET", "/v1/threads", None, None).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+
+    // the operator sees every user's threads, must name the owner when creating one, and can read a thread
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/threads",
+        operator,
+        Some(json!({"agent": agent})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/threads",
+        operator,
+        Some(json!({"agent": agent, "user_id": "ben"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED);
+    let (_, v) = call(&w.app, "GET", "/v1/threads", operator, None).await;
+    assert_eq!(ids(&v, "user_id").len(), 2);
+    let (st, _) = call(&w.app, "GET", &format!("/v1/threads/{tid}"), operator, None).await;
+    assert_eq!(st, StatusCode::OK);
+
+    // an unknown agent is refused
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/threads",
+        ana,
+        Some(json!({"agent": "no-such-agent"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+
+    // the owner forgets the thread: gone, messages gone, and the journal records that it happened (not what was said)
+    let (st, _) = call(&w.app, "DELETE", &format!("/v1/threads/{tid}"), ana, None).await;
+    assert_eq!(st, StatusCode::NO_CONTENT);
+    let (st, _) = call(
+        &w.app,
+        "GET",
+        &format!("/v1/threads/{tid}/messages"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    let (_, audit) = call(&w.app, "GET", "/v1/audit", operator, None).await;
+    let text = audit.to_string();
+    assert!(
+        text.contains("keep.thread.delete"),
+        "the deletion is not journaled"
+    );
+    assert!(
+        !text.contains("book a table"),
+        "message text must never reach the journal"
+    );
+}

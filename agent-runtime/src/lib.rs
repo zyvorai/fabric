@@ -36,6 +36,7 @@ pub mod skills;
 pub mod store;
 #[cfg(test)]
 mod tenancy_tests;
+pub mod threads;
 
 /// Test values that are keys, secrets or salts. CodeQL's `rust/hard-coded-cryptographic-value` flags a source literal that reaches a
 /// key parameter, so the tests pass their fixtures through here: the bytes are identical, but they are no longer a literal at the sink.

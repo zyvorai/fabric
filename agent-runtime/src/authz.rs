@@ -188,6 +188,8 @@ pub enum UserRoute {
     Artifacts(Vec<Uuid>, Scope),
     /// A route under `/v1/users/{id}/…`: the id must be the caller's own.
     OwnUser(String, Scope),
+    /// Names one conversation thread, which must be the user's.
+    Thread(Uuid, Scope),
 }
 
 /// The only routes a user token can reach. Anything not listed is [`UserRoute::Denied`].
@@ -206,6 +208,18 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
             Some(sid) if write => UserRoute::Session(sid, Scope::Run),
             _ => UserRoute::Denied,
         },
+        // A user's own conversation threads: list and create, then read or forget one of their own.
+        ["v1", "threads"] if read => UserRoute::Open(Scope::Read),
+        ["v1", "threads"] if *method == Method::POST => UserRoute::Open(Scope::Run),
+        ["v1", "threads", tid] | ["v1", "threads", tid, "messages"]
+            if read || *method == Method::DELETE =>
+        {
+            match (id(tid), *method == Method::DELETE, parts.len()) {
+                (Some(tid), false, _) => UserRoute::Thread(tid, Scope::Read),
+                (Some(tid), true, 3) => UserRoute::Thread(tid, Scope::Run),
+                _ => UserRoute::Denied,
+            }
+        }
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),
@@ -242,6 +256,16 @@ pub async fn owns_session(state: &AppState, user: &str, id: Uuid) -> bool {
         .get_session(id)
         .await
         .is_some_and(|s| s.user_id.as_deref() == Some(user))
+}
+
+/// Does thread `id` belong to `user`?
+pub async fn owns_thread(state: &AppState, user: &str, id: Uuid) -> bool {
+    state
+        .store
+        .threads
+        .get(id)
+        .await
+        .is_some_and(|t| t.user_id == user)
 }
 
 /// Does approval `id` belong to `user` (through its session)?
@@ -420,6 +444,47 @@ mod tests {
                 UserRoute::Approval(aid, Scope::Approve),
             ),
             (Method::POST, "/v1/approvals".into(), UserRoute::Denied),
+            (
+                Method::GET,
+                "/v1/threads".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (
+                Method::POST,
+                "/v1/threads".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::GET,
+                format!("/v1/threads/{aid}"),
+                UserRoute::Thread(aid, Scope::Read),
+            ),
+            (
+                Method::GET,
+                format!("/v1/threads/{aid}/messages"),
+                UserRoute::Thread(aid, Scope::Read),
+            ),
+            (
+                Method::DELETE,
+                format!("/v1/threads/{aid}"),
+                UserRoute::Thread(aid, Scope::Run),
+            ),
+            // Only reading a thread's messages exists; nothing may write or delete through that path.
+            (
+                Method::DELETE,
+                format!("/v1/threads/{aid}/messages"),
+                UserRoute::Denied,
+            ),
+            (
+                Method::POST,
+                format!("/v1/threads/{aid}/messages"),
+                UserRoute::Denied,
+            ),
+            (
+                Method::GET,
+                "/v1/threads/not-a-uuid".into(),
+                UserRoute::Denied,
+            ),
             (
                 Method::GET,
                 format!("/v1/artifacts/{aid}"),

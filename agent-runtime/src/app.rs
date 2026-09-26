@@ -356,6 +356,18 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             get(crate::goals::get_goal).patch(crate::goals::patch_goal),
         )
         .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
+        .route(
+            "/v1/threads",
+            get(crate::threads::list_threads).post(crate::threads::create_thread),
+        )
+        .route(
+            "/v1/threads/{id}",
+            get(crate::threads::get_thread).delete(crate::threads::delete_thread),
+        )
+        .route(
+            "/v1/threads/{id}/messages",
+            get(crate::threads::thread_messages),
+        )
         .route("/v1/goals/{id}/browse", post(crate::goals::goal_browse))
         .route("/v1/keep/status", get(crate::demos::keep_status))
         .route(
@@ -505,6 +517,7 @@ async fn api_auth(
             UserRoute::Session(sid, s) => (*s, authz::owns_session(&state, id, *sid).await),
             UserRoute::Approval(aid, s) => (*s, authz::owns_approval(&state, id, *aid).await),
             UserRoute::OwnUser(uid, s) => (*s, uid == id),
+            UserRoute::Thread(tid, s) => (*s, authz::owns_thread(&state, id, *tid).await),
             UserRoute::Artifacts(ids, s) => {
                 let mut all = true;
                 for a in ids {
