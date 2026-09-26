@@ -13,14 +13,14 @@ cat > "$W/bin/curl" <<'SH'
 url=""; body=""; while [[ $# -gt 0 ]]; do case "$1" in -d) body="$2"; shift ;; http*) url="$1" ;; esac; shift; done
 case "$url" in
   */readyz) exit 0 ;;
-  */v1/templates) echo '{"items":[{"name":"node22-agent"}]}' ;;
+  */v1/templates) if [[ -n "${FAKE_NO_TEMPLATE:-}" ]]; then echo '{"items":[]}'; else echo '{"items":[{"name":"node22-agent"}]}'; fi ;;
   */v1/user-tokens) echo "$body" > "$FAKE_BODY"; echo '{"token":"kut1.FAKE.TOKEN"}' ;;
   *) exit 22 ;;
 esac
 SH
 chmod +x "$W/bin/curl"
 # the tool checks look for a real cargo; a fake one keeps this test independent of the machine it runs on
-printf '#!/bin/sh\nexit 0\n' > "$W/bin/cargo"; chmod +x "$W/bin/cargo"
+printf '#!/bin/sh\nexit 0\n' > "$W/bin/cargo"; cp "$W/bin/cargo" "$W/bin/cc"; chmod +x "$W/bin/cargo" "$W/bin/cc"
 printf 'ZYVOR_AGENT_LISTEN=127.0.0.1:9096\nZYVOR_AGENT_API_TOKEN=OPERATOR-SECRET-123\n' > "$W/agent.env"
 export PATH="$W/bin:$PATH" FAKE_BODY="$W/body.json" KEEP_SUDO="" KEEP_ENV_FILE="$W/agent.env"
 GOOD=(KEEP_UP_UNAME=Linux KEEP_UP_ARCH=x86_64 KEEP_UP_KVM=1 KEEP_UP_SYSTEMD=1 KEEP_UP_MEM_KB=8000000 KEEP_UP_DISK_KB=100000000)
@@ -49,6 +49,11 @@ done
 [[ ! -e "$FAKE_BODY" ]] || fail "a dry run must not call the token endpoint"
 ok "a dry run prints the plan and calls nothing"
 
+# 4b. the template is baked before the runtime is deployed (the runtime's smoke test needs it)
+t=$(grep -n "Cell template" <<<"$out" | head -1 | cut -d: -f1); r=$(grep -n "Keep runtime" <<<"$out" | head -1 | cut -d: -f1)
+[[ -n "$t" && -n "$r" && "$t" -lt "$r" ]] || fail "the template phase must come before the runtime phase: $out"
+ok "the cell template is prepared before the runtime is deployed"
+
 # 5. --token-only mints a scoped user token, never shows the operator token, writes no file
 out=$(up --token-only --user-id ana --ttl-days 2) || fail "token-only failed: $out"
 grep -q "kut1.FAKE.TOKEN" <<<"$out" || fail "the user token is not shown: $out"
@@ -70,4 +75,4 @@ ok "under sudo the default user id is the person, not root"
 "$ROOT/scripts/keep-up.sh" --ttl-days 8 >/dev/null 2>&1 && fail "--ttl-days 8 should be rejected"
 "$ROOT/scripts/keep-up.sh" --user-id 'Bad Id' >/dev/null 2>&1 && fail "a bad --user-id should be rejected"
 ok "an out-of-range TTL and a bad user id are rejected"
-echo "keep-up: 7 checks passed"
+echo "keep-up: 8 checks passed"

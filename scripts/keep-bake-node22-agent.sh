@@ -87,11 +87,16 @@ if [[ ! -f "$OUT_IMG" || "$FORCE" == 1 ]]; then
     curl -fSL -o "$NODE_TAR.part" "$NODE_URL"
     mv "$NODE_TAR.part" "$NODE_TAR"
   fi
-  STAGE="$(mktemp -d)"
-  trap 'rm -rf "$STAGE"' EXIT
-  cp "$SRC/fluxvm-guest-agent.service" "$STAGE/"
-  BUILD="$STAGE/build.json"
-  python3 - "$SRC/build.json" "$BUILD" "$OUT_IMG" "$NODE_TAR" "$GUEST_AGENT" "$STAGE/fluxvm-guest-agent.service" "$BASE_IMG" "$NODE_VERSION" <<'PY'
+  # Stage every build input under /var/lib/fluxvm: the AppArmor profile FluxVM's bootstrap installs lets fluxctl read
+  # only there (a spec in /tmp or an agent in /usr/local/bin is refused with "Permission denied").
+  STAGE_ROOT="${KEEP_BAKE_STAGE_DIR:-/var/lib/fluxvm/downloads}"
+  if [[ -d "$STAGE_ROOT" ]]; then STAGE="$($SUDO mktemp -d "$STAGE_ROOT/keep-bake.XXXXXX")"; else STAGE="$(mktemp -d)"; fi
+  trap '$SUDO rm -rf "$STAGE"' EXIT
+  $SUDO cp "$SRC/fluxvm-guest-agent.service" "$STAGE/"
+  $SUDO cp "$NODE_TAR" "$STAGE/node.tar.xz"
+  $SUDO cp "$GUEST_AGENT" "$STAGE/fluxvm-guest-agent"
+  BUILD_TMP="$(mktemp)"
+  python3 - "$SRC/build.json" "$BUILD_TMP" "$OUT_IMG" "$STAGE/node.tar.xz" "$STAGE/fluxvm-guest-agent" "$STAGE/fluxvm-guest-agent.service" "$BASE_IMG" "$NODE_VERSION" <<'PY'
 import json, sys
 src, dest, out, node, agent, unit, base, version = sys.argv[1:]
 spec = json.load(open(src))
@@ -106,8 +111,16 @@ spec["copy_in"] = [
 spec["pins"] = {"node": f"v{version}"}
 json.dump(spec, open(dest, "w"), indent=2)
 PY
+  $SUDO cp "$BUILD_TMP" "$STAGE/build.json"; rm -f "$BUILD_TMP"
+  BUILD="$STAGE/build.json"
   echo "==> building the image (a few minutes; needs several GiB free)"
-  $SUDO "$FLUX" --config "$FLUX_CONFIG" build-image --spec "$BUILD"
+  # A failed build leaves a half-written image at $OUT_IMG that the next run would take for a finished one (and
+  # register). This path did not exist before this step, so removing it on failure is safe.
+  if ! $SUDO "$FLUX" --config "$FLUX_CONFIG" build-image --spec "$BUILD"; then
+    $SUDO rm -f "$OUT_IMG"
+    echo "the image build failed; the partial image was removed" >&2
+    exit 1
+  fi
 else
   echo "==> image already present: skipping the build"
 fi

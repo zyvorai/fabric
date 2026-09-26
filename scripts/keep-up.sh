@@ -11,8 +11,8 @@
 #
 # Options: --user-id ID (default: the login name), --ttl-days N (1-7, default 7), --no-template
 #
-# It does, in order: (1) preflight, (2) FluxVM check (or install), (3) the Keep runtime via `deploy-keep.sh local`,
-# (4) the node22-agent cell template (scripts/keep-bake-node22-agent.sh, with poppler and tesseract), (5) a scoped user
+# It does, in order: (1) preflight, (2) FluxVM check (or install), (3) the node22-agent cell template (scripts/keep-bake-node22-agent.sh, with poppler and tesseract),
+# (4) the Keep runtime via `deploy-keep.sh local` (its smoke test needs the template), (5) a scoped user
 # token, printed once with the exact Solvor settings. Nothing leaves this machine; the token is not written to disk.
 # The cell is sealed only when KVM is present: the preflight refuses without it rather than pretend.
 # ============================================================================
@@ -60,6 +60,15 @@ kvm_ok()  { if [[ -n "${KEEP_UP_KVM:-}" ]]; then [[ "$KEEP_UP_KVM" == 1 ]]; else
 systemd_ok() { if [[ -n "${KEEP_UP_SYSTEMD:-}" ]]; then [[ "$KEEP_UP_SYSTEMD" == 1 ]]; else [[ -d /run/systemd/system ]]; fi; }
 SUDO=""; [[ "$(id -u)" == 0 ]] || SUDO="sudo"
 SUDO="${KEEP_SUDO-$SUDO}"   # KEEP_SUDO="" disables sudo (used by the tests)
+# A Rust installed with rustup lives in the login user's home; under sudo, HOME and PATH point at root's, so
+# cargo is either not found or "could not choose a version". Use the login user's toolchain (read only here).
+if [[ "$(id -u)" == 0 && -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]]; then
+  USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+  if [[ -x "$USER_HOME/.cargo/bin/cargo" ]]; then
+    case ":$PATH:" in *":$USER_HOME/.cargo/bin:"*) ;; *) export PATH="$USER_HOME/.cargo/bin:$PATH" ;; esac
+    if [[ -z "${RUSTUP_HOME:-}" && -d "$USER_HOME/.rustup" ]]; then export RUSTUP_HOME="$USER_HOME/.rustup"; fi
+  fi
+fi
 
 preflight() {
   step "Preflight"
@@ -70,7 +79,7 @@ preflight() {
   local mem; mem=$(mem_kb); (( mem >= 3800000 )) && ok "memory $((mem / 1024)) MiB" || bad "memory $((mem / 1024)) MiB: at least 4 GiB (the Rust build and a cell need it)"
   local disk; disk=$(disk_kb); (( disk >= 20000000 )) && ok "free disk $((disk / 1048576)) GiB" || bad "free disk $((disk / 1048576)) GiB under /var/lib: at least 20 GiB (cell images and the build)"
   if [[ "$(id -u)" == 0 ]] || command -v sudo >/dev/null 2>&1; then ok "root or sudo"; else bad "run as root or install sudo"; fi
-  local c; for c in git curl python3 openssl node cargo; do
+  local c; for c in git curl python3 openssl node cargo cc; do
     if command -v "$c" >/dev/null 2>&1; then ok "$c"; else bad "$c is missing ($(hint "$c"))"; fi
   done
   if command -v node >/dev/null 2>&1; then
@@ -82,7 +91,8 @@ preflight() {
 }
 hint() {
   case "$1" in
-    cargo) echo "install Rust from https://rustup.rs. If it is installed for your user, sudo may not see it: run sudo env \"PATH=\$PATH\" $0" ;;
+    cargo) echo "install Rust from https://rustup.rs (a rustup install in your home is found under sudo automatically; a Rust installed elsewhere: run sudo env \"PATH=\$PATH\" $0)" ;;
+    cc) echo "a C compiler and linker: sudo apt-get install -y build-essential (Fedora: sudo dnf groupinstall \"Development Tools\"); Rust cannot link without one" ;;
     node) echo "install Node 20 or newer, for example from https://nodejs.org" ;;
     *) echo "for example: sudo apt-get install -y $1" ;;
   esac
@@ -98,8 +108,19 @@ phase_fluxvm() {
   fi
   info "building FluxVM from source (its README's Quick start; this takes a while and is experimental)"
   if [[ "$DRY" == 1 ]]; then
-    info "would: clone zyvorai/fluxvm and zyvorai/guestkit side by side, run scripts/bootstrap-host.sh vmbr0, cargo build --release, install fluxctl and fluxvm-hypervisor and /etc/fluxvm.toml"
+    info "would: install build dependencies (C toolchain, pkg-config, libsystemd, clang, libbpf headers), clone zyvorai/fluxvm and zyvorai/guestkit side by side, run scripts/bootstrap-host.sh vmbr0, cargo build --release, install fluxctl, fluxvm-hypervisor, a static guest agent, /etc/fluxvm.toml and the fluxvm systemd unit, and start it"
     return
+  fi
+  # Build dependencies found on a clean Ubuntu 24.04 VM: a C toolchain, pkg-config and libsystemd (guestkit),
+  # clang and libbpf (the guest eBPF objects), musl-tools (a static guest agent). The Rust code needs no OpenSSL.
+  . /etc/os-release 2>/dev/null || true
+  if [[ "${ID:-}" == "debian" || "${ID:-}" == "ubuntu" || "${ID_LIKE:-}" == *"debian"* ]]; then
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y -qq build-essential pkg-config libsystemd-dev clang libbpf-dev musl-tools
+  elif command -v dnf >/dev/null; then
+    $SUDO dnf install -y gcc gcc-c++ make pkgconf-pkg-config systemd-devel clang libbpf-devel musl-gcc
+  else
+    info "unrecognized package manager: install a C toolchain, pkg-config, libsystemd headers, clang and libbpf headers yourself"
   fi
   local d="${KEEP_FLUXVM_SRC:-/opt/fluxvm-src}"
   $SUDO mkdir -p "$d" && $SUDO chown "$(id -un)" "$d"
@@ -108,8 +129,33 @@ phase_fluxvm() {
   ( cd "$d/fluxvm" && $SUDO ./scripts/bootstrap-host.sh vmbr0 && ./scripts/preflight.sh && cargo build --release )
   for b in fluxctl fluxvm-hypervisor; do $SUDO install -m 0755 "$d/fluxvm/target/release/$b" "/usr/local/bin/$b"; done
   [[ -f /etc/fluxvm.toml ]] || $SUDO install -m 0644 "$d/fluxvm/config.example.toml" /etc/fluxvm.toml
+  # The guest agent goes into every cell image, so it is built static (musl): a glibc-linked one fails to start
+  # in a guest with an older glibc. The musl target is added as the login user, who owns the rustup home.
+  if [[ ! -x /usr/local/bin/fluxvm-guest-agent ]]; then
+    info "building the static guest agent"
+    if [[ "$(id -u)" == 0 && -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]]; then
+      sudo -u "$SUDO_USER" -H env "PATH=$PATH" rustup target add x86_64-unknown-linux-musl
+    else
+      rustup target add x86_64-unknown-linux-musl
+    fi
+    ( cd "$d/fluxvm" && cargo build --release -p fluxvm-guest-agent --target x86_64-unknown-linux-musl )
+    $SUDO install -m 0755 "$d/fluxvm/target/x86_64-unknown-linux-musl/release/fluxvm-guest-agent" /usr/local/bin/fluxvm-guest-agent
+  fi
+  # Start the control plane with FluxVM's own unit.
+  if ! fluxvm_ready && systemd_ok; then
+    $SUDO install -m 0644 "$d/fluxvm/systemd/fluxvm.service" /etc/systemd/system/fluxvm.service
+    # The unit sandboxes the daemon with ReadWritePaths for directories a clean machine does not have yet: systemd
+    # fails it with 226/NAMESPACE before any start command runs (an ExecStartPre cannot help). /run is a tmpfs, so
+    # tmpfiles.d creates them now and on every boot.
+    printf 'd /run/netns 0755 root root -\nd /var/lib/kubelet 0755 root root -\n' \
+      | $SUDO tee /etc/tmpfiles.d/fluxvm.conf >/dev/null
+    $SUDO systemd-tmpfiles --create /etc/tmpfiles.d/fluxvm.conf
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable --now fluxvm
+    local i; for i in $(seq 1 30); do fluxvm_ready && break; sleep 1; done
+  fi
   if fluxvm_ready; then ok "FluxVM answers at $FLUXVM_URL"
-  else bad "FluxVM is built and installed but is not answering at $FLUXVM_URL: start its control plane (see the FluxVM docs, operations) and re-run"; fi
+  else bad "FluxVM is installed and its unit started but is not answering at $FLUXVM_URL: see journalctl -u fluxvm"; fi
 }
 
 phase_runtime() {
@@ -118,13 +164,23 @@ phase_runtime() {
   "$SCRIPT_DIR/deploy-keep.sh" local
 }
 
+fluxctl_profile_enforced() {
+  [[ -n "${KEEP_UP_AA_ENFORCED:-}" ]] && { [[ "$KEEP_UP_AA_ENFORCED" == 1 ]]; return; }
+  [[ -r /sys/kernel/security/apparmor/profiles ]] && $SUDO grep -q '^fluxctl (enforce)' /sys/kernel/security/apparmor/profiles 2>/dev/null
+}
 template_listed() { curl -fsS -m 5 "$FLUXVM_URL/v1/templates" 2>/dev/null | grep -q '"node22-agent"'; }
 phase_template() {
   step "Cell template (node22-agent: Node, poppler, tesseract)"
   if [[ "$NO_TEMPLATE" == 1 ]]; then info "skipped (--no-template)"; return; fi
   if template_listed; then ok "node22-agent is already registered"; return; fi
   if [[ "$DRY" == 1 ]]; then info "would run: $SCRIPT_DIR/keep-bake-node22-agent.sh"; return; fi
-  "$SCRIPT_DIR/keep-bake-node22-agent.sh"
+  if ! "$SCRIPT_DIR/keep-bake-node22-agent.sh"; then
+    if fluxctl_profile_enforced; then
+      bad "the template bake failed. FluxVM's AppArmor profile 'fluxctl' is enforced; a FluxVM older than zyvorai/fluxvm#108 and #110 blocks building or running cells under it: update FluxVM (git pull, re-run bootstrap-host.sh) and re-run"
+    else
+      bad "the template bake failed (see above)"
+    fi
+  fi
 }
 
 operator_token() { $SUDO sed -n 's/^ZYVOR_AGENT_API_TOKEN=//p' "$ENV_FILE" 2>/dev/null | head -1; }
@@ -161,8 +217,9 @@ if [[ "$TOKEN_ONLY" == 1 ]]; then phase_token; (( PROBLEMS == 0 )); exit $?; fi
 preflight
 phase_fluxvm
 if (( PROBLEMS > 0 )); then echo; echo "==> $PROBLEMS problem(s) above; nothing was installed" >&2; exit 1; fi
+phase_template   # before the runtime: its deploy ends with a smoke test that needs the template
+if (( PROBLEMS > 0 )) && [[ "$DRY" == 0 ]]; then echo; echo "==> $PROBLEMS problem(s) above; the runtime was not deployed" >&2; exit 1; fi
 phase_runtime
-phase_template
 phase_token
 (( PROBLEMS == 0 )) || exit 1
 [[ "$DRY" == 1 ]] && echo && echo "==> dry run: nothing changed"

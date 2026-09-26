@@ -24,7 +24,7 @@ environment, not a hardware-attested one ([SECURITY-PROFILES.md](SECURITY-PROFIL
 | Solvor client library | **55 tests passed**, 6 skipped (they need a live host) | `swift test` in `integrations/macos-keep` |
 | Web console | **419 tests passed** | `npx vitest run` in `web/` |
 | SDK | **38 tests passed** | `npm test` in `sdk/agent-runtime` |
-| Shell tooling | `keep-up.sh` (7 checks), the template bake (3), shellcheck | `agent-runtime/tests/keep-up.sh`, `bake-fresh-image.sh` |
+| Shell tooling | `keep-up.sh` (8 checks), the template bake (3), shellcheck | `agent-runtime/tests/keep-up.sh`, `bake-fresh-image.sh` |
 
 The stub-cell suites run the fixed extractors as ordinary processes: they prove the runtime, the packs and the API, **not** isolation.
 
@@ -63,7 +63,7 @@ from a short run.
 | Approvals signed on a device | Signing checked against the runtime's test vectors (KeepKit and SDK tests) | Not run in the app against a waiting approval ([TODO.md](TODO.md)) |
 | Solvor (macOS 26) | Builds, 55 unit tests, connected to a real host, watched-folder flow end to end, email pipeline in real cells | Browser email on real webmail, Siri, microphone, Services, `keep://`: built, **not verified** ([VERIFY.md](https://github.com/zyvorai/solvor/blob/main/docs/VERIFY.md)) |
 | Local demo (simulator) | Runs on a Mac end to end; every result labelled `SIMULATED, not sealed` | Not isolated, by design |
-| One-command host (`keep-up.sh`) | 7 checks with fake facts; on the real Linux lab host the test passes and a `sudo` dry run passes the whole preflight and prints the plan | Not run from nothing on a clean machine; `--install-fluxvm` never run |
+| One-command host (`keep-up.sh`) | 9 checks with fake facts. On a clean Ubuntu 24.04 VM (nested KVM, 4 vCPU, 8 GB, 2026-09-26) the real flow was run in stages, fixing what broke: rustup under sudo, missing C toolchain, FluxVM build dependencies (pkg-config, libsystemd-dev, clang, libbpf-dev; no OpenSSL), a static guest agent, starting FluxVM (its unit needs `/run/netns` and `/var/lib/kubelet`), the template bake (inputs staged under `/var/lib/fluxvm`, a failed build no longer leaves a half-built image, phase order). A run of `sudo ./scripts/keep-up.sh` with FluxVM's AppArmor profile enforced and fixed ([zyvorai/fluxvm#108](https://github.com/zyvorai/fluxvm/pull/108) and [#110](https://github.com/zyvorai/fluxvm/pull/110)) exited 0: template baked, runtime deployed, `csv-clean` and `pdf-brief` ran in sealed cells with 0 CONNECT, a token was printed; a second `--dry-run` was all ok | Not one uninterrupted pass from an empty machine (FluxVM was already built when the last run started); before FluxVM #108 and #110 its AppArmor profile blocked the image build and cell creation (#110 was open when this was written); a few harmless capability denials (`sys_module`, `audit_write`) remain; Ubuntu 24.04 only; Solvor not connected; evidence class `software-test` |
 | Page tracking (`keep-watch.sh`) | Against a real runtime and a local page in `demos-ci.sh` | cron, launchd and notifications not run |
 | Template rebuild | `--force` builds a new image beside the old one (3 checks; done by hand on the lab host once, then scripted) | Not run again against real FluxVM since scripting it |
 
