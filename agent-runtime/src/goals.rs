@@ -372,6 +372,9 @@ pub(crate) async fn advance_step(
         .get_goal(id)
         .await
         .ok_or_else(|| ApiError::not_found("goal not found"))?;
+    if goal.status == GoalStatus::Cancelled {
+        return Err(ApiError::conflict("the goal is cancelled"));
+    }
     let step = goal
         .plan
         .iter_mut()
@@ -438,6 +441,41 @@ pub(crate) async fn advance_step(
             )
             .await;
         return Ok(Json(goal));
+    }
+
+    // An approval step is done only once its approval was granted. A pending, denied or expired approval must
+    // not be skipped by asking again (the request above only opens the approval the first time).
+    if step.requires_approval && matches!(req.status, PlanStepStatus::Done) {
+        if let Some(approval_id) = step.approval_id {
+            let approval = state.store.get_approval(approval_id).await;
+            match approval.as_ref().map(|a| &a.status) {
+                Some(ApprovalStatus::Approved) => {}
+                Some(ApprovalStatus::Pending) => {
+                    return Err(ApiError::conflict(
+                        "the approval for this step is still pending",
+                    ));
+                }
+                other => {
+                    let reason = match other {
+                        Some(ApprovalStatus::Denied) => "denied",
+                        Some(ApprovalStatus::Expired) => "expired",
+                        _ => "missing",
+                    };
+                    step.status = PlanStepStatus::Blocked;
+                    step.detail = Some(format!("approval {reason}"));
+                    goal.status = GoalStatus::Blocked;
+                    goal.updated_at = Utc::now();
+                    state
+                        .store
+                        .save_goal(goal)
+                        .await
+                        .map_err(ApiError::internal)?;
+                    return Err(ApiError::conflict(format!(
+                        "the approval for this step was {reason}; the step stays blocked"
+                    )));
+                }
+            }
+        }
     }
 
     step.status = req.status;
@@ -750,9 +788,8 @@ pub(crate) mod tests {
         assert!(g2.artifact_ids.contains(&art.id));
     }
 
-    #[tokio::test]
-    async fn requires_approval_step_opens_approval() {
-        let state = test_state().await;
+    /// A goal whose only step needs approval, after the first `advance` to Done opened the approval.
+    async fn goal_blocked_on_approval(state: &Arc<AppState>) -> GoalRecord {
         let session_id = Uuid::new_v4();
         // Minimal session so advance can bind approval.
         use crate::model::{SessionRecord, SessionStartMode, SessionStartPolicy, SessionStatus};
@@ -820,10 +857,110 @@ pub(crate) mod tests {
         )
         .await
         .unwrap();
+        blocked
+    }
+
+    fn advance_done(goal: &GoalRecord) -> AdvanceStepRequest {
+        AdvanceStepRequest {
+            step_id: goal.plan[0].id.clone(),
+            status: PlanStepStatus::Done,
+            artifact_id: None,
+            detail: None,
+            approval_prompt: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn requires_approval_step_opens_approval() {
+        let state = test_state().await;
+        let blocked = goal_blocked_on_approval(&state).await;
         assert_eq!(blocked.status, GoalStatus::Blocked);
         assert_eq!(blocked.plan[0].status, PlanStepStatus::Blocked);
         assert!(blocked.plan[0].approval_id.is_some());
         assert_eq!(state.store.list_approvals().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn done_is_refused_while_the_approval_is_pending() {
+        let state = test_state().await;
+        let blocked = goal_blocked_on_approval(&state).await;
+        let err = advance_step(
+            State(state.clone()),
+            Path(blocked.id),
+            Json(advance_done(&blocked)),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status(), StatusCode::CONFLICT);
+        let goal = state.store.get_goal(blocked.id).await.unwrap();
+        assert_eq!(goal.plan[0].status, PlanStepStatus::Blocked);
+        assert_eq!(goal.status, GoalStatus::Blocked);
+    }
+
+    #[tokio::test]
+    async fn done_is_refused_after_the_approval_is_denied_and_the_step_stays_blocked() {
+        let state = test_state().await;
+        let blocked = goal_blocked_on_approval(&state).await;
+        let approval_id = blocked.plan[0].approval_id.unwrap();
+        state
+            .store
+            .transition_approval(approval_id, ApprovalStatus::Denied, Some("no".into()), None)
+            .await
+            .unwrap();
+        let err = advance_step(
+            State(state.clone()),
+            Path(blocked.id),
+            Json(advance_done(&blocked)),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status(), StatusCode::CONFLICT);
+        let goal = state.store.get_goal(blocked.id).await.unwrap();
+        assert_eq!(goal.plan[0].status, PlanStepStatus::Blocked);
+        assert_eq!(goal.plan[0].detail.as_deref(), Some("approval denied"));
+        assert_eq!(goal.status, GoalStatus::Blocked);
+    }
+
+    #[tokio::test]
+    async fn done_goes_through_once_the_approval_is_approved() {
+        let state = test_state().await;
+        let blocked = goal_blocked_on_approval(&state).await;
+        let approval_id = blocked.plan[0].approval_id.unwrap();
+        state
+            .store
+            .transition_approval(approval_id, ApprovalStatus::Approved, None, None)
+            .await
+            .unwrap();
+        let Json(done) = advance_step(
+            State(state.clone()),
+            Path(blocked.id),
+            Json(advance_done(&blocked)),
+        )
+        .await
+        .unwrap();
+        assert_eq!(done.plan[0].status, PlanStepStatus::Done);
+        assert_eq!(done.status, GoalStatus::Done);
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_goal_cannot_be_advanced() {
+        let state = test_state().await;
+        let blocked = goal_blocked_on_approval(&state).await;
+        let mut goal = state.store.get_goal(blocked.id).await.unwrap();
+        goal.status = GoalStatus::Cancelled;
+        state.store.save_goal(goal).await.unwrap();
+        let err = advance_step(
+            State(state.clone()),
+            Path(blocked.id),
+            Json(advance_done(&blocked)),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            state.store.get_goal(blocked.id).await.unwrap().status,
+            GoalStatus::Cancelled
+        );
     }
 
     #[tokio::test]
