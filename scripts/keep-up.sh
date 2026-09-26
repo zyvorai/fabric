@@ -9,8 +9,7 @@
 #   sudo ./scripts/keep-up.sh --install-fluxvm   # also build and install FluxVM from source (experimental, see docs)
 #   sudo ./scripts/keep-up.sh --token-only       # mint a fresh user token for an existing host
 #
-# Options: --user-id ID (default: the login name), --ttl-days N (1-7, default 7), --no-template,
-#          --apparmor-complain (put FluxVM's AppArmor profile in complain mode, see zyvorai/fluxvm#107)
+# Options: --user-id ID (default: the login name), --ttl-days N (1-7, default 7), --no-template
 #
 # It does, in order: (1) preflight, (2) FluxVM check (or install), (3) the node22-agent cell template (scripts/keep-bake-node22-agent.sh, with poppler and tesseract),
 # (4) the Keep runtime via `deploy-keep.sh local` (its smoke test needs the template), (5) a scoped user
@@ -24,7 +23,7 @@ FLUXVM_URL="${KEEP_FLUXVM_URL:-http://127.0.0.1:7788}"
 KEEP_URL="${KEEP_URL:-http://127.0.0.1:9096}"
 ENV_FILE="${KEEP_ENV_FILE:-/etc/zyvor-fabricd/zyvor-fabric-agent.env}"
 
-DRY=0; INSTALL_FLUXVM=0; TOKEN_ONLY=0; NO_TEMPLATE=0; APPARMOR_COMPLAIN=0
+DRY=0; INSTALL_FLUXVM=0; TOKEN_ONLY=0; NO_TEMPLATE=0
 # the person, not root: under sudo the login name is in SUDO_USER
 LOGIN_NAME="${SUDO_USER:-$(id -un)}"
 USER_ID="$(printf '%s' "$LOGIN_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9._-' '-' | cut -c1-32)"
@@ -37,7 +36,6 @@ while [[ $# -gt 0 ]]; do
     --install-fluxvm) INSTALL_FLUXVM=1 ;;
     --token-only) TOKEN_ONLY=1 ;;
     --no-template) NO_TEMPLATE=1 ;;
-    --apparmor-complain) APPARMOR_COMPLAIN=1 ;;
     --user-id) USER_ID="${2:?--user-id needs a value}"; shift ;;
     --ttl-days) TTL_DAYS="${2:?--ttl-days needs a value}"; shift ;;
     *) echo "unknown option: $1" >&2; usage 64 ;;
@@ -175,21 +173,14 @@ phase_template() {
   step "Cell template (node22-agent: Node, poppler, tesseract)"
   if [[ "$NO_TEMPLATE" == 1 ]]; then info "skipped (--no-template)"; return; fi
   if template_listed; then ok "node22-agent is already registered"; return; fi
-  if fluxctl_profile_enforced; then
-    if [[ "$APPARMOR_COMPLAIN" == 1 ]]; then
-      if [[ "$DRY" == 1 ]]; then info "would put FluxVM's AppArmor profile 'fluxctl' in complain mode (--apparmor-complain)"
-      else
-        info "putting FluxVM's AppArmor profile 'fluxctl' in complain mode (it is logged, not blocked); to undo: sudo sed -i 's/,complain//' /etc/apparmor.d/fluxvm && sudo apparmor_parser -r /etc/apparmor.d/fluxvm"
-        $SUDO sed -i 's/flags=(attach_disconnected)/flags=(attach_disconnected,complain)/' /etc/apparmor.d/fluxvm
-        $SUDO apparmor_parser -r /etc/apparmor.d/fluxvm
-      fi
+  if [[ "$DRY" == 1 ]]; then info "would run: $SCRIPT_DIR/keep-bake-node22-agent.sh"; return; fi
+  if ! "$SCRIPT_DIR/keep-bake-node22-agent.sh"; then
+    if fluxctl_profile_enforced; then
+      bad "the template bake failed. FluxVM's AppArmor profile 'fluxctl' is enforced; a FluxVM older than zyvorai/fluxvm#108 and #110 blocks building or running cells under it: update FluxVM (git pull, re-run bootstrap-host.sh) and re-run"
     else
-      bad "FluxVM's AppArmor profile 'fluxctl' is enforced and blocks building the cell image (zyvorai/fluxvm#107). Re-run with --apparmor-complain to log instead of block (a weaker policy for FluxVM itself, your choice), or fix the profile"
-      return
+      bad "the template bake failed (see above)"
     fi
   fi
-  if [[ "$DRY" == 1 ]]; then info "would run: $SCRIPT_DIR/keep-bake-node22-agent.sh"; return; fi
-  "$SCRIPT_DIR/keep-bake-node22-agent.sh"
 }
 
 operator_token() { $SUDO sed -n 's/^ZYVOR_AGENT_API_TOKEN=//p' "$ENV_FILE" 2>/dev/null | head -1; }

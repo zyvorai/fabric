@@ -54,13 +54,6 @@ t=$(grep -n "Cell template" <<<"$out" | head -1 | cut -d: -f1); r=$(grep -n "Kee
 [[ -n "$t" && -n "$r" && "$t" -lt "$r" ]] || fail "the template phase must come before the runtime phase: $out"
 ok "the cell template is prepared before the runtime is deployed"
 
-# 4c. an enforced AppArmor profile for fluxctl blocks the image build: refused unless the flag is given explicitly
-out=$(FAKE_NO_TEMPLATE=1 KEEP_UP_AA_ENFORCED=1 up --dry-run) && fail "an enforced fluxctl profile should be refused without the flag: $out"
-grep -qF -- "--apparmor-complain" <<<"$out" && grep -qF "fluxvm#107" <<<"$out" || fail "the AppArmor refusal does not explain itself: $out"
-out=$(FAKE_NO_TEMPLATE=1 KEEP_UP_AA_ENFORCED=1 up --dry-run --apparmor-complain) || fail "the flag should allow the plan: $out"
-grep -qF "complain mode" <<<"$out" || fail "the plan does not say it will use complain mode: $out"
-ok "an enforced fluxctl AppArmor profile is refused unless --apparmor-complain is given"
-
 # 5. --token-only mints a scoped user token, never shows the operator token, writes no file
 out=$(up --token-only --user-id ana --ttl-days 2) || fail "token-only failed: $out"
 grep -q "kut1.FAKE.TOKEN" <<<"$out" || fail "the user token is not shown: $out"
@@ -82,4 +75,4 @@ ok "under sudo the default user id is the person, not root"
 "$ROOT/scripts/keep-up.sh" --ttl-days 8 >/dev/null 2>&1 && fail "--ttl-days 8 should be rejected"
 "$ROOT/scripts/keep-up.sh" --user-id 'Bad Id' >/dev/null 2>&1 && fail "a bad --user-id should be rejected"
 ok "an out-of-range TTL and a bad user id are rejected"
-echo "keep-up: 9 checks passed"
+echo "keep-up: 8 checks passed"
