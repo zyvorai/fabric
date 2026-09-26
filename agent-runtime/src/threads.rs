@@ -310,6 +310,16 @@ pub struct CreateThreadRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ListQuery {
+    /// Only threads with this agent.
+    #[serde(default)]
+    pub agent: Option<String>,
+    /// Only this user's threads. Honoured for the operator; a user token always sees only its own.
+    #[serde(default)]
+    pub user_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct MessagesQuery {
     #[serde(default)]
     pub after: u64,
@@ -340,8 +350,17 @@ async fn visible(
 pub(crate) async fn list_threads(
     State(state): State<Arc<AppState>>,
     Extension(principal): Extension<Principal>,
+    Query(q): Query<ListQuery>,
 ) -> Json<Value> {
-    let items = state.store.threads.list(principal.user()).await;
+    let mut items = state.store.threads.list(principal.user()).await;
+    if principal.user().is_none() {
+        if let Some(user) = q.user_id.as_deref() {
+            items.retain(|t| t.user_id == user);
+        }
+    }
+    if let Some(agent) = q.agent.as_deref() {
+        items.retain(|t| t.agent == agent);
+    }
     Json(json!({ "items": items }))
 }
 

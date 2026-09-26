@@ -5,8 +5,8 @@ the agent's sessions start and end. Threads live on the **host**, under `threads
 (`thread.json` plus an append-only `messages.jsonl`), never inside a cell.
 
 **Status: the store, the HTTP API and the AG-UI endpoint are built and tested.** `POST /v1/agui` keeps every conversation as a thread,
-continues it after the agent's session ended, and sends the stored messages to a reconnecting client ([AGUI.md](../AGUI.md)). **The chat page
-does not yet list or reopen earlier threads**: it starts a new conversation on every page load.
+continues it after the agent's session ended, and sends the stored messages to a reconnecting client ([AGUI.md](../AGUI.md)). The chat page
+(`scripts/keep-chat.py`) lists, reopens and forgets them and reopens your last conversation after a reload.
 
 | Route | Who | What |
 |---|---|---|
@@ -21,5 +21,5 @@ does not yet list or reopen earlier threads**: it starts a new conversation on e
 
 **Limits.** 500 threads per user, 32 KiB per message (refused, not cut), 120-character titles, 500 messages per page.
 
-**Not built yet.** Retention (threads are kept until forgotten), a chat page that lists and reopens threads, and memory. Like the vault, the operator of the host can read this data; it is not
+**Not built yet.** Retention (threads are kept until forgotten), search and attachments in the chat page, and memory. Like the vault, the operator of the host can read this data; it is not
 encrypted to the user.

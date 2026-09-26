@@ -1057,6 +1057,34 @@ async fn threads_are_private_to_their_owner() {
     let (st, _) = call(&w.app, "GET", &format!("/v1/threads/{tid}"), operator, None).await;
     assert_eq!(st, StatusCode::OK);
 
+    // the list can be narrowed by agent, and by user for the operator; a user token cannot widen or redirect it
+    let (_, v) = call(
+        &w.app,
+        "GET",
+        &format!("/v1/threads?agent={agent}"),
+        operator,
+        None,
+    )
+    .await;
+    assert_eq!(ids(&v, "user_id").len(), 2);
+    let (_, v) = call(
+        &w.app,
+        "GET",
+        "/v1/threads?agent=someone-else",
+        operator,
+        None,
+    )
+    .await;
+    assert!(ids(&v, "id").is_empty());
+    let (_, v) = call(&w.app, "GET", "/v1/threads?user_id=ben", operator, None).await;
+    assert_eq!(ids(&v, "user_id"), ["ben"]);
+    let (_, v) = call(&w.app, "GET", "/v1/threads?user_id=ben", ana, None).await;
+    assert_eq!(
+        ids(&v, "user_id"),
+        ["ana"],
+        "a user token ignores user_id and stays on its own threads"
+    );
+
     // an unknown agent is refused
     let (st, _) = call(
         &w.app,
