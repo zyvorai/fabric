@@ -27,12 +27,14 @@ public struct KeepClient: Sendable {
     public let baseURL: URL
     private let token: String
     private let session: URLSession
+    /// The session the chat stream uses (Chat.swift); each request sets its own timeout.
+    let streamSession: URLSession
 
     public init(baseURL: URL, token: String, session: URLSession = .shared) throws {
         guard let scheme = baseURL.scheme?.lowercased(), scheme == "http" || scheme == "https", baseURL.host != nil else {
             throw KeepError.badURL
         }
-        self.baseURL = baseURL; self.token = token; self.session = session
+        self.baseURL = baseURL; self.token = token; self.session = session; self.streamSession = session
     }
 
     // MARK: endpoints
@@ -116,6 +118,10 @@ public struct KeepClient: Sendable {
             return .single(try d.decode(RunResult.self, from: data))
         } catch { throw KeepError.decoding("\(error)") }
     }
+
+    func pathEscape(_ s: String) -> String { escape(s) }
+    func getJSON<T: Decodable>(_ path: String) async throws -> T { try await get(path) }
+    func sendRequest(_ req: URLRequest) async throws -> (Data, HTTPURLResponse) { try await send(req) }
 
     private func escape(_ s: String) -> String { s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))) ?? s }
 
