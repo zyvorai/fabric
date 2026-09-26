@@ -3,7 +3,7 @@
 Short notes a person lets their agent keep between conversations: a preference, a fact, a habit. It is built to be the opposite of a
 hidden profile: **off until the user turns it on, edited and deleted by the user, and every entry says where it came from.**
 
-**Status: the store, the HTTP API and the connection to agents are built and tested.** An agent that asks for memory is handed the user's accepted entries and can propose new ones; see "Agents" below. There is no memory view in the chat page or Solvor yet (use the API).
+**Status: the store, the HTTP API and the connection to agents are built and tested.** An agent that asks for memory is handed the user's accepted entries and can propose new ones; see "Agents" below. The chat page has a Memory tab (switch, add, forget, review the agent's suggestions); Solvor has none yet.
 
 | Route | What |
 |---|---|
@@ -42,4 +42,4 @@ host can read the files under `memory/`: they are **not encrypted to the user**.
 **Tests.** `memory::tests` (14: the store, plus that an agent gets memory only when it asked, the session has a user and memory is on; only counts are journaled; proposals wait, record their source and are marked tainted; refusals give a reason and never the text; the per-session cap),
 `tenancy_tests::memory_is_private_opt_in_and_decided_by_the_user` (two users and the operator against the real router, including the inbox), two worker tests in `sdk/agent-runtime/test/worker.test.js` (frozen entries, not echoed into events, `propose`), and an end-to-end block in `demos-ci.sh` (a signed `memory-agent` in a Keep-mode runtime with a stub cell: nothing known with memory off, the entry given once on, not stored in the session record, a proposal waiting in the list and inbox and unused until accepted, another user gets none, turning it off stops it). Mutation checks: letting a user token honor `?user_id=` fails the tenancy test; dropping the manifest gate or the freezing fails the tests above.
 
-**Not built yet.** A memory view in the chat page and Solvor, retention for memory, memory for the model-backed and CLI-harness agents (only the `node` worker's `ctx.memory` exists; nothing puts memory into a model prompt for you), and encryption to the user.
+**Not built yet.** A memory view in Solvor, retention for memory, memory for the model-backed and CLI-harness agents (only the `node` worker's `ctx.memory` exists; nothing puts memory into a model prompt for you), and encryption to the user.

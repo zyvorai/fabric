@@ -428,6 +428,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             axum::routing::put(crate::connections::put_connection)
                 .delete(crate::connections::delete_connection),
         )
+        .route("/v1/whoami", get(whoami))
         .route("/v1/model-grants", get(crate::model_call::list_grants))
         .route(
             "/v1/model-grants/{key}",
@@ -3238,6 +3239,17 @@ async fn usage_route(
 
 /// `GET /v1/inbox`: what a phone shows on open. The user's pending approvals and latest runs.
 /// The operator passes `?user_id=`.
+/// `GET /v1/whoami`: who the caller is, so a client (a chat page, a phone) need not guess: `{"role": "operator"}` or
+/// `{"role": "user", "user_id": ..., "scopes": [...]}`.
+async fn whoami(Extension(principal): Extension<Principal>) -> Json<Value> {
+    match &principal {
+        Principal::Operator => Json(json!({ "role": "operator" })),
+        Principal::User { id, scopes } => {
+            Json(json!({ "role": "user", "user_id": id, "scopes": scopes }))
+        }
+    }
+}
+
 async fn inbox(
     State(state): State<Arc<AppState>>,
     Extension(principal): Extension<Principal>,

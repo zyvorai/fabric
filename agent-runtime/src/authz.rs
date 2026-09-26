@@ -263,6 +263,7 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
         {
             UserRoute::Open(Scope::Run)
         }
+        ["v1", "whoami"] if read => UserRoute::Open(Scope::Read),
         // Ask for a plan, and accept or reject the one an agent proposed (nothing in a proposal runs until the person accepts it).
         ["v1", "goals", gid, "plan"] if *method == Method::POST => match id(gid) {
             Some(gid) => UserRoute::Goal(gid, Scope::Run),
@@ -631,6 +632,12 @@ mod tests {
                 "/v1/goals".into(),
                 UserRoute::Open(Scope::Read),
             ),
+            (
+                Method::GET,
+                "/v1/whoami".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (Method::POST, "/v1/whoami".into(), UserRoute::Denied),
             (
                 Method::POST,
                 "/v1/goals".into(),
