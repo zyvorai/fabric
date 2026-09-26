@@ -2,28 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   <title>Keep chat</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <main class="chat" aria-label="Chat with a Keep agent">
-    <header>
-      <div>
-        <h1>Keep chat</h1>
-        <p class="sub">Agent <code id="agent">{{AGENT}}</code> · runs on your Keep host</p>
-      </div>
-      <button id="new" type="button" class="ghost">New chat</button>
-    </header>
-    <ol id="log" class="log" aria-live="polite" aria-relevant="additions text"></ol>
-    <p id="status" class="status" role="status"></p>
-    <form id="form" class="composer" autocomplete="off">
-      <label for="input" class="sr">Message</label>
-      <textarea id="input" rows="1" placeholder="Message the agent" maxlength="16000" required></textarea>
-      <button id="send" type="submit">Send</button>
-    </form>
-    <p class="note">Approvals are decided on your own device. This chat can show that one is waiting, but it cannot approve or deny anything.</p>
-  </main>
+  <div class="app" id="app">
+    <aside class="list" aria-label="Chats">
+      <header class="list-head">
+        <h2>Chats</h2>
+        <button id="new" type="button" class="icon" aria-label="New chat" title="New chat">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <ul id="threads" class="threads"></ul>
+      <p id="threads-empty" class="list-empty" hidden>No chats yet.<br>Say hello to start one.</p>
+    </aside>
+
+    <main class="chat" aria-label="Chat with {{AGENT}}">
+      <header class="chat-head">
+        <button id="back" type="button" class="icon back" aria-label="Back to chats">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="avatar" id="avatar" aria-hidden="true"></div>
+        <div class="who">
+          <h1 id="agent-name">{{AGENT}}</h1>
+          <p id="status" class="status" role="status">Runs on your Keep host</p>
+        </div>
+      </header>
+
+      <section class="stage">
+        <ol id="log" class="log" aria-live="polite" aria-relevant="additions text"></ol>
+        <div id="hello" class="hello">
+          <div class="hello-card">
+            <div class="avatar big" id="hello-avatar" aria-hidden="true"></div>
+            <h3>Ask <span id="hello-name">{{AGENT}}</span></h3>
+            <p>Your messages go to an agent that runs on your own Keep host. Nothing it asks to send or spend happens until you approve it on your device.</p>
+          </div>
+        </div>
+      </section>
+
+      <form id="form" class="composer" autocomplete="off">
+        <div class="field" id="field">
+          <label for="input" class="sr">Message</label>
+          <textarea id="input" rows="1" placeholder="Message" maxlength="16000" required></textarea>
+        </div>
+        <button id="send" type="submit" class="send" aria-label="Send" title="Send">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </form>
+      <p class="fine">Approvals are decided on your own device. This chat can show that one is waiting, but it cannot approve or deny anything.</p>
+    </main>
+  </div>
   <script src="/app.js"></script>
 </body>
 </html>
