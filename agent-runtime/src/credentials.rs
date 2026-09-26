@@ -25,7 +25,8 @@ pub struct CredentialDescriptor {
     /// Optional HTTP method allowlist for this credential. Empty means any method.
     #[serde(default)]
     pub allowed_methods: Vec<String>,
-    /// Optional URL path-prefix allowlist. Empty means any path on the bound host.
+    /// Optional URL path-prefix allowlist. Empty means any path on the bound host. An entry ending in `$` matches that exact path only
+    /// (`/gmail/v1/users/me/drafts$` allows the drafts collection but not `/drafts/send`).
     #[serde(default)]
     pub path_prefixes: Vec<String>,
     /// Additional HTTPS ports that may receive this credential. Port 443 is always allowed.
@@ -56,6 +57,11 @@ pub struct CredentialDescriptor {
     /// token decides them (see `devices.rs`). The operator token can always decide unsigned.
     #[serde(default)]
     pub require_device_signature: bool,
+    /// What the person is shown when they decide a request that uses this credential: the host reads the request body and renders it
+    /// (`gmail-message`, `calendar-event`; see `preview.rs`). A body it cannot render faithfully is refused before anything is sent.
+    /// Only meaningful with `requires_approval`.
+    #[serde(default)]
+    pub preview: Option<String>,
     /// For `kind=oauth-refresh`: how the host mints short-lived access tokens from a long-lived
     /// refresh token (e.g. Google). The access token is what gets injected; the refresh token,
     /// client id and client secret stay in host env and never reach a cell.
@@ -73,8 +79,13 @@ pub struct OAuthRefresh {
     pub client_id_env: String,
     /// Host env variable holding the OAuth client secret (empty env value means a public client).
     pub client_secret_env: String,
-    /// Host env variable holding the refresh token.
+    /// Host env variable holding the refresh token: one identity for the whole host. Leave empty when `connection` is set.
+    #[serde(default)]
     pub refresh_token_env: String,
+    /// Makes the credential **per person**: the refresh token is the one that person stored under this connection name
+    /// (`PUT /v1/connections/{name}`), and the access token is minted for them on first use. A session with no user cannot use it.
+    #[serde(default)]
+    pub connection: Option<String>,
     /// Refresh this many seconds before the access token expires. Default 300.
     #[serde(default = "default_refresh_margin")]
     pub refresh_margin_secs: u64,
@@ -86,6 +97,65 @@ fn default_refresh_margin() -> u64 {
 
 /// The kind name for credentials whose secret is a refreshed OAuth access token.
 pub const KIND_OAUTH_REFRESH: &str = "oauth-refresh";
+
+fn env_secret(var: &str, required: bool) -> Result<String> {
+    match std::env::var(var) {
+        Ok(v) if !v.is_empty() => Ok(v),
+        _ if !required => Ok(String::new()),
+        _ => bail!("host environment variable {var} is not set"),
+    }
+}
+
+/// The refresh-token grant against the token endpoint. The client id and secret come from host env; `refresh_token` is passed in. The error
+/// text carries Google's error code at most, never a secret.
+async fn mint_access_token(
+    oauth: &OAuthRefresh,
+    refresh_token: &str,
+    name: &str,
+    http: &reqwest::Client,
+) -> Result<(String, Duration)> {
+    let body = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("grant_type", "refresh_token")
+        .append_pair("client_id", &env_secret(&oauth.client_id_env, true)?)
+        .append_pair(
+            "client_secret",
+            &env_secret(&oauth.client_secret_env, false)?,
+        )
+        .append_pair("refresh_token", refresh_token)
+        .finish();
+    let response = http
+        .post(&oauth.token_url)
+        .header("content-type", "application/x-www-form-urlencoded")
+        .header("accept", "application/json")
+        .body(body)
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .with_context(|| format!("token endpoint for '{name}' is unreachable"))?;
+    let status = response.status();
+    let json: serde_json::Value = response.json().await.with_context(|| {
+        format!("token endpoint for '{name}' returned status {status} with a non-JSON body")
+    })?;
+    if !status.is_success() {
+        let code = json
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        bail!("token endpoint for '{name}' refused the refresh: status {status}, error {code}");
+    }
+    let token = json
+        .get("access_token")
+        .and_then(|v| v.as_str())
+        .filter(|t| !t.is_empty())
+        .with_context(|| format!("token endpoint for '{name}' returned no access_token"))?;
+    let lifetime = Duration::from_secs(
+        json.get("expires_in")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(3600)
+            .max(1),
+    );
+    Ok((token.to_string(), lifetime))
+}
 
 #[derive(Debug, Clone)]
 struct CachedToken {
@@ -128,6 +198,8 @@ pub struct CredentialVault {
     /// Current access tokens of `oauth-refresh` credentials. Shared by clones of the vault so
     /// the refresher task and request handlers see the same values. Never persisted or logged.
     tokens: Arc<RwLock<HashMap<String, CachedToken>>>,
+    /// Access tokens minted for one person's connection, by (credential, person).
+    user_tokens: Arc<RwLock<HashMap<(String, String), CachedToken>>>,
 }
 
 impl CredentialVault {
@@ -151,6 +223,7 @@ impl CredentialVault {
         Self {
             descriptors,
             tokens: Arc::default(),
+            user_tokens: Arc::default(),
         }
     }
 
@@ -185,6 +258,15 @@ impl CredentialVault {
     }
 
     pub fn resolve(&self, name: &str) -> Result<(&CredentialDescriptor, String)> {
+        self.resolve_for(name, None)
+    }
+
+    /// Like [`resolve`](Self::resolve), for a request made on behalf of `user` (needed for a per-person credential).
+    pub fn resolve_for(
+        &self,
+        name: &str,
+        user: Option<&str>,
+    ) -> Result<(&CredentialDescriptor, String)> {
         let descriptor = self.descriptor(name).with_context(|| {
             format!("credential '{name}' is not configured on this Fabric host")
         })?;
@@ -197,15 +279,24 @@ impl CredentialVault {
             return Ok((descriptor, format!("{}{}", descriptor.prefix, value)));
         }
         if descriptor.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH) {
-            let cached = self
-                .tokens
-                .read()
-                .ok()
-                .and_then(|t| t.get(name).cloned())
-                .filter(|t| t.valid_until > Instant::now())
-                .with_context(|| {
-                    format!("credential '{name}' has no valid access token yet (the last refresh failed or is pending)")
+            let per_person = descriptor
+                .oauth
+                .as_ref()
+                .is_some_and(|o| o.connection.is_some());
+            let candidate = if per_person {
+                let user = user.with_context(|| {
+                    format!("credential '{name}' belongs to a person's own connection and needs a session with a user")
                 })?;
+                self.user_tokens
+                    .read()
+                    .ok()
+                    .and_then(|t| t.get(&(name.to_string(), user.to_string())).cloned())
+            } else {
+                self.tokens.read().ok().and_then(|t| t.get(name).cloned())
+            };
+            let cached = candidate.filter(|t| t.valid_until > Instant::now()).with_context(|| {
+                format!("credential '{name}' has no valid access token yet (the last refresh failed, is pending, or the person has not connected)")
+            })?;
             let prefix = if descriptor.prefix.is_empty() {
                 "Bearer "
             } else {
@@ -230,64 +321,118 @@ impl CredentialVault {
         let oauth = descriptor
             .oauth
             .as_ref()
-            .filter(|_| descriptor.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH))
-            .with_context(|| format!("credential '{name}' is not an oauth-refresh credential"))?;
-        let env = |var: &str, required: bool| -> Result<String> {
-            match std::env::var(var) {
-                Ok(v) if !v.is_empty() => Ok(v),
-                _ if !required => Ok(String::new()),
-                _ => bail!("host environment variable {var} is not set"),
-            }
-        };
-        let body = url::form_urlencoded::Serializer::new(String::new())
-            .append_pair("grant_type", "refresh_token")
-            .append_pair("client_id", &env(&oauth.client_id_env, true)?)
-            .append_pair("client_secret", &env(&oauth.client_secret_env, false)?)
-            .append_pair("refresh_token", &env(&oauth.refresh_token_env, true)?)
-            .finish();
-        let response = http
-            .post(&oauth.token_url)
-            .header("content-type", "application/x-www-form-urlencoded")
-            .header("accept", "application/json")
-            .body(body)
-            .timeout(Duration::from_secs(20))
-            .send()
-            .await
-            .with_context(|| format!("token endpoint for '{name}' is unreachable"))?;
-        let status = response.status();
-        let json: serde_json::Value = response.json().await.with_context(|| {
-            format!("token endpoint for '{name}' returned status {status} with a non-JSON body")
-        })?;
-        if !status.is_success() {
-            // The `error` code (e.g. invalid_grant) is safe to show; the description can be long.
-            let code = json
-                .get("error")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
-            bail!("token endpoint for '{name}' refused the refresh: status {status}, error {code}");
-        }
-        let token = json
-            .get("access_token")
-            .and_then(|v| v.as_str())
-            .filter(|t| !t.is_empty())
-            .with_context(|| format!("token endpoint for '{name}' returned no access_token"))?;
-        let lifetime = Duration::from_secs(
-            json.get("expires_in")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(3600)
-                .max(1),
-        );
+            .filter(|o| {
+                descriptor.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH) && o.connection.is_none()
+            })
+            .with_context(|| {
+                format!("credential '{name}' is not a host-wide oauth-refresh credential")
+            })?;
+        let refresh_token = env_secret(&oauth.refresh_token_env, true)?;
+        let (token, lifetime) = mint_access_token(oauth, &refresh_token, name, http).await?;
         self.tokens
             .write()
             .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
             .insert(
                 name.to_string(),
                 CachedToken {
-                    value: token.to_string(),
+                    value: token,
                     valid_until: Instant::now() + lifetime,
                 },
             );
         Ok(lifetime)
+    }
+
+    /// Whether `name` is a per-person credential (its refresh token is the person's own connection).
+    pub fn is_per_person(&self, name: &str) -> bool {
+        self.descriptors
+            .get(name)
+            .and_then(|d| d.oauth.as_ref())
+            .is_some_and(|o| o.connection.is_some())
+    }
+
+    /// The connection a per-person credential uses (`google`), if it is one.
+    pub fn connection_of(&self, name: &str) -> Option<&str> {
+        self.descriptors
+            .get(name)?
+            .oauth
+            .as_ref()?
+            .connection
+            .as_deref()
+    }
+
+    /// Every connection name some credential asks a person to provide, sorted.
+    pub fn connection_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .descriptors
+            .values()
+            .filter_map(|d| d.oauth.as_ref()?.connection.clone())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Makes sure `user` has a valid access token for the per-person credential `name`, minting one from `refresh_token` (the person's own,
+    /// from their connection) when there is none or it is about to expire. A missing connection or a refusal is an error that names no secret.
+    pub async fn ensure_user_token(
+        &self,
+        name: &str,
+        user: &str,
+        refresh_token: Option<&str>,
+        http: &reqwest::Client,
+    ) -> Result<()> {
+        let descriptor = self
+            .descriptor(name)
+            .with_context(|| format!("credential '{name}' is not configured"))?;
+        let oauth = descriptor
+            .oauth
+            .as_ref()
+            .filter(|o| o.connection.is_some())
+            .with_context(|| format!("credential '{name}' is not a per-person credential"))?;
+        let key = (name.to_string(), user.to_string());
+        let margin = Duration::from_secs(oauth.refresh_margin_secs.min(600));
+        let fresh = self
+            .user_tokens
+            .read()
+            .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
+            .get(&key)
+            .is_some_and(|t| t.valid_until > Instant::now() + margin);
+        if fresh {
+            return Ok(());
+        }
+        let refresh_token = refresh_token.with_context(|| {
+            format!(
+                "connect your {} account first (credential '{name}' uses your own connection)",
+                oauth.connection.as_deref().unwrap_or("account")
+            )
+        })?;
+        let (token, lifetime) = mint_access_token(oauth, refresh_token, name, http).await?;
+        self.user_tokens
+            .write()
+            .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
+            .insert(
+                key,
+                CachedToken {
+                    value: token,
+                    valid_until: Instant::now() + lifetime,
+                },
+            );
+        Ok(())
+    }
+
+    /// Drops the cached access tokens of `user` for every credential that uses `connection` (after they disconnect or replace it).
+    pub fn forget_user_connection(&self, user: &str, connection: &str) {
+        let names: Vec<&String> = self
+            .descriptors
+            .iter()
+            .filter(|(_, d)| {
+                d.oauth.as_ref().and_then(|o| o.connection.as_deref()) == Some(connection)
+            })
+            .map(|(n, _)| n)
+            .collect();
+        if let Ok(mut cache) = self.user_tokens.write() {
+            cache.retain(|(n, u), _| !(u == user && names.contains(&n)));
+        }
     }
 
     /// Get a first token for every `oauth-refresh` credential (a failure is logged, not fatal:
@@ -297,7 +442,10 @@ impl CredentialVault {
         let names: Vec<String> = self
             .descriptors
             .iter()
-            .filter(|(_, d)| d.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH))
+            .filter(|(_, d)| {
+                d.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH)
+                    && d.oauth.as_ref().is_some_and(|o| o.connection.is_none())
+            })
             .map(|(n, _)| n.clone())
             .collect();
         for name in names {
@@ -382,7 +530,7 @@ impl CredentialVault {
                 bail!("credential '{name}' is not allowed for user '{uid}'");
             }
         }
-        self.resolve(name)
+        self.resolve_for(name, ctx.user_id)
     }
 }
 
@@ -410,8 +558,21 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
         if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
             bail!("credential '{name}' oauth token_url must be https (http only for loopback)");
         }
-        if o.client_id_env.trim().is_empty() || o.refresh_token_env.trim().is_empty() {
-            bail!("credential '{name}' oauth needs client_id_env and refresh_token_env");
+        if o.client_id_env.trim().is_empty() {
+            bail!("credential '{name}' oauth needs client_id_env");
+        }
+        match (&o.connection, o.refresh_token_env.trim().is_empty()) {
+            (None, true) => bail!("credential '{name}' oauth needs refresh_token_env, or a connection for a per-person credential"),
+            (Some(_), false) => bail!("credential '{name}' oauth sets both refresh_token_env and connection; choose one"),
+            (Some(c), true) => {
+                if c.is_empty() || c.len() > 32 || !c.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
+                    bail!("credential '{name}' oauth connection must be 1 to 32 characters of a-z, 0-9 and '-'");
+                }
+                if d.intercept {
+                    bail!("credential '{name}' is per person and cannot be intercepted");
+                }
+            }
+            (None, false) => {}
         }
     } else if !d.kind.eq_ignore_ascii_case("fabric") && d.env.trim().is_empty() {
         bail!("credential '{name}' requires env unless kind is fabric or oauth-refresh");
@@ -425,6 +586,14 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
         reqwest::Method::from_bytes(method.as_bytes()).with_context(|| {
             format!("credential '{name}' has invalid allowed method '{method}'")
         })?;
+    }
+    if let Some(kind) = &d.preview {
+        if !crate::preview::is_known(kind) {
+            bail!("credential '{name}' has an unknown preview '{kind}'");
+        }
+        if d.requires_approval.is_empty() {
+            bail!("credential '{name}' sets a preview but never asks for approval");
+        }
     }
     for method in &d.requires_approval {
         if method != "*" {
@@ -462,7 +631,10 @@ pub fn credential_allows_request(
         || descriptor
             .path_prefixes
             .iter()
-            .any(|prefix| path.starts_with(prefix));
+            .any(|prefix| match prefix.strip_suffix('$') {
+                Some(exact) => path == exact,
+                None => path.starts_with(prefix),
+            });
     let port_ok = port == 443
         || port == 80
         || descriptor.allowed_ports.contains(&port)
@@ -487,6 +659,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_path_ending_in_a_dollar_sign_matches_that_exact_path_only() {
+        let d: CredentialDescriptor = serde_json::from_value(serde_json::json!({
+            "host": "h", "header": "authorization", "env": "E",
+            "path_prefixes": ["/gmail/v1/users/me/drafts$", "/calendar/"]
+        }))
+        .unwrap();
+        let ok = |p: &str| credential_allows_request(&d, &reqwest::Method::POST, p, 443);
+        assert!(ok("/gmail/v1/users/me/drafts"));
+        assert!(
+            !ok("/gmail/v1/users/me/drafts/send"),
+            "a draft is not sent by this credential"
+        );
+        assert!(!ok("/gmail/v1/users/me/drafts/"));
+        assert!(!ok("/gmail/v1/users/me/messages/send"));
+        assert!(
+            ok("/calendar/v3/anything"),
+            "a plain prefix still matches by prefix"
+        );
+    }
+
+    #[test]
+    fn a_preview_must_be_a_known_kind_and_belong_to_a_credential_that_asks_for_approval() {
+        let make = |preview: &str, approval: bool| {
+            let mut d = serde_json::json!({"host": "h", "header": "authorization", "env": "E", "preview": preview});
+            if approval {
+                d["requires_approval"] = serde_json::json!(["POST"]);
+            }
+            serde_json::from_value::<CredentialDescriptor>(d).unwrap()
+        };
+        assert!(validate_descriptor("m", &make("gmail-message", true)).is_ok());
+        assert!(validate_descriptor("m", &make("calendar-event", true)).is_ok());
+        assert!(validate_descriptor("m", &make("nonsense", true)).is_err());
+        assert!(validate_descriptor("m", &make("gmail-message", false)).is_err());
+    }
+
+    #[test]
     fn host_suffix_is_boundary_safe() {
         assert!(host_matches("openai.com", "api.openai.com"));
         assert!(host_matches("api.openai.com", "api.openai.com"));
@@ -509,6 +717,7 @@ mod tests {
             approval_kind: None,
             intercept: false,
             require_device_signature: false,
+            preview: None,
             oauth: None,
         };
         assert!(credential_allows_request(
@@ -780,5 +989,263 @@ mod tests {
             serde_json::json!({"host": "h", "header": "authorization", "kind": "oauth-refresh"}),
         );
         assert!(validate_descriptor("g", &missing).is_err());
+    }
+
+    /// A token endpoint that answers `access_token = "at-" + the refresh token it was given`, and records the refresh tokens seen.
+    async fn per_person_token_endpoint() -> (String, Arc<std::sync::Mutex<Vec<String>>>) {
+        use axum::{extract::State, routing::post, Router};
+        let seen: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+        let app = Router::new()
+            .route(
+                "/token",
+                post(|State(seen): State<Arc<std::sync::Mutex<Vec<String>>>>, body: String| async move {
+                    let rt = url::form_urlencoded::parse(body.as_bytes()).find(|(k, _)| k == "refresh_token").map(|(_, v)| v.to_string()).unwrap_or_default();
+                    seen.lock().unwrap().push(rt.clone());
+                    axum::Json(serde_json::json!({"access_token": format!("at-{rt}"), "expires_in": 3600}))
+                }),
+            )
+            .with_state(seen.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/token", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (url, seen)
+    }
+
+    fn person_vault(token_url: &str) -> CredentialVault {
+        std::env::set_var("PP_CLIENT_ID", "cid");
+        std::env::set_var("PP_CLIENT_SECRET", "csecret");
+        let d: CredentialDescriptor = serde_json::from_value(serde_json::json!({
+            "host": "gmail.googleapis.com", "header": "authorization", "kind": "oauth-refresh", "allowed_methods": ["GET"],
+            "oauth": {"token_url": token_url, "client_id_env": "PP_CLIENT_ID", "client_secret_env": "PP_CLIENT_SECRET", "connection": "google"}
+        }))
+        .unwrap();
+        validate_descriptor("gmail", &d).unwrap();
+        CredentialVault::from_descriptors(HashMap::from([("gmail".to_string(), d)]))
+    }
+
+    #[tokio::test]
+    async fn a_per_person_credential_uses_each_persons_own_refresh_token_and_caches_it() {
+        let (url, seen) = per_person_token_endpoint().await;
+        let vault = person_vault(&url);
+        let http = reqwest::Client::new();
+        assert!(vault.is_per_person("gmail") && vault.connection_of("gmail") == Some("google"));
+        assert_eq!(vault.connection_names(), ["google"]);
+        // nothing works without a user, or before the person connected
+        assert!(
+            vault.resolve_for("gmail", None).is_err(),
+            "a session with no user"
+        );
+        assert!(vault.resolve("gmail").is_err(), "and the host-wide path");
+        let err = vault
+            .ensure_user_token("gmail", "ana", None, &http)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("connect your google account first"), "{err}");
+        assert!(
+            seen.lock().unwrap().is_empty(),
+            "nothing was sent to the token endpoint"
+        );
+        // two people, two tokens, each minted from their own refresh token
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-refresh"), &http)
+            .await
+            .unwrap();
+        vault
+            .ensure_user_token("gmail", "ben", Some("1//ben-refresh"), &http)
+            .await
+            .unwrap();
+        assert_eq!(
+            vault.resolve_for("gmail", Some("ana")).unwrap().1,
+            "Bearer at-1//ana-refresh"
+        );
+        assert_eq!(
+            vault.resolve_for("gmail", Some("ben")).unwrap().1,
+            "Bearer at-1//ben-refresh"
+        );
+        assert!(
+            vault.resolve_for("gmail", Some("cam")).is_err(),
+            "a person who has not connected gets nothing"
+        );
+        // a second use does not call the endpoint again
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-refresh"), &http)
+            .await
+            .unwrap();
+        assert_eq!(*seen.lock().unwrap(), ["1//ana-refresh", "1//ben-refresh"]);
+        // the policy still applies through authorize_resolve
+        let get = reqwest::Method::GET;
+        let post = reqwest::Method::POST;
+        let ctx = |m, u| ResolveContext {
+            host: "gmail.googleapis.com",
+            method: m,
+            path: "/gmail/v1/users/me/messages",
+            port: 443,
+            user_id: u,
+        };
+        assert!(vault
+            .authorize_resolve("gmail", &ctx(&get, Some("ana")))
+            .is_ok());
+        assert!(vault
+            .authorize_resolve("gmail", &ctx(&post, Some("ana")))
+            .is_err());
+        assert!(vault.authorize_resolve("gmail", &ctx(&get, None)).is_err());
+    }
+
+    #[tokio::test]
+    async fn disconnecting_or_replacing_a_connection_drops_only_that_persons_tokens() {
+        let (url, seen) = per_person_token_endpoint().await;
+        let vault = person_vault(&url);
+        let http = reqwest::Client::new();
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-refresh"), &http)
+            .await
+            .unwrap();
+        vault
+            .ensure_user_token("gmail", "ben", Some("1//ben-refresh"), &http)
+            .await
+            .unwrap();
+        vault.forget_user_connection("ana", "google");
+        assert!(
+            vault.resolve_for("gmail", Some("ana")).is_err(),
+            "ana's token is gone at once"
+        );
+        assert!(
+            vault.resolve_for("gmail", Some("ben")).is_ok(),
+            "ben's is not"
+        );
+        vault.forget_user_connection("ben", "another-connection");
+        assert!(
+            vault.resolve_for("gmail", Some("ben")).is_ok(),
+            "a different connection name leaves it alone"
+        );
+        // a new refresh token mints a new access token
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-new"), &http)
+            .await
+            .unwrap();
+        assert_eq!(
+            vault.resolve_for("gmail", Some("ana")).unwrap().1,
+            "Bearer at-1//ana-new"
+        );
+        assert_eq!(seen.lock().unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn a_refused_refresh_names_the_error_code_and_no_secret() {
+        use axum::{routing::post, Router};
+        let app = Router::new().route("/token", post(|| async { (axum::http::StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({"error": "invalid_grant", "error_description": "Token has been revoked 1//ana-refresh"}))) }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/token", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let vault = person_vault(&url);
+        let err = format!(
+            "{:#}",
+            vault
+                .ensure_user_token(
+                    "gmail",
+                    "ana",
+                    Some("1//ana-refresh"),
+                    &reqwest::Client::new()
+                )
+                .await
+                .unwrap_err()
+        );
+        assert!(
+            err.contains("invalid_grant")
+                && !err.contains("1//ana-refresh")
+                && !err.contains("csecret"),
+            "{err}"
+        );
+        assert!(
+            vault.resolve_for("gmail", Some("ana")).is_err(),
+            "and it stays closed"
+        );
+    }
+
+    #[test]
+    fn the_documented_google_examples_are_valid_descriptors() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/keep/connectors");
+        for (file, per_person) in [
+            ("google.credentials.json", false),
+            ("google.per-person.credentials.json", true),
+        ] {
+            let text = std::fs::read_to_string(dir.join(file)).unwrap();
+            let map: HashMap<String, CredentialDescriptor> = serde_json::from_str(&text).unwrap();
+            assert_eq!(map.len(), 5, "{file}");
+            for (name, d) in &map {
+                validate_descriptor(name, d).unwrap_or_else(|e| panic!("{file}: {e}"));
+            }
+            assert_eq!(
+                CredentialVault::from_descriptors(map).is_per_person("gmail-read"),
+                per_person,
+                "{file}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_descriptor_uses_either_a_host_refresh_token_or_a_persons_connection() {
+        let make = |oauth: serde_json::Value, extra: serde_json::Value| {
+            let mut d = serde_json::json!({"host": "h", "header": "authorization", "kind": "oauth-refresh", "oauth": oauth});
+            for (k, v) in extra.as_object().cloned().unwrap_or_default() {
+                d[k] = v;
+            }
+            serde_json::from_value::<CredentialDescriptor>(d).unwrap()
+        };
+        let base = |rt: &str, conn: Option<&str>| {
+            let mut o = serde_json::json!({"token_url": "https://oauth2.googleapis.com/token", "client_id_env": "A", "client_secret_env": "B", "refresh_token_env": rt});
+            if let Some(c) = conn {
+                o["connection"] = c.into();
+            }
+            o
+        };
+        assert!(
+            validate_descriptor("g", &make(base("C", None), serde_json::json!({}))).is_ok(),
+            "host-wide"
+        );
+        assert!(
+            validate_descriptor("g", &make(base("", Some("google")), serde_json::json!({})))
+                .is_ok(),
+            "per person"
+        );
+        assert!(
+            validate_descriptor("g", &make(base("", None), serde_json::json!({}))).is_err(),
+            "neither"
+        );
+        assert!(
+            validate_descriptor("g", &make(base("C", Some("google")), serde_json::json!({})))
+                .is_err(),
+            "both"
+        );
+        for bad in ["", "Google", "with space", &"x".repeat(33)] {
+            assert!(
+                validate_descriptor("g", &make(base("", Some(bad)), serde_json::json!({})))
+                    .is_err(),
+                "{bad:?}"
+            );
+        }
+        assert!(
+            validate_descriptor(
+                "g",
+                &make(
+                    base("", Some("google")),
+                    serde_json::json!({"intercept": true})
+                )
+            )
+            .is_err(),
+            "a per-person credential is not intercepted"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_host_wide_refresher_leaves_per_person_credentials_alone() {
+        let (url, seen) = per_person_token_endpoint().await;
+        let vault = person_vault(&url);
+        vault.start_oauth_refresh(reqwest::Client::new()).await;
+        assert!(
+            seen.lock().unwrap().is_empty(),
+            "no host refresh token exists for a per-person credential"
+        );
     }
 }

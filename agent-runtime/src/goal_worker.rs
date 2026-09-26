@@ -520,6 +520,7 @@ async fn open_approval(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        preview: None,
         broker_held: false,
     };
     state

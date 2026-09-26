@@ -59,6 +59,8 @@ pub struct Store {
     pub threads: crate::threads::ThreadStore,
     /// Opt-in personal memory, per user.
     pub memory: crate::memory::MemoryStore,
+    /// A person's own connections to outside accounts (refresh tokens, write-only).
+    pub connections: crate::connections::ConnectionStore,
 }
 
 impl Store {
@@ -70,12 +72,15 @@ impl Store {
         let skills = SkillStore::open(root.join("skills")).await?;
         let threads = crate::threads::ThreadStore::open(root.join("threads")).await?;
         let memory = crate::memory::MemoryStore::open(root.join("memory")).await?;
+        let connections =
+            crate::connections::ConnectionStore::open(root.join("connections")).await?;
 
         let store = Self {
             audit,
             skills,
             threads,
             memory,
+            connections,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
@@ -804,6 +809,20 @@ impl Store {
         out
     }
 
+    /// The approvals of one session, oldest first (a read of the map, not a copy of every approval).
+    pub async fn approvals_of_session(&self, session_id: Uuid) -> Vec<ApprovalRecord> {
+        let mut out: Vec<_> = self
+            .approvals
+            .read()
+            .await
+            .values()
+            .filter(|a| a.session_id == session_id)
+            .cloned()
+            .collect();
+        out.sort_by_key(|record| record.created_at);
+        out
+    }
+
     pub async fn get_approval(&self, id: Uuid) -> Option<ApprovalRecord> {
         self.approvals.read().await.get(&id).cloned()
     }
@@ -1069,6 +1088,8 @@ impl Store {
         record.status = status;
         record.comment = comment;
         record.decided_at = Some(Utc::now());
+        // What the person was shown lives only while the question is open.
+        record.preview = None;
         record.grant_scope = if status == ApprovalStatus::Approved {
             scope
         } else {

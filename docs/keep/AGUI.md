@@ -49,6 +49,7 @@ It is the lightest client, not a product: one agent, no search, and no attachmen
 | `session.waiting`, `session.running` | `CUSTOM` `keep.waiting`, `keep.running` |
 | an event the agent emitted with `ctx.emit` | `CUSTOM` `keep.event` with `{kind, data}` |
 | `approval.requested` | `TEXT_MESSAGE_END` if open, then `CUSTOM` `keep.approval_requested` with the prompt |
+| an approval the host holds for the agent (a request that needs a person, e.g. sending mail), while it waits | `CUSTOM` `keep.approval_requested` with `{approval_id, kind, prompt, preview}` (`preview` is the host's rendering of what would be sent, when the credential has one; see [connectors](connectors/README.md)), then `CUSTOM` `keep.approval_decided` with `{approval_id, decision}` (`approved`, `denied` or `expired`) |
 | `session.result` | a text message if the result is a string, then `RUN_FINISHED` with `result` |
 | `session.failed`, `cancelled`, `expired`, `deleted` | `RUN_ERROR` with a `code` |
 | (start, when the thread already has messages) | `MESSAGES_SNAPSHOT` right after `RUN_STARTED`: the stored conversation, including the message just sent |
