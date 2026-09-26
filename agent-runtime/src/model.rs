@@ -1160,6 +1160,10 @@ pub struct ApprovalRecord {
     /// Set when an egress approval is approved.
     #[serde(default)]
     pub grant_scope: Option<GrantScope>,
+    /// The host's rendering of the request body (recipients, subject, text; see `preview.rs`), for the person deciding. Kept only while
+    /// the approval is pending, and never sent to the journal, a webhook or a push relay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

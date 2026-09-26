@@ -252,6 +252,7 @@ pub(crate) async fn proxy_inner(
     }
 
     let mut needs_approval: Option<(ApprovalKind, String)> = None;
+    let mut preview: Option<crate::preview::Preview> = None;
     if let Some(name) = request.credential.as_deref() {
         if !agent.manifest.credentials.iter().any(|c| c == name) {
             return Err((
@@ -325,6 +326,18 @@ pub(crate) async fn proxy_inner(
         };
         if let Some(kind) = descriptor.approval_kind_for(&method) {
             needs_approval = Some((kind, name.to_string()));
+            // The person decides what the host reads out of the real body, not what the agent says it is. A body the host cannot
+            // render faithfully is not sent at all.
+            if let Some(preview_kind) = descriptor.preview.as_deref() {
+                preview = Some(
+                    crate::preview::render(preview_kind, body.as_deref().unwrap_or_default(), url.query()).map_err(|e| {
+                        (
+                            StatusCode::UNPROCESSABLE_ENTITY,
+                            format!("this request cannot be shown for approval, so it was not sent: {e:#}"),
+                        )
+                    })?,
+                );
+            }
         }
         if !secret.is_empty() {
             let header_name = reqwest::header::HeaderName::from_bytes(descriptor.header.as_bytes())
@@ -379,6 +392,7 @@ pub(crate) async fn proxy_inner(
             credential.as_deref(),
             &reasons,
             body.as_deref(),
+            preview.as_ref(),
         )
         .await?;
     }
@@ -709,6 +723,7 @@ pub(crate) async fn authorize_unlisted_host(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        preview: None,
         broker_held: true,
     };
     let (approval, created) = state
@@ -830,6 +845,7 @@ async fn hold_for_approval(
     credential: Option<&str>,
     reasons: &[String],
     body: Option<&[u8]>,
+    preview: Option<&crate::preview::Preview>,
 ) -> Result<(), (StatusCode, String)> {
     let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
     let mut target = url.clone();
@@ -841,20 +857,25 @@ async fn hold_for_approval(
         Some(bytes) => (bytes.len(), hex::encode(sha2::Sha256::digest(bytes))),
         None => (0, String::new()),
     };
+    let mut planned = json!({
+        "method": method,
+        "url": target.as_str(),
+        "credential": credential,
+        "reasons": reasons,
+        "body_bytes": body_len,
+        "body_sha256": body_sha256,
+        "scopes": ["once"],
+    });
+    if let Some(p) = preview {
+        // What the phone signs covers the rendering the person read, not only the raw bytes.
+        planned["preview_sha256"] = json!(p.sha256());
+    }
     let approval = ApprovalRecord {
         id: uuid::Uuid::new_v4(),
         session_id: session.id,
         kind,
         subject: Some(host.clone()),
-        planned_action: Some(json!({
-            "method": method,
-            "url": target.as_str(),
-            "credential": credential,
-            "reasons": reasons,
-            "body_bytes": body_len,
-            "body_sha256": body_sha256,
-            "scopes": ["once"],
-        })),
+        planned_action: Some(planned),
         prompt: {
             let mut prompt = format!("Agent wants to {method} {target}");
             if let Some(name) = credential {
@@ -871,6 +892,7 @@ async fn hold_for_approval(
         decided_at: None,
         source_seq: None,
         grant_scope: None,
+        preview: preview.map(crate::preview::Preview::to_value),
         broker_held: true,
     };
     state
@@ -1362,16 +1384,20 @@ pub(crate) mod ask_tests {
 
     /// A state whose agent holds a `mail` credential that needs approval for POST.
     async fn approval_gated_agent(port: u16) -> (Arc<AppState>, SessionRecord) {
+        approval_gated_agent_with(port, json!({})).await
+    }
+
+    /// The same, with extra fields merged into the `mail` descriptor (a `preview`, say).
+    async fn approval_gated_agent_with(port: u16, extra: Value) -> (Arc<AppState>, SessionRecord) {
         let file = std::env::temp_dir().join(format!("zyvor-cred-{}.json", uuid::Uuid::new_v4()));
-        std::fs::write(
-            &file,
-            json!({"mail": {
-                "host": "127.0.0.1", "header": "authorization", "kind": "fabric",
-                "allowed_ports": [port], "requires_approval": ["POST"], "approval_kind": "send"
-            }})
-            .to_string(),
-        )
-        .unwrap();
+        let mut descriptor = json!({
+            "host": "127.0.0.1", "header": "authorization", "kind": "fabric",
+            "allowed_ports": [port], "requires_approval": ["POST"], "approval_kind": "send"
+        });
+        for (k, v) in extra.as_object().cloned().unwrap_or_default() {
+            descriptor[k] = v;
+        }
+        std::fs::write(&file, json!({ "mail": descriptor }).to_string()).unwrap();
         let (state, session) =
             state_and_session_cfg(|config| config.credentials_file = Some(file)).await;
         let mut m = manifest(EgressMode::Deny, Some(30));
@@ -1420,6 +1446,100 @@ pub(crate) mod ask_tests {
             },
         )
         .await
+    }
+
+    fn mail_body(message: &str) -> String {
+        json!({"message": {"raw": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(message)}}).to_string()
+    }
+
+    #[tokio::test]
+    async fn an_approval_shows_the_person_what_the_body_says_and_keeps_it_off_the_record() {
+        let (port, hits) = upstream_counter().await;
+        let (state, session) =
+            approval_gated_agent_with(port, json!({"preview": "gmail-message"})).await;
+        let message = "To: ana@example.com\nBcc: boss@example.com\nSubject: Quarterly numbers\n\nAttached below.";
+        let waiter = {
+            let (state, session) = (state.clone(), session.clone());
+            let body = mail_body(message);
+            tokio::spawn(async move { call(&state, &session, port, "POST", Some(&body)).await })
+        };
+        let pending = wait_pending(&state, session.id).await;
+        // the host read the real body
+        let preview = pending.preview.clone().expect("a preview");
+        let shown = preview.to_string();
+        for want in [
+            "ana@example.com",
+            "boss@example.com",
+            "Quarterly numbers",
+            "Attached below.",
+        ] {
+            assert!(shown.contains(want), "{want} in {shown}");
+        }
+        // the phone signs a digest of that rendering
+        let planned = pending.planned_action.clone().unwrap();
+        let expected = crate::preview::render(
+            crate::preview::GMAIL_MESSAGE,
+            mail_body(message).as_bytes(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(planned["preview_sha256"], expected.sha256());
+        // and none of the text is in the prompt, the planned action, or the journal
+        let journal =
+            serde_json::to_string(&state.store.audit.list(None, 100).await.unwrap()).unwrap();
+        for text in [&pending.prompt, &planned.to_string(), &journal] {
+            for secret in [
+                "ana@example.com",
+                "boss@example.com",
+                "Quarterly numbers",
+                "Attached below.",
+            ] {
+                assert!(!text.contains(secret), "{secret} leaked into {text}");
+            }
+        }
+        assert_eq!(
+            hits.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "nothing sent before the decision"
+        );
+        state
+            .store
+            .transition_approval(pending.id, ApprovalStatus::Approved, None, None)
+            .await
+            .unwrap();
+        waiter.await.unwrap().unwrap();
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let decided = state.store.get_approval(pending.id).await.unwrap();
+        assert!(
+            decided.preview.is_none(),
+            "the rendering is dropped once decided"
+        );
+        let on_disk =
+            std::fs::read_to_string(state.config.state_dir.join("approvals.json")).unwrap();
+        assert!(
+            !on_disk.contains("boss@example.com"),
+            "and it is not left on disk"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_body_the_host_cannot_render_is_not_sent_and_opens_no_approval() {
+        let (port, hits) = upstream_counter().await;
+        let (state, session) =
+            approval_gated_agent_with(port, json!({"preview": "gmail-message"})).await;
+        for body in [
+            mail_body("To: a@b.co\nContent-Type: text/html\n\n<b>x</b>"),
+            "not json".to_string(),
+            json!({"id": "draft-1"}).to_string(),
+        ] {
+            let err = call(&state, &session, port, "POST", Some(&body))
+                .await
+                .unwrap_err();
+            assert_eq!(err.0, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+            assert!(err.1.contains("cannot be shown for approval"), "{}", err.1);
+        }
+        assert!(state.store.list_approvals().await.is_empty());
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
     /// A fake "Google": a token endpoint over plain loopback HTTP (`access_token = "at-" + refresh token`) and an HTTPS API (a certificate from a
@@ -2078,6 +2198,7 @@ pub(crate) mod ask_tests {
             source_seq: None,
             broker_held: held,
             grant_scope: None,
+            preview: None,
         };
         let held = open(true);
         state.store.save_approval(held.clone()).await.unwrap();

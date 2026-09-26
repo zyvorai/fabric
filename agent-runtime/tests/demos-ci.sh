@@ -32,7 +32,7 @@ PASSED=0
 
 fail() {
   echo "demos-ci: FAIL: $*" >&2
-  for f in stub runtime keep-runtime; do
+  for f in stub runtime keep-runtime mem-runtime google-runtime; do
     [[ -f "$WORK/$f.log" ]] && { echo "----- $f -----" >&2; tail -n 40 "$WORK/$f.log" >&2; }
   done
   exit 1
@@ -1059,6 +1059,217 @@ GS=$(mem_api "$CAM" GET "/v1/goals/$GID" | json plan.0.session_id)
 [[ "$(mem_api "$DAN" GET "/v1/goals/$GID" -o /dev/null -w '%{http_code}')" == "404" && "$(mem_api "$DAN" PATCH "/v1/goals/$GID" -d '{"status":"cancelled"}' -o /dev/null -w '%{http_code}')" == "404" ]] || fail "another user's goal must be a 404"
 [[ "$(mem_api "$CAM" POST "/v1/goals/$GID/advance" -d '{"step_id":"s1","status":"done"}' -o /dev/null -w '%{http_code}')" == "403" ]] || fail "advancing by hand is the operator's"
 ok "a user made a goal with their own token, it ran as them and finished; another user cannot see or cancel it; advancing stays with the operator"
+
+echo "demos-ci: Gmail and Calendar agents against a fake Google (own connections, host-rendered approvals, phone signatures)"
+command -v openssl >/dev/null || fail "openssl is needed for the fake Google's TLS"
+G="$WORK/google"; mkdir -p "$G"
+GAPI=$(free_port); GTOK=$(free_port); GRT=$(free_port); GREG=$(free_port); GBASE="http://127.0.0.1:$GRT"
+# a throwaway CA, and a certificate for 127.0.0.1 signed by it (the broker is told to trust the CA)
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$G/ca.key" -out "$G/ca.pem" -days 2 -subj "/CN=keep-ci-ca" -addext "basicConstraints=critical,CA:TRUE" >/dev/null 2>&1 || fail "could not make the test CA"
+openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$G/api.key" -out "$G/api.csr" -subj "/CN=127.0.0.1" >/dev/null 2>&1
+printf 'subjectAltName=IP:127.0.0.1\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n' > "$G/ext.cnf"
+openssl x509 -req -in "$G/api.csr" -CA "$G/ca.pem" -CAkey "$G/ca.key" -CAcreateserial -out "$G/api.pem" -days 2 -extfile "$G/ext.cnf" >/dev/null 2>&1 || fail "could not sign the test certificate"
+: >"$G/api.log"
+GOOGLE_STUB_LOG="$G/api.log" python3 "$ROOT/agent-runtime/tests/google_stub.py" "$GAPI" "$GTOK" "$G/api.pem" "$G/api.key" >"$G/stub.log" 2>&1 &
+PIDS+=($!)
+# the shipped per-person descriptors, pointed at the fake
+python3 - "$ROOT/docs/keep/connectors/google.per-person.credentials.json" "$G/creds.json" "$GAPI" "$GTOK" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert len(d) == 5, list(d)
+for v in d.values():
+    v["host"] = "127.0.0.1"
+    v["allowed_ports"] = [int(sys.argv[3])]
+    v["oauth"]["token_url"] = "http://127.0.0.1:%s/token" % sys.argv[4]
+    v["oauth"]["client_id_env"], v["oauth"]["client_secret_env"] = "GE_CLIENT_ID", "GE_CLIENT_SECRET"
+json.dump(d, open(sys.argv[2], "w"))
+PY
+start_runtime google-runtime "$GRT" "$GREG" ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE" \
+  ZYVOR_AGENT_CREDENTIALS_FILE="$G/creds.json" ZYVOR_AGENT_EXTRA_CA_FILE="$G/ca.pem" GE_CLIENT_ID=ci-client GE_CLIENT_SECRET=ci-secret
+wait_http "$GBASE/healthz" || fail "the google-test runtime did not start: $(tail -5 "$WORK/google-runtime.log")"
+for a in gmail-triage mail-compose calendar-agent; do
+  cp -R "$ROOT/examples/keep-agents/$a" "$G/$a"
+  python3 - "$G/$a/pack.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["manifest"].update({"egress_allow_hosts": ["127.0.0.1"], "allow_private_networks": True})
+json.dump(p, open(sys.argv[1], "w"), indent=2)
+PY
+  printf 'version: 1\ndefault_egress: deny\nallow:\n  - host: "127.0.0.1"\n    methods: [GET, POST]\n    action: google\n    ask: never\n' > "$G/$a/keep.policy.yaml"
+  KEEP_POLICY_SEED="$SEED" FABRIC_AGENT_URL="$GBASE" node "$CLI" pack deploy "$G/$a" >"$G/$a.out" 2>&1 || fail "$a deploy failed: $(cat "$G/$a.out")"
+done
+gop() { curl -s -H "Authorization: Bearer $KEEP_TOKEN_VALUE" "$@"; }
+gmint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":900}" "$GBASE/v1/user-tokens" | json token; }
+gas() { local tok=$1; shift; curl -s -H "Authorization: Bearer $tok" "$@"; }
+GINA=$(gmint gina); HAL=$(gmint hal)
+GH="https://127.0.0.1:$GAPI"   # the agents' Gmail and Calendar base: in real use the default, https://gmail.googleapis.com
+g_run() {   # $1 token, $2 agent, $3 input JSON: starts a session as that user and prints the agent's result text
+  local sid; sid=$(gas "$1" -X POST -H 'content-type: application/json' -d "{\"agent\":\"$2\",\"input\":$3}" "$GBASE/v1/sessions" | json id) || return 1
+  curl -sN --max-time 150 -H "Authorization: Bearer $1" "$GBASE/v1/sessions/$sid/events?after=0" | python3 -c 'import json,sys
+found=None
+for block in sys.stdin.read().split("\n\n"):
+    data="".join(l[5:].strip() for l in block.splitlines() if l.startswith("data:"))
+    if data:
+        ev=json.loads(data)
+        if ev.get("kind")=="session.result": found=ev["data"]
+        if ev.get("kind") in ("session.failed","session.error"): sys.exit("session failed: "+json.dumps(ev["data"]))
+if found is None: sys.exit("no session.result")
+print(found if isinstance(found,str) else json.dumps(found))'
+}
+api_lines() { python3 -c 'import json,sys; print(len([1 for l in open(sys.argv[1]) if json.loads(l)["method"]==sys.argv[2] and sys.argv[3] in json.loads(l)["path"]]))' "$G/api.log" "$1" "$2"; }
+
+r=$(g_run "$GINA" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "the triage run failed"
+[[ "$r" == *"connect your google account first"* ]] || fail "before connecting, the agent must say to connect: $r"
+[[ ! -s "$G/api.log" ]] || fail "nothing may reach Google before anyone connects: $(cat "$G/api.log")"
+ok "before a person connects their Google account the agent is told to connect it, and nothing reaches Google"
+[[ "$(gas "$GINA" -X PUT -H 'content-type: application/json' -d '{"refresh_token":"gina-refresh-token"}' -o /dev/null -w '%{http_code}' "$GBASE/v1/connections/google")" =~ ^20 ]] || fail "gina could not connect"
+gas "$GINA" "$GBASE/v1/connections" | grep -q "gina-refresh-token" && fail "the refresh token must never be returned"
+r=$(g_run "$GINA" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "the connected triage run failed"
+[[ "$r" == *"2 unread messages"* && "$r" == *"Board notes"* && "$r" == *"gina-refresh-token-friend@example.com"* ]] || fail "gina's unread mail should be listed: $r"
+python3 - "$G/api.log" <<'PY' || fail "every triage request should carry gina's own token"
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])]
+assert rows and all(r["method"] == "GET" and r["auth"] == "Bearer at-gina-refresh-token" for r in rows), rows
+PY
+r=$(g_run "$HAL" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "hal's triage run failed"
+[[ "$r" == *"connect your google account first"* && "$r" != *"Board notes"* ]] || fail "hal has not connected and must not get gina's mail: $r"
+ok "gina connects her own account: her mail is listed with her token; hal, who has not, is refused"
+r=$(g_run "$GINA" calendar-agent "{\"action\":\"agenda\",\"calendarBase\":\"$GH\"}") || fail "the agenda run failed"
+[[ "$r" == *"gina-refresh-token dinner"* ]] || fail "gina's agenda should come from her own calendar: $r"
+ok "the calendar agenda is read with her token"
+
+GPHONE="node $ROOT/sdk/agent-runtime/src/phone-cli.js"
+$GPHONE keygen "$G/gina.key" p256 >/dev/null; $GPHONE enrol "$G/gina.key" gina-phone > "$G/enrol.json"
+[[ "$(gop -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$G/enrol.json" "$GBASE/v1/users/gina/devices")" == "201" ]] || fail "enrolling gina's phone"
+wait_pending() {   # the pending approval in gina's inbox, written to $G/pending.json
+  for _ in $(seq 1 150); do
+    gas "$GINA" "$GBASE/v1/inbox" | python3 -c 'import json,sys; p=json.load(sys.stdin)["pending_approvals"]; json.dump(p[0], open(sys.argv[1],"w")) if p else sys.exit(1)' "$G/pending.json" 2>/dev/null && return 0
+    sleep 0.2
+  done
+  return 1
+}
+decide() {   # $1 approved|denied: sign with gina's phone and send as gina; prints the HTTP status
+  $GPHONE decide "$G/gina.key" gina-phone "$G/pending.json" "$1" > "$G/decision.json"
+  gas "$GINA" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data-binary @"$G/decision.json" "$GBASE/v1/approvals/$(json id < "$G/pending.json")"
+}
+mail_in() {   # $1 action, $2 to, $3 subject, $4 body
+  python3 -c 'import json,sys; print(json.dumps({"action":sys.argv[1],"to":sys.argv[2],"subject":sys.argv[3],"body":sys.argv[4],"gmailBase":sys.argv[5]}))' "$1" "$2" "$3" "$4" "$GH"
+}
+g_run "$GINA" mail-compose "$(mail_in draft "ana@example.com, boss@example.com" "Quarterly numbers" $'Hi Ana,\nthe numbers are attached below.')" > "$G/d1.out" &
+DPID=$!
+wait_pending || fail "the draft did not open an approval"
+python3 - "$G/pending.json" <<'PY' || fail "the approval should show what the host read out of the request"
+import json, sys
+a = json.load(open(sys.argv[1]))
+fields = {f["label"]: f["value"] for f in a["preview"]["fields"]}
+assert a["preview"]["kind"] == "gmail-message", a
+assert fields["To"] == "ana@example.com, boss@example.com" and fields["Subject"] == "Quarterly numbers", fields
+assert fields["Message"] == "Hi Ana,\nthe numbers are attached below.", fields
+assert len(a["planned_action"]["preview_sha256"]) == 64 and "sign" in a, a
+for text in (a["prompt"], json.dumps(a["planned_action"])):
+    assert "ana@example.com" not in text and "Quarterly" not in text, text
+PY
+[[ "$(api_lines POST /drafts)" == "0" ]] || fail "nothing may be created before the decision"
+[[ "$(gas "$GINA" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"decision":"approved"}' "$GBASE/v1/approvals/$(json id < "$G/pending.json")")" == "403" ]] || fail "an unsigned decision must be refused"
+[[ "$(api_lines POST /drafts)" == "0" ]] || fail "a refused decision must not let the draft through"
+[[ "$(decide approved)" == "200" ]] || fail "the phone-signed approval was refused"
+wait "$DPID" || fail "the draft run failed"
+[[ "$(cat "$G/d1.out")" == "Saved as a draft (draft draft-1). Nothing was sent." ]] || fail "unexpected draft reply: $(cat "$G/d1.out")"
+python3 - "$G/api.log" <<'PY' || fail "Google should have seen exactly the approved draft, with gina's token"
+import base64, json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if '"POST"' in l]
+assert len(rows) == 1 and rows[0]["path"] == "/gmail/v1/users/me/drafts" and rows[0]["auth"] == "Bearer at-gina-refresh-token", rows
+raw = json.loads(rows[0]["body"])["message"]["raw"]
+msg = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode()
+assert "To: ana@example.com, boss@example.com" in msg and "Subject: Quarterly numbers" in msg and "the numbers are attached below." in msg, msg
+PY
+ok "a draft waits for gina's phone: the approval shows the real recipients, subject and text; unsigned is refused; signed lets exactly that draft through"
+gop "$GBASE/v1/approvals" | python3 -c 'import json,sys; items=json.load(sys.stdin)["items"]; assert items and all("preview" not in a for a in items), items' || fail "a decided approval must not keep what it showed"
+gop "$GBASE/v1/audit?limit=1000" | python3 -c 'import sys; t=sys.stdin.read(); assert "approval.send" in t; assert not any(s in t for s in ("ana@example.com","boss@example.com","Quarterly numbers","numbers are attached")), "personal text in the journal"' || fail "the journal must hold no recipients, subject or text"
+ok "after the decision the approval keeps no copy of what was shown, and the journal never held it"
+
+g_run "$GINA" mail-compose "$(mail_in send ana@example.com "Too soon" "Not ready.")" > "$G/s1.out" &
+SPID=$!
+wait_pending || fail "the send did not open an approval"
+[[ "$(decide denied)" == "200" ]] || fail "the signed denial was refused"
+wait "$SPID" || fail "the denied send run failed"
+[[ "$(cat "$G/s1.out")" == "Not sent: "* ]] || fail "a denied send should say it was not sent: $(cat "$G/s1.out")"
+[[ "$(api_lines POST /messages/send)" == "0" ]] || fail "a denied send must never reach Google"
+g_run "$GINA" mail-compose "$(mail_in send ana@example.com "Ready" "Here it is.")" > "$G/s2.out" &
+SPID=$!
+wait_pending || fail "the second send did not open an approval"
+[[ "$(decide approved)" == "200" ]] || fail "the signed approval of the send was refused"
+wait "$SPID" || fail "the approved send run failed"
+[[ "$(cat "$G/s2.out")" == "Sent to 1 recipient (message sent-1)." ]] || fail "unexpected send reply: $(cat "$G/s2.out")"
+[[ "$(api_lines POST /messages/send)" == "1" ]] || fail "exactly one send should have reached Google"
+ok "a denied send never reaches Google; an approved one does, once"
+
+g_run "$GINA" calendar-agent "{\"action\":\"add\",\"title\":\"Dinner\",\"start\":\"2026-10-01T19:00:00+02:00\",\"end\":\"2026-10-01T21:00:00+02:00\",\"guests\":\"ana@example.com\",\"notify\":\"yes\",\"calendarBase\":\"$GH\"}" > "$G/c2.out" &
+CPID=$!
+wait_pending || fail "the event did not open an approval"
+python3 - "$G/pending.json" <<'PY' || fail "the approval should show the event, the guests and that they are emailed"
+import json, sys
+a = json.load(open(sys.argv[1]))
+f = {x["label"]: x["value"] for x in a["preview"]["fields"]}
+assert a["preview"]["kind"] == "calendar-event" and f["Title"] == "Dinner" and f["Guests"] == "ana@example.com" and f["Guests are emailed"] == "yes, all of them", f
+PY
+[[ "$(decide approved)" == "200" ]] || fail "the signed approval of the event was refused"
+wait "$CPID" || fail "the event run failed"
+[[ "$(cat "$G/c2.out")" == 'Added "Dinner". Your guests were emailed.' ]] || fail "unexpected event reply: $(cat "$G/c2.out")"
+grep -q '"path": "/calendar/v3/calendars/primary/events?sendUpdates=all"' "$G/api.log" || fail "the event should have been created with guest emails on"
+ok "a calendar event waits for the phone and shows who is invited and that they are emailed"
+
+# A chat client sees the held approval, with the host's preview, while the agent waits (AG-UI), and the decision when it comes.
+PROBE="$G/chat-probe"; mkdir -p "$PROBE"
+cat > "$PROBE/agent.ts" <<TS
+import { defineAgent } from "@zyvor/fabric-agent";
+export default defineAgent({ async run(ctx) {
+  const raw = Buffer.from("To: ana@example.com\r\nSubject: From chat\r\n\r\nHello from the chat", "utf8").toString("base64url");
+  try {
+    const res = await ctx.fetch("$GH/gmail/v1/users/me/drafts", { method: "POST", credential: "gmail-draft", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: { raw } }) });
+    return res.ok ? "drafted" : "Google said " + res.status;
+  } catch (e) { return "Not saved: " + e.message; }
+} });
+TS
+cat > "$PROBE/pack.json" <<JSON
+{ "kind": "agent", "name": "chat-probe",
+  "manifest": { "template": "ci", "egress_mode": "deny", "egress_allow_hosts": ["127.0.0.1"], "allow_private_networks": true, "egress_approval_timeout_seconds": 60, "credentials": ["gmail-draft"], "confinement": "strict" },
+  "goal": { "title": "Draft from chat", "text": "Save a fixed draft." } }
+JSON
+cp "$G/mail-compose/keep.policy.yaml" "$PROBE/keep.policy.yaml"
+KEEP_POLICY_SEED="$SEED" FABRIC_AGENT_URL="$GBASE" node "$CLI" pack deploy "$PROBE" >"$G/probe.out" 2>&1 || fail "chat-probe deploy failed: $(cat "$G/probe.out")"
+PB=$(python3 -c 'import json; print(json.dumps({"threadId":"probe-1","runId":"r-probe-1","messages":[{"id":"m","role":"user","content":"draft it"}],"forwardedProps":{"agent":"chat-probe"}}))')
+curl -sN --max-time 120 -X POST -H "Authorization: Bearer $GINA" -H 'content-type: application/json' -d "$PB" "$GBASE/v1/agui" > "$G/probe.sse" &
+CHPID=$!
+wait_pending || fail "the chat-driven draft did not open an approval"
+for _ in $(seq 1 50); do grep -q keep.approval_requested "$G/probe.sse" && break; sleep 0.2; done
+python3 - "$G/probe.sse" <<'PY' || fail "the chat stream should announce the held approval with its preview"
+import json, sys
+ev = [json.loads(l[5:]) for l in open(sys.argv[1]) if l.startswith("data:")]
+req = [e for e in ev if e.get("name") == "keep.approval_requested"]
+assert len(req) == 1, ev
+v = req[0]["value"]
+f = {x["label"]: x["value"] for x in v["preview"]["fields"]}
+assert f["To"] == "ana@example.com" and f["Subject"] == "From chat" and f["Message"] == "Hello from the chat", f
+assert "planned_action" not in v and "sign" not in v, v
+PY
+[[ "$(decide approved)" == "200" ]] || fail "the signed approval of the chat-driven draft was refused"
+wait "$CHPID" || fail "the chat stream did not finish"
+python3 - "$G/probe.sse" <<'PY' || fail "the chat stream should report the decision and finish with the result"
+import json, sys
+ev = [json.loads(l[5:]) for l in open(sys.argv[1]) if l.startswith("data:")]
+names = [e.get("name") or e["type"] for e in ev]
+assert names.index("keep.approval_requested") < names.index("keep.approval_decided") < names.index("RUN_FINISHED"), names
+dec = [e for e in ev if e.get("name") == "keep.approval_decided"][0]["value"]
+assert dec["decision"] == "approved" and "preview" not in dec, dec
+assert ev[-1]["type"] == "RUN_FINISHED" and ev[-1]["result"] == "drafted", ev[-1]
+PY
+ok "a chat client is shown the held approval with the host's preview while the agent waits, then the decision, and never a way to decide it"
+
+[[ "$(gas "$GINA" -X DELETE -o /dev/null -w '%{http_code}' "$GBASE/v1/connections/google")" =~ ^20 ]] || fail "gina could not disconnect"
+r=$(g_run "$GINA" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "the run after disconnecting failed"
+[[ "$r" == *"connect your google account first"* ]] || fail "after disconnecting, the agent must be refused again: $r"
+ok "disconnecting closes her at once"
 
 echo "demos-ci: two users on one shard (user tokens, isolation, quota, revocation)"
 mint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":600}" "$KEEP_BASE/v1/user-tokens" | json token; }
