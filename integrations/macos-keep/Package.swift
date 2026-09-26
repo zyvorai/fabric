@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "KeepKit",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("26.0"), .iOS("26.0")],
     products: [.library(name: "KeepKit", targets: ["KeepKit"])],
     targets: [
         .target(name: "KeepKit", path: "Sources/KeepKit"),

@@ -130,6 +130,20 @@ public struct SignInfo: Codable, Equatable, Hashable, Sendable {
     public var algorithms: [String]?
 }
 
+/// What the host read out of the request an approval is about (recipients, subject, text; docs/keep/connectors/README.md). Rendered by the host,
+/// not by the agent, and covered by the signature through `planned_action.preview_sha256`. Present only while the approval is pending.
+public struct PreviewField: Codable, Equatable, Hashable, Sendable {
+    public var label: String
+    public var value: String
+    public init(label: String, value: String) { self.label = label; self.value = value }
+}
+
+public struct ApprovalPreview: Codable, Equatable, Hashable, Sendable {
+    public var kind: String
+    public var fields: [PreviewField]
+    public init(kind: String, fields: [PreviewField]) { self.kind = kind; self.fields = fields }
+}
+
 public struct Approval: Codable, Equatable, Hashable, Identifiable, Sendable {
     public var id: String
     public var kind: String
@@ -140,6 +154,7 @@ public struct Approval: Codable, Equatable, Hashable, Identifiable, Sendable {
     public var createdAt: String?
     public var decidedAt: String?
     public var sign: SignInfo?
+    public var preview: ApprovalPreview?
 
     public var isPending: Bool { (status ?? "pending") == "pending" }
 }
