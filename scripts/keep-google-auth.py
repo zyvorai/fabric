@@ -8,6 +8,8 @@ You bring your own Google OAuth client (Google Cloud console -> APIs & Services 
 the code for a refresh token, and writes `GOOGLE_REFRESH_TOKEN=...` to a file with mode 0600 (default
 `./google-refresh-token.env`). The refresh token is never printed to the terminal. Put the three
 values in the Keep host's environment and use docs/keep/connectors/google.credentials.json.
+On a host with several people, each person instead stores the token with PUT /v1/connections/google (see
+docs/keep/connectors/README.md) and the host uses google.per-person.credentials.json.
 
     GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... scripts/keep-google-auth.py            # read-only scopes
     scripts/keep-google-auth.py --with-drafts                                            # also Gmail drafts

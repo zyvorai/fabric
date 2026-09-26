@@ -425,7 +425,7 @@ impl CredentialVault {
             .map(|(n, _)| n)
             .collect();
         if let Ok(mut cache) = self.user_tokens.write() {
-            cache.retain(|(n, u), _| !(u == user && names.iter().any(|x| *x == n)));
+            cache.retain(|(n, u), _| !(u == user && names.contains(&n)));
         }
     }
 
@@ -1107,6 +1107,27 @@ mod tests {
             vault.resolve_for("gmail", Some("ana")).is_err(),
             "and it stays closed"
         );
+    }
+
+    #[test]
+    fn the_documented_google_examples_are_valid_descriptors() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/keep/connectors");
+        for (file, per_person) in [
+            ("google.credentials.json", false),
+            ("google.per-person.credentials.json", true),
+        ] {
+            let text = std::fs::read_to_string(dir.join(file)).unwrap();
+            let map: HashMap<String, CredentialDescriptor> = serde_json::from_str(&text).unwrap();
+            assert_eq!(map.len(), 3, "{file}");
+            for (name, d) in &map {
+                validate_descriptor(name, d).unwrap_or_else(|e| panic!("{file}: {e}"));
+            }
+            assert_eq!(
+                CredentialVault::from_descriptors(map).is_per_person("gmail-read"),
+                per_person,
+                "{file}"
+            );
+        }
     }
 
     #[test]

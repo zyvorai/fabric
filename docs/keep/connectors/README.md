@@ -25,6 +25,24 @@ A Keep agent never holds a Google token. The host holds the OAuth client id and 
 3. Put `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN` in the Keep host's environment and merge [google.credentials.json](google.credentials.json) into the credentials file.
 4. In an agent's manifest, list the credentials it may use, for example `"credentials": ["gmail-read", "calendar-read"]`, and call `https://gmail.googleapis.com/gmail/v1/users/me/messages` or `https://www.googleapis.com/calendar/v3/calendars/primary/events` through the egress broker.
 
+## Per-person connections (one Google account for each person on the host)
+
+The setup above gives the whole host one Google identity. On a host with several people ([TENANCY](../TENANCY.md)) each person connects their **own** account instead:
+
+1. The operator keeps only the OAuth **client** in the host environment (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) and merges [google.per-person.credentials.json](google.per-person.credentials.json) into the credentials file. Those descriptors set `"connection": "google"` in place of `refresh_token_env`; a descriptor sets one or the other.
+2. Each person runs `scripts/keep-google-auth.py` on their own machine, then stores the token with their own user token:
+
+   ```bash
+   curl -X PUT "$KEEP/v1/connections/google" -H "Authorization: Bearer $USER_TOKEN" \
+        -H 'content-type: application/json' \
+        -d "{\"refresh_token\": \"$(sed 's/^GOOGLE_REFRESH_TOKEN=//' google-refresh-token.env)\"}"
+   ```
+
+   `GET /v1/connections` lists the connections this host offers and whether *you* have set each (never the token). `DELETE /v1/connections/google` disconnects: the stored token and every cached access token of that person are dropped at once.
+3. When an agent of that person's session calls Gmail, Keep mints an access token from **that person's** refresh token and injects it. Another person's session never gets it, a session with no user cannot use a per-person credential at all, and a person who has not connected gets a refusal that says to connect first.
+
+What this does and does not do: the refresh token is write-only over the API (never returned, listed, logged or journaled; the journal records only that a connection was set, removed or accessed by the operator) and is held in a host file (mode 0600), one per person. As with the vault, **the operator of the host can read those files**; per-person connections separate people from each other, not from the operator. A name can be set only if some credential on the host asks for it.
+
 ## The three example credentials
 
 | Name | Allows | Approval |
