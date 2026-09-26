@@ -75,6 +75,13 @@ jobs:
           cargo test --manifest-path agent-runtime/Cargo.toml notify -- --nocapture
           cargo test --manifest-path agent-runtime/Cargo.toml --lib
 
+      - name: Sandbox create concurrency default (guestkit flock / fluxvm#104)
+        run: |
+          # Default must stay ≥4 now that guestkit serializes nbd allocate+connect.
+          # ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY still overrides (1–64).
+          cargo test --manifest-path agent-runtime/Cargo.toml \
+            fluxvm::tests::sandbox_create_concurrency_parsing_is_bounded -- --exact --nocapture
+
   keep-demos-e2e:
     # The one-click demos, a user-defined use case, and a signed pack deploy in
     # Keep mode, against the real runtime binary and the FluxVM stand-in.
