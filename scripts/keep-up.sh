@@ -24,7 +24,9 @@ KEEP_URL="${KEEP_URL:-http://127.0.0.1:9096}"
 ENV_FILE="${KEEP_ENV_FILE:-/etc/zyvor-fabricd/zyvor-fabric-agent.env}"
 
 DRY=0; INSTALL_FLUXVM=0; TOKEN_ONLY=0; NO_TEMPLATE=0
-USER_ID="$(id -un | tr -c 'a-z0-9._-\n' '-' | cut -c1-32)"
+# the person, not root: under sudo the login name is in SUDO_USER
+LOGIN_NAME="${SUDO_USER:-$(id -un)}"
+USER_ID="$(printf '%s' "$LOGIN_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9._-' '-' | cut -c1-32)"
 TTL_DAYS=7
 usage() { sed -n '5,14p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 while [[ $# -gt 0 ]]; do
@@ -63,7 +65,7 @@ preflight() {
   step "Preflight"
   [[ "$(uname_s)" == Linux ]] && ok "Linux" || bad "this machine is $(uname_s): Keep cells are Linux microVMs on FluxVM. Run this on a Linux host (see docs/keep/README.md); on a Mac, install Solvor and point it at a Linux host"
   case "$(uname_m)" in x86_64|amd64) ok "x86_64" ;; *) bad "architecture $(uname_m): the cell image and the bake script are x86_64 only for now" ;; esac
-  if kvm_ok; then ok "/dev/kvm is usable"; else bad "no usable /dev/kvm. Cells are KVM microVMs; enable virtualization (on a cloud VM, pick an instance type with nested virtualization or bare metal) and add this user to the kvm group"; fi
+  if kvm_ok; then ok "/dev/kvm is usable"; else bad "no usable /dev/kvm for $(id -un). Cells are KVM microVMs: run with sudo, enable virtualization (on a cloud VM pick an instance type with nested virtualization or bare metal), or add this user to the kvm group"; fi
   systemd_ok && ok "systemd" || bad "systemd is not running (the runtime is installed as a systemd unit)"
   local mem; mem=$(mem_kb); (( mem >= 3800000 )) && ok "memory $((mem / 1024)) MiB" || bad "memory $((mem / 1024)) MiB: at least 4 GiB (the Rust build and a cell need it)"
   local disk; disk=$(disk_kb); (( disk >= 20000000 )) && ok "free disk $((disk / 1048576)) GiB" || bad "free disk $((disk / 1048576)) GiB under /var/lib: at least 20 GiB (cell images and the build)"
@@ -80,7 +82,7 @@ preflight() {
 }
 hint() {
   case "$1" in
-    cargo) echo "install Rust from https://rustup.rs" ;;
+    cargo) echo "install Rust from https://rustup.rs. If it is installed for your user, sudo may not see it: run sudo env \"PATH=\$PATH\" $0" ;;
     node) echo "install Node 20 or newer, for example from https://nodejs.org" ;;
     *) echo "for example: sudo apt-get install -y $1" ;;
   esac
@@ -143,7 +145,7 @@ phase_token() {
 
   Keep is up on this machine. To connect Solvor from your Mac:
 
-    1. On the Mac:   ssh -N -L 9096:127.0.0.1:9096 $(id -un)@$host
+    1. On the Mac:   ssh -N -L 9096:127.0.0.1:9096 $LOGIN_NAME@$host
     2. In Solvor, Settings:   Host  http://127.0.0.1:9096
                               User  $USER_ID
                               Token $tok

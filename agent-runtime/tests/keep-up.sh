@@ -19,6 +19,8 @@ case "$url" in
 esac
 SH
 chmod +x "$W/bin/curl"
+# the tool checks look for a real cargo; a fake one keeps this test independent of the machine it runs on
+printf '#!/bin/sh\nexit 0\n' > "$W/bin/cargo"; chmod +x "$W/bin/cargo"
 printf 'ZYVOR_AGENT_LISTEN=127.0.0.1:9096\nZYVOR_AGENT_API_TOKEN=OPERATOR-SECRET-123\n' > "$W/agent.env"
 export PATH="$W/bin:$PATH" FAKE_BODY="$W/body.json" KEEP_SUDO="" KEEP_ENV_FILE="$W/agent.env"
 GOOD=(KEEP_UP_UNAME=Linux KEEP_UP_ARCH=x86_64 KEEP_UP_KVM=1 KEEP_UP_SYSTEMD=1 KEEP_UP_MEM_KB=8000000 KEEP_UP_DISK_KB=100000000)
@@ -59,8 +61,13 @@ PY
 grep -rl "kut1.FAKE.TOKEN" "$W" 2>/dev/null | grep -v "^$W/bin" | grep -q . && fail "the token was written to disk"
 ok "token-only mints a 2-day read/run/approve token for ana, hides the operator token, saves nothing"
 
+# the default user id is the person who ran sudo, never root (this test is not run under sudo, so SUDO_USER is faked)
+out=$(env SUDO_USER=Ana.Smith "${GOOD[@]}" "$ROOT/scripts/keep-up.sh" --dry-run 2>&1) || fail "dry run with SUDO_USER failed: $out"
+grep -q "user token for 'ana.smith'" <<<"$out" || fail "the default user id is not derived from SUDO_USER: $out"
+ok "under sudo the default user id is the person, not root"
+
 # 6. bad arguments are rejected
 "$ROOT/scripts/keep-up.sh" --ttl-days 8 >/dev/null 2>&1 && fail "--ttl-days 8 should be rejected"
 "$ROOT/scripts/keep-up.sh" --user-id 'Bad Id' >/dev/null 2>&1 && fail "a bad --user-id should be rejected"
 ok "an out-of-range TTL and a bad user id are rejected"
-echo "keep-up: 6 checks passed"
+echo "keep-up: 7 checks passed"
