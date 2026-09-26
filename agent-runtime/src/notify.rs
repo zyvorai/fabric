@@ -763,4 +763,153 @@ mod tests {
         kinds.sort();
         assert_eq!(kinds, vec!["fcm", "local"]);
     }
+
+    fn notice() -> Notice {
+        Notice {
+            event: "goal.blocked",
+            title: "A goal needs your attention".into(),
+            body: "Open Keep to see what happened.".into(),
+            detail_title: "Book the trip to Goa".into(),
+            detail_body: "failed after 3 attempts: boom".into(),
+            data: json!({ "goal_id": "g1", "step_id": "s2" }),
+        }
+    }
+
+    fn device(user: &str, id: &str, kind: Option<&str>) -> crate::devices::DeviceRecord {
+        crate::devices::DeviceRecord {
+            user_id: user.into(),
+            device_id: id.into(),
+            name: None,
+            alg: crate::devices::KeyAlg::Ed25519,
+            public_key: "x".into(),
+            push: kind.map(|k| crate::devices::PushTarget {
+                kind: k.into(),
+                token: format!("tok-{id}"),
+            }),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn a_notice_is_generic_by_default_and_can_never_be_used_to_decide_anything() {
+        let d = device("ana", "a-fcm", Some("fcm"));
+        let generic: Value = serde_json::from_slice(&notice_payload(&notice(), &d, false)).unwrap();
+        assert_eq!(generic["ui"]["title"], "A goal needs your attention");
+        assert!(
+            !generic.to_string().contains("Goa") && !generic.to_string().contains("boom"),
+            "the person's text is not in a generic notice: {generic}"
+        );
+        assert_eq!(
+            generic["data"],
+            json!({ "goal_id": "g1", "step_id": "s2" }),
+            "ids only"
+        );
+        // nothing to approve from it: no signing info, no decide route, no planned action
+        for absent in ["sign", "decide", "approval"] {
+            assert!(
+                generic.get(absent).is_none(),
+                "{absent} must not be in a notice"
+            );
+        }
+        assert!(generic["note"]
+            .as_str()
+            .unwrap()
+            .contains("nothing can be approved"));
+        let detailed: Value = serde_json::from_slice(&notice_payload(&notice(), &d, true)).unwrap();
+        assert_eq!(detailed["ui"]["title"], "Book the trip to Goa");
+        assert!(detailed["ui"]["body"].as_str().unwrap().contains("boom"));
+        assert_eq!(
+            detailed["data"], generic["data"],
+            "the data is the same either way"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_notice_goes_to_that_persons_routable_devices_only_signed() {
+        let (url, seen) = receiver(0).await;
+        let (state, _) = crate::egress::ask_tests::state_and_session_cfg(|_| {}).await;
+        for d in [
+            device("ana", "a-fcm", Some("fcm")),
+            device("ana", "a-none", None),
+            device("ana", "a-hms", Some("hms")),
+            device("ben", "b-fcm", Some("fcm")),
+        ] {
+            state.store.save_device(d).await.unwrap();
+        }
+        let relays = std::collections::HashMap::from([("fcm".to_string(), url)]);
+        push_notice(
+            &state.egress_http,
+            &state.store,
+            &relays,
+            &crate::fixture::text("relay-secret"),
+            "ana",
+            &notice(),
+            false,
+            &[],
+        )
+        .await;
+        let seen = seen.lock().unwrap();
+        assert_eq!(
+            seen.len(),
+            1,
+            "only ana's device that has a push target with a relay"
+        );
+        let (signature, body) = &seen[0];
+        assert!(signature_matches(
+            &crate::fixture::text("relay-secret"),
+            body,
+            signature
+        ));
+        let v: Value = serde_json::from_slice(body).unwrap();
+        assert_eq!(
+            (v["device"]["id"].clone(), v["event"].clone()),
+            (json!("a-fcm"), json!("goal.blocked"))
+        );
+        assert!(!v.to_string().contains("relay-secret") && !v.to_string().contains("b-fcm"));
+    }
+
+    #[tokio::test]
+    async fn a_failing_relay_is_journaled_once_and_does_not_stop_the_others() {
+        let (bad, _) = receiver(usize::MAX).await;
+        let (good, seen) = receiver(0).await;
+        let (state, _) = crate::egress::ask_tests::state_and_session_cfg(|_| {}).await;
+        state
+            .store
+            .save_device(device("ana", "a-hms", Some("hms")))
+            .await
+            .unwrap();
+        state
+            .store
+            .save_device(device("ana", "a-fcm", Some("fcm")))
+            .await
+            .unwrap();
+        let relays =
+            std::collections::HashMap::from([("hms".to_string(), bad), ("fcm".to_string(), good)]);
+        push_notice(
+            &state.egress_http,
+            &state.store,
+            &relays,
+            "s",
+            "ana",
+            &notice(),
+            false,
+            &[],
+        )
+        .await;
+        assert_eq!(
+            seen.lock().unwrap().len(),
+            1,
+            "the working relay still got its message"
+        );
+        let journal =
+            serde_json::to_string(&state.store.audit.list(None, 50).await.unwrap()).unwrap();
+        assert!(
+            journal.contains("notice.push") && journal.contains("a-hms"),
+            "{journal}"
+        );
+        assert!(
+            !journal.contains("Goa") && !journal.contains("boom"),
+            "no text in the journal"
+        );
+    }
 }
