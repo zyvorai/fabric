@@ -15,6 +15,10 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **Bank operations packs.** Six declarative packs for a bank's operations teams: `neft-rtgs-returns`,
+  `nach-return-report`, `recon-exceptions`, `upi-dispute-mail`, `loan-sanction-letter` and `rbi-circular-brief`, each
+  with a README and (except the two PDF ones) a synthetic sample, plus `docs/keep/BANK-OPERATIONS.md`. Declarative, so
+  no runtime change; extractive, with no OCR and no compliance claim.
 - **OCR for photos and screenshots.** A new `ocr` extractor reads `.png`, `.jpg` and `.tif` with `tesseract` (English) inside the cell, and two packs use it: `receipt-photo`
   and `bill-photo`. The `node22-agent` template gains `tesseract-ocr`; a template baked earlier refuses an image run with a clear message instead of failing. Quality depends
   on the picture (check amounts against the original); scanned PDFs, HEIC and other languages are not read. Verified with real tesseract through the runtime (a generated

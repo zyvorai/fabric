@@ -134,6 +134,21 @@ reader, not a pack), legacy `.ppt`, Outlook `.msg` / `.pst`, `.evtx` and browser
 read), and live GitHub or Xcode access. "Real layout" samples follow output captured from a real run with names replaced; "documented layout" samples
 were written from the tool's documented output and **have not been checked against a real export**, so try a pack on your own file first.
 
+### Bank operations packs
+
+For a bank's payments, collections, reconciliation, care, credit and compliance teams. All are extractive: no model
+reads the file, and the cell reports `0` outbound connections. What they do not do (no OCR, no decisions, no
+compliance claim) is in [BANK-OPERATIONS.md](BANK-OPERATIONS.md).
+
+| Pack | You drop in | You get | Reads with | Sample |
+|---|---|---|---|---|
+| [`neft-rtgs-returns`](../../examples/keep-agents/neft-rtgs-returns/README.md) | a returns / rejects report (`.txt`, `.csv`) | returned and rejected lines, beneficiary problems, UTRs, IFSCs, amounts | `text` | yes |
+| [`nach-return-report`](../../examples/keep-agents/nach-return-report/README.md) | a NACH debit return report (`.csv`) | returns by reason, status and sponsor, first rows | `text` + `csv_columns` | yes |
+| [`recon-exceptions`](../../examples/keep-agents/recon-exceptions/README.md) | a reconciliation exceptions export (`.csv`) | exceptions by type, channel and ageing, first rows | `text` + `csv_columns` | yes |
+| [`upi-dispute-mail`](../../examples/keep-agents/upi-dispute-mail/README.md) | dispute mail (`.eml`, `.mbox`) | what customers report, reference numbers, amounts, escalation asks | `eml` | yes |
+| [`loan-sanction-letter`](../../examples/keep-agents/loan-sanction-letter/README.md) | a sanction letter PDF | terms, conditions, charges, amounts, rates, dates | `pdftotext` | no |
+| [`rbi-circular-brief`](../../examples/keep-agents/rbi-circular-brief/README.md) | a regulator circular PDF | references, applicability, deadlines, "shall" lines, repeals | `pdftotext` | no |
+
 The two model packs send the extracted text to an endpoint **you** allow, after **you** approve it once. Out of the
 box they are refused, because the vault has no such credential. See [MODEL.md](MODEL.md).
 
