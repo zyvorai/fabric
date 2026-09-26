@@ -3,7 +3,7 @@
 #
 # Solvor, the Mac app. Run `make help`. macOS with Xcode only; nothing here signs, notarizes or uploads anything.
 .DEFAULT_GOAL := help
-.PHONY: help project build test test-kit test-app run stop open catalog icon clean
+.PHONY: help project build test test-kit test-app run stop open catalog icon export clean
 
 APP      := Solvor
 PROJECT  := $(APP).xcodeproj
@@ -48,6 +48,10 @@ catalog: ## regenerate Sources/KeepKit/CatalogData.swift from examples/keep-agen
 
 icon: ## regenerate the app icon and menu-bar glyph (needs rsvg-convert)
 	python3 tools/make_icon.py
+
+export: ## copy this folder into a checkout of the standalone repo: make export DEST=../solvor
+	@test -n "$(DEST)" || { echo 'usage: make export DEST=path/to/solvor-checkout' >&2; exit 1; }
+	tools/export.sh '$(DEST)'
 
 clean: ## remove build products
 	rm -rf build .build
