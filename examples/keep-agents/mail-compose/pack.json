@@ -6,7 +6,7 @@
     "resources": { "vcpus": 1, "memory_mib": 512 },
     "egress_mode": "deny",
     "egress_allow_hosts": ["gmail.googleapis.com"],
-    "egress_approval_timeout_seconds": 300,
+    "egress_approval_timeout_seconds": 240,
     "credentials": ["gmail-draft", "gmail-send"],
     "confinement": "strict"
   },

@@ -44,9 +44,14 @@ export default defineAgent({
       const from = new Date();
       const to = new Date(from.getTime() + days * 86400_000);
       const q = new URLSearchParams({ timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "25" });
-      const res = await ctx.fetch(`${events}?${q}`, { credential: "calendar-read" });
+      let res;
+      try {
+        res = await ctx.fetch(`${events}?${q}`, { credential: "calendar-read" });
+      } catch (e) {
+        return `Calendar was not read: ${clean((e as Error).message, 300)}`; // e.g. connect your google account first
+      }
       const text = await res.text();
-      if (!res.ok) throw new Error(`Calendar did not answer (${res.status}): ${clean(text, 200)}`);
+      if (!res.ok) return `Calendar did not answer (${res.status}): ${clean(text, 200)}`;
       const items: any[] = JSON.parse(text || "{}").items ?? [];
       if (items.length === 0) return `Nothing on your calendar in the next ${days === 1 ? "24 hours" : `${days} days`}.`;
       const rows = items.map((e) => `- ${clean(e.start?.dateTime ?? e.start?.date, 40)}: ${clean(e.summary, 120) || "(no title)"}${e.location ? ` @ ${clean(e.location, 80)}` : ""}`);
@@ -75,12 +80,17 @@ export default defineAgent({
     if (where) event.location = where;
     const notify = /^(yes|true|all)$/i.test(String(pick("notify") ?? "")) && guests.length > 0;
 
-    const res = await ctx.fetch(`${events}${notify ? "?sendUpdates=all" : ""}`, {
-      method: "POST",
-      credential: "calendar-write",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(event),
-    });
+    let res;
+    try {
+      res = await ctx.fetch(`${events}${notify ? "?sendUpdates=all" : ""}`, {
+        method: "POST",
+        credential: "calendar-write",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(event),
+      });
+    } catch (e) {
+      return `Event not added: ${clean((e as Error).message, 300)}`; // denied, timed out, or could not be shown for approval
+    }
     const text = await res.text();
     if (!res.ok) return `Event not added (${res.status}): ${text.replace(/\s+/g, " ").slice(0, 200)}`;
     ctx.emit("calendar.add.done", { guests: guests.length, notified: notify });

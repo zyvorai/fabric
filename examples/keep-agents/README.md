@@ -9,6 +9,9 @@
 | [`pdf-brief`](./pdf-brief/) | One-click PDF → `brief.md` (no browser, 0 CONNECT) |
 | [`invoice-check`](./invoice-check/) | A use case **you** define: `kind: usecase`, no code |
 | [`inbox-digest`](./inbox-digest/) | A use case **you** define: drop in a plain-text mail export, get a digest (no code, no model, 0 CONNECT) |
+| [`gmail-triage`](./gmail-triage/) | Lists unread mail with a read-only Gmail credential (per-person Google account) |
+| [`mail-compose`](./mail-compose/) | Drafts or sends a plain-text mail; every use waits for a phone-signed approval that shows the real text |
+| [`calendar-agent`](./calendar-agent/) | Reads your next day, or adds an event after a phone-signed approval |
 | [`_fabric`](./_fabric/) | Shared client + credential/policy recipes |
 
 ```bash

@@ -27,6 +27,8 @@ const fakeCtx = (input, replies = []) => {
       fetch: async (url, init = {}) => {
         calls.push({ url: String(url), method: init.method ?? "GET", credential: init.credential, body: init.body });
         const [status, body] = replies.shift() ?? [200, {}];
+        // the worker's brokerFetch throws when the HOST refuses (not connected, denied, expired): status "throw" stands for that
+        if (status === "throw") throw new Error(body);
         const text = typeof body === "string" ? body : JSON.stringify(body);
         return { ok: status >= 200 && status < 300, status, text: async () => text };
       },
@@ -55,7 +57,8 @@ test("gmail-triage lists unread mail with the read-only credential and prints ot
 test("gmail-triage says so when there is nothing, and reports a refusal instead of hiding it", async () => {
   const agent = await load("gmail-triage");
   assert.match(await agent.run(fakeCtx({}, [[200, {}]]).ctx), /No unread mail/);
-  await assert.rejects(agent.run(fakeCtx({}, [[403, "connect your google account first"]]).ctx), /403.*connect your google account first/);
+  assert.match(await agent.run(fakeCtx({}, [[403, "quota"]]).ctx), /answer \(403\): quota/);
+  assert.match(await agent.run(fakeCtx({}, [["throw", "connect your google account first"]]).ctx), /^connect your google account first/);
 });
 
 test("mail-compose saves a draft: nested raw, the draft credential, and a message that reads back as written", async () => {
@@ -85,8 +88,10 @@ test("mail-compose sends with the send credential and a top-level raw, and repor
   assert.equal(sent.calls[0].credential, "gmail-send");
   assert.equal(sent.calls[0].url, "https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
   assert.ok(typeof JSON.parse(sent.calls[0].body).raw === "string" && !("message" in JSON.parse(sent.calls[0].body)));
-  const denied = fakeCtx({ action: "send", to: "ana@example.com", subject: "Hi", body: "Hello" }, [[403, "send to gmail.googleapis.com was denied by an operator"]]);
-  assert.match(await agent.run(denied.ctx), /^Not sent \(403\): send to gmail\.googleapis\.com was denied/);
+  const denied = fakeCtx({ action: "send", to: "ana@example.com", subject: "Hi", body: "Hello" }, [["throw", "send to gmail.googleapis.com was denied by an operator"]]);
+  assert.match(await agent.run(denied.ctx), /^Not sent: send to gmail\.googleapis\.com was denied/);
+  const drafted = fakeCtx({ action: "draft", to: "ana@example.com", subject: "Hi", body: "Hello" }, [["throw", "approval expired"]]);
+  assert.equal(await agent.run(drafted.ctx), "Not saved as a draft: approval expired");
 });
 
 test("mail-compose defaults to a draft, never a send, and non-ASCII subjects are encoded", async () => {

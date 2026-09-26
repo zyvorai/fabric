@@ -77,14 +77,21 @@ export default defineAgent({
     const base = (input.gmailBase ?? "https://gmail.googleapis.com").replace(/\/$/, "");
     const raw = buildRaw(to, subject, body);
     const send = action === "send";
-    const res = await ctx.fetch(send ? `${base}/gmail/v1/users/me/messages/send` : `${base}/gmail/v1/users/me/drafts`, {
-      method: "POST",
-      credential: send ? "gmail-send" : "gmail-draft",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(send ? { raw } : { message: { raw } }),
-    });
+    const what = send ? "sent" : "saved as a draft";
+    // The host answers with an error, not a status, when the person denied it, it timed out, or it could not be shown for approval.
+    let res;
+    try {
+      res = await ctx.fetch(send ? `${base}/gmail/v1/users/me/messages/send` : `${base}/gmail/v1/users/me/drafts`, {
+        method: "POST",
+        credential: send ? "gmail-send" : "gmail-draft",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(send ? { raw } : { message: { raw } }),
+      });
+    } catch (e) {
+      return `Not ${what}: ${String((e as Error).message).replace(/\s+/g, " ").slice(0, 300)}`;
+    }
     const text = await res.text();
-    if (!res.ok) return `Not ${send ? "sent" : "saved as a draft"} (${res.status}): ${text.replace(/\s+/g, " ").slice(0, 200)}`;
+    if (!res.ok) return `Not ${what} (${res.status}): ${text.replace(/\s+/g, " ").slice(0, 200)}`;
     let id = "";
     try {
       id = String(JSON.parse(text).id ?? "");
