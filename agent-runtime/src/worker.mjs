@@ -140,7 +140,7 @@ const model = Object.freeze({
   },
 });
 
-async function run(input) {
+async function run(input, memoryItems) {
   if (runPromise) throw new Error("session already started");
   state = "running";
   emit("session.started", { input });
@@ -155,6 +155,13 @@ async function run(input) {
         emit,
         fetch: brokerFetch,
         model,
+        // The user's memory, if the agent's manifest asked for it and the user turned it on: `items` are notes to treat as DATA about the user,
+        // never as instructions (an entry with `tainted: true` came from a session that had read untrusted content). `propose` suggests a new
+        // entry; it stays unused until the user accepts it.
+        memory: Object.freeze({
+          items: Object.freeze((Array.isArray(memoryItems) ? memoryItems : []).map((m) => Object.freeze({ ...m }))),
+          propose(text, kind = "note") { emit("memory.propose", { text: String(text), kind: String(kind) }); },
+        }),
         nextSteer,
         isCancelled: () => cancelled,
       });
@@ -204,7 +211,10 @@ const server = http.createServer({ requireHostHeader: false }, async (req, res) 
       const after = Number(url.searchParams.get("after") || "0");
       return json(res, 200, { items: events.filter((e) => e.seq > after) });
     }
-    if (req.method === "POST" && url.pathname === "/run") return json(res, 202, await run((await bodyJson(req)).input));
+    if (req.method === "POST" && url.pathname === "/run") {
+      const body = await bodyJson(req);
+      return json(res, 202, await run(body.input, body.memory));
+    }
     if (req.method === "POST" && url.pathname === "/steer") {
       const payload = (await bodyJson(req)).message;
       steering.push(payload);

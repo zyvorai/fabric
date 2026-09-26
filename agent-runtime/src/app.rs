@@ -1381,6 +1381,8 @@ async fn provision_guest(
             _ => anyhow::bail!("guest agent worker did not become ready before timeout"),
         }
     }
+    // The user's memory, only for an agent that asked for it (manifest `memory`), goes in the run request, never in the session's stored input.
+    let memory = crate::memory::context_for_session(state, &session, &agent.manifest).await;
     with_timeout(
         HEALTH_CHECK_ATTEMPT_TIMEOUT,
         state.fluxvm.guest_request(
@@ -1388,7 +1390,7 @@ async fn provision_guest(
             agent.manifest.runtime_port,
             Method::POST,
             "run",
-            Some(&json!({"input": input})),
+            Some(&json!({"input": input, "memory": memory})),
         ),
     )
     .await?;
@@ -1824,6 +1826,9 @@ async fn sync_session(state: &Arc<AppState>, session: SessionRecord) -> Result<(
             }
             "approval.requested" => {
                 record_approval_request(state, session.id, event.seq, &event.data).await?;
+            }
+            "memory.propose" => {
+                crate::memory::record_proposal(state, &session, &agent.manifest, &event.data).await;
             }
             _ => {}
         }
@@ -3263,8 +3268,19 @@ async fn inbox(
             })
         })
         .collect();
+    // Memory an agent proposed, waiting for this user to accept or refuse it.
+    let memory_proposals: Vec<Value> = state
+        .store
+        .memory
+        .get(&user)
+        .await
+        .items
+        .into_iter()
+        .filter(|i| i.status == crate::memory::Status::Proposed)
+        .map(|i| json!({ "id": i.id, "text": i.text, "kind": i.kind, "tainted": i.tainted, "session_id": i.source.session_id }))
+        .collect();
     Ok(Json(
-        json!({ "user_id": user, "pending_approvals": pending, "recent_runs": recent }),
+        json!({ "user_id": user, "pending_approvals": pending, "memory_proposals": memory_proposals, "recent_runs": recent }),
     ))
 }
 

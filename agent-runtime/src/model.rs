@@ -77,6 +77,11 @@ pub struct AgentManifest {
     pub egress_approval_timeout_seconds: Option<u64>,
     #[serde(default = "default_runtime_port")]
     pub runtime_port: u16,
+    /// The agent asks for the user's [memory](crate::memory): a session run by a user who turned memory on gets their accepted entries as
+    /// `ctx.memory.items`, and the agent may propose entries with `ctx.memory.propose(text, kind)` (the user decides). Off by default; a
+    /// deployment that does not set it serializes exactly as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub memory: bool,
     #[serde(default)]
     pub ttl_seconds: Option<u64>,
     /// Maximum number of non-terminal sessions for this agent deployment.
@@ -1213,6 +1218,7 @@ mod home_volume_tests {
             egress_allow_hosts: vec![],
             allow_private_networks: false,
             runtime_port: 8080,
+            memory: false,
             ttl_seconds: None,
             max_concurrent_sessions: Some(1),
             idle_hibernate_seconds: None,

@@ -1228,6 +1228,12 @@ async fn memory_is_private_opt_in_and_decided_by_the_user() {
     let (_, v) = call(&w.app, "GET", "/v1/memory", ana, None).await;
     assert_eq!(v["proposals"][0]["id"], p.id.to_string());
     assert_eq!(v["proposals"][0]["tainted"], true);
+    // the user's inbox lists it for review; another user's inbox does not
+    let (_, inbox) = call(&w.app, "GET", "/v1/inbox", ana, None).await;
+    assert_eq!(inbox["memory_proposals"][0]["id"], p.id.to_string());
+    assert_eq!(inbox["memory_proposals"][0]["tainted"], true);
+    let (_, inbox) = call(&w.app, "GET", "/v1/inbox", ben, None).await;
+    assert!(inbox["memory_proposals"].as_array().unwrap().is_empty());
     assert_eq!(v["items"].as_array().unwrap().len(), 1);
     let (st, _) = call(
         &w.app,

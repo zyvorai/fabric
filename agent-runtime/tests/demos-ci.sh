@@ -57,7 +57,9 @@ wait_http() {
   return 1
 }
 
-[[ -x "$BIN" ]] || cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml"
+# Always build (incremental, quick when nothing changed) unless a binary was supplied: a stale target/debug binary once ran an older runtime and
+# failed a check that the source would pass.
+[[ -n "${ZYVOR_AGENT_BIN:-}" && -x "$BIN" ]] || cargo build --manifest-path "$ROOT/agent-runtime/Cargo.toml"
 [[ -d "$ROOT/sdk/agent-runtime/node_modules" ]] || npm install --prefix "$ROOT/sdk/agent-runtime" --no-audit --no-fund >/dev/null
 
 mkdir -p "$WORK/sandboxes"
@@ -886,6 +888,53 @@ post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Beare
 [[ "$(post "$WORK/deploy.bytes")" == "201" ]] || fail "exact signed bytes should deploy (201)"
 [[ "$(post "$WORK/deploy.tampered")" =~ ^40[13]$ ]] || fail "tampered bytes must be refused"
 ok "bundle bytes verify; a one-byte change is refused"
+
+echo "demos-ci: personal memory (an agent that asked for it, a user who turned it on, proposals the user decides)"
+# its own runtime: the Keep-mode one above limits each user to 3 runs a day for the quota checks further down
+MEM_PORT=$(free_port); MEM_EGRESS=$(free_port); MEM_BASE="http://127.0.0.1:$MEM_PORT"
+start_runtime mem-runtime "$MEM_PORT" "$MEM_EGRESS" ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
+wait_http "$MEM_BASE/healthz" || fail "the memory-test runtime did not start: $(tail -5 "$WORK/mem-runtime.log")"
+MEMPACK="$WORK/memory-agent"; cp -R "$ROOT/examples/keep-agents/memory-agent" "$MEMPACK"
+printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$MEMPACK/keep.policy.yaml"
+KEEP_POLICY_SEED="$SEED" FABRIC_AGENT_URL="$MEM_BASE" node "$CLI" pack deploy "$MEMPACK" >"$WORK/memory-agent.out" 2>&1 || fail "memory-agent deploy failed: $(cat "$WORK/memory-agent.out")"
+cmint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":600}" "$MEM_BASE/v1/user-tokens" | json token; }
+CAM=$(cmint cam); DAN=$(cmint dan)
+mem_chat() {   # $1 token, $2 thread id, $3 text: the agent's reply text (what an AG-UI client shows)
+  local body; body=$(python3 -c 'import json,sys; print(json.dumps({"threadId":sys.argv[2],"runId":"r-"+sys.argv[2],"messages":[{"id":"m","role":"user","content":sys.argv[3]}],"forwardedProps":{"agent":"memory-agent"}}))' "$1" "$2" "$3")
+  curl -sN --max-time 90 -X POST -H "Authorization: Bearer $1" -H 'content-type: application/json' -d "$body" "$MEM_BASE/v1/agui" \
+    | python3 -c 'import json,sys
+ev=[json.loads(l[5:]) for l in sys.stdin if l.startswith("data:")]
+assert ev and ev[-1]["type"]=="RUN_FINISHED", ev
+print("".join(e["delta"] for e in ev if e["type"]=="TEXT_MESSAGE_CONTENT"))'
+}
+mem_api() { local tok=$1 method=$2 path=$3; shift 3; curl -s -X "$method" -H "Authorization: Bearer $tok" -H 'content-type: application/json' "$@" "$MEM_BASE$path"; }
+r=$(mem_chat "$CAM" mem-1 "what do you remember?") || fail "the memory-agent run failed"
+[[ "$r" == *"do not remember anything"* ]] || fail "with memory off the agent should know nothing: $r"
+[[ "$(mem_api "$CAM" POST /v1/memory -d '{"text":"prefers window seats"}' -o /dev/null -w '%{http_code}')" == "400" ]] || fail "adding while memory is off must be refused"
+mem_api "$CAM" PUT /v1/memory/settings -d '{"enabled":true}' >/dev/null
+mem_api "$CAM" POST /v1/memory -d '{"text":"prefers window seats","kind":"preference"}' -o /dev/null
+r=$(mem_chat "$CAM" mem-2 "what do you remember?") || fail "the second memory-agent run failed"
+[[ "$r" == *"prefers window seats"* ]] || fail "the agent should have been given the accepted entry: $r"
+ok "memory off: the agent knows nothing; turned on and an entry added: the agent is given it"
+# the entry went in the run request, not into the session's stored input
+SID=$(mem_api "$CAM" GET /v1/sessions | python3 -c 'import json,sys; s=json.load(sys.stdin)["items"]; print(s[0]["id"])')
+mem_api "$CAM" GET "/v1/sessions/$SID" | grep -q "window seats" && fail "memory must not be stored in the session's input"
+ok "the memory entry is not in the session record"
+r=$(mem_chat "$CAM" mem-3 "remember I like aisle seats too") || fail "the proposing run failed"
+[[ "$r" == *"suggested remembering"* ]] || fail "the agent should say it suggested an entry: $r"
+view=$(mem_api "$CAM" GET /v1/memory)
+echo "$view" | python3 -c 'import json,sys; v=json.load(sys.stdin); assert [p["text"] for p in v["proposals"]]==["I like aisle seats too"] and v["proposals"][0]["origin"]=="agent" and v["proposals"][0]["source"]["session_id"], v; assert [i["text"] for i in v["items"]]==["prefers window seats"], v' || fail "the proposal should wait for review: $view"
+mem_api "$CAM" GET /v1/inbox | grep -q "aisle seats" || fail "the proposal should be in the inbox"
+r=$(mem_chat "$CAM" mem-4 "what do you remember?"); [[ "$r" == *"aisle"* ]] && fail "an unaccepted proposal must not reach the agent: $r"
+PID=$(echo "$view" | json proposals.0.id)
+mem_api "$CAM" POST "/v1/memory/$PID/accept" -o /dev/null
+r=$(mem_chat "$CAM" mem-5 "what do you remember?"); [[ "$r" == *"aisle seats"* && "$r" == *"window seats"* ]] || fail "an accepted proposal should now be given to the agent: $r"
+ok "an agent's proposal waits in the review list and the inbox, is not used until accepted, then is"
+r=$(mem_chat "$DAN" mem-6 "what do you remember?"); [[ "$r" == *"do not remember anything"* && "$r" != *"seats"* ]] || fail "another user must get none of cam's memory: $r"
+[[ "$(mem_api "$DAN" PATCH "/v1/memory/$PID" -d '{"text":"x"}' -o /dev/null -w '%{http_code}')" == "404" ]] || fail "another user's entry must be a 404"
+mem_api "$CAM" PUT /v1/memory/settings -d '{"enabled":false}' >/dev/null
+r=$(mem_chat "$CAM" mem-7 "what do you remember?"); [[ "$r" == *"do not remember anything"* ]] || fail "turning memory off must stop it reaching the agent: $r"
+ok "another user gets none of it and cannot touch it; turning memory off stops it reaching the agent"
 
 echo "demos-ci: two users on one shard (user tokens, isolation, quota, revocation)"
 mint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":600}" "$KEEP_BASE/v1/user-tokens" | json token; }

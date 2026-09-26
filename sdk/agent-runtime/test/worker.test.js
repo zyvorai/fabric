@@ -83,3 +83,51 @@ test("worker exposes waiting state only while blocked in nextSteer", async (t) =
   assert.ok(kinds.includes("session.running"));
   assert.ok(kinds.includes("session.result"));
 });
+
+test("worker gives the agent its memory as frozen data, keeps it out of the events, and lets it propose", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "zyvor-agent-worker-"));
+  const bundle = join(dir, "bundle.mjs");
+  await writeFile(bundle, `export default async (ctx) => {
+  let frozen = false;
+  try { ctx.memory.items[0].text = "changed"; } catch { frozen = true; }
+  ctx.memory.propose("likes window seats", "preference");
+  return { items: ctx.memory.items.map((i) => i.text), tainted: ctx.memory.items.map((i) => i.tainted), frozen: frozen || ctx.memory.items[0].text !== "changed" };
+};\n`);
+  const port = await freePort();
+  const child = spawn(process.execPath, [workerPath], {
+    env: { ...process.env, ZYVOR_SESSION_ID: "s", ZYVOR_EGRESS_CAPABILITY: "c", ZYVOR_EGRESS_BROKER: "http://127.0.0.1:9", ZYVOR_AGENT_PORT: String(port), ZYVOR_AGENT_BUNDLE: bundle },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  t.after(async () => { child.kill("SIGTERM"); await rm(dir, { recursive: true, force: true }); });
+  await poll(`http://127.0.0.1:${port}/health`, (v) => v.ok === true);
+  const run = await fetch(`http://127.0.0.1:${port}/run`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ input: { message: "hi" }, memory: [{ text: "vegetarian", kind: "fact", pinned: true, tainted: false }, { text: "from a web page", kind: "note", pinned: false, tainted: true }] }),
+  });
+  assert.equal(run.status, 202);
+  const events = await poll(`http://127.0.0.1:${port}/events?after=0`, (v) => v.items.some((e) => e.kind === "session.result"));
+  const result = events.items.find((e) => e.kind === "session.result").data;
+  assert.deepEqual(result.items, ["vegetarian", "from a web page"]);
+  assert.deepEqual(result.tainted, [false, true]);
+  assert.equal(result.frozen, true, "an agent cannot edit the entries it was given");
+  const proposal = events.items.find((e) => e.kind === "memory.propose");
+  assert.deepEqual(proposal.data, { text: "likes window seats", kind: "preference" });
+  assert.equal(JSON.stringify(events.items.filter((e) => e.kind !== "memory.propose" && e.kind !== "session.result")).includes("vegetarian"), false, "memory is not echoed into the session events");
+});
+
+test("worker without memory in the run request gives an empty list", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "zyvor-agent-worker-"));
+  const bundle = join(dir, "bundle.mjs");
+  await writeFile(bundle, "export default async (ctx) => ({ n: ctx.memory.items.length });\n");
+  const port = await freePort();
+  const child = spawn(process.execPath, [workerPath], {
+    env: { ...process.env, ZYVOR_SESSION_ID: "s", ZYVOR_EGRESS_CAPABILITY: "c", ZYVOR_EGRESS_BROKER: "http://127.0.0.1:9", ZYVOR_AGENT_PORT: String(port), ZYVOR_AGENT_BUNDLE: bundle },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  t.after(async () => { child.kill("SIGTERM"); await rm(dir, { recursive: true, force: true }); });
+  await poll(`http://127.0.0.1:${port}/health`, (v) => v.ok === true);
+  await fetch(`http://127.0.0.1:${port}/run`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: {} }) });
+  const events = await poll(`http://127.0.0.1:${port}/events?after=0`, (v) => v.items.some((e) => e.kind === "session.result"));
+  assert.deepEqual(events.items.find((e) => e.kind === "session.result").data, { n: 0 });
+});

@@ -984,6 +984,7 @@ pub(crate) mod ask_tests {
             egress_allow_hosts: vec![],
             allow_private_networks: false,
             runtime_port: 8080,
+            memory: false,
             ttl_seconds: None,
             max_concurrent_sessions: None,
             idle_hibernate_seconds: None,
