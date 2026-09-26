@@ -1507,6 +1507,308 @@ pub(crate) mod ask_tests {
         .await
     }
 
+    async fn call_keyed(
+        state: &AppState,
+        session: &SessionRecord,
+        port: u16,
+        method: &str,
+        body: Option<&str>,
+        key: &str,
+    ) -> Result<Value, (StatusCode, String)> {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-zyvor-session-id",
+            session.id.to_string().parse().unwrap(),
+        );
+        headers.insert("x-zyvor-egress-capability", "cap".parse().unwrap());
+        proxy_inner(
+            state,
+            &headers,
+            EgressRequest {
+                url: format!("http://127.0.0.1:{port}/send?token=hunter2"),
+                method: method.into(),
+                headers: [("Idempotency-Key".to_string(), key.to_string())].into(),
+                body_base64: body.map(|b| base64::engine::general_purpose::STANDARD.encode(b)),
+                credential: Some("mail".into()),
+            },
+        )
+        .await
+    }
+
+    async fn approve(
+        state: &AppState,
+        session: uuid::Uuid,
+        decision: ApprovalStatus,
+    ) -> ApprovalRecord {
+        let pending = wait_pending(state, session).await;
+        state
+            .store
+            .transition_approval(pending.id, decision, None, Some(GrantScope::Once))
+            .await
+            .unwrap();
+        pending
+    }
+
+    /// Approves a pending approval once more than `already` approvals exist.
+    async fn approve_after(state: &AppState, session: uuid::Uuid, already: usize) {
+        for _ in 0..200 {
+            let all = state.store.list_approvals().await;
+            if all.len() > already {
+                if let Some(p) = all
+                    .iter()
+                    .find(|a| a.session_id == session && a.status == ApprovalStatus::Pending)
+                {
+                    state
+                        .store
+                        .transition_approval(
+                            p.id,
+                            ApprovalStatus::Approved,
+                            None,
+                            Some(GrantScope::Once),
+                        )
+                        .await
+                        .unwrap();
+                    return;
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("no further approval appeared");
+    }
+
+    #[tokio::test]
+    async fn a_keyed_request_is_performed_once_and_a_retry_is_answered_from_its_receipt() {
+        let (port, count) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        let first = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(async move {
+                call_keyed(
+                    &state,
+                    &session,
+                    port,
+                    "POST",
+                    Some("send this once"),
+                    "step-1:attempt-1",
+                )
+                .await
+            })
+        };
+        let approval = approve(&state, session.id, ApprovalStatus::Approved).await;
+        let reply = first.await.unwrap().unwrap();
+        assert_eq!((reply["status"].clone(), hits(&count)), (json!(200), 1));
+        assert!(reply["receipt_id"].is_string());
+
+        // the retry (a goal step tried again, say): no new approval, nothing sent, the answer says it was a replay
+        let retry = call_keyed(
+            &state,
+            &session,
+            port,
+            "POST",
+            Some("send this once"),
+            "step-1:attempt-1",
+        )
+        .await
+        .unwrap();
+        assert_eq!(retry["replayed"], true);
+        assert_eq!(retry["status"], 200);
+        assert_eq!(hits(&count), 1, "the retry was not sent");
+        assert_eq!(
+            state.store.list_approvals().await.len(),
+            1,
+            "and no second approval was opened"
+        );
+
+        // the receipt says what was approved and done, without the body or the query
+        let receipts = state.store.receipts.list(None, 10).await;
+        assert_eq!(receipts.len(), 1);
+        let r = &receipts[0];
+        assert_eq!(
+            (
+                r.approval_id,
+                r.status,
+                r.method.as_str(),
+                r.credential.as_deref()
+            ),
+            (Some(approval.id), 200, "POST", Some("mail"))
+        );
+        assert_eq!(
+            r.body_sha256,
+            hex::encode(sha2::Sha256::digest(b"send this once"))
+        );
+        let stored = serde_json::to_string(&receipts).unwrap();
+        assert!(
+            !stored.contains("send this once") && !stored.contains("hunter2"),
+            "{stored}"
+        );
+        let journal =
+            serde_json::to_string(&state.store.audit.list(None, 100).await.unwrap()).unwrap();
+        assert!(
+            journal.contains("keep.action.performed") && journal.contains("keep.action.replayed")
+        );
+        assert!(
+            !journal.contains("send this once"),
+            "the journal never holds the body"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_same_key_with_a_different_request_is_refused_and_nothing_is_sent() {
+        let (port, count) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        let first = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(async move {
+                call_keyed(&state, &session, port, "POST", Some("one"), "k").await
+            })
+        };
+        approve(&state, session.id, ApprovalStatus::Approved).await;
+        first.await.unwrap().unwrap();
+        let err = call_keyed(&state, &session, port, "POST", Some("two"), "k")
+            .await
+            .unwrap_err();
+        assert_eq!(err.0, StatusCode::CONFLICT);
+        assert!(err.1.contains("different request"), "{}", err.1);
+        assert_eq!(
+            (hits(&count), state.store.list_approvals().await.len()),
+            (1, 1),
+            "nothing was sent and nobody was asked"
+        );
+    }
+
+    #[tokio::test]
+    async fn without_a_key_every_request_is_asked_about_and_gets_its_own_receipt() {
+        let (port, count) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        for _ in 0..2 {
+            let waiter = {
+                let (state, session) = (state.clone(), session.clone());
+                tokio::spawn(async move { call(&state, &session, port, "POST", Some("x")).await })
+            };
+            approve_after(&state, session.id, state.store.list_approvals().await.len()).await;
+            waiter.await.unwrap().unwrap();
+        }
+        assert_eq!(hits(&count), 2);
+        let receipts = state.store.receipts.list(None, 10).await;
+        assert_eq!(receipts.len(), 2);
+        assert!(receipts.iter().all(|r| r.idempotency_key.is_none()));
+    }
+
+    #[tokio::test]
+    async fn a_denied_request_leaves_no_receipt_and_its_key_can_be_used_again() {
+        let (port, count) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        let denied = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(
+                async move { call_keyed(&state, &session, port, "POST", Some("x"), "k").await },
+            )
+        };
+        approve(&state, session.id, ApprovalStatus::Denied).await;
+        assert!(denied.await.unwrap().is_err());
+        assert!(
+            state.store.receipts.list(None, 10).await.is_empty(),
+            "a refusal is not a performed action"
+        );
+        assert_eq!(hits(&count), 0);
+        // the same key, asked again, opens a fresh approval and can go through
+        let already = state.store.list_approvals().await.len();
+        let again = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(
+                async move { call_keyed(&state, &session, port, "POST", Some("x"), "k").await },
+            )
+        };
+        approve_after(&state, session.id, already).await;
+        again.await.unwrap().unwrap();
+        assert_eq!(
+            (
+                hits(&count),
+                state.store.receipts.list(None, 10).await.len()
+            ),
+            (1, 1)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_bad_key_is_refused_before_anything_happens() {
+        let (port, count) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        for bad in ["has space", "", &"k".repeat(200)] {
+            let err = call_keyed(&state, &session, port, "POST", Some("x"), bad)
+                .await
+                .unwrap_err();
+            assert_eq!(err.0, StatusCode::BAD_REQUEST, "{bad:?}");
+        }
+        assert_eq!(
+            (hits(&count), state.store.list_approvals().await.len()),
+            (0, 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn the_same_key_while_the_first_is_still_waiting_is_refused_not_duplicated() {
+        let (port, count) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        let first = {
+            let (state, session) = (state.clone(), session.clone());
+            tokio::spawn(
+                async move { call_keyed(&state, &session, port, "POST", Some("x"), "k").await },
+            )
+        };
+        wait_pending(&state, session.id).await;
+        let err = call_keyed(&state, &session, port, "POST", Some("x"), "k")
+            .await
+            .unwrap_err();
+        assert_eq!(err.0, StatusCode::CONFLICT);
+        assert!(err.1.contains("in progress"), "{}", err.1);
+        approve(&state, session.id, ApprovalStatus::Approved).await;
+        first.await.unwrap().unwrap();
+        assert_eq!(hits(&count), 1);
+    }
+
+    #[tokio::test]
+    async fn one_persons_key_never_answers_for_another_person() {
+        let (port, count) = upstream_counter().await;
+        let (state, session) = approval_gated_agent(port).await;
+        let ana = state
+            .store
+            .update_session(session.id, |s| s.user_id = Some("ana".into()))
+            .await
+            .unwrap();
+        let mut other = ana.clone();
+        other.id = uuid::Uuid::new_v4();
+        other.user_id = Some("ben".into());
+        state.store.save_session(other.clone()).await.unwrap();
+        let a = {
+            let (state, ana) = (state.clone(), ana.clone());
+            tokio::spawn(async move {
+                call_keyed(&state, &ana, port, "POST", Some("x"), "same-key").await
+            })
+        };
+        approve(&state, ana.id, ApprovalStatus::Approved).await;
+        a.await.unwrap().unwrap();
+        // ben, same key and same request: not a replay of ana's; his own approval is asked for and it is sent
+        let b = {
+            let (state, other) = (state.clone(), other.clone());
+            tokio::spawn(async move {
+                call_keyed(&state, &other, port, "POST", Some("x"), "same-key").await
+            })
+        };
+        approve(&state, other.id, ApprovalStatus::Approved).await;
+        let reply = b.await.unwrap().unwrap();
+        assert!(reply["replayed"].is_null(), "not a replay");
+        assert_eq!(hits(&count), 2);
+        let mine = state.store.receipts.list(Some("ben"), 10).await;
+        assert_eq!(
+            (
+                mine.len(),
+                state.store.receipts.list(Some("ana"), 10).await.len()
+            ),
+            (1, 1)
+        );
+    }
+
     #[tokio::test]
     async fn send_credential_holds_the_request_until_approved_and_never_records_the_body() {
         let (port, hits) = upstream_counter().await;
