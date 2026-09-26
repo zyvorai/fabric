@@ -15,6 +15,10 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **`POST /v1/agui`, an AG-UI endpoint over Keep sessions.** A chat client that speaks the AG-UI protocol can start an agent in a sealed cell and stream its events; later messages on a thread steer the same session. Through
+  the same session code as `/v1/sessions`, so scopes, quotas and tenancy apply (a user token needs `run`; threads are per user). **It cannot approve or deny anything**: an approval request is shown as a `CUSTOM` event and is decided on
+  the user's device. The stream is validated against the official `@ag-ui/core` 1.0.0 schemas in `demos-ci.sh` (129 checks) with 8 unit tests and authz tests; no tool-call or state events yet, and not tried with a real chat client.
+  `model-agent` also accepts `input.message`. See `docs/keep/AGUI.md`.
 - **`keepctl init <name>`**, a one-command start for a new use-case pack: scaffolds a valid pack (rules, a synthetic sample, a README) from `docs/keep/pack-template`, refuses to overwrite and refuses bad names. Tested in `demos-ci.sh`: the scaffold
   deploys and passes its own sample with no edits.
 - **`scripts/keep-demo-local.sh`, a two-minute local demo that is honest about what it is.** Starts the FluxVM simulator (`agent-runtime/tests/sandbox_stub.py`) and the runtime on loopback with no KVM, Docker or root, mints a 1-day

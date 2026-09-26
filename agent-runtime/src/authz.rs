@@ -229,6 +229,8 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
             UserRoute::Open(Scope::Read)
         }
         ["v1", "demos", _] if *method == Method::POST => UserRoute::Open(Scope::Run),
+        // A chat client's run: starts or steers the caller's own session, like POST /v1/sessions.
+        ["v1", "agui"] if *method == Method::POST => UserRoute::Open(Scope::Run),
         _ => UserRoute::Denied,
     }
 }
@@ -445,6 +447,11 @@ mod tests {
                 UserRoute::Open(Scope::Run),
             ),
             (Method::POST, "/v1/demos".into(), UserRoute::Denied),
+            // AG-UI: a chat client may start or steer its own run; nothing else on that path
+            (Method::POST, "/v1/agui".into(), UserRoute::Open(Scope::Run)),
+            (Method::GET, "/v1/agui".into(), UserRoute::Denied),
+            (Method::DELETE, "/v1/agui".into(), UserRoute::Denied),
+            (Method::POST, "/v1/agui/x".into(), UserRoute::Denied),
             (
                 Method::DELETE,
                 "/v1/demos/csv-clean".into(),
