@@ -35,6 +35,7 @@ pub mod policy;
 pub mod pool;
 pub mod preview;
 pub mod proxy;
+pub mod receipts;
 pub mod retention;
 pub mod schedules;
 pub mod sentinel;
