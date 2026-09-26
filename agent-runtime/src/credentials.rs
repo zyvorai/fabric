@@ -936,4 +936,241 @@ mod tests {
         );
         assert!(validate_descriptor("g", &missing).is_err());
     }
+
+    /// A token endpoint that answers `access_token = "at-" + the refresh token it was given`, and records the refresh tokens seen.
+    async fn per_person_token_endpoint() -> (String, Arc<std::sync::Mutex<Vec<String>>>) {
+        use axum::{extract::State, routing::post, Router};
+        let seen: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+        let app = Router::new()
+            .route(
+                "/token",
+                post(|State(seen): State<Arc<std::sync::Mutex<Vec<String>>>>, body: String| async move {
+                    let rt = url::form_urlencoded::parse(body.as_bytes()).find(|(k, _)| k == "refresh_token").map(|(_, v)| v.to_string()).unwrap_or_default();
+                    seen.lock().unwrap().push(rt.clone());
+                    axum::Json(serde_json::json!({"access_token": format!("at-{rt}"), "expires_in": 3600}))
+                }),
+            )
+            .with_state(seen.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/token", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (url, seen)
+    }
+
+    fn person_vault(token_url: &str) -> CredentialVault {
+        std::env::set_var("PP_CLIENT_ID", "cid");
+        std::env::set_var("PP_CLIENT_SECRET", "csecret");
+        let d: CredentialDescriptor = serde_json::from_value(serde_json::json!({
+            "host": "gmail.googleapis.com", "header": "authorization", "kind": "oauth-refresh", "allowed_methods": ["GET"],
+            "oauth": {"token_url": token_url, "client_id_env": "PP_CLIENT_ID", "client_secret_env": "PP_CLIENT_SECRET", "connection": "google"}
+        }))
+        .unwrap();
+        validate_descriptor("gmail", &d).unwrap();
+        CredentialVault::from_descriptors(HashMap::from([("gmail".to_string(), d)]))
+    }
+
+    #[tokio::test]
+    async fn a_per_person_credential_uses_each_persons_own_refresh_token_and_caches_it() {
+        let (url, seen) = per_person_token_endpoint().await;
+        let vault = person_vault(&url);
+        let http = reqwest::Client::new();
+        assert!(vault.is_per_person("gmail") && vault.connection_of("gmail") == Some("google"));
+        assert_eq!(vault.connection_names(), ["google"]);
+        // nothing works without a user, or before the person connected
+        assert!(
+            vault.resolve_for("gmail", None).is_err(),
+            "a session with no user"
+        );
+        assert!(vault.resolve("gmail").is_err(), "and the host-wide path");
+        let err = vault
+            .ensure_user_token("gmail", "ana", None, &http)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("connect your google account first"), "{err}");
+        assert!(
+            seen.lock().unwrap().is_empty(),
+            "nothing was sent to the token endpoint"
+        );
+        // two people, two tokens, each minted from their own refresh token
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-refresh"), &http)
+            .await
+            .unwrap();
+        vault
+            .ensure_user_token("gmail", "ben", Some("1//ben-refresh"), &http)
+            .await
+            .unwrap();
+        assert_eq!(
+            vault.resolve_for("gmail", Some("ana")).unwrap().1,
+            "Bearer at-1//ana-refresh"
+        );
+        assert_eq!(
+            vault.resolve_for("gmail", Some("ben")).unwrap().1,
+            "Bearer at-1//ben-refresh"
+        );
+        assert!(
+            vault.resolve_for("gmail", Some("cam")).is_err(),
+            "a person who has not connected gets nothing"
+        );
+        // a second use does not call the endpoint again
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-refresh"), &http)
+            .await
+            .unwrap();
+        assert_eq!(*seen.lock().unwrap(), ["1//ana-refresh", "1//ben-refresh"]);
+        // the policy still applies through authorize_resolve
+        let get = reqwest::Method::GET;
+        let post = reqwest::Method::POST;
+        let ctx = |m, u| ResolveContext {
+            host: "gmail.googleapis.com",
+            method: m,
+            path: "/gmail/v1/users/me/messages",
+            port: 443,
+            user_id: u,
+        };
+        assert!(vault
+            .authorize_resolve("gmail", &ctx(&get, Some("ana")))
+            .is_ok());
+        assert!(vault
+            .authorize_resolve("gmail", &ctx(&post, Some("ana")))
+            .is_err());
+        assert!(vault.authorize_resolve("gmail", &ctx(&get, None)).is_err());
+    }
+
+    #[tokio::test]
+    async fn disconnecting_or_replacing_a_connection_drops_only_that_persons_tokens() {
+        let (url, seen) = per_person_token_endpoint().await;
+        let vault = person_vault(&url);
+        let http = reqwest::Client::new();
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-refresh"), &http)
+            .await
+            .unwrap();
+        vault
+            .ensure_user_token("gmail", "ben", Some("1//ben-refresh"), &http)
+            .await
+            .unwrap();
+        vault.forget_user_connection("ana", "google");
+        assert!(
+            vault.resolve_for("gmail", Some("ana")).is_err(),
+            "ana's token is gone at once"
+        );
+        assert!(
+            vault.resolve_for("gmail", Some("ben")).is_ok(),
+            "ben's is not"
+        );
+        vault.forget_user_connection("ben", "another-connection");
+        assert!(
+            vault.resolve_for("gmail", Some("ben")).is_ok(),
+            "a different connection name leaves it alone"
+        );
+        // a new refresh token mints a new access token
+        vault
+            .ensure_user_token("gmail", "ana", Some("1//ana-new"), &http)
+            .await
+            .unwrap();
+        assert_eq!(
+            vault.resolve_for("gmail", Some("ana")).unwrap().1,
+            "Bearer at-1//ana-new"
+        );
+        assert_eq!(seen.lock().unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn a_refused_refresh_names_the_error_code_and_no_secret() {
+        use axum::{routing::post, Router};
+        let app = Router::new().route("/token", post(|| async { (axum::http::StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({"error": "invalid_grant", "error_description": "Token has been revoked 1//ana-refresh"}))) }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/token", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let vault = person_vault(&url);
+        let err = format!(
+            "{:#}",
+            vault
+                .ensure_user_token(
+                    "gmail",
+                    "ana",
+                    Some("1//ana-refresh"),
+                    &reqwest::Client::new()
+                )
+                .await
+                .unwrap_err()
+        );
+        assert!(
+            err.contains("invalid_grant")
+                && !err.contains("1//ana-refresh")
+                && !err.contains("csecret"),
+            "{err}"
+        );
+        assert!(
+            vault.resolve_for("gmail", Some("ana")).is_err(),
+            "and it stays closed"
+        );
+    }
+
+    #[test]
+    fn a_descriptor_uses_either_a_host_refresh_token_or_a_persons_connection() {
+        let make = |oauth: serde_json::Value, extra: serde_json::Value| {
+            let mut d = serde_json::json!({"host": "h", "header": "authorization", "kind": "oauth-refresh", "oauth": oauth});
+            for (k, v) in extra.as_object().cloned().unwrap_or_default() {
+                d[k] = v;
+            }
+            serde_json::from_value::<CredentialDescriptor>(d).unwrap()
+        };
+        let base = |rt: &str, conn: Option<&str>| {
+            let mut o = serde_json::json!({"token_url": "https://oauth2.googleapis.com/token", "client_id_env": "A", "client_secret_env": "B", "refresh_token_env": rt});
+            if let Some(c) = conn {
+                o["connection"] = c.into();
+            }
+            o
+        };
+        assert!(
+            validate_descriptor("g", &make(base("C", None), serde_json::json!({}))).is_ok(),
+            "host-wide"
+        );
+        assert!(
+            validate_descriptor("g", &make(base("", Some("google")), serde_json::json!({})))
+                .is_ok(),
+            "per person"
+        );
+        assert!(
+            validate_descriptor("g", &make(base("", None), serde_json::json!({}))).is_err(),
+            "neither"
+        );
+        assert!(
+            validate_descriptor("g", &make(base("C", Some("google")), serde_json::json!({})))
+                .is_err(),
+            "both"
+        );
+        for bad in ["", "Google", "with space", &"x".repeat(33)] {
+            assert!(
+                validate_descriptor("g", &make(base("", Some(bad)), serde_json::json!({})))
+                    .is_err(),
+                "{bad:?}"
+            );
+        }
+        assert!(
+            validate_descriptor(
+                "g",
+                &make(
+                    base("", Some("google")),
+                    serde_json::json!({"intercept": true})
+                )
+            )
+            .is_err(),
+            "a per-person credential is not intercepted"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_host_wide_refresher_leaves_per_person_credentials_alone() {
+        let (url, seen) = per_person_token_endpoint().await;
+        let vault = person_vault(&url);
+        vault.start_oauth_refresh(reqwest::Client::new()).await;
+        assert!(
+            seen.lock().unwrap().is_empty(),
+            "no host refresh token exists for a per-person credential"
+        );
+    }
 }
