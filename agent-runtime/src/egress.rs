@@ -155,6 +155,24 @@ pub(crate) async fn proxy_inner(
     let host = url
         .host_str()
         .ok_or((StatusCode::BAD_REQUEST, "egress URL has no host".into()))?;
+    // An `Idempotency-Key` on a request that needs approval makes it at-most-once (see `receipts`). It is also forwarded upstream.
+    let idem = request
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("idempotency-key"))
+        .map(|(_, value)| value.trim().to_string());
+    if idem
+        .as_deref()
+        .is_some_and(|k| !crate::receipts::valid_key(k))
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Idempotency-Key must be 1 to {} printable characters without spaces",
+                crate::receipts::MAX_KEY_LEN
+            ),
+        ));
+    }
     let body = match request.body_base64 {
         Some(encoded) => {
             let body = base64::engine::general_purpose::STANDARD
@@ -344,23 +362,66 @@ pub(crate) async fn proxy_inner(
             }
         }
     }
-    if needs_approval.is_some() || !reasons.is_empty() {
+    let gated = needs_approval.is_some() || !reasons.is_empty();
+    let mut approval_id = None;
+    let mut _in_flight = None;
+    let body_sha256 = body
+        .as_deref()
+        .map(|b| hex::encode(sha2::Sha256::digest(b)))
+        .unwrap_or_default();
+    let body_len = body.as_ref().map_or(0, Vec::len);
+    let request_fingerprint =
+        crate::receipts::fingerprint(method.as_str(), url.as_str(), &body_sha256);
+    if gated {
         let (kind, credential) = match needs_approval {
             Some((kind, name)) => (kind, Some(name)),
             None => (ApprovalKind::Send, None),
         };
-        hold_for_approval(
-            state,
-            &session,
-            &agent.manifest,
-            kind,
-            &url,
-            method.as_str(),
-            credential.as_deref(),
-            &reasons,
-            body.as_deref(),
-        )
-        .await?;
+        // At-most-once: a keyed request that was already performed is answered from its receipt, without asking again or sending again.
+        if let Some(key) = idem.as_deref() {
+            let scope = crate::receipts::scope_key(
+                session.user_id.as_deref(),
+                request.credential.as_deref(),
+                key,
+            );
+            match state
+                .store
+                .receipts
+                .begin(&scope, &request_fingerprint)
+                .await
+            {
+                crate::receipts::Begin::Replay(receipt) => {
+                    let _ = state
+                        .store
+                        .audit
+                        .append(
+                            Some(session.id),
+                            AuditPhase::Performed,
+                            "keep.action.replayed",
+                            Some(session.agent.clone()),
+                            json!({ "receipt_id": receipt.id, "credential": receipt.credential, "method": receipt.method, "host": host.to_ascii_lowercase() }),
+                        )
+                        .await;
+                    return Ok(crate::receipts::replay_response(&receipt));
+                }
+                crate::receipts::Begin::Conflict(why) => return Err((StatusCode::CONFLICT, why)),
+                crate::receipts::Begin::Proceed(guard) => _in_flight = Some(guard),
+            }
+        }
+        approval_id = Some(
+            hold_for_approval(
+                state,
+                &session,
+                &agent.manifest,
+                kind,
+                &url,
+                method.as_str(),
+                credential.as_deref(),
+                &reasons,
+                body.as_deref(),
+            )
+            .await?,
+        );
     }
     if let Some(body) = body {
         upstream = upstream.body(body);
@@ -400,11 +461,54 @@ pub(crate) async fn proxy_inner(
     }
 
     tracing::info!(session = %id, agent = %session.agent, %host, credential = ?request.credential, status, "agent egress");
+    // A receipt for what a person approved: recorded when the upstream answered with anything below 500 (a 5xx or a network error may be retried).
+    let mut receipt_id = None;
+    if gated && status < 500 {
+        let mut target = url.clone();
+        target.set_query(None);
+        target.set_fragment(None);
+        let _ = target.set_username("");
+        let _ = target.set_password(None);
+        let receipt = crate::receipts::Receipt {
+            id: uuid::Uuid::new_v4(),
+            at: chrono::Utc::now(),
+            user_id: session.user_id.clone(),
+            session_id: session.id,
+            agent: session.agent.clone(),
+            credential: request.credential.clone(),
+            method: method.as_str().to_string(),
+            url: target.to_string(),
+            body_bytes: body_len,
+            body_sha256: body_sha256.clone(),
+            approval_id,
+            idempotency_key: idem.clone(),
+            status,
+            fingerprint: request_fingerprint.clone(),
+        };
+        match state.store.receipts.record(receipt.clone()).await {
+            Ok(()) => {
+                receipt_id = Some(receipt.id);
+                let _ = state
+                    .store
+                    .audit
+                    .append(
+                        Some(session.id),
+                        AuditPhase::Performed,
+                        "keep.action.performed",
+                        Some(session.agent.clone()),
+                        json!({ "receipt_id": receipt.id, "approval_id": approval_id, "credential": receipt.credential, "method": receipt.method, "host": host.to_ascii_lowercase(), "status": status, "keyed": idem.is_some() }),
+                    )
+                    .await;
+            }
+            Err(error) => tracing::error!(%error, "could not record an action receipt"),
+        }
+    }
     Ok(json!({
         "status": status,
         "headers": out_headers,
         "header_list": header_list,
         "body_base64": base64::engine::general_purpose::STANDARD.encode(body),
+        "receipt_id": receipt_id,
     }))
 }
 
@@ -810,7 +914,7 @@ async fn hold_for_approval(
     credential: Option<&str>,
     reasons: &[String],
     body: Option<&[u8]>,
-) -> Result<(), (StatusCode, String)> {
+) -> Result<uuid::Uuid, (StatusCode, String)> {
     let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
     let mut target = url.clone();
     target.set_query(None);
@@ -874,7 +978,8 @@ async fn hold_for_approval(
         &format!("{what} to {host} was denied by an operator"),
         &format!("{what} approval for {host} expired"),
     )
-    .await
+    .await?;
+    Ok(approval.id)
 }
 
 #[cfg(test)]

@@ -251,6 +251,8 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
             Some(gid) => UserRoute::Goal(gid, Scope::Run),
             None => UserRoute::Denied,
         },
+        // What was done after you approved: a person reads their own receipts (the handler scopes them).
+        ["v1", "receipts"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),
@@ -484,6 +486,13 @@ mod tests {
                 UserRoute::Approval(aid, Scope::Approve),
             ),
             (Method::POST, "/v1/approvals".into(), UserRoute::Denied),
+            (
+                Method::GET,
+                "/v1/receipts".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (Method::POST, "/v1/receipts".into(), UserRoute::Denied),
+            (Method::DELETE, "/v1/receipts".into(), UserRoute::Denied),
             (
                 Method::GET,
                 "/v1/threads".into(),

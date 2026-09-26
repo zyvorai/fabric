@@ -59,6 +59,8 @@ pub struct Store {
     pub threads: crate::threads::ThreadStore,
     /// Opt-in personal memory, per user.
     pub memory: crate::memory::MemoryStore,
+    /// Receipts for approved actions, and the answers to repeated keyed requests.
+    pub receipts: crate::receipts::ReceiptStore,
 }
 
 impl Store {
@@ -70,12 +72,14 @@ impl Store {
         let skills = SkillStore::open(root.join("skills")).await?;
         let threads = crate::threads::ThreadStore::open(root.join("threads")).await?;
         let memory = crate::memory::MemoryStore::open(root.join("memory")).await?;
+        let receipts = crate::receipts::ReceiptStore::open(root.join("receipts")).await?;
 
         let store = Self {
             audit,
             skills,
             threads,
             memory,
+            receipts,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),

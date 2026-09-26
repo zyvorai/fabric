@@ -410,6 +410,7 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/usage", get(usage_route))
         .route("/v1/inbox", get(inbox))
+        .route("/v1/receipts", get(crate::receipts::list_receipts))
         .route("/v1/model-grants", get(crate::model_call::list_grants))
         .route(
             "/v1/model-grants/{key}",
