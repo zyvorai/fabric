@@ -1172,7 +1172,7 @@ mod tests {
         ] {
             let text = std::fs::read_to_string(dir.join(file)).unwrap();
             let map: HashMap<String, CredentialDescriptor> = serde_json::from_str(&text).unwrap();
-            assert_eq!(map.len(), 3, "{file}");
+            assert_eq!(map.len(), 5, "{file}");
             for (name, d) in &map {
                 validate_descriptor(name, d).unwrap_or_else(|e| panic!("{file}: {e}"));
             }

@@ -13,6 +13,7 @@ docs/keep/connectors/README.md) and the host uses google.per-person.credentials.
 
     GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... scripts/keep-google-auth.py            # read-only scopes
     scripts/keep-google-auth.py --with-drafts                                            # also Gmail drafts
+    scripts/keep-google-auth.py --with-send --with-events                                # also send mail and create events
 
 Nothing is sent anywhere except to Google's own endpoints (or the ones you pass with --auth-url/--token-url).
 """
@@ -20,6 +21,8 @@ import argparse, base64, hashlib, http.server, json, os, secrets, sys, threading
 
 READ = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/calendar.readonly"]
 DRAFTS = ["https://www.googleapis.com/auth/gmail.compose"]
+SEND = ["https://www.googleapis.com/auth/gmail.send"]
+EVENTS = ["https://www.googleapis.com/auth/calendar.events"]
 
 
 def pkce():
@@ -31,6 +34,8 @@ def pkce():
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--with-drafts", action="store_true", help="also ask for Gmail compose (drafts; sending stays behind a phone approval)")
+    p.add_argument("--with-send", action="store_true", help="also ask for Gmail send (every send stays behind a phone approval)")
+    p.add_argument("--with-events", action="store_true", help="also ask to create and edit calendar events (behind a phone approval)")
     p.add_argument("--out", default="google-refresh-token.env", help="file for GOOGLE_REFRESH_TOKEN (mode 0600)")
     p.add_argument("--port", type=int, default=0, help="loopback port (default: any free port)")
     p.add_argument("--no-browser", action="store_true", help="print the URL instead of opening a browser")
@@ -65,7 +70,7 @@ def main(argv=None):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = a.auth_url + "?" + urllib.parse.urlencode({
         "client_id": cid, "redirect_uri": redirect, "response_type": "code",
-        "scope": " ".join(READ + (DRAFTS if a.with_drafts else [])),
+        "scope": " ".join(READ + (DRAFTS if a.with_drafts else []) + (SEND if a.with_send else []) + (EVENTS if a.with_events else [])),
         "code_challenge": challenge, "code_challenge_method": "S256", "state": state,
         "access_type": "offline", "prompt": "consent",
     })

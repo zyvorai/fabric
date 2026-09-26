@@ -65,6 +65,11 @@ def main():
     rc, url, q, so, se, out = run(["--with-drafts"])
     assert rc == 0 and "gmail.compose" in q["scope"][0], q["scope"]
 
+    rc, url, q, so, se, out = run(["--with-send", "--with-events"])
+    scopes = q["scope"][0].split()
+    assert rc == 0 and "https://www.googleapis.com/auth/gmail.send" in scopes and "https://www.googleapis.com/auth/calendar.events" in scopes, scopes
+    assert not any(s.endswith("gmail.compose") for s in scopes), "send does not imply drafts"
+
     rc, url, q, so, se, out = run([], tamper_state=True)  # a wrong state aborts
     assert rc != 0 and not os.path.exists(out)
 

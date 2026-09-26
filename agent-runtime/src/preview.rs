@@ -223,8 +223,12 @@ fn parse_headers(head: &str) -> Vec<(String, String)> {
 fn decode_words(value: &str) -> String {
     let mut out = String::new();
     let mut rest = value;
+    let mut after_word = false;
     while let Some(start) = rest.find("=?") {
-        out.push_str(&rest[..start]);
+        // Whitespace between two encoded words is not part of the text (RFC 2047 section 6.2).
+        if !(after_word && rest[..start].trim().is_empty()) {
+            out.push_str(&rest[..start]);
+        }
         let after = &rest[start + 2..];
         let parsed = (|| {
             let mut it = after.splitn(3, '?');
@@ -271,10 +275,12 @@ fn decode_words(value: &str) -> String {
             Some((text, consumed)) => {
                 out.push_str(&text);
                 rest = &rest[consumed..];
+                after_word = true;
             }
             None => {
                 out.push_str("=?");
                 rest = &rest[start + 2..];
+                after_word = false;
             }
         }
     }
@@ -466,6 +472,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(field(&p, "Subject"), ["Café ☕ today"]);
+        let words = format!(
+            "=?UTF-8?B?{}?= =?UTF-8?B?{}?=",
+            base64::engine::general_purpose::STANDARD.encode("Über"),
+            base64::engine::general_purpose::STANDARD.encode("gabe")
+        );
+        let p = render(
+            GMAIL_MESSAGE,
+            &raw(&format!("To: a@b.co\nSubject: {words}\n\nx")),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            field(&p, "Subject"),
+            ["Übergabe"],
+            "the space between two encoded words is not text"
+        );
         let p = render(
             GMAIL_MESSAGE,
             &raw("To: a@b.co\nSubject: =?utf-8?Q?a_b=C3=A9?=\n\nx"),
