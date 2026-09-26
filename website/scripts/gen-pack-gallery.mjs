@@ -10,13 +10,13 @@ const root = join(here, '..', '..', 'examples', 'keep-agents');
 const out = join(here, '..', 'src', 'data', 'packGallery.generated.ts');
 
 const GROUPS = {
-  Documents: 'pdf-brief contract-clauses security-questionnaire meeting-actions meeting-notes-model nda-review receipt-pdf receipt-photo bill-photo invoice-model-brief deck-outline api-facts invoice-check inbox-digest status-page-watch mailbox-triage csv-clean',
-  Phone: 'chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder',
+  Documents: 'pdf-brief contract-clauses security-questionnaire meeting-actions meeting-notes-model nda-review receipt-pdf receipt-photo bill-photo fuel-receipt-photo school-fee-receipt-photo kindle-highlights insurance-claim-mail invoice-model-brief deck-outline api-facts invoice-check inbox-digest status-page-watch mailbox-triage csv-clean',
+  Phone: 'chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder android-call-log',
   Mac: 'mac-system-report homebrew-audit mac-log-triage mac-update-history mac-apps-inventory mac-launch-items',
   Windows: 'windows-systeminfo windows-hotfixes windows-installed-software windows-event-log windows-services windows-scheduled-tasks',
   Developer: 'github-prs github-issues github-actions-log dependabot-alerts git-log-digest xcodebuild-log xcode-crash-log vscode-extensions vscode-settings-audit log-triage sbom-summary',
-  Browser: 'bookmarks-digest browser-history-takeout',
-  Office: 'receivables-ageing po-line-items employee-ledger reimbursement-claims sales-register-sheet inventory-sheet attendance-sheet expense-sheet',
+  Browser: 'bookmarks-digest browser-history-takeout takeout-my-activity',
+  Office: 'receivables-ageing po-line-items employee-ledger reimbursement-claims sales-register-sheet inventory-sheet attendance-sheet expense-sheet payslip-text',
   Bank: 'neft-rtgs-returns nach-return-report recon-exceptions upi-dispute-mail loan-sanction-letter rbi-circular-brief',
 };
 const groupOf = new Map();

@@ -45,6 +45,19 @@ reads the file, and the cell reports `0` outbound connections.
 | [`receipt-photo`](../../examples/keep-agents/receipt-photo/README.md) | a photo or screenshot of a receipt (`.png`, `.jpg`) | totals, dates, warranty and return terms, amounts | `ocr` | no |
 | [`bill-photo`](../../examples/keep-agents/bill-photo/README.md) | a photo or screenshot of a utility, phone or card bill | amount due, due dates, account and reference lines, charges | `ocr` | no |
 
+| [`fuel-receipt-photo`](../../examples/keep-agents/fuel-receipt-photo/README.md) | a photo of a fuel receipt | litres, rate, total, date | `ocr` | no |
+| [`school-fee-receipt-photo`](../../examples/keep-agents/school-fee-receipt-photo/README.md) | a photo of a school fee receipt | receipt number, student and term, fees paid, balance | `ocr` | no |
+
+More everyday packs:
+
+| Pack | You drop in | You get | Reads with | Sample |
+|---|---|---|---|---|
+| [`payslip-text`](../../examples/keep-agents/payslip-text/README.md) | a payslip as text | month, earnings, deductions, net pay, amounts | `text` | yes |
+| [`kindle-highlights`](../../examples/keep-agents/kindle-highlights/README.md) | a Kindle `My Clippings.txt` | books ranked by clippings, highlights vs notes, dates | `text` | yes |
+| [`android-call-log`](../../examples/keep-agents/android-call-log/README.md) | a call-log CSV | calls by type, who you talk to, numbers | `text` + `csv_columns` | yes |
+| [`insurance-claim-mail`](../../examples/keep-agents/insurance-claim-mail/README.md) | insurer emails (`.eml`, `.mbox`) | claim numbers, status, amounts, what they need from you | `eml` | yes |
+| [`takeout-my-activity`](../../examples/keep-agents/takeout-my-activity/README.md) | Google Takeout `MyActivity.json` | products used, what you did, dates | `text` | yes |
+
 Photos are read by OCR (English, `tesseract` in the cell), so check the amounts against the original; a scanned PDF and HEIC are not read. Not covered: vendor-specific
 exports whose layout changes between versions (location history, health, screen time), where a pack would be guessing.
 These packs read personal data. The cell is sealed and reports `0` outbound connections, but the evidence class is

@@ -295,6 +295,20 @@ PY
   [[ "$code" == "400" ]] && grep -q "No text could be read" "$WORK/blank.json" || fail "a blank image should be refused with 400 and a reason (got $code): $(cat "$WORK/blank.json")"
   ok "receipt-photo: a blank image is refused with a reason, not guessed"
   curl -sf -X DELETE "$BASE/v1/demos/receipt-photo" >/dev/null || fail "delete receipt-photo"
+  # a fuel receipt read by OCR through its pack, and the school-fee photo pack deploys
+  python3 - "$WORK/fuel.png" <<'PY'
+import sys
+from PIL import Image, ImageDraw, ImageFont
+lines = ["EXAMPLE FUEL STATION", "Date 12/09/2026", "Petrol   Volume 30.00 Litre", "Rate Rs 100.00 per Litre", "Total Rs 3000.00"]
+img = Image.new("RGB", (1000, 70 + len(lines) * 52), "white"); d = ImageDraw.Draw(img); f = ImageFont.load_default(34)
+for i, l in enumerate(lines): d.text((30, 30 + i * 52), l, fill="black", font=f)
+img.save(sys.argv[1])
+PY
+  (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy examples/keep-agents/fuel-receipt-photo) > "$WORK/pack-fuel.out" 2>&1 || fail "fuel-receipt-photo: pack deploy failed: $(cat "$WORK/pack-fuel.out")"
+  b=$(body_of fuel-receipt-photo "$WORK/fuel.png"); echo "$b" | grep -qiF "30.00" && echo "$b" | grep -qF "3000.00" || fail "fuel-receipt-photo: litres or total not read from the image: $b"
+  (cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy examples/keep-agents/school-fee-receipt-photo) > "$WORK/pack-school.out" 2>&1 || fail "school-fee-receipt-photo: pack deploy failed: $(cat "$WORK/pack-school.out")"
+  ok "fuel-receipt-photo reads litres and total from an image by OCR; school-fee-receipt-photo deploys"
+  for p in fuel-receipt-photo school-fee-receipt-photo; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
 else
   echo "  skip receipt-photo (tesseract or Pillow not installed)"
 fi
@@ -432,6 +446,24 @@ KEEP_WATCH_STATE="$WORK/watch-state2" "$WATCH" "http://127.0.0.1:$BAD/x" --max-f
 "$WATCH" "http://user:pw@example.com/" >/dev/null 2>&1 && fail "a URL with credentials must be refused"
 "$WATCH" "ftp://example.com/" >/dev/null 2>&1 && fail "a non-http URL must be refused"
 ok "keep-watch: baseline, unchanged, a change reported once, --match alerts only on new text, repeated failures escalate, bad URLs refused"
+
+# more everyday packs: each sample runs in the stub cell and the summary carries what the pack promises (asserted from the real engine's output)
+b=$(pack_test payslip-text payslip.md)
+echo "$b" | grep -qF "1× August 2026" && echo "$b" | grep -qF "Net Pay 71,300.00" && echo "$b" | grep -qF "Total Deductions 13,700.00" && echo "$b" | grep -qF "1× 31-08-2026" || fail "payslip-text: month, net pay, deductions or date missing: $b"
+ok "payslip-text: month, earnings, deductions, net pay and the pay date, 0 CONNECT"
+b=$(pack_test kindle-highlights highlights.md)
+echo "$b" | grep -qF "3× The Example Book (Jane Author)" && echo "$b" | grep -qF "1× A Second Example (John Writer)" && echo "$b" | grep -qF "3× Highlight" && echo "$b" | grep -qF "2× 1 September 2026" || fail "kindle-highlights: books, kinds or dates not counted: $b"
+ok "kindle-highlights: books ranked by clippings, kinds and dates counted, 0 CONNECT"
+b=$(pack_test android-call-log calls.md)
+echo "$b" | grep -qF "incoming (3)" && echo "$b" | grep -qF "Ana Example (3)" && echo "$b" | grep -qF "555-0101 (3)" || fail "android-call-log: types, names or numbers not counted: $b"
+ok "android-call-log: calls by type, name and number, 0 CONNECT"
+b=$(pack_test insurance-claim-mail claims.md)
+echo "$b" | grep -qF "3× CLM-2026-0042" && echo "$b" | grep -qF "Rs 41,500" && echo "$b" | grep -qF "Please submit the discharge summary" || fail "insurance-claim-mail: claim number, amount or request missing: $b"
+ok "insurance-claim-mail: claim numbers, amounts and what the insurer needs, 0 CONNECT"
+b=$(pack_test takeout-my-activity activity.md)
+echo "$b" | grep -qF "3× Search" && echo "$b" | grep -qF "1× YouTube" && echo "$b" | grep -qF "2× 2026-09-01" || fail "takeout-my-activity: products or dates not counted: $b"
+ok "takeout-my-activity: products and dates counted, 0 CONNECT"
+for p in payslip-text kindle-highlights android-call-log insurance-claim-mail takeout-my-activity; do curl -sf -X DELETE "$BASE/v1/demos/$p" >/dev/null || fail "delete $p"; done
 b=$(pack_test mailbox-triage mailbox-triage.md)
 echo "$b" | grep -qF "1× Invoice 2041 is overdue" && echo "$b" | grep -qF "1× ana@example.com" || fail "mailbox-triage: subjects or senders missing: $b"
 echo "$b" | grep -qF "Please reply" || fail "mailbox-triage: reply section missing: $b"
