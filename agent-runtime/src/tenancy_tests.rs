@@ -304,7 +304,10 @@ async fn operator_routes_are_closed_to_user_tokens() {
         ("GET", "/v1/export/audit"),
         ("POST", "/v1/export-tokens"),
         ("GET", "/v1/vault/status"),
-        ("GET", "/v1/goals"),
+        (
+            "POST",
+            "/v1/goals/00000000-0000-4000-8000-000000000000/advance",
+        ),
         ("POST", "/v1/artifacts"),
         ("POST", "/v1/approvals"),
         ("POST", "/v1/demos"),
@@ -1289,5 +1292,241 @@ async fn memory_is_private_opt_in_and_decided_by_the_user() {
     let (_, v) = call(&w.app, "GET", "/v1/memory", ana, None).await;
     assert!(v["items"].as_array().unwrap().is_empty() && v["enabled"] == true);
     let (st, _) = call(&w.app, "GET", "/v1/memory", None, None).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn goals_are_private_bounded_and_only_cancelled_or_paused_by_their_owner() {
+    let w = world().await;
+    let (ana, ben) = (Some(w.ana.token.as_str()), Some(w.ben.token.as_str()));
+    let opt = op();
+    let operator = Some(opt.as_str());
+    let agent = w
+        .state
+        .store
+        .get_session(w.ana.session)
+        .await
+        .unwrap()
+        .agent;
+    w.state
+        .store
+        .deploy_agent(crate::model::DeployAgentRequest {
+            name: agent.clone(),
+            bundle_base64: base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                "export default 1",
+            ),
+            manifest: crate::egress::ask_tests::manifest(crate::model::EgressMode::Deny, Some(30)),
+        })
+        .await
+        .unwrap();
+    let goal = |autorun: bool| json!({"title": "Trip", "agent": agent, "autorun": autorun, "plan": [{"title": "a"}, {"title": "b", "requires_approval": true}]});
+
+    // a user creates a goal for themselves; the owner is forced, whatever the body says
+    let (st, g) = call(&w.app, "POST", "/v1/goals", ana, Some(goal(false))).await;
+    assert_eq!(st, StatusCode::CREATED, "{g}");
+    assert_eq!(g["user_id"], "ana");
+    let gid = g["id"].as_str().unwrap().to_string();
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/goals",
+        ana,
+        Some(json!({"title": "x", "agent": agent, "user_id": "ben"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "not for someone else");
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/goals",
+        ana,
+        Some(json!({"title": "x", "agent": agent, "session_id": w.ben.session})),
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::FORBIDDEN,
+        "binding a session is the operator's"
+    );
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/goals",
+        ana,
+        Some(json!({"title": "x", "agent": agent, "allow_hosts": ["a.example"]})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/goals",
+        ana,
+        Some(json!({"title": "x", "agent": "no-such-agent"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    let many: Vec<Value> = (0..crate::goals::USER_MAX_STEPS + 1)
+        .map(|i| json!({"title": format!("s{i}")}))
+        .collect();
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        "/v1/goals",
+        ana,
+        Some(json!({"title": "x", "agent": agent, "plan": many})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "too many steps");
+
+    // list and read: own only; another user's goal is a 404 for every probe
+    let (_, v) = call(&w.app, "GET", "/v1/goals", ana, None).await;
+    assert_eq!(ids(&v, "id"), std::slice::from_ref(&gid));
+    let (_, v) = call(&w.app, "GET", "/v1/goals", ben, None).await;
+    assert!(ids(&v, "id").is_empty());
+    for (method, body) in [
+        ("GET", None),
+        ("PATCH", Some(json!({"status": "cancelled"}))),
+    ] {
+        let (st, _) = call(&w.app, method, &format!("/v1/goals/{gid}"), ben, body).await;
+        assert_eq!(st, StatusCode::NOT_FOUND, "{method}");
+    }
+    assert_ne!(
+        w.state
+            .store
+            .get_goal(gid.parse().unwrap())
+            .await
+            .unwrap()
+            .status,
+        crate::goals::GoalStatus::Cancelled,
+        "ben changed nothing"
+    );
+    // the operator's routes stay the operator's
+    for path in [
+        format!("/v1/goals/{gid}/advance"),
+        format!("/v1/goals/{gid}/browse"),
+    ] {
+        let (st, _) = call(&w.app, "POST", &path, ana, Some(json!({}))).await;
+        assert_eq!(st, StatusCode::FORBIDDEN, "{path}");
+    }
+    let (st, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{gid}"),
+        ana,
+        Some(json!({"plan": []})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN, "a user cannot rewrite the plan");
+    let (st, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{gid}"),
+        ana,
+        Some(json!({"status": "done"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN, "a user cannot mark a goal done");
+    let (st, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{gid}"),
+        ana,
+        Some(json!({"session_id": w.ben.session})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+
+    // automatic goals are capped per user
+    let mut auto = Vec::new();
+    for _ in 0..crate::goals::USER_MAX_ACTIVE_AUTORUN {
+        let (st, g) = call(&w.app, "POST", "/v1/goals", ana, Some(goal(true))).await;
+        assert_eq!(st, StatusCode::CREATED, "{g}");
+        auto.push(g["id"].as_str().unwrap().to_string());
+    }
+    let (st, _) = call(&w.app, "POST", "/v1/goals", ana, Some(goal(true))).await;
+    assert_eq!(
+        st,
+        StatusCode::TOO_MANY_REQUESTS,
+        "the sixth automatic goal"
+    );
+    let (st, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{gid}"),
+        ana,
+        Some(json!({"autorun": true})),
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::TOO_MANY_REQUESTS,
+        "switching one on counts too"
+    );
+    // ben's count is his own
+    let (st, _) = call(&w.app, "POST", "/v1/goals", ben, Some(goal(true))).await;
+    assert_eq!(st, StatusCode::CREATED);
+    // pausing frees a slot; cancelling ends the goal and it cannot be switched on again
+    let (st, v) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{}", auto[0]),
+        ana,
+        Some(json!({"autorun": false})),
+    )
+    .await;
+    assert_eq!((st, v["autorun"].clone()), (StatusCode::OK, json!(false)));
+    let (st, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{gid}"),
+        ana,
+        Some(json!({"autorun": true})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let (st, v) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{}", auto[1]),
+        ana,
+        Some(json!({"status": "cancelled"})),
+    )
+    .await;
+    assert_eq!(
+        (st, v["status"].clone()),
+        (StatusCode::OK, json!("cancelled"))
+    );
+    let (st, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{}", auto[1]),
+        ana,
+        Some(json!({"autorun": true})),
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::CONFLICT,
+        "a cancelled goal is not run again"
+    );
+
+    // the operator sees every goal and may still do everything
+    let (_, v) = call(&w.app, "GET", "/v1/goals", operator, None).await;
+    assert!(
+        ids(&v, "user_id").iter().any(|u| u == "ben")
+            && ids(&v, "user_id").iter().any(|u| u == "ana")
+    );
+    let (st, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/v1/goals/{gid}"),
+        operator,
+        Some(json!({"allow_hosts": ["x.example"]})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let (st, _) = call(&w.app, "GET", "/v1/goals", None, None).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }

@@ -190,6 +190,8 @@ pub enum UserRoute {
     OwnUser(String, Scope),
     /// Names one conversation thread, which must be the user's.
     Thread(Uuid, Scope),
+    /// Names one goal, which must be the user's.
+    Goal(Uuid, Scope),
 }
 
 /// The only routes a user token can reach. Anything not listed is [`UserRoute::Denied`].
@@ -237,6 +239,18 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
         {
             UserRoute::Open(Scope::Run)
         }
+        // A user's own goals: list, create for themselves, read one, and cancel or pause it. Advancing steps by hand and browsing under a goal stay
+        // with the operator (not listed).
+        ["v1", "goals"] if read => UserRoute::Open(Scope::Read),
+        ["v1", "goals"] if *method == Method::POST => UserRoute::Open(Scope::Run),
+        ["v1", "goals", gid] if read => match id(gid) {
+            Some(gid) => UserRoute::Goal(gid, Scope::Read),
+            None => UserRoute::Denied,
+        },
+        ["v1", "goals", gid] if *method == Method::PATCH => match id(gid) {
+            Some(gid) => UserRoute::Goal(gid, Scope::Run),
+            None => UserRoute::Denied,
+        },
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),
@@ -283,6 +297,15 @@ pub async fn owns_thread(state: &AppState, user: &str, id: Uuid) -> bool {
         .get(id)
         .await
         .is_some_and(|t| t.user_id == user)
+}
+
+/// Does goal `id` belong to `user`?
+pub async fn owns_goal(state: &AppState, user: &str, id: Uuid) -> bool {
+    state
+        .store
+        .get_goal(id)
+        .await
+        .is_some_and(|g| g.user_id.as_deref() == Some(user))
 }
 
 /// Does approval `id` belong to `user` (through its session)?
@@ -554,6 +577,49 @@ mod tests {
             ),
             (Method::GET, format!("/v1/memory/{aid}"), UserRoute::Denied),
             (Method::PUT, "/v1/memory".into(), UserRoute::Denied),
+            (
+                Method::GET,
+                "/v1/goals".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (
+                Method::POST,
+                "/v1/goals".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::GET,
+                format!("/v1/goals/{aid}"),
+                UserRoute::Goal(aid, Scope::Read),
+            ),
+            (
+                Method::PATCH,
+                format!("/v1/goals/{aid}"),
+                UserRoute::Goal(aid, Scope::Run),
+            ),
+            (
+                Method::PATCH,
+                "/v1/goals/not-a-uuid".into(),
+                UserRoute::Denied,
+            ),
+            (
+                Method::POST,
+                format!("/v1/goals/{aid}/advance"),
+                UserRoute::Denied,
+            ),
+            (
+                Method::POST,
+                format!("/v1/goals/{aid}/browse"),
+                UserRoute::Denied,
+            ),
+            (
+                Method::DELETE,
+                format!("/v1/goals/{aid}"),
+                UserRoute::Denied,
+            ),
+            (Method::PUT, format!("/v1/goals/{aid}"), UserRoute::Denied),
+            (Method::DELETE, "/v1/goals".into(), UserRoute::Denied),
+            (Method::PUT, "/v1/goals".into(), UserRoute::Denied),
             (Method::PUT, format!("/v1/memory/{aid}"), UserRoute::Denied),
             (
                 Method::GET,
@@ -607,7 +673,6 @@ mod tests {
             "/v1/skills",
             "/v1/schedules",
             "/v1/webhooks",
-            "/v1/goals",
             "/v1/workstations/a/b",
             "/v1/export/audit",
             "/v1/export-tokens",

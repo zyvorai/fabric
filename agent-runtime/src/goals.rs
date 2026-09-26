@@ -272,9 +272,14 @@ pub struct ListQuery {
 
 pub(crate) async fn list_goals(
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
     Query(q): Query<ListQuery>,
 ) -> Json<Value> {
     let mut items = state.store.list_goals().await;
+    // A user sees only their own goals.
+    if let Some(user) = principal.user() {
+        items.retain(|g| g.user_id.as_deref() == Some(user));
+    }
     if let Some(agent) = q.agent.as_deref() {
         items.retain(|g| g.agent == agent);
     }
@@ -284,6 +289,75 @@ pub(crate) async fn list_goals(
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
     items.truncate(limit);
     Json(json!({ "items": items }))
+}
+
+/// The most steps, goals and automatic goals a user token may have (the operator has no such limits).
+pub const USER_MAX_STEPS: usize = 20;
+pub const USER_MAX_GOALS: usize = 100;
+pub const USER_MAX_ACTIVE_AUTORUN: usize = 5;
+
+/// A user's non-finished goals that the worker is running.
+async fn active_autorun(state: &AppState, user: &str) -> usize {
+    state
+        .store
+        .list_goals()
+        .await
+        .iter()
+        .filter(|g| {
+            g.user_id.as_deref() == Some(user)
+                && g.autorun
+                && matches!(g.status, GoalStatus::Open | GoalStatus::Blocked)
+        })
+        .count()
+}
+
+/// The route: a user token creates goals only for itself.
+pub(crate) async fn create_goal_route(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
+    Json(req): Json<CreateGoalRequest>,
+) -> ApiResult<(StatusCode, Json<GoalRecord>)> {
+    let mut req = req;
+    if let Some(user) = principal.user() {
+        if req.user_id.as_deref().is_some_and(|u| u != user) {
+            return Err(ApiError::bad_request(
+                "a user token can only create goals for itself",
+            ));
+        }
+        if req.session_id.is_some() || !req.allow_hosts.is_empty() {
+            return Err(ApiError::forbidden(
+                "session_id and allow_hosts are set by the operator",
+            ));
+        }
+        if req.plan.len() > USER_MAX_STEPS {
+            return Err(ApiError::bad_request(format!(
+                "a goal may have at most {USER_MAX_STEPS} steps"
+            )));
+        }
+        let mine = state
+            .store
+            .list_goals()
+            .await
+            .iter()
+            .filter(|g| g.user_id.as_deref() == Some(user))
+            .count();
+        if mine >= USER_MAX_GOALS {
+            return Err(ApiError::too_many(format!(
+                "at most {USER_MAX_GOALS} goals; delete or finish some first"
+            )));
+        }
+        if req.autorun && active_autorun(&state, user).await >= USER_MAX_ACTIVE_AUTORUN {
+            return Err(ApiError::too_many(format!(
+                "at most {USER_MAX_ACTIVE_AUTORUN} goals may run automatically at once"
+            )));
+        }
+        // a user goal always names a deployed agent, whether or not it runs by itself
+        if state.store.get_agent(req.agent.trim()).await.is_none() {
+            return Err(ApiError::not_found("agent not found"));
+        }
+        req.user_id = Some(user.to_string());
+    }
+    create_goal(State(state), Json(req)).await
 }
 
 pub(crate) async fn create_goal(
@@ -382,6 +456,69 @@ pub(crate) async fn get_goal(
         .await
         .map(Json)
         .ok_or_else(|| ApiError::not_found("goal not found"))
+}
+
+/// The route: a goal that is not yours looks like one that does not exist (the middleware already says so; this is the second check).
+pub(crate) async fn get_goal_route(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<GoalRecord>> {
+    let Json(goal) = get_goal(State(state), Path(id)).await?;
+    match principal.user() {
+        Some(user) if goal.user_id.as_deref() != Some(user) => {
+            Err(ApiError::not_found("goal not found"))
+        }
+        _ => Ok(Json(goal)),
+    }
+}
+
+/// The route: a user may cancel their goal and switch its automatic running on or off (within the limits); the plan, the bound session and the
+/// allowed hosts stay the operator's.
+pub(crate) async fn patch_goal_route(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<Principal>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<PatchGoalRequest>,
+) -> ApiResult<Json<GoalRecord>> {
+    if let Some(user) = principal.user() {
+        let goal = state
+            .store
+            .get_goal(id)
+            .await
+            .filter(|g| g.user_id.as_deref() == Some(user))
+            .ok_or_else(|| ApiError::not_found("goal not found"))?;
+        if req.session_id.is_some() || req.plan.is_some() || req.allow_hosts.is_some() {
+            return Err(ApiError::forbidden(
+                "the plan, session_id and allow_hosts are set by the operator",
+            ));
+        }
+        if req
+            .status
+            .as_ref()
+            .is_some_and(|s| *s != GoalStatus::Cancelled)
+        {
+            return Err(ApiError::forbidden(
+                "a user can cancel a goal; other statuses follow from its steps",
+            ));
+        }
+        if req.autorun == Some(true)
+            && !goal.autorun
+            && active_autorun(&state, user).await >= USER_MAX_ACTIVE_AUTORUN
+        {
+            return Err(ApiError::too_many(format!(
+                "at most {USER_MAX_ACTIVE_AUTORUN} goals may run automatically at once"
+            )));
+        }
+        if req.autorun == Some(true)
+            && matches!(goal.status, GoalStatus::Done | GoalStatus::Cancelled)
+        {
+            return Err(ApiError::conflict(
+                "a finished or cancelled goal cannot be run again",
+            ));
+        }
+    }
+    patch_goal(State(state), Path(id), Json(req)).await
 }
 
 pub(crate) async fn patch_goal(

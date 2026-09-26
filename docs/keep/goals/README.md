@@ -44,8 +44,21 @@ An approval step here is a **checkpoint after the step ran**, before the goal mo
 What the worker never does: widen any authority (a step's session is an ordinary session with every policy, quota and approval of one started by hand), approve anything itself, run two steps of a goal at once, or retry what it blocked. Cancelling the goal (`PATCH {"status":"cancelled"}`) cancels the running step's session. A goal with `autorun` refuses `advance` (409) so two hands never move one goal; pause it first if you want to.
 Each start, retry, block and completion is journaled (`keep.goal.step.started`, `.retry`, `.blocked`, `.done`, `.approval`, `.cancelled`) with ids and reasons, never step inputs.
 
-**Known limits.** Goals and their routes are operator-only today (a user token cannot create one), so for now an operator creates goals on a user's behalf. The worker looks at goals on a timer (a step starts up to one tick after the last one ends). It has no planner: the plan is what you give it (a model proposing steps for the person to accept is not built). Updates race with a concurrent `PATCH` in a small window: the worker re-reads the goal before saving and drops its move if the step or the cancellation changed, and the next tick looks again.
-**Tests.** `goal_worker::tests` (9: every move of the state machine, with three mutation checks: a refusal counted as approval, retries ignoring `max_attempts`, and a blocked failure being restarted each fail a test), `goals::tests` (creation limits, no hand-advancing an autorun goal), and `demos-ci.sh` against a real runtime and the stub cell: a two-step plan runs in order with each step's own input and refuses a hand on it; a failing agent is retried and then blocks the goal with the reason while the next step never starts and nothing retries after the block; an approval step waits, approval finishes the goal, denial stops it for good; a goal without `autorun` is left alone, switching it on runs it, pausing stops further steps.
+## Goals for a user
+
+A user token can manage its **own** goals: `GET /v1/goals` (own only), `POST /v1/goals` (always for itself; a `user_id` naming someone else is a 400), `GET /v1/goals/{id}` and `PATCH /v1/goals/{id}`. Another user's goal is a 404 for every probe. What a user can do is deliberately narrower than the operator:
+
+| | User token | Operator |
+|---|---|---|
+| create | own goals only, for a deployed agent, at most 20 steps, at most 100 goals, at most 5 running automatically at once | any |
+| `session_id`, `allow_hosts`, replacing the plan | refused (403) | yes |
+| `PATCH` | `status: "cancelled"`, `autorun` on or off (within the cap; a finished or cancelled goal cannot be switched on again) | anything |
+| `advance` by hand, `browse` under a goal | closed | yes |
+
+A user's goal runs as that user: its step sessions carry their `user_id`, use their run quota and their memory, and any approval it opens is theirs to decide on their device (`/v1/approvals`).
+
+**Known limits.** The worker looks at goals on a timer (a step starts up to one tick after the last one ends). It has no planner: the plan is what you give it (a model proposing steps for the person to accept is not built). Updates race with a concurrent `PATCH` in a small window: the worker re-reads the goal before saving and drops its move if the step or the cancellation changed, and the next tick looks again.
+**Tests.** `tenancy_tests::goals_are_private_bounded_and_only_cancelled_or_paused_by_their_owner` (two users and the operator against the real router: forced owner, refused fields, the caps, cross-user 404s, cancel and pause; mutation checks: dropping the list filter or loosening the cap fail it), `demos-ci.sh` (a user's automatic goal is created with their token, runs as them and finishes, another user cannot see or cancel it), and `goal_worker::tests` (9: every move of the state machine, with three mutation checks: a refusal counted as approval, retries ignoring `max_attempts`, and a blocked failure being restarted each fail a test), `goals::tests` (creation limits, no hand-advancing an autorun goal), and `demos-ci.sh` against a real runtime and the stub cell: a two-step plan runs in order with each step's own input and refuses a hand on it; a failing agent is retried and then blocks the goal with the reason while the next step never starts and nothing retries after the block; an approval step waits, approval finishes the goal, denial stops it for good; a goal without `autorun` is left alone, switching it on runs it, pausing stops further steps.
 
 Packaged agents: [`examples/keep-agents/`](../../examples/keep-agents/).
 Demo: [`./scripts/keep-pack-demo.sh`](../../scripts/keep-pack-demo.sh).

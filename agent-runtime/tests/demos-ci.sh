@@ -1005,7 +1005,7 @@ ok "bundle bytes verify; a one-byte change is refused"
 echo "demos-ci: personal memory (an agent that asked for it, a user who turned it on, proposals the user decides)"
 # its own runtime: the Keep-mode one above limits each user to 3 runs a day for the quota checks further down
 MEM_PORT=$(free_port); MEM_EGRESS=$(free_port); MEM_BASE="http://127.0.0.1:$MEM_PORT"
-start_runtime mem-runtime "$MEM_PORT" "$MEM_EGRESS" ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
+start_runtime mem-runtime "$MEM_PORT" "$MEM_EGRESS" ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE"
 wait_http "$MEM_BASE/healthz" || fail "the memory-test runtime did not start: $(tail -5 "$WORK/mem-runtime.log")"
 MEMPACK="$WORK/memory-agent"; cp -R "$ROOT/examples/keep-agents/memory-agent" "$MEMPACK"
 printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$MEMPACK/keep.policy.yaml"
@@ -1048,6 +1048,17 @@ r=$(mem_chat "$DAN" mem-6 "what do you remember?"); [[ "$r" == *"do not remember
 mem_api "$CAM" PUT /v1/memory/settings -d '{"enabled":false}' >/dev/null
 r=$(mem_chat "$CAM" mem-7 "what do you remember?"); [[ "$r" == *"do not remember anything"* ]] || fail "turning memory off must stop it reaching the agent: $r"
 ok "another user gets none of it and cannot touch it; turning memory off stops it reaching the agent"
+
+echo "demos-ci: a user's own goals (created with their token, run as them, private, cancellable)"
+GID=$(mem_api "$CAM" POST /v1/goals -d '{"title":"Recall","agent":"memory-agent","autorun":true,"plan":[{"title":"recall","input":{"message":"what do you remember?"}}]}' | json id) || fail "a user could not create a goal"
+for _ in $(seq 1 120); do [[ "$(mem_api "$CAM" GET "/v1/goals/$GID" | json status)" == "done" ]] && break; sleep 0.5; done
+[[ "$(mem_api "$CAM" GET "/v1/goals/$GID" | json status)" == "done" ]] || fail "the user's automatic goal did not finish: $(mem_api "$CAM" GET "/v1/goals/$GID")"
+GS=$(mem_api "$CAM" GET "/v1/goals/$GID" | json plan.0.session_id)
+[[ "$(mem_api "$CAM" GET "/v1/sessions/$GS" | json user_id)" == "cam" ]] || fail "the goal's step must run as the goal's user: $(mem_api "$CAM" GET "/v1/sessions/$GS")"
+[[ "$(mem_api "$DAN" GET "/v1/goals" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["items"]))')" == "0" ]] || fail "another user must not see cam's goals"
+[[ "$(mem_api "$DAN" GET "/v1/goals/$GID" -o /dev/null -w '%{http_code}')" == "404" && "$(mem_api "$DAN" PATCH "/v1/goals/$GID" -d '{"status":"cancelled"}' -o /dev/null -w '%{http_code}')" == "404" ]] || fail "another user's goal must be a 404"
+[[ "$(mem_api "$CAM" POST "/v1/goals/$GID/advance" -d '{"step_id":"s1","status":"done"}' -o /dev/null -w '%{http_code}')" == "403" ]] || fail "advancing by hand is the operator's"
+ok "a user made a goal with their own token, it ran as them and finished; another user cannot see or cancel it; advancing stays with the operator"
 
 echo "demos-ci: two users on one shard (user tokens, isolation, quota, revocation)"
 mint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":600}" "$KEEP_BASE/v1/user-tokens" | json token; }
