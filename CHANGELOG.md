@@ -15,6 +15,8 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **`scripts/keep-chat.py`, a small web chat for a Keep agent over AG-UI.** One static page and one proxied route: the token stays server-side, the agent is fixed by `--agent`, `127.0.0.1` only, foreign Host/Origin refused. Streams the reply, starts a new thread when the agent finished the last, shows approval
+  requests as notices and cannot approve. 8 proxy tests, a `demos-ci.sh` check, and the page driven in a real browser. `keep-demo-local.sh` now deploys `echo-agent` (so the chat works out of the box) and always does an incremental build, so it never runs a runtime older than the checkout.
 - **`echo-agent`**, an agent with no model, credentials or network, to try `POST /v1/agui` end to end; AG-UI now also passes on events an agent emits with `ctx.emit` as `CUSTOM` `keep.event`. Docs record a real-host finding: agent sessions need IP
   networking on the host (`ZYVOR_AGENT_EGRESS_ADVERTISE_HOST` or tap+netns); on the use-case-only lab host the run ended with the runtime's refusal delivered as a valid `RUN_ERROR`, so only AG-UI's error path is verified on a real cell.
 - **`scripts/keep-watch.sh`, page-change tracking with no new server capability.** Fetches a public page on the user's own machine (http/https, 2 MiB, 30 s, no credentials in the URL), reads it with a use case in a cell, and

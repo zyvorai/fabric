@@ -18,6 +18,18 @@ curl -N -X POST "$KEEP_API/v1/agui" -H "Authorization: Bearer $KEEP_TOKEN" -H 'c
 
 `forwardedProps.agent` names a deployed Keep agent. In a CopilotKit or other AG-UI client, point the HTTP agent at this URL and put the agent name in `forwardedProps`.
 
+## A small web chat: `scripts/keep-chat.py`
+
+No chat framework needed to try it. `keep-chat.py` serves one static page and forwards exactly one route to `/v1/agui`:
+
+```bash
+KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=... ./scripts/keep-chat.py --agent echo-agent      # then open http://127.0.0.1:8787
+```
+
+Your token stays in that process; the browser never sees it. The agent is fixed by `--agent` (the page cannot choose another), nothing else on the host is reachable through it, it listens on `127.0.0.1` only and refuses a
+foreign `Host` or `Origin`. The page renders text with `textContent` only, streams the reply as it arrives, starts a new thread when the agent has finished the last one, shows an approval request as a notice, and cannot approve it.
+It is the lightest client, not a product: one agent, one conversation, no history. With `scripts/keep-demo-local.sh` (a simulator, not sealed) the example agent is already deployed.
+
 ## What happens
 
 - **A thread is one session.** The first run on a `threadId` starts the agent's session with `{"message": <latest user text>, "threadId": ..., "state": ...}` as its input. Later runs on the same thread
@@ -55,6 +67,8 @@ runtime's message (`sandbox did not report a default gateway; use tap+netns or s
 - The events are validated against the official `@ag-ui/core` 1.0.0 schemas (`EventSchemas`) with ordering checks (RUN_STARTED first, balanced text messages, one terminal event last) in
   `agent-runtime/tests/agui-conformance.mjs`, run by `demos-ci.sh` against a real runtime and a stub cell with a real agent (`model-agent`). Unit tests cover the event mapping, thread isolation and the
   route's authorisation (a user token may POST `/v1/agui`, and nothing else on that path).
+- **The chat page and its proxy:** 8 unit tests against a fake host (`agent-runtime/tests/keep-chat-test.py`: token added server-side, agent fixed, events streamed as they arrive, foreign host and origin refused, size and JSON limits, errors passed through),
+  a `demos-ci.sh` check against a real runtime and a stub cell, and the page driven in a real browser (typed text is shown literally, the agent's progress note and reply appear, a second message after the agent finished starts a new thread).
 - **On the real lab host (FluxVM, Keep mode):** a signed agent was deployed and a run posted. The host is set up only for use cases, so the run ended with the runtime's own refusal, delivered as a valid `RUN_ERROR` (the stream
   validated against the `@ag-ui/core` schemas). That checks the endpoint, the authorisation and the error path on a real host; **the successful path on a real cell is not tested**, because that host has no agent networking.
 - **Not tested:** an actual CopilotKit or other AG-UI client, and a successful run on a real FluxVM cell.

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keep chat</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <main class="chat" aria-label="Chat with a Keep agent">
+    <header>
+      <div>
+        <h1>Keep chat</h1>
+        <p class="sub">Agent <code id="agent">{{AGENT}}</code> · runs on your Keep host</p>
+      </div>
+      <button id="new" type="button" class="ghost">New chat</button>
+    </header>
+    <ol id="log" class="log" aria-live="polite" aria-relevant="additions text"></ol>
+    <p id="status" class="status" role="status"></p>
+    <form id="form" class="composer" autocomplete="off">
+      <label for="input" class="sr">Message</label>
+      <textarea id="input" rows="1" placeholder="Message the agent" maxlength="16000" required></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+    <p class="note">Approvals are decided on your own device. This chat can show that one is waiting, but it cannot approve or deny anything.</p>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

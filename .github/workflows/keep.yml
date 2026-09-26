@@ -61,6 +61,8 @@ jobs:
         run: cargo clippy --manifest-path agent-runtime/Cargo.toml --all-targets --examples -- -D warnings
       - name: Template bake script (--force builds a new image beside a locked one)
         run: bash agent-runtime/tests/bake-fresh-image.sh
+      - name: keep-chat proxy (token stays server-side, one route, foreign hosts refused)
+        run: python3 agent-runtime/tests/keep-chat-test.py
       - name: keep-up starter (preflight, dry run, token)
         run: bash agent-runtime/tests/keep-up.sh
       - name: Keep / policy / credentials / export tests

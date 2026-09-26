@@ -712,6 +712,18 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: applicat
 [[ "$code" == "409" ]] || fail "a message on a thread whose session has ended must be 409, got $code"
 ok "AG-UI input errors: no agent 400, no user message 400, an ended thread 409"
 
+# keep-chat: the web chat's proxy talks AG-UI to a real runtime and a stub cell, with the agent fixed and no token in the browser's reach
+(cd "$ROOT" && FABRIC_AGENT_URL="$BASE" node "$CLI" pack deploy examples/keep-agents/echo-agent) >"$WORK/echo-agent.out" 2>&1 || fail "echo-agent deploy failed: $(cat "$WORK/echo-agent.out")"
+CHAT_PORT=$(free_port)
+KEEP_API="$BASE" KEEP_TOKEN="" python3 "$ROOT/scripts/keep-chat.py" --agent echo-agent --port "$CHAT_PORT" >"$WORK/chat.log" 2>&1 &
+PIDS+=($!)
+wait_http "http://127.0.0.1:$CHAT_PORT/" || fail "keep-chat did not start: $(cat "$WORK/chat.log")"
+curl -sN --max-time 60 -X POST "http://127.0.0.1:$CHAT_PORT/agui" -H 'content-type: application/json' \
+  -d '{"threadId":"chat-1","runId":"r1","messages":[{"id":"m","role":"user","content":"hello chat"}],"forwardedProps":{"agent":"some-other-agent"}}' > "$WORK/chat.sse" || fail "keep-chat request failed"
+grep -q "You said: hello chat" "$WORK/chat.sse" && grep -q "RUN_FINISHED" "$WORK/chat.sse" || fail "keep-chat did not stream the echo agent's reply: $(head -c 600 "$WORK/chat.sse")"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$CHAT_PORT/v1/agents")" == "404" ]] || fail "keep-chat must not proxy anything but /agui"
+ok "keep-chat: a browser message reaches the echo agent through the proxy (agent fixed server-side) and the reply streams back; other routes are not proxied"
+
 echo "demos-ci: validation and hostile input"
 code=$(printf 'MZ' > "$WORK/evil.exe"; curl -s -o /dev/null -w '%{http_code}' -X POST -F "file=@$WORK/evil.exe" "$BASE/v1/demos/csv-clean")
 [[ "$code" == "400" ]] || fail "wrong extension should be 400, got $code"; ok "wrong file type refused (400)"
