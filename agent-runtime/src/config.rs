@@ -49,6 +49,8 @@ pub struct Config {
     pub thread_retention_days: Option<u64>,
     /// How often the goal worker looks at autorun goals (`ZYVOR_AGENT_GOAL_TICK_MS`, at least 200).
     pub goal_tick_ms: u64,
+    /// The agent that proposes plans for goals (`ZYVOR_AGENT_PLANNER_AGENT`); a request may name another. `None`: the request must name one.
+    pub planner_agent: Option<String>,
     /// The first retry delay of a failed goal step, doubled each time up to ten minutes (`ZYVOR_AGENT_GOAL_RETRY_BASE_SECS`).
     pub goal_retry_base_secs: u64,
     /// Delete the event log of sessions that ended this many days ago (`ZYVOR_AGENT_EVENT_RETENTION_DAYS`); `None` keeps it.
@@ -121,6 +123,7 @@ impl Config {
             thread_retention_days: env_days("ZYVOR_AGENT_THREAD_RETENTION_DAYS")?,
             goal_tick_ms: env_parse("ZYVOR_AGENT_GOAL_TICK_MS", "5000")?,
             goal_retry_base_secs: env_parse("ZYVOR_AGENT_GOAL_RETRY_BASE_SECS", "15")?,
+            planner_agent: env_opt("ZYVOR_AGENT_PLANNER_AGENT"),
             event_retention_days: env_days("ZYVOR_AGENT_EVENT_RETENTION_DAYS")?,
             idle_scan_interval_ms: env_parse("ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS", "1000")?,
             warm_pool_reconcile_interval_ms: env_parse(

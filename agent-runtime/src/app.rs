@@ -357,6 +357,18 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/goals/{id}/advance", post(crate::goals::advance_step))
         .route(
+            "/v1/goals/{id}/plan",
+            post(crate::goal_plan::start_planning),
+        )
+        .route(
+            "/v1/goals/{id}/plan/accept",
+            post(crate::goal_plan::accept_plan),
+        )
+        .route(
+            "/v1/goals/{id}/plan/reject",
+            post(crate::goal_plan::reject_plan),
+        )
+        .route(
             "/v1/threads",
             get(crate::threads::list_threads).post(crate::threads::create_thread),
         )
@@ -1828,6 +1840,9 @@ async fn sync_session(state: &Arc<AppState>, session: SessionRecord) -> Result<(
             }
             "approval.requested" => {
                 record_approval_request(state, session.id, event.seq, &event.data).await?;
+            }
+            "goal.plan_proposed" => {
+                crate::goal_plan::record_proposal(state, &session, &event.data).await;
             }
             "memory.propose" => {
                 crate::memory::record_proposal(state, &session, &agent.manifest, &event.data).await;

@@ -1,0 +1,358 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B9E766EEEBF0603BD1D8DA6 /* KeepKit in Frameworks */ = {isa = PBXBuildFile; productRef = 15869258260610970298394E /* KeepKit */; };
+		51F34030940DF1F462E02A2C /* ChatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DDEE1E5F2B3229E416262E1 /* ChatsView.swift */; };
+		6CC549794A92F1016DC153F3 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF6E8194FC47565DF90E56A0 /* AppModel.swift */; };
+		71222044B34DEE781CB76738 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D6C00757C12636AB9BDB8C /* ChatView.swift */; };
+		99FDFEC2E72F7AFB6400B3BD /* KeepPhoneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3AB1191A41736B0EB6BFB4B /* KeepPhoneApp.swift */; };
+		A198D5BF8203953EEE973A17 /* ApprovalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCE13A54294EF20CE88492D /* ApprovalsView.swift */; };
+		D3FE0FC143BE18A25A7C767A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D834924B30632589A64AD6E3 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		06E143982C0D99FBD5360BA1 /* macos-keep */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "macos-keep"; path = "../macos-keep"; sourceTree = SOURCE_ROOT; };
+		1DDEE1E5F2B3229E416262E1 /* ChatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatsView.swift; sourceTree = "<group>"; };
+		2BCE13A54294EF20CE88492D /* ApprovalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalsView.swift; sourceTree = "<group>"; };
+		3535254826B9FF3CAE8A95D7 /* KeepPhone.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KeepPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF6E8194FC47565DF90E56A0 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C4D6C00757C12636AB9BDB8C /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		D834924B30632589A64AD6E3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F3AB1191A41736B0EB6BFB4B /* KeepPhoneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepPhoneApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		77BA8E8EE734BF98A13BCDBE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B9E766EEEBF0603BD1D8DA6 /* KeepKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		04990FAC88FCEF464D74F2C5 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				99241FD9EBAA7BDB0875C27F /* KeepPhone */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		74D149273B84779F3EC8DEB0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3535254826B9FF3CAE8A95D7 /* KeepPhone.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		755DD35795ADEEF550402AA0 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				06E143982C0D99FBD5360BA1 /* macos-keep */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		99241FD9EBAA7BDB0875C27F /* KeepPhone */ = {
+			isa = PBXGroup;
+			children = (
+				AF6E8194FC47565DF90E56A0 /* AppModel.swift */,
+				2BCE13A54294EF20CE88492D /* ApprovalsView.swift */,
+				1DDEE1E5F2B3229E416262E1 /* ChatsView.swift */,
+				C4D6C00757C12636AB9BDB8C /* ChatView.swift */,
+				F3AB1191A41736B0EB6BFB4B /* KeepPhoneApp.swift */,
+				D834924B30632589A64AD6E3 /* SettingsView.swift */,
+			);
+			path = KeepPhone;
+			sourceTree = "<group>";
+		};
+		A5E76B626277098FFC9352BD = {
+			isa = PBXGroup;
+			children = (
+				755DD35795ADEEF550402AA0 /* Packages */,
+				04990FAC88FCEF464D74F2C5 /* Sources */,
+				74D149273B84779F3EC8DEB0 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B58E3685352A06E1517DE4B5 /* KeepPhone */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E926DE9ED41B739568A9DE6F /* Build configuration list for PBXNativeTarget "KeepPhone" */;
+			buildPhases = (
+				4EE1B0BBB89ECF8DB97D4F6F /* Sources */,
+				77BA8E8EE734BF98A13BCDBE /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KeepPhone;
+			packageProductDependencies = (
+				15869258260610970298394E /* KeepKit */,
+			);
+			productName = KeepPhone;
+			productReference = 3535254826B9FF3CAE8A95D7 /* KeepPhone.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		38AF0FF1BCFAE538660FB31A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					B58E3685352A06E1517DE4B5 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = AF1FDFF51CF1EC7AAD24474B /* Build configuration list for PBXProject "KeepPhone" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A5E76B626277098FFC9352BD;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4B69FD7A25D3AA72EC54A75A /* XCLocalSwiftPackageReference "../macos-keep" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 74D149273B84779F3EC8DEB0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B58E3685352A06E1517DE4B5 /* KeepPhone */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4EE1B0BBB89ECF8DB97D4F6F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6CC549794A92F1016DC153F3 /* AppModel.swift in Sources */,
+				A198D5BF8203953EEE973A17 /* ApprovalsView.swift in Sources */,
+				71222044B34DEE781CB76738 /* ChatView.swift in Sources */,
+				51F34030940DF1F462E02A2C /* ChatsView.swift in Sources */,
+				99FDFEC2E72F7AFB6400B3BD /* KeepPhoneApp.swift in Sources */,
+				D3FE0FC143BE18A25A7C767A /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2772D3ED7819CCB9083FBF72 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.zyvor.keep.phone;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7D746ACF59FF11953E474548 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.zyvor.keep.phone;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BB78D1121933F8F32FA46925 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+		E4F4F32215C0DE5913A2F7A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AF1FDFF51CF1EC7AAD24474B /* Build configuration list for PBXProject "KeepPhone" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E4F4F32215C0DE5913A2F7A4 /* Debug */,
+				BB78D1121933F8F32FA46925 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E926DE9ED41B739568A9DE6F /* Build configuration list for PBXNativeTarget "KeepPhone" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2772D3ED7819CCB9083FBF72 /* Debug */,
+				7D746ACF59FF11953E474548 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4B69FD7A25D3AA72EC54A75A /* XCLocalSwiftPackageReference "../macos-keep" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../macos-keep";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		15869258260610970298394E /* KeepKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KeepKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 38AF0FF1BCFAE538660FB31A /* Project object */;
+}
