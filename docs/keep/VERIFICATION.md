@@ -70,7 +70,7 @@ from a short run.
 ## Known and unresolved
 
 - An intermittent FluxVM eBPF refusal (`bpftool prog load`) was seen in 4 of 56 live scenarios on one day and has not reproduced in five full passes and 40 sequential runs since.
-  It fails closed. The concurrency failures above are a **different** FluxVM bug (VM disk provisioning), worked around in the runtime and still to be reported upstream.
+  It fails closed. The concurrency failures above were a **different** FluxVM/guestkit bug (two creates handed the same nbd device), reported as [fluxvm#104](https://github.com/zyvorai/fluxvm/issues/104) and fixed in guestkit 1.2.5; the runtime's create gate now defaults to 4. The table row shows the numbers from before the fix; the benchmark after it has not been re-run here.
 - A stale `qemu-nbd` holds the old template image on the lab host, which is why rebuilds go to a new image.
 - CI: `CI / test` was red on newer clippy lints until PR #203; `Lab deploy` fails because its SSH login to the workflow's host is refused (the owner's secret to fix).
 
