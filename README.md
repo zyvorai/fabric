@@ -112,15 +112,23 @@ Full capability tour and metrics: **[docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVER
   <a href="docs/keep/README.md"><img src="docs/assets/keep/demo-static.svg" alt="Real output of ./scripts/keep-e2e.sh: 40 checks passed, 0 failed" width="640"></a>
 </p>
 
-**Your agent gets a real computer. You keep the keys.** Keep gives an untrusted AI agent its own sealed
-FluxVM cell while you hold the policy, the credentials and the approvals. Muse got the threat model
-right; Keep is the open version you run, read and take with you.
+**Drop a file. Get answers. Nothing leaves the cell.** Keep reads your files, and runs your agents, inside a sealed cell: a throw-away microVM whose network policy the host sets, with secrets that never enter the cell and approvals signed on your own device.
+You run it, you read it, you take it with you. 60+ ready use cases (statements, chats, logs, decks, receipts and bills from photos, bank operations files, and more), and a small JSON file adds another.
+
+| I want to... | Do this |
+|---|---|
+| **See what it gives me, in two minutes, on this laptop** | `./scripts/keep-demo-local.sh` (macOS or Linux; no KVM, Docker or root). A **simulator, not sealed**: every result says so |
+| **Use it on my Mac** | [Solvor](https://github.com/zyvorai/solvor), a native app (macOS 26): drop a file, get the answer, see the proof |
+| **Run a real sealed host** | `sudo ./scripts/keep-up.sh` on Linux with KVM (checks, runtime, cell template, a token for Solvor); needs FluxVM. Tested with fake facts and a dry run on a real host; a clean-machine run is still open |
+| **Browse what it can read** | [use-case gallery](https://zyvorai.github.io/fabric/keep/packs) · [`examples/keep-agents`](examples/keep-agents) · add your own with `./scripts/keepctl init my-pack` |
+| **Chat with an agent** | `./scripts/keep-chat.py --agent echo-agent` (a web chat over [AG-UI](docs/keep/AGUI.md); the token stays server-side) |
+| **Know what was actually tested** | [VERIFICATION.md](docs/keep/VERIFICATION.md) · [threat model](docs/keep/THREAT-MODEL.md) · [what still needs a person or a resource](docs/keep/TODO.md) |
 
 ```bash
 ./scripts/keep-e2e.sh   # live runtime + FluxVM stub + keepctl, no KVM. passed=40 failed=0
 ```
 
-Honesty: until Keep 0.2 on real SNP/TDX with a user-held key, evidence class stays `software-test` — never marketed as "the operator cannot read this."
+**Be precise about the guarantee.** The cell has no network, and a result reports the outbound-connection count as a cross-check; the guarantee is the deny-all policy the host applies before the file enters the cell. The evidence class is `software-test`: whoever operates the host can still read a cell's memory, so run the host yourself. Until Keep 0.2 on real SNP/TDX with a user-held key, this is never marketed as "the operator cannot read this."
 
 | Start here | |
 |---|---|
