@@ -63,7 +63,7 @@ Treat the model as compromised the moment it reads a webpage.
 |---|---|---|
 | Where it runs | Meta cloud only | Laptop, mini-PC, FluxVM host, rented SNP/TDX — same API |
 | Policy | Closed Sentinel | Signed `keep.policy.yaml` you can diff in git |
-| Cell | Often nspawn — shared kernel with Sentinel | Firecracker / KVM microVM via FluxVM |
+| Cell | Its own dedicated cloud VM; Sentinel on the same machine, kept apart at the system level (Meta) | Firecracker / KVM microVM via FluxVM; the network policy is applied by the host, outside the guest |
 | Model | Married to Muse Spark | BYO model socket |
 | Training | Trajectories may train after sanitization | Training default **off**; export needs a scoped token |
 | Host eBPF | Not a tenant-owned pin you can show | FluxVM TC: `deny_udp` + gateway-only ports; cockpit CONNECT 0 |

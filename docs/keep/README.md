@@ -279,12 +279,12 @@ Keep runs on FluxVM's security profiles:
 
 ## Keep vs Meta Muse
 
-Muse got the threat model right. Keep is the version you run, read and take with you. The Muse-side details below come from public reporting (listed under the table), not from Meta's own pages, and may change.
+Muse got the threat model right. Keep is the version you run, read and take with you. The Muse-side details below come from Meta's own announcement (first source under the table) and public reporting, and may change.
 
 | | Meta Muse | Keep |
 |---|---|---|
 | Where it runs | Meta's cloud only; not self-hostable. | Your hardware, under Apache-2.0. |
-| The cell | A container-style cell (`systemd-nspawn`) on a VM shared with its policy engine. | A Firecracker/KVM microVM on FluxVM, with its own kernel. |
+| The cell | Its own dedicated cloud VM; a separate Sentinel runs on the same machine, kept apart from the agent at the system level. How the agent is separated inside that VM is not stated by Meta. | A Firecracker/KVM microVM per cell on FluxVM, with its own kernel; the network policy is applied by the host, outside the guest. |
 | Model | Muse Spark, Meta's proprietary model. | Bring your own model socket. |
 | Training data | Users can opt out of interaction data being used for training. | Off by default. Export needs a scoped token. |
 | Policy | Set by Meta. | A signed `keep.policy.yaml` you can diff in git. |
@@ -297,7 +297,7 @@ Full matrix: [homepage matrix](https://zyvorai.github.io/fabric/?t=stack#matrix)
 **Keep and personal-agent apps.** Apps offer chat clients, connectors and durable tasks; Keep is the sealed runtime under such an app: a microVM, a host-enforced deny-all
 network policy and device-signed approvals. They fit together more than they compete; see [Keep and personal-agent apps](KEEP-AND-AGENT-APPS.md), including where Keep is behind today.
 
-Sources for the Muse column: [MarkTechPost, 2026-09-08](https://www.marktechpost.com/2026/09/08/meta-introduces-muse-a-personal-ai-agent-that-runs-on-its-own-dedicated-secure-cloud-computer/) · [Vellum, "Official Muse Breakdown"](https://www.vellum.ai/blog/official-muse-breakdown) · [DEV Community, "Meta Muse and the Secure VM Bet"](https://dev.to/ifynx_studio/meta-muse-and-the-secure-vm-bet-personal-agents-that-act-without-owning-your-secrets-1ik4). Zyvor is not affiliated with Meta; if a Muse row is out of date, please open an issue.
+Sources for the Muse column: [Meta, "Introducing Muse", 2026-09](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) (the VM, Sentinel, launch platforms iOS, Android and web plus WhatsApp, and the announced Confidential VM) · [MarkTechPost, 2026-09-08](https://www.marktechpost.com/2026/09/08/meta-introduces-muse-a-personal-ai-agent-that-runs-on-its-own-dedicated-secure-cloud-computer/) · [Vellum, "Official Muse Breakdown"](https://www.vellum.ai/blog/official-muse-breakdown) · [DEV Community, "Meta Muse and the Secure VM Bet"](https://dev.to/ifynx_studio/meta-muse-and-the-secure-vm-bet-personal-agents-that-act-without-owning-your-secrets-1ik4). Zyvor is not affiliated with Meta; if a Muse row is out of date, please open an issue.
 
 ## Where everything lives
 
