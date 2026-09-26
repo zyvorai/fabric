@@ -9,10 +9,11 @@
 #   sudo ./scripts/keep-up.sh --install-fluxvm   # also build and install FluxVM from source (experimental, see docs)
 #   sudo ./scripts/keep-up.sh --token-only       # mint a fresh user token for an existing host
 #
-# Options: --user-id ID (default: the login name), --ttl-days N (1-7, default 7), --no-template
+# Options: --user-id ID (default: the login name), --ttl-days N (1-7, default 7), --no-template,
+#          --apparmor-complain (put FluxVM's AppArmor profile in complain mode, see zyvorai/fluxvm#107)
 #
-# It does, in order: (1) preflight, (2) FluxVM check (or install), (3) the Keep runtime via `deploy-keep.sh local`,
-# (4) the node22-agent cell template (scripts/keep-bake-node22-agent.sh, with poppler and tesseract), (5) a scoped user
+# It does, in order: (1) preflight, (2) FluxVM check (or install), (3) the node22-agent cell template (scripts/keep-bake-node22-agent.sh, with poppler and tesseract),
+# (4) the Keep runtime via `deploy-keep.sh local` (its smoke test needs the template), (5) a scoped user
 # token, printed once with the exact Solvor settings. Nothing leaves this machine; the token is not written to disk.
 # The cell is sealed only when KVM is present: the preflight refuses without it rather than pretend.
 # ============================================================================
@@ -23,7 +24,7 @@ FLUXVM_URL="${KEEP_FLUXVM_URL:-http://127.0.0.1:7788}"
 KEEP_URL="${KEEP_URL:-http://127.0.0.1:9096}"
 ENV_FILE="${KEEP_ENV_FILE:-/etc/zyvor-fabricd/zyvor-fabric-agent.env}"
 
-DRY=0; INSTALL_FLUXVM=0; TOKEN_ONLY=0; NO_TEMPLATE=0
+DRY=0; INSTALL_FLUXVM=0; TOKEN_ONLY=0; NO_TEMPLATE=0; APPARMOR_COMPLAIN=0
 # the person, not root: under sudo the login name is in SUDO_USER
 LOGIN_NAME="${SUDO_USER:-$(id -un)}"
 USER_ID="$(printf '%s' "$LOGIN_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9._-' '-' | cut -c1-32)"
@@ -36,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --install-fluxvm) INSTALL_FLUXVM=1 ;;
     --token-only) TOKEN_ONLY=1 ;;
     --no-template) NO_TEMPLATE=1 ;;
+    --apparmor-complain) APPARMOR_COMPLAIN=1 ;;
     --user-id) USER_ID="${2:?--user-id needs a value}"; shift ;;
     --ttl-days) TTL_DAYS="${2:?--ttl-days needs a value}"; shift ;;
     *) echo "unknown option: $1" >&2; usage 64 ;;
@@ -164,11 +166,28 @@ phase_runtime() {
   "$SCRIPT_DIR/deploy-keep.sh" local
 }
 
+fluxctl_profile_enforced() {
+  [[ -n "${KEEP_UP_AA_ENFORCED:-}" ]] && { [[ "$KEEP_UP_AA_ENFORCED" == 1 ]]; return; }
+  [[ -r /sys/kernel/security/apparmor/profiles ]] && $SUDO grep -q '^fluxctl (enforce)' /sys/kernel/security/apparmor/profiles 2>/dev/null
+}
 template_listed() { curl -fsS -m 5 "$FLUXVM_URL/v1/templates" 2>/dev/null | grep -q '"node22-agent"'; }
 phase_template() {
   step "Cell template (node22-agent: Node, poppler, tesseract)"
   if [[ "$NO_TEMPLATE" == 1 ]]; then info "skipped (--no-template)"; return; fi
   if template_listed; then ok "node22-agent is already registered"; return; fi
+  if fluxctl_profile_enforced; then
+    if [[ "$APPARMOR_COMPLAIN" == 1 ]]; then
+      if [[ "$DRY" == 1 ]]; then info "would put FluxVM's AppArmor profile 'fluxctl' in complain mode (--apparmor-complain)"
+      else
+        info "putting FluxVM's AppArmor profile 'fluxctl' in complain mode (it is logged, not blocked); to undo: sudo sed -i 's/,complain//' /etc/apparmor.d/fluxvm && sudo apparmor_parser -r /etc/apparmor.d/fluxvm"
+        $SUDO sed -i 's/flags=(attach_disconnected)/flags=(attach_disconnected,complain)/' /etc/apparmor.d/fluxvm
+        $SUDO apparmor_parser -r /etc/apparmor.d/fluxvm
+      fi
+    else
+      bad "FluxVM's AppArmor profile 'fluxctl' is enforced and blocks building the cell image (zyvorai/fluxvm#107). Re-run with --apparmor-complain to log instead of block (a weaker policy for FluxVM itself, your choice), or fix the profile"
+      return
+    fi
+  fi
   if [[ "$DRY" == 1 ]]; then info "would run: $SCRIPT_DIR/keep-bake-node22-agent.sh"; return; fi
   "$SCRIPT_DIR/keep-bake-node22-agent.sh"
 }
@@ -207,8 +226,8 @@ if [[ "$TOKEN_ONLY" == 1 ]]; then phase_token; (( PROBLEMS == 0 )); exit $?; fi
 preflight
 phase_fluxvm
 if (( PROBLEMS > 0 )); then echo; echo "==> $PROBLEMS problem(s) above; nothing was installed" >&2; exit 1; fi
+phase_template   # before the runtime: its deploy ends with a smoke test that needs the template
 phase_runtime
-phase_template
 phase_token
 (( PROBLEMS == 0 )) || exit 1
 [[ "$DRY" == 1 ]] && echo && echo "==> dry run: nothing changed"
