@@ -73,8 +73,13 @@ pub struct OAuthRefresh {
     pub client_id_env: String,
     /// Host env variable holding the OAuth client secret (empty env value means a public client).
     pub client_secret_env: String,
-    /// Host env variable holding the refresh token.
+    /// Host env variable holding the refresh token: one identity for the whole host. Leave empty when `connection` is set.
+    #[serde(default)]
     pub refresh_token_env: String,
+    /// Makes the credential **per person**: the refresh token is the one that person stored under this connection name
+    /// (`PUT /v1/connections/{name}`), and the access token is minted for them on first use. A session with no user cannot use it.
+    #[serde(default)]
+    pub connection: Option<String>,
     /// Refresh this many seconds before the access token expires. Default 300.
     #[serde(default = "default_refresh_margin")]
     pub refresh_margin_secs: u64,
@@ -86,6 +91,65 @@ fn default_refresh_margin() -> u64 {
 
 /// The kind name for credentials whose secret is a refreshed OAuth access token.
 pub const KIND_OAUTH_REFRESH: &str = "oauth-refresh";
+
+fn env_secret(var: &str, required: bool) -> Result<String> {
+    match std::env::var(var) {
+        Ok(v) if !v.is_empty() => Ok(v),
+        _ if !required => Ok(String::new()),
+        _ => bail!("host environment variable {var} is not set"),
+    }
+}
+
+/// The refresh-token grant against the token endpoint. The client id and secret come from host env; `refresh_token` is passed in. The error
+/// text carries Google's error code at most, never a secret.
+async fn mint_access_token(
+    oauth: &OAuthRefresh,
+    refresh_token: &str,
+    name: &str,
+    http: &reqwest::Client,
+) -> Result<(String, Duration)> {
+    let body = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("grant_type", "refresh_token")
+        .append_pair("client_id", &env_secret(&oauth.client_id_env, true)?)
+        .append_pair(
+            "client_secret",
+            &env_secret(&oauth.client_secret_env, false)?,
+        )
+        .append_pair("refresh_token", refresh_token)
+        .finish();
+    let response = http
+        .post(&oauth.token_url)
+        .header("content-type", "application/x-www-form-urlencoded")
+        .header("accept", "application/json")
+        .body(body)
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .with_context(|| format!("token endpoint for '{name}' is unreachable"))?;
+    let status = response.status();
+    let json: serde_json::Value = response.json().await.with_context(|| {
+        format!("token endpoint for '{name}' returned status {status} with a non-JSON body")
+    })?;
+    if !status.is_success() {
+        let code = json
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        bail!("token endpoint for '{name}' refused the refresh: status {status}, error {code}");
+    }
+    let token = json
+        .get("access_token")
+        .and_then(|v| v.as_str())
+        .filter(|t| !t.is_empty())
+        .with_context(|| format!("token endpoint for '{name}' returned no access_token"))?;
+    let lifetime = Duration::from_secs(
+        json.get("expires_in")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(3600)
+            .max(1),
+    );
+    Ok((token.to_string(), lifetime))
+}
 
 #[derive(Debug, Clone)]
 struct CachedToken {
@@ -128,6 +192,8 @@ pub struct CredentialVault {
     /// Current access tokens of `oauth-refresh` credentials. Shared by clones of the vault so
     /// the refresher task and request handlers see the same values. Never persisted or logged.
     tokens: Arc<RwLock<HashMap<String, CachedToken>>>,
+    /// Access tokens minted for one person's connection, by (credential, person).
+    user_tokens: Arc<RwLock<HashMap<(String, String), CachedToken>>>,
 }
 
 impl CredentialVault {
@@ -151,6 +217,7 @@ impl CredentialVault {
         Self {
             descriptors,
             tokens: Arc::default(),
+            user_tokens: Arc::default(),
         }
     }
 
@@ -185,6 +252,15 @@ impl CredentialVault {
     }
 
     pub fn resolve(&self, name: &str) -> Result<(&CredentialDescriptor, String)> {
+        self.resolve_for(name, None)
+    }
+
+    /// Like [`resolve`](Self::resolve), for a request made on behalf of `user` (needed for a per-person credential).
+    pub fn resolve_for(
+        &self,
+        name: &str,
+        user: Option<&str>,
+    ) -> Result<(&CredentialDescriptor, String)> {
         let descriptor = self.descriptor(name).with_context(|| {
             format!("credential '{name}' is not configured on this Fabric host")
         })?;
@@ -197,15 +273,24 @@ impl CredentialVault {
             return Ok((descriptor, format!("{}{}", descriptor.prefix, value)));
         }
         if descriptor.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH) {
-            let cached = self
-                .tokens
-                .read()
-                .ok()
-                .and_then(|t| t.get(name).cloned())
-                .filter(|t| t.valid_until > Instant::now())
-                .with_context(|| {
-                    format!("credential '{name}' has no valid access token yet (the last refresh failed or is pending)")
+            let per_person = descriptor
+                .oauth
+                .as_ref()
+                .is_some_and(|o| o.connection.is_some());
+            let candidate = if per_person {
+                let user = user.with_context(|| {
+                    format!("credential '{name}' belongs to a person's own connection and needs a session with a user")
                 })?;
+                self.user_tokens
+                    .read()
+                    .ok()
+                    .and_then(|t| t.get(&(name.to_string(), user.to_string())).cloned())
+            } else {
+                self.tokens.read().ok().and_then(|t| t.get(name).cloned())
+            };
+            let cached = candidate.filter(|t| t.valid_until > Instant::now()).with_context(|| {
+                format!("credential '{name}' has no valid access token yet (the last refresh failed, is pending, or the person has not connected)")
+            })?;
             let prefix = if descriptor.prefix.is_empty() {
                 "Bearer "
             } else {
@@ -230,64 +315,118 @@ impl CredentialVault {
         let oauth = descriptor
             .oauth
             .as_ref()
-            .filter(|_| descriptor.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH))
-            .with_context(|| format!("credential '{name}' is not an oauth-refresh credential"))?;
-        let env = |var: &str, required: bool| -> Result<String> {
-            match std::env::var(var) {
-                Ok(v) if !v.is_empty() => Ok(v),
-                _ if !required => Ok(String::new()),
-                _ => bail!("host environment variable {var} is not set"),
-            }
-        };
-        let body = url::form_urlencoded::Serializer::new(String::new())
-            .append_pair("grant_type", "refresh_token")
-            .append_pair("client_id", &env(&oauth.client_id_env, true)?)
-            .append_pair("client_secret", &env(&oauth.client_secret_env, false)?)
-            .append_pair("refresh_token", &env(&oauth.refresh_token_env, true)?)
-            .finish();
-        let response = http
-            .post(&oauth.token_url)
-            .header("content-type", "application/x-www-form-urlencoded")
-            .header("accept", "application/json")
-            .body(body)
-            .timeout(Duration::from_secs(20))
-            .send()
-            .await
-            .with_context(|| format!("token endpoint for '{name}' is unreachable"))?;
-        let status = response.status();
-        let json: serde_json::Value = response.json().await.with_context(|| {
-            format!("token endpoint for '{name}' returned status {status} with a non-JSON body")
-        })?;
-        if !status.is_success() {
-            // The `error` code (e.g. invalid_grant) is safe to show; the description can be long.
-            let code = json
-                .get("error")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
-            bail!("token endpoint for '{name}' refused the refresh: status {status}, error {code}");
-        }
-        let token = json
-            .get("access_token")
-            .and_then(|v| v.as_str())
-            .filter(|t| !t.is_empty())
-            .with_context(|| format!("token endpoint for '{name}' returned no access_token"))?;
-        let lifetime = Duration::from_secs(
-            json.get("expires_in")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(3600)
-                .max(1),
-        );
+            .filter(|o| {
+                descriptor.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH) && o.connection.is_none()
+            })
+            .with_context(|| {
+                format!("credential '{name}' is not a host-wide oauth-refresh credential")
+            })?;
+        let refresh_token = env_secret(&oauth.refresh_token_env, true)?;
+        let (token, lifetime) = mint_access_token(oauth, &refresh_token, name, http).await?;
         self.tokens
             .write()
             .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
             .insert(
                 name.to_string(),
                 CachedToken {
-                    value: token.to_string(),
+                    value: token,
                     valid_until: Instant::now() + lifetime,
                 },
             );
         Ok(lifetime)
+    }
+
+    /// Whether `name` is a per-person credential (its refresh token is the person's own connection).
+    pub fn is_per_person(&self, name: &str) -> bool {
+        self.descriptors
+            .get(name)
+            .and_then(|d| d.oauth.as_ref())
+            .is_some_and(|o| o.connection.is_some())
+    }
+
+    /// The connection a per-person credential uses (`google`), if it is one.
+    pub fn connection_of(&self, name: &str) -> Option<&str> {
+        self.descriptors
+            .get(name)?
+            .oauth
+            .as_ref()?
+            .connection
+            .as_deref()
+    }
+
+    /// Every connection name some credential asks a person to provide, sorted.
+    pub fn connection_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .descriptors
+            .values()
+            .filter_map(|d| d.oauth.as_ref()?.connection.clone())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Makes sure `user` has a valid access token for the per-person credential `name`, minting one from `refresh_token` (the person's own,
+    /// from their connection) when there is none or it is about to expire. A missing connection or a refusal is an error that names no secret.
+    pub async fn ensure_user_token(
+        &self,
+        name: &str,
+        user: &str,
+        refresh_token: Option<&str>,
+        http: &reqwest::Client,
+    ) -> Result<()> {
+        let descriptor = self
+            .descriptor(name)
+            .with_context(|| format!("credential '{name}' is not configured"))?;
+        let oauth = descriptor
+            .oauth
+            .as_ref()
+            .filter(|o| o.connection.is_some())
+            .with_context(|| format!("credential '{name}' is not a per-person credential"))?;
+        let key = (name.to_string(), user.to_string());
+        let margin = Duration::from_secs(oauth.refresh_margin_secs.min(600));
+        let fresh = self
+            .user_tokens
+            .read()
+            .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
+            .get(&key)
+            .is_some_and(|t| t.valid_until > Instant::now() + margin);
+        if fresh {
+            return Ok(());
+        }
+        let refresh_token = refresh_token.with_context(|| {
+            format!(
+                "connect your {} account first (credential '{name}' uses your own connection)",
+                oauth.connection.as_deref().unwrap_or("account")
+            )
+        })?;
+        let (token, lifetime) = mint_access_token(oauth, refresh_token, name, http).await?;
+        self.user_tokens
+            .write()
+            .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
+            .insert(
+                key,
+                CachedToken {
+                    value: token,
+                    valid_until: Instant::now() + lifetime,
+                },
+            );
+        Ok(())
+    }
+
+    /// Drops the cached access tokens of `user` for every credential that uses `connection` (after they disconnect or replace it).
+    pub fn forget_user_connection(&self, user: &str, connection: &str) {
+        let names: Vec<&String> = self
+            .descriptors
+            .iter()
+            .filter(|(_, d)| {
+                d.oauth.as_ref().and_then(|o| o.connection.as_deref()) == Some(connection)
+            })
+            .map(|(n, _)| n)
+            .collect();
+        if let Ok(mut cache) = self.user_tokens.write() {
+            cache.retain(|(n, u), _| !(u == user && names.iter().any(|x| *x == n)));
+        }
     }
 
     /// Get a first token for every `oauth-refresh` credential (a failure is logged, not fatal:
@@ -297,7 +436,10 @@ impl CredentialVault {
         let names: Vec<String> = self
             .descriptors
             .iter()
-            .filter(|(_, d)| d.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH))
+            .filter(|(_, d)| {
+                d.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH)
+                    && d.oauth.as_ref().is_some_and(|o| o.connection.is_none())
+            })
             .map(|(n, _)| n.clone())
             .collect();
         for name in names {
@@ -382,7 +524,7 @@ impl CredentialVault {
                 bail!("credential '{name}' is not allowed for user '{uid}'");
             }
         }
-        self.resolve(name)
+        self.resolve_for(name, ctx.user_id)
     }
 }
 
@@ -410,8 +552,21 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
         if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
             bail!("credential '{name}' oauth token_url must be https (http only for loopback)");
         }
-        if o.client_id_env.trim().is_empty() || o.refresh_token_env.trim().is_empty() {
-            bail!("credential '{name}' oauth needs client_id_env and refresh_token_env");
+        if o.client_id_env.trim().is_empty() {
+            bail!("credential '{name}' oauth needs client_id_env");
+        }
+        match (&o.connection, o.refresh_token_env.trim().is_empty()) {
+            (None, true) => bail!("credential '{name}' oauth needs refresh_token_env, or a connection for a per-person credential"),
+            (Some(_), false) => bail!("credential '{name}' oauth sets both refresh_token_env and connection; choose one"),
+            (Some(c), true) => {
+                if c.is_empty() || c.len() > 32 || !c.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
+                    bail!("credential '{name}' oauth connection must be 1 to 32 characters of a-z, 0-9 and '-'");
+                }
+                if d.intercept {
+                    bail!("credential '{name}' is per person and cannot be intercepted");
+                }
+            }
+            (None, false) => {}
         }
     } else if !d.kind.eq_ignore_ascii_case("fabric") && d.env.trim().is_empty() {
         bail!("credential '{name}' requires env unless kind is fabric or oauth-refresh");
