@@ -120,6 +120,7 @@ impl AppState {
             .redirect(reqwest::redirect::Policy::none())
             .timeout(std::time::Duration::from_secs(120))
             .build()?;
+        credentials.start_oauth_refresh(egress_http.clone()).await;
         let mitm = match &config.mitm_ca_dir {
             Some(dir) => Some(Arc::new(mitm::Mitm::load_or_create(dir).await?)),
             None => None,

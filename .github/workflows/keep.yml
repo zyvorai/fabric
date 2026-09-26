@@ -63,6 +63,8 @@ jobs:
         run: bash agent-runtime/tests/bake-fresh-image.sh
       - name: keep-chat proxy (token stays server-side, one route, foreign hosts refused)
         run: python3 agent-runtime/tests/keep-chat-test.py
+      - name: Google consent script (PKCE, scopes, token file mode) against a fake Google
+        run: python3 agent-runtime/tests/keep-google-auth-test.py
       - name: keep-up starter (preflight, dry run, token)
         run: bash agent-runtime/tests/keep-up.sh
       - name: Keep / policy / credentials / export tests
