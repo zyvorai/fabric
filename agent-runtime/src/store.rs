@@ -55,6 +55,8 @@ pub struct Store {
     pub audit: AuditLog,
     /// Immutable, content-addressed skill bundles agents can mount.
     pub skills: SkillStore,
+    /// Conversation threads and their messages, per user.
+    pub threads: crate::threads::ThreadStore,
 }
 
 impl Store {
@@ -64,10 +66,12 @@ impl Store {
         fs::create_dir_all(root.join("sessions")).await?;
         let audit = AuditLog::open(root.join("audit.jsonl")).await?;
         let skills = SkillStore::open(root.join("skills")).await?;
+        let threads = crate::threads::ThreadStore::open(root.join("threads")).await?;
 
         let store = Self {
             audit,
             skills,
+            threads,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
