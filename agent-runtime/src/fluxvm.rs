@@ -14,6 +14,30 @@ pub struct FluxVm {
     base: Url,
     http: reqwest::Client,
     token: Option<String>,
+    /// Bounds how many `POST /v1/sandboxes` are in flight at once. FluxVM provisions each VM disk by mounting it through an nbd
+    /// device; two provisions at the same moment can be handed the same device ("/dev/nbd0p1 already mounted") or mix up the guest
+    /// agent token, so about 15% of runs failed at concurrency 4 on the lab host. Creating one VM at a time avoids it; a cell that
+    /// is already running is not affected. `ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY` raises the bound (default 1).
+    create_gate: std::sync::Arc<tokio::sync::Semaphore>,
+}
+
+/// Default and lower bound for concurrent sandbox creations.
+const DEFAULT_CREATE_CONCURRENCY: usize = 1;
+
+/// 1 to 64; anything unset, unparsable or below 1 falls back to the default.
+fn parse_create_concurrency(value: Option<&str>) -> usize {
+    value
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .map(|n| n.clamp(1, 64))
+        .unwrap_or(DEFAULT_CREATE_CONCURRENCY)
+}
+
+fn create_concurrency() -> usize {
+    parse_create_concurrency(
+        std::env::var("ZYVOR_AGENT_SANDBOX_CREATE_CONCURRENCY")
+            .ok()
+            .as_deref(),
+    )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -87,7 +111,12 @@ impl FluxVm {
             .timeout(std::time::Duration::from_secs(180))
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
-        Ok(Self { base, http, token })
+        Ok(Self {
+            base,
+            http,
+            token,
+            create_gate: std::sync::Arc::new(tokio::sync::Semaphore::new(create_concurrency())),
+        })
     }
 
     fn url(&self, path: &str) -> Result<Url> {
@@ -146,6 +175,12 @@ impl FluxVm {
         runtime_port: u16,
         options: &SandboxOptions<'_>,
     ) -> Result<SandboxRecord> {
+        // Held until FluxVM answers, so provisioning never overlaps (see `create_gate`).
+        let _permit = self
+            .create_gate
+            .acquire()
+            .await
+            .context("the sandbox create gate was closed")?;
         let response = self
             .auth(self.http.post(self.url("/v1/sandboxes")?))
             .json(&SandboxCreate {
@@ -493,6 +528,60 @@ mod tests {
             error.contains("400") && error.contains("invalid eBPF allow CIDR"),
             "{error}"
         );
+    }
+
+    /// FluxVM cannot provision two VM disks at once, so the client must never have two creates in flight.
+    #[tokio::test]
+    async fn sandbox_creates_are_serialised_by_default() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let in_flight = std::sync::Arc::new(AtomicUsize::new(0));
+        let peak = std::sync::Arc::new(AtomicUsize::new(0));
+        let (a, b) = (in_flight.clone(), peak.clone());
+        let app = axum::Router::new().route(
+            "/v1/sandboxes",
+            axum::routing::post(move || {
+                let (in_flight, peak) = (a.clone(), b.clone());
+                async move {
+                    let now = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+                    peak.fetch_max(now, Ordering::SeqCst);
+                    tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+                    in_flight.fetch_sub(1, Ordering::SeqCst);
+                    axum::Json(json!({"id": Uuid::new_v4()}))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = FluxVm::new(&format!("http://{addr}"), None).unwrap();
+        let mut jobs = Vec::new();
+        for i in 0..6 {
+            let c = client.clone();
+            jobs.push(tokio::spawn(async move {
+                c.create_sandbox(
+                    format!("t-{i}"),
+                    "node22-agent",
+                    None,
+                    18082,
+                    &SandboxOptions::default(),
+                )
+                .await
+            }));
+        }
+        for j in jobs {
+            j.await.unwrap().unwrap();
+        }
+        assert_eq!(peak.load(Ordering::SeqCst), 1, "creates overlapped");
+    }
+
+    #[test]
+    fn sandbox_create_concurrency_parsing_is_bounded() {
+        assert_eq!(parse_create_concurrency(None), 1);
+        assert_eq!(parse_create_concurrency(Some("4")), 4);
+        assert_eq!(parse_create_concurrency(Some(" 2 ")), 2);
+        assert_eq!(parse_create_concurrency(Some("0")), 1);
+        assert_eq!(parse_create_concurrency(Some("999")), 64);
+        assert_eq!(parse_create_concurrency(Some("not a number")), 1);
     }
 
     #[test]
