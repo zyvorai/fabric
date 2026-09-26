@@ -29,6 +29,8 @@ targets:
       path: Resources/Info.plist
       properties:
         CFBundleDisplayName: Solvor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleName: Solvor
         LSApplicationCategoryType: public.app-category.developer-tools
         NSHumanReadableCopyright: "Copyright 2026 Zyvor. Apache-2.0."
