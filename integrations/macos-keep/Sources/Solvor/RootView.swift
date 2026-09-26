@@ -41,7 +41,6 @@ struct RootView: View {
                 .listStyle(.sidebar).scrollContentBackground(.hidden)
                 ConnectionStrip()
             }
-            .modifier(LegacySidebarBackground())
             .navigationSplitViewColumnWidth(min: 210, ideal: 230)
         } detail: {
             Group {
@@ -153,11 +152,3 @@ enum DebugLaunch {
     }
 }
 #endif
-
-
-/// Before macOS 26 the sidebar gets a material behind it; on macOS 26 the system draws its own Liquid Glass sidebar.
-struct LegacySidebarBackground: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) { content } else { content.background(.regularMaterial) }
-    }
-}

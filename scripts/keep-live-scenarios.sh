@@ -92,6 +92,8 @@ for pair in "neft-rtgs-returns:3× EXMP0001234" "nach-return-report:Insufficient
     r=$(api -X POST -F note=none "$KEEP_API/v1/demos/$p")
     if [[ "$(json egress_connects <<<"$r" 2>/dev/null)" == "0" ]]; then has "$p: sample summarised in a real cell" "$(body_of "$r")" "$want"; else bad "$p: $(head -c 300 <<<"$r")"; fi
   else bad "$p: deploy failed: $(head -c 300 "$WORK/deploy-$p.out")"; fi
+  # the runtime allows 50 custom use cases and this script deploys about that many: drop each one once it has been checked
+  curl -s -o /dev/null -X DELETE "${AUTH[@]}" "$KEEP_API/v1/demos/$p"
   [[ "$QUICK" == 1 ]] && break
 done
 

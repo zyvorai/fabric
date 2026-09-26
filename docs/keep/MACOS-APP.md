@@ -6,7 +6,7 @@ sidebar_position: 10
 
 ![Solvor: drop a file, get answers, see the proof](../assets/keep/solvor-home.png)
 
-Solvor is a native macOS app (SwiftUI, Liquid Glass on macOS 26, system accent colour on older releases) for using Keep from a Mac. Source: [`integrations/macos-keep`](https://github.com/zyvorai/fabric/tree/main/integrations/macos-keep).
+Solvor is a native macOS app (SwiftUI, macOS 26 and later, built on Liquid Glass with the system accent colour) for using Keep from a Mac. Source: [`integrations/macos-keep`](https://github.com/zyvorai/fabric/tree/main/integrations/macos-keep).
 
 **What it is.** A client. You choose or drop a file; the app uploads it to a Keep host you run; the host reads it in a sealed cell that has
 no network; the summary comes back and is kept in a history. Every use case the host lists is available: the built-ins, the

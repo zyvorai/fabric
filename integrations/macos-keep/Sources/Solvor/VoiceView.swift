@@ -66,7 +66,7 @@ struct VoiceView: View {
             listener.onFinished = { text in handle(text) }
         }
         .onChange(of: localeID) { _, new in app.speechLanguage = new }
-        .background { if #available(macOS 15.0, *) { TranslateBridge(request: translateRequest, onResult: { english = $0; translating = false }, onError: { translateProblem = $0; translating = false }) } }
+        .background { TranslateBridge(request: translateRequest, onResult: { english = $0; translating = false }, onError: { translateProblem = $0; translating = false }) }
     }
 
     private var isUnknown: Bool { if case .unknown = command { return true }; return false }
@@ -100,16 +100,11 @@ struct VoiceView: View {
         let lang = locale.language
         if lang.languageCode?.identifier == "en" { english = text; return }
         translating = true
-        if #available(macOS 15.0, *) {
-            translateRequest = TranslateRequest(text: text, source: lang)
-        } else {
-            translating = false; translateProblem = "Translating needs macOS 15 or later. Speak or type English, or update macOS."
-        }
+        translateRequest = TranslateRequest(text: text, source: lang)
     }
 }
 
-/// Apple's on-device Translation, driven from SwiftUI. Available on macOS 15 and later; the first use of a language may ask to download it.
-@available(macOS 15.0, *)
+/// Apple's on-device Translation, driven from SwiftUI. The first use of a language may ask to download it.
 struct TranslateBridge: View {
     let request: VoiceView.TranslateRequest?
     let onResult: (String) -> Void

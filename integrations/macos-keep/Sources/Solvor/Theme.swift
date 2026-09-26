@@ -72,21 +72,11 @@ struct LogoTile: View {
 struct Card: ViewModifier {
     var hover = false
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.accentColor.opacity(hover ? 0.7 : 0), lineWidth: 1.5))
-                .scaleEffect(hover ? 1.01 : 1)
-                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: hover)
-        } else {
-            content
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.background.opacity(0.9)))
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.quaternary.opacity(0.35)))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(hover ? Color.accentColor.opacity(0.7) : Color.primary.opacity(0.08), lineWidth: hover ? 1.5 : 1))
-                .shadow(color: .black.opacity(hover ? 0.18 : 0.06), radius: hover ? 12 : 4, y: hover ? 6 : 2)
-                .scaleEffect(hover ? 1.012 : 1)
-                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: hover)
-        }
+        content
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.accentColor.opacity(hover ? 0.7 : 0), lineWidth: 1.5))
+            .scaleEffect(hover ? 1.01 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: hover)
     }
 }
 extension View { func card(hover: Bool = false) -> some View { modifier(Card(hover: hover)) } }
@@ -138,10 +128,10 @@ struct SealedCellView: View {
 // person's system accent colour, so nothing here forces a brand colour onto a control.
 extension View {
     @ViewBuilder func primaryButton() -> some View {
-        if #available(macOS 26.0, *) { self.buttonStyle(.glassProminent).buttonBorderShape(.capsule) } else { self.buttonStyle(.borderedProminent) }
+        self.buttonStyle(.glassProminent).buttonBorderShape(.capsule)
     }
     @ViewBuilder func secondaryButton() -> some View {
-        if #available(macOS 26.0, *) { self.buttonStyle(.glass).buttonBorderShape(.capsule) } else { self.buttonStyle(.bordered) }
+        self.buttonStyle(.glass).buttonBorderShape(.capsule)
     }
 }
 
