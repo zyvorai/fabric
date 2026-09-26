@@ -10,7 +10,7 @@ process. The starting point is [`pack-template/`](pack-template/) (a valid pack 
 ## The five steps
 
 1. **Pick a file a real person has** and can get without a developer (an export, a statement, a report). Write down the command or menu that produces it: it goes in the README.
-2. **Copy the template** to `examples/keep-agents/<your-pack>/` and rename `name` (lowercase letters, digits, `-`, at most 40 characters).
+2. **Start from the template**: `./scripts/keepctl init <your-pack> --dir examples/keep-agents/<your-pack>` (lowercase letters, digits, `-`, at most 40 characters). It writes a valid pack with a synthetic sample, which you then edit.
 3. **Write a synthetic sample** (`sample.txt`, `.csv`, `.eml`, `.mbox` or `.html`). **Never commit real data**: invent names, use example domains and fake identifiers.
    Text-based extractors can carry a sample; PDF, Word, Excel, PowerPoint and photos cannot, so those packs are deploy-tested only.
 4. **Choose the rules** (`keyword_sections`, `regex_extract`, `csv_columns`, `table`, `stats`, `json_path`). Keep each pattern under 200 characters, each pack under 20 rules. If a pattern needs to be longer, split it in two rules.
