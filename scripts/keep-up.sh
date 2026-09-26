@@ -227,6 +227,7 @@ preflight
 phase_fluxvm
 if (( PROBLEMS > 0 )); then echo; echo "==> $PROBLEMS problem(s) above; nothing was installed" >&2; exit 1; fi
 phase_template   # before the runtime: its deploy ends with a smoke test that needs the template
+if (( PROBLEMS > 0 )) && [[ "$DRY" == 0 ]]; then echo; echo "==> $PROBLEMS problem(s) above; the runtime was not deployed" >&2; exit 1; fi
 phase_runtime
 phase_token
 (( PROBLEMS == 0 )) || exit 1
