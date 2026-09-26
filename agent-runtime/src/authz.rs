@@ -220,6 +220,23 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
                 _ => UserRoute::Denied,
             }
         }
+        // A user's own memory (the handlers scope it to the caller): read it, add, edit, delete, forget all, turn it on or off, and decide
+        // what an agent proposed.
+        ["v1", "memory"] if read => UserRoute::Open(Scope::Read),
+        ["v1", "memory"] if matches!(*method, Method::POST | Method::DELETE) => {
+            UserRoute::Open(Scope::Run)
+        }
+        ["v1", "memory", "settings"] if *method == Method::PUT => UserRoute::Open(Scope::Run),
+        ["v1", "memory", mid]
+            if (*method == Method::PATCH || *method == Method::DELETE) && id(mid).is_some() =>
+        {
+            UserRoute::Open(Scope::Run)
+        }
+        ["v1", "memory", mid, "accept" | "reject"]
+            if *method == Method::POST && id(mid).is_some() =>
+        {
+            UserRoute::Open(Scope::Run)
+        }
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),
@@ -485,6 +502,59 @@ mod tests {
                 "/v1/threads/not-a-uuid".into(),
                 UserRoute::Denied,
             ),
+            (
+                Method::GET,
+                "/v1/memory".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (
+                Method::POST,
+                "/v1/memory".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::DELETE,
+                "/v1/memory".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::PUT,
+                "/v1/memory/settings".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::PATCH,
+                format!("/v1/memory/{aid}"),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::DELETE,
+                format!("/v1/memory/{aid}"),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::POST,
+                format!("/v1/memory/{aid}/accept"),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::POST,
+                format!("/v1/memory/{aid}/reject"),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::PATCH,
+                "/v1/memory/not-a-uuid".into(),
+                UserRoute::Denied,
+            ),
+            (
+                Method::POST,
+                format!("/v1/memory/{aid}/other"),
+                UserRoute::Denied,
+            ),
+            (Method::GET, format!("/v1/memory/{aid}"), UserRoute::Denied),
+            (Method::PUT, "/v1/memory".into(), UserRoute::Denied),
+            (Method::PUT, format!("/v1/memory/{aid}"), UserRoute::Denied),
             (
                 Method::GET,
                 format!("/v1/artifacts/{aid}"),

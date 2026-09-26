@@ -23,6 +23,7 @@ pub mod fluxvm;
 pub mod goals;
 pub mod l7;
 pub mod mcp;
+pub mod memory;
 pub mod mitm;
 pub mod model;
 pub mod model_call;

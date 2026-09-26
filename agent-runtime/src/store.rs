@@ -57,6 +57,8 @@ pub struct Store {
     pub skills: SkillStore,
     /// Conversation threads and their messages, per user.
     pub threads: crate::threads::ThreadStore,
+    /// Opt-in personal memory, per user.
+    pub memory: crate::memory::MemoryStore,
 }
 
 impl Store {
@@ -67,11 +69,13 @@ impl Store {
         let audit = AuditLog::open(root.join("audit.jsonl")).await?;
         let skills = SkillStore::open(root.join("skills")).await?;
         let threads = crate::threads::ThreadStore::open(root.join("threads")).await?;
+        let memory = crate::memory::MemoryStore::open(root.join("memory")).await?;
 
         let store = Self {
             audit,
             skills,
             threads,
+            memory,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),
