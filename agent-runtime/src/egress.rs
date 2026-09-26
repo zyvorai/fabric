@@ -289,6 +289,26 @@ pub(crate) async fn proxy_inner(
                         .into(),
                 ));
             }
+            // A per-person credential (Google mail or calendar): mint an access token from THIS person's own connection first.
+            if state.credentials.is_per_person(name) {
+                let Some(user) = session.user_id.as_deref() else {
+                    return Err((
+                        StatusCode::FORBIDDEN,
+                        format!("credential '{name}' belongs to a person's own connection and this session has no user"),
+                    ));
+                };
+                let connection = state.credentials.connection_of(name).unwrap_or_default();
+                let refresh_token = state
+                    .store
+                    .connections
+                    .refresh_token(user, connection)
+                    .await;
+                state
+                    .credentials
+                    .ensure_user_token(name, user, refresh_token.as_deref(), &state.egress_http)
+                    .await
+                    .map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?;
+            }
             state
                 .credentials
                 .authorize_resolve(

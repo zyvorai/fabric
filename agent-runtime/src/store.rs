@@ -59,6 +59,8 @@ pub struct Store {
     pub threads: crate::threads::ThreadStore,
     /// Opt-in personal memory, per user.
     pub memory: crate::memory::MemoryStore,
+    /// A person's own connections to outside accounts (refresh tokens, write-only).
+    pub connections: crate::connections::ConnectionStore,
 }
 
 impl Store {
@@ -70,12 +72,15 @@ impl Store {
         let skills = SkillStore::open(root.join("skills")).await?;
         let threads = crate::threads::ThreadStore::open(root.join("threads")).await?;
         let memory = crate::memory::MemoryStore::open(root.join("memory")).await?;
+        let connections =
+            crate::connections::ConnectionStore::open(root.join("connections")).await?;
 
         let store = Self {
             audit,
             skills,
             threads,
             memory,
+            connections,
             root,
             agents: RwLock::new(HashMap::new()),
             sessions: RwLock::new(HashMap::new()),

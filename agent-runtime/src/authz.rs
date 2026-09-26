@@ -251,6 +251,18 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
             Some(gid) => UserRoute::Goal(gid, Scope::Run),
             None => UserRoute::Denied,
         },
+        // A person's own outside-account connections (write-only tokens; the handlers scope them to the caller).
+        ["v1", "connections"] if read => UserRoute::Open(Scope::Read),
+        ["v1", "connections", name]
+            if (*method == Method::PUT || *method == Method::DELETE)
+                && !name.is_empty()
+                && name.len() <= 32
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') =>
+        {
+            UserRoute::Open(Scope::Run)
+        }
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),
@@ -484,6 +496,32 @@ mod tests {
                 UserRoute::Approval(aid, Scope::Approve),
             ),
             (Method::POST, "/v1/approvals".into(), UserRoute::Denied),
+            (
+                Method::GET,
+                "/v1/connections".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (
+                Method::PUT,
+                "/v1/connections/google".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::DELETE,
+                "/v1/connections/google".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::GET,
+                "/v1/connections/google".into(),
+                UserRoute::Denied,
+            ),
+            (
+                Method::PUT,
+                "/v1/connections/Bad_Name".into(),
+                UserRoute::Denied,
+            ),
+            (Method::POST, "/v1/connections".into(), UserRoute::Denied),
             (
                 Method::GET,
                 "/v1/threads".into(),

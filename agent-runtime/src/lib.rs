@@ -11,6 +11,7 @@ pub mod browse_ifc;
 pub mod browser;
 pub mod config;
 pub mod confine;
+pub mod connections;
 pub mod contain;
 pub mod credentials;
 pub mod demo_builders;
