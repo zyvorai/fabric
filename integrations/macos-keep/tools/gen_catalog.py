@@ -12,12 +12,12 @@ out = os.path.join(here, "..", "Sources", "KeepKit", "CatalogData.swift")
 
 GROUPS = {
     "documents": "pdf-brief contract-clauses security-questionnaire meeting-actions meeting-notes-model nda-review receipt-pdf invoice-model-brief deck-outline api-facts invoice-check inbox-digest status-page-watch mailbox-triage csv-clean".split(),
-    "phone": "chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder".split(),
+    "phone": "chat-export-digest bank-sms-ledger card-statement calendar-week contacts-audit travel-itinerary subscription-finder android-call-log".split(),
     "mac": "mac-system-report homebrew-audit mac-log-triage mac-update-history mac-apps-inventory mac-launch-items".split(),
     "windows": "windows-systeminfo windows-hotfixes windows-installed-software windows-event-log windows-services windows-scheduled-tasks".split(),
     "developer": "github-prs github-issues github-actions-log dependabot-alerts git-log-digest xcodebuild-log xcode-crash-log vscode-extensions vscode-settings-audit log-triage sbom-summary".split(),
-    "browser": "bookmarks-digest browser-history-takeout".split(),
-    "office": "receivables-ageing po-line-items employee-ledger reimbursement-claims sales-register-sheet inventory-sheet attendance-sheet expense-sheet".split(),
+    "browser": "bookmarks-digest browser-history-takeout takeout-my-activity".split(),
+    "office": "receivables-ageing po-line-items employee-ledger reimbursement-claims sales-register-sheet inventory-sheet attendance-sheet expense-sheet payslip-text".split(),
 }
 group_of = {pack: g for g, packs in GROUPS.items() for pack in packs}
 

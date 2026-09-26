@@ -36,6 +36,5 @@ the Solvor catalogue are generated from the packs, so you do not edit them by ha
 
 ## Good first packs
 
-Things people ask for that are not shipped yet, each a good first contribution: a payslip or salary-slip text export, a Google Takeout activity summary, a Kindle or
-Notion export digest, an Android call-log CSV, a fuel or toll receipt photo, a school fee receipt photo, a health-insurance claim mail, a rent receipt. Open an issue first if
-you want to claim one.
+Things people ask for that are not shipped yet, each a good first contribution: a Notion or Obsidian export digest, a toll receipt photo, a rent receipt, a mobile-recharge or
+utility SMS ledger for your region, a Spotify or Netflix viewing-history summary, a WhatsApp Business chat export. Open an issue first if you want to claim one. (Payslip, Kindle, call log, insurance claim mail, Google activity, fuel and school-fee photo packs already exist.)

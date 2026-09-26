@@ -15,6 +15,8 @@
   deletes the cell at once; a cell frozen for touching the network is kept for inspection.
 
 ### Added
+- **Seven more everyday use cases**: `payslip-text`, `kindle-highlights`, `android-call-log`, `insurance-claim-mail`, `takeout-my-activity` (each with a synthetic sample, asserted in `demos-ci.sh` from the real engine's output) and the OCR photo packs `fuel-receipt-photo` and
+  `school-fee-receipt-photo` (the fuel pack tested on a generated image; school-fee deploys only). The Kindle ranking first put the `==========` separator above the books; it now reads the title line before each clipping. Catalogue and gallery groups updated.
 - **`scripts/keep-chat.py`, a small web chat for a Keep agent over AG-UI.** One static page and one proxied route: the token stays server-side, the agent is fixed by `--agent`, `127.0.0.1` only, foreign Host/Origin refused. Streams the reply, starts a new thread when the agent finished the last, shows approval
   requests as notices and cannot approve. 8 proxy tests, a `demos-ci.sh` check, and the page driven in a real browser. `keep-demo-local.sh` now deploys `echo-agent` (so the chat works out of the box) and always does an incremental build, so it never runs a runtime older than the checkout.
 - **`echo-agent`**, an agent with no model, credentials or network, to try `POST /v1/agui` end to end; AG-UI now also passes on events an agent emits with `ctx.emit` as `CUSTOM` `keep.event`. Docs record a real-host finding: agent sessions need IP

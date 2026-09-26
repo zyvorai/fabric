@@ -3,6 +3,18 @@ export type GalleryPack = {id: string; title: string; description: string; accep
 
 export const GALLERY_PACKS: GalleryPack[] = [
   {
+    "id": "android-call-log",
+    "title": "Call log",
+    "description": "Drop in a call-log CSV exported from your phone and see calls by type, who you talk to most and the first rows.",
+    "accepts": [
+      "csv"
+    ],
+    "reads": "Text",
+    "sample": true,
+    "model": false,
+    "group": "Phone"
+  },
+  {
     "id": "api-facts",
     "title": "API facts",
     "description": "Drop in a JSON document (an order, a webhook payload, an API response) and pull out the fields you care about.",
@@ -175,6 +187,21 @@ export const GALLERY_PACKS: GalleryPack[] = [
     "group": "Office"
   },
   {
+    "id": "fuel-receipt-photo",
+    "title": "Fuel receipt photo",
+    "description": "Drop in a photo of a fuel-station receipt and get the litres, the rate, the total and the date.",
+    "accepts": [
+      "png",
+      "jpg",
+      "jpeg",
+      "tiff"
+    ],
+    "reads": "Photo (OCR)",
+    "sample": false,
+    "model": false,
+    "group": "Documents"
+  },
+  {
     "id": "git-log-digest",
     "title": "Git log digest",
     "description": "Drop in git log output in a pipe-separated format and get commits per author and month, commit-type prefixes and the merge count.",
@@ -251,6 +278,19 @@ export const GALLERY_PACKS: GalleryPack[] = [
     "group": "Documents"
   },
   {
+    "id": "insurance-claim-mail",
+    "title": "Insurance claim mail",
+    "description": "Drop in claim emails from your insurer and see the claim numbers, status, amounts, dates and what they still need from you.",
+    "accepts": [
+      "eml",
+      "mbox"
+    ],
+    "reads": "Mail",
+    "sample": true,
+    "model": false,
+    "group": "Documents"
+  },
+  {
     "id": "inventory-sheet",
     "title": "Inventory sheet",
     "description": "Drop in an Excel stock sheet and see rows per location and the first rows.",
@@ -284,6 +324,18 @@ export const GALLERY_PACKS: GalleryPack[] = [
     "reads": "PDF text",
     "sample": false,
     "model": true,
+    "group": "Documents"
+  },
+  {
+    "id": "kindle-highlights",
+    "title": "Kindle highlights",
+    "description": "Drop in your Kindle My Clippings.txt and see which books you highlighted most and how many highlights, notes and bookmarks there are.",
+    "accepts": [
+      "txt"
+    ],
+    "reads": "Text",
+    "sample": true,
+    "model": false,
     "group": "Documents"
   },
   {
@@ -423,6 +475,18 @@ export const GALLERY_PACKS: GalleryPack[] = [
     "group": "Bank"
   },
   {
+    "id": "payslip-text",
+    "title": "Payslip",
+    "description": "Drop in the text of a payslip (copied from the PDF or the HR portal) and get earnings, deductions, net pay and the month.",
+    "accepts": [
+      "txt"
+    ],
+    "reads": "Text",
+    "sample": true,
+    "model": false,
+    "group": "Office"
+  },
+  {
     "id": "po-line-items",
     "title": "Purchase order line items",
     "description": "Drop in a purchase order as text and list the PO number, tax ids, HSN/SAC codes, the line-item lines and the amounts.",
@@ -524,6 +588,21 @@ export const GALLERY_PACKS: GalleryPack[] = [
     "group": "Office"
   },
   {
+    "id": "school-fee-receipt-photo",
+    "title": "School fee receipt photo",
+    "description": "Drop in a photo of a school fee receipt and get the receipt number, the term, the amounts paid and any balance due.",
+    "accepts": [
+      "png",
+      "jpg",
+      "jpeg",
+      "tiff"
+    ],
+    "reads": "Photo (OCR)",
+    "sample": false,
+    "model": false,
+    "group": "Documents"
+  },
+  {
     "id": "status-page-watch",
     "title": "Status page watch",
     "description": "Drop in a saved vendor status page (HTML) and see what is down, degraded, under maintenance or recovered.",
@@ -548,6 +627,18 @@ export const GALLERY_PACKS: GalleryPack[] = [
     "sample": true,
     "model": false,
     "group": "Phone"
+  },
+  {
+    "id": "takeout-my-activity",
+    "title": "Google activity",
+    "description": "Drop in the My Activity JSON from Google Takeout and see which Google products you used most, what you did, and the first entries.",
+    "accepts": [
+      "json"
+    ],
+    "reads": "Text",
+    "sample": true,
+    "model": false,
+    "group": "Browser"
   },
   {
     "id": "travel-itinerary",
