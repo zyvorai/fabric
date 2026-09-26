@@ -1422,6 +1422,204 @@ pub(crate) mod ask_tests {
         .await
     }
 
+    /// A fake "Google": a token endpoint over plain loopback HTTP (`access_token = "at-" + refresh token`) and an HTTPS API (a certificate from a
+    /// throwaway CA, which the caller must trust) that answers with the Authorization header it was called with. Returns the API port, the token
+    /// port, the CA certificate (PEM) and every Authorization the API saw.
+    async fn fake_google() -> (u16, u16, String, Arc<std::sync::Mutex<Vec<String>>>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let dir = tempfile::tempdir().unwrap();
+        let mitm = crate::mitm::Mitm::load_or_create(dir.path()).await.unwrap();
+        let acceptor = tokio_rustls::TlsAcceptor::from(mitm.server_config("127.0.0.1").unwrap());
+        let seen: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+        let api = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api_port = api.local_addr().unwrap().port();
+        let sink = seen.clone();
+        tokio::spawn(async move {
+            let _keep = dir; // the CA files live as long as the server
+            loop {
+                let Ok((tcp, _)) = api.accept().await else {
+                    return;
+                };
+                let (acceptor, sink) = (acceptor.clone(), sink.clone());
+                tokio::spawn(async move {
+                    let Ok(mut tls) = acceptor.accept(tcp).await else {
+                        return;
+                    };
+                    let mut buf = Vec::new();
+                    let mut chunk = [0u8; 2048];
+                    while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match tls.read(&mut chunk).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                        }
+                    }
+                    let text = String::from_utf8_lossy(&buf).to_string();
+                    let auth = text
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .starts_with("authorization:")
+                                .then(|| l.split_once(':').unwrap().1.trim().to_string())
+                        })
+                        .unwrap_or_default();
+                    sink.lock().unwrap().push(auth.clone());
+                    let body = json!({"saw": auth}).to_string();
+                    let reply = format!("HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}", body.len());
+                    let _ = tls.write_all(reply.as_bytes()).await;
+                    let _ = tls.shutdown().await;
+                });
+            }
+        });
+        let ca = mitm.ca_pem().to_string();
+        let token = axum::Router::new().route(
+            "/token",
+            axum::routing::post(|body: String| async move {
+                let rt = url::form_urlencoded::parse(body.as_bytes())
+                    .find(|(k, _)| k == "refresh_token")
+                    .map(|(_, v)| v.to_string())
+                    .unwrap_or_default();
+                axum::Json(json!({"access_token": format!("at-{rt}"), "expires_in": 3600}))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let token_port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move { axum::serve(listener, token).await.unwrap() });
+        (api_port, token_port, ca, seen)
+    }
+
+    #[tokio::test]
+    async fn a_per_person_credential_reaches_the_api_with_that_persons_own_token_and_only_once_connected(
+    ) {
+        std::env::set_var("EG_PP_ID", "cid");
+        std::env::set_var("EG_PP_SECRET", "csecret");
+        let (api_port, token_port, ca_pem, seen) = fake_google().await;
+        let ca_file = std::env::temp_dir().join(format!("zyvor-ca-{}.pem", uuid::Uuid::new_v4()));
+        std::fs::write(&ca_file, ca_pem).unwrap();
+        let file = std::env::temp_dir().join(format!("zyvor-cred-{}.json", uuid::Uuid::new_v4()));
+        std::fs::write(
+            &file,
+            json!({"gmail": {
+                "host": "127.0.0.1", "header": "authorization", "kind": "oauth-refresh", "allowed_ports": [api_port], "allowed_methods": ["GET"],
+                "oauth": {"token_url": format!("http://127.0.0.1:{token_port}/token"), "client_id_env": "EG_PP_ID", "client_secret_env": "EG_PP_SECRET", "connection": "google"}
+            }})
+            .to_string(),
+        )
+        .unwrap();
+        let (state, base) = state_and_session_cfg(|config| {
+            config.credentials_file = Some(file);
+            config.extra_ca_files = vec![ca_file];
+        })
+        .await;
+        let mut m = manifest(EgressMode::Deny, Some(30));
+        m.credentials = vec!["gmail".into()];
+        m.egress_allow_hosts = vec!["127.0.0.1".into()];
+        m.allow_private_networks = true;
+        let deployed = state
+            .store
+            .deploy_agent(crate::model::DeployAgentRequest {
+                name: base.agent.clone(),
+                bundle_base64: base64::engine::general_purpose::STANDARD.encode("export default 1"),
+                manifest: m,
+            })
+            .await
+            .unwrap();
+        let session_of = |user: Option<&str>| {
+            let mut s = base.clone();
+            s.id = uuid::Uuid::new_v4();
+            s.agent_version = deployed.version.clone();
+            s.user_id = user.map(str::to_string);
+            s
+        };
+        let (ana, ben, nobody) = (
+            session_of(Some("ana")),
+            session_of(Some("ben")),
+            session_of(None),
+        );
+        for s in [&ana, &ben, &nobody] {
+            state.store.save_session(s.clone()).await.unwrap();
+        }
+        let read = |session: SessionRecord| {
+            let state = state.clone();
+            async move {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    "x-zyvor-session-id",
+                    session.id.to_string().parse().unwrap(),
+                );
+                headers.insert("x-zyvor-egress-capability", "cap".parse().unwrap());
+                proxy_inner(
+                    &state,
+                    &headers,
+                    EgressRequest {
+                        url: format!(
+                            "https://127.0.0.1:{api_port}/gmail/v1/users/me/messages?maxResults=3"
+                        ),
+                        method: "GET".into(),
+                        headers: Default::default(),
+                        body_base64: None,
+                        credential: Some("gmail".into()),
+                    },
+                )
+                .await
+            }
+        };
+        // before anyone connected: refused, and it says what to do
+        let err = read(ana.clone()).await.unwrap_err();
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+        assert!(
+            err.1.contains("connect your google account first"),
+            "{}",
+            err.1
+        );
+        assert!(seen.lock().unwrap().is_empty(), "nothing reached the API");
+        // a session with no user cannot use a person's connection at all
+        assert!(read(nobody).await.unwrap_err().1.contains("has no user"));
+        // each person's request carries their own token
+        state
+            .store
+            .connections
+            .set("ana", "google", "1//ana-refresh")
+            .await
+            .unwrap();
+        state
+            .store
+            .connections
+            .set("ben", "google", "1//ben-refresh")
+            .await
+            .unwrap();
+        let (a, b) = (
+            read(ana.clone()).await.unwrap(),
+            read(ben.clone()).await.unwrap(),
+        );
+        for (reply, who) in [(&a, "ana"), (&b, "ben")] {
+            let body: Value = serde_json::from_slice(
+                &base64::engine::general_purpose::STANDARD
+                    .decode(reply["body_base64"].as_str().unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(body["saw"], format!("Bearer at-1//{who}-refresh"), "{who}");
+        }
+        assert_eq!(
+            *seen.lock().unwrap(),
+            ["Bearer at-1//ana-refresh", "Bearer at-1//ben-refresh"]
+        );
+        // ana disconnecting closes her at once; ben is unaffected
+        state
+            .store
+            .connections
+            .remove("ana", "google")
+            .await
+            .unwrap();
+        state.credentials.forget_user_connection("ana", "google");
+        assert!(read(ana)
+            .await
+            .unwrap_err()
+            .1
+            .contains("connect your google account first"));
+        assert!(read(ben).await.is_ok(), "ben is still connected");
+    }
+
     #[tokio::test]
     async fn send_credential_holds_the_request_until_approved_and_never_records_the_body() {
         let (port, hits) = upstream_counter().await;
