@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Keep roadmap
 
-Where each piece stands. Sources: [STATUS.md](STATUS.md), [KEEP-0.2.md](KEEP-0.2.md),
+Where each piece stands (what is left, in full: [REMAINING.md](REMAINING.md)). Sources: [STATUS.md](STATUS.md), [KEEP-0.2.md](KEEP-0.2.md),
 [browser/BROWSER-0.3.md](browser/BROWSER-0.3.md).
 
 ## Shipped

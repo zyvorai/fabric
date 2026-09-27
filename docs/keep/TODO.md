@@ -4,6 +4,8 @@ sidebar_position: 5
 
 # Keep and Solvor: open items that need a person or a resource
 
+> The whole list of what is left, including what is buildable and what needs a design decision, is in [REMAINING.md](REMAINING.md). This page keeps the part that is blocked on the owner.
+
 Everything that can be built and tested without these is done or in flight. This page lists what is **blocked on something only the
 owner can provide**, what it unblocks, and how to tell when it is done. The plan behind it: make Keep and Solvor easy to try, easy to
 trust, and easy to talk about ([ROADMAP.md](ROADMAP.md) has the product side).
