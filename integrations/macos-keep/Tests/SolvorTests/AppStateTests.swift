@@ -1,4 +1,6 @@
+import CryptoKit
 import KeepKit
+import UserNotifications
 import XCTest
 @testable import Solvor
 
@@ -15,6 +17,8 @@ private final class StubHost: KeepAPI, @unchecked Sendable {
     var statusResult: Result<KeepStatus, Error> = .failure(KeepError.http(status: 403, message: "this route is not available to user tokens"))
     var demosResult: Result<[Demo], Error> = .success([])
     var pending: [Approval] = []
+    var deviceList: [DeviceInfo] = []
+    var decisions: [(id: String, decision: Decision, deviceId: String?, signature: String?)] = []
 
     func whoami() async throws -> WhoAmI { try whoamiResult.get() }
     func status() async throws -> KeepStatus { try statusResult.get() }
@@ -27,11 +31,25 @@ private final class StubHost: KeepAPI, @unchecked Sendable {
     }
     func approvals() async throws -> [Approval] { pending }
     func usage(userId: String?) async throws -> UsageReport { throw KeepError.http(status: 404, message: "none") }
+    func devices(userId: String) async throws -> [DeviceInfo] { deviceList }
+    func decide(approval id: String, _ decision: Decision, deviceId: String?, signature: String?) async throws {
+        decisions.append((id, decision, deviceId, signature)); pending.removeAll { $0.id == id }
+    }
     func run(demo: String, files: [URL], maxBytes: Int?) async throws -> RunOutcome { throw KeepError.http(status: 500, message: "not in this test") }
+}
+
+private final class Counter: @unchecked Sendable {
+    private let lock = NSLock(); private var n = 0
+    func bump() { lock.lock(); n += 1; lock.unlock() }
+    var value: Int { lock.lock(); defer { lock.unlock() }; return n }
 }
 
 private func approval(_ id: String) -> Approval {
     try! JSONDecoder.keep.decode(Approval.self, from: Data(#"{"id":"\#(id)","kind":"gmail.send","subject":"Hi","status":"pending"}"#.utf8))
+}
+private func signed(_ id: String, expiresIn seconds: Int = 300) -> Approval {
+    let exp = Int(Date().timeIntervalSince1970) + seconds
+    return try! JSONDecoder.keep.decode(Approval.self, from: Data(#"{"id":"\#(id)","kind":"gmail.send","subject":"Hi","status":"pending","sign":{"format":"keep-approval-v1","challenge":"ch","expires_at":\#(exp),"action_sha256":"ab"}}"#.utf8))
 }
 private func demo(_ id: String) -> Demo {
     try! JSONDecoder.keep.decode(Demo.self, from: Data(#"{"id":"\#(id)","title":"T","description":"d","accepts":[],"builtin":true}"#.utf8))
@@ -43,9 +61,10 @@ final class AppStateTests: XCTestCase {
     private var tokens = MemoryTokens()
     private var built = 0
     private var told: [String] = []
+    private var keyReads = Counter()
 
     private func makeApp(host h: String = "http://127.0.0.1:9096", token: String? = "kut1abc") -> AppState {
-        host = StubHost(); tokens = MemoryTokens(); tokens.value = token; built = 0; told = []
+        host = StubHost(); tokens = MemoryTokens(); tokens.value = token; built = 0; told = []; keyReads = Counter()
         let suite = "solvor-test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
@@ -54,6 +73,8 @@ final class AppStateTests: XCTestCase {
         let app = AppState(defaults: defaults, tokens: tokens, supportDir: dir, makeClient: { [unowned self] _, _ in built += 1; return host })
         app.host = h
         app.notifier = { [unowned self] title, body in told.append("\(title): \(body)") }
+        let reads = keyReads
+        app.keyProvider = { reads.bump(); return nil }   // never the real Secure Enclave from a test: it can prompt and block
         return app
     }
 
@@ -63,6 +84,7 @@ final class AppStateTests: XCTestCase {
         await app.connect()
         XCTAssertTrue(app.connected); XCTAssertNil(app.problem)
         XCTAssertEqual(app.userId, "ana", "the user id is read from whoami, not typed")
+        XCTAssertEqual(keyReads.value, 0, "connecting does not touch the approval key (reading it can wait on a Keychain prompt)")
         XCTAssertEqual(app.demos.map(\.id), ["csv-clean"])
         XCTAssertNil(app.status)
     }
@@ -153,5 +175,71 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(m.paste("kut1othertoken")); XCTAssertEqual(m.tokenText, "kut1othertoken"); XCTAssertNil(m.warning)
         XCTAssertFalse(m.paste("hello there")); XCTAssertFalse(m.paste("")); XCTAssertFalse(m.paste("https://example.com"))
         XCTAssertEqual(m.tokenText, "kut1othertoken", "text that is neither a link nor a token changes nothing")
+    }
+
+    // MARK: deciding
+
+    private func appWithKey(_ key: SoftwareP256Key, enrolled: Bool) async -> AppState {
+        let app = makeApp()
+        app.keyProvider = { key }
+        if enrolled { host.deviceList = [DeviceInfo(deviceId: "work-mac", publicKey: key.publicKeyBase64)] }
+        await app.connect()
+        await app.refreshDevice()
+        XCTAssertEqual(app.myPublicKey, key.publicKeyBase64)
+        return app
+    }
+
+    func testASignedDecisionIsSignedOverTheExactTextAndSentWithTheEnrolledDeviceId() async throws {
+        let key = SoftwareP256Key()
+        let app = await appWithKey(key, enrolled: true)
+        XCTAssertEqual(app.device, .enrolled(deviceId: "work-mac"))
+        let a = signed("a1"); host.pending = [a]; await app.refreshApprovals()
+        let r = await app.decide(a, .approved)
+        XCTAssertEqual(r, .decided("Approved: Tool Use Thing".replacingOccurrences(of: "Tool Use Thing", with: "Gmail Send")))
+        let sent = try XCTUnwrap(host.decisions.first)
+        XCTAssertEqual(sent.deviceId, "work-mac")
+        let payload = try ApprovalPayload.text(for: a, decision: .approved)
+        let pub = try P256.Signing.PublicKey(derRepresentation: Data(base64Encoded: key.publicKeyBase64)!)
+        let sig = try P256.Signing.ECDSASignature(derRepresentation: Data(base64Encoded: try XCTUnwrap(sent.signature))!)
+        XCTAssertTrue(pub.isValidSignature(sig, for: Data(payload.utf8)), "the host can check this signature against the enrolled key")
+        XCTAssertFalse(pub.isValidSignature(sig, for: Data(try ApprovalPayload.text(for: a, decision: .denied).utf8)), "an approval is not a denial")
+        XCTAssertTrue(app.approvals.isEmpty)
+    }
+
+    func testAnUnsignedDecisionIsNeverSentWhenTheHostAskedForASignature() async {
+        let app = await appWithKey(SoftwareP256Key(), enrolled: false)
+        XCTAssertEqual(app.device, .notEnrolled)
+        let a = signed("a1"); host.pending = [a]
+        let r = await app.decide(a, .approved)
+        guard case .refused(let why) = r else { return XCTFail("\(r)") }
+        XCTAssertTrue(why.contains("not enrolled"))
+        XCTAssertTrue(host.decisions.isEmpty, "the host was not contacted")
+    }
+
+    func testAnExpiredWindowAndAMissingKeyAreRefusedWithoutContactingTheHost() async {
+        let key = SoftwareP256Key()
+        let app = await appWithKey(key, enrolled: true)
+        let old = signed("a1", expiresIn: -5)
+        guard case .refused = await app.decide(old, .approved) else { return XCTFail("expired") }
+        app.keyProvider = { nil }; await app.refreshDevice()
+        XCTAssertEqual(app.device, .noKey)
+        guard case .refused = await app.decide(signed("a2"), .denied) else { return XCTFail("no key") }
+        XCTAssertTrue(host.decisions.isEmpty)
+    }
+
+    func testAHostThatIssuesNoChallengeAcceptsAnUnsignedDecision() async throws {
+        let app = await appWithKey(SoftwareP256Key(), enrolled: false)
+        let plain = approval("p1"); host.pending = [plain]
+        let r = await app.decide(plain, .denied)
+        guard case .decided = r else { return XCTFail("\(r)") }
+        let sent = try XCTUnwrap(host.decisions.first)
+        XCTAssertNil(sent.signature); XCTAssertNil(sent.deviceId)
+    }
+
+    func testANotificationOnlyOffersToOpenTheApproval() {
+        let c = Notifier.approvalCategory
+        XCTAssertEqual(c.actions.map(\.identifier), ["open"], "there is no approve or deny button on a notification")
+        XCTAssertTrue(c.actions.allSatisfy { $0.options.contains(.foreground) })
+        XCTAssertEqual(Notifier.approvalCategoryId, "keep.approval")
     }
 }

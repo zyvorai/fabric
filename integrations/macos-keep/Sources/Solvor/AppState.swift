@@ -64,8 +64,16 @@ final class AppState: ObservableObject {
     private let makeClient: (URL, String) throws -> any KeepAPI
     /// Approvals the person has already been told about. It outlives a reconnect, so reconnecting does not notify again.
     private(set) var announcedApprovals = Set<String>()
-    var notifier: @MainActor (String, String) -> Void = { Notifier.post(title: $0, body: $1) }
+    var notifier: @MainActor (String, String) -> Void = { Notifier.post(title: $0, body: $1, category: Notifier.approvalCategoryId) }
+    /// Seconds between polls while the app is in the background, and while the person is looking at it.
     var pollInterval: UInt64 = 20
+    var activePollInterval: UInt64 = 5
+    /// This Mac's approval key; a test supplies a software key instead of the Secure Enclave.
+    /// It is only ever called off the main thread: reading the key can wait on a Keychain prompt, and the app must not freeze while it does.
+    var keyProvider: @Sendable () -> ApprovalKey? = { try? SecureEnclaveKey.loadOrCreate() }
+    @Published var device: DeviceState = .unknown
+    /// This Mac's public key, known once `refreshDevice` has run. Only the public half is ever held here.
+    @Published private(set) var myPublicKey: String?
 
     enum ActiveSheet: String, Identifiable { case email, voice, welcome, about; var id: String { rawValue } }
 
@@ -141,7 +149,7 @@ final class AppState: ObservableObject {
 
     func disconnect() {
         try? tokens.clear(); connected = false; status = nil; demos = []; runs = []; approvals = []; poller?.cancel(); watcher.update(rules: [])
-        announcedApprovals = []
+        announcedApprovals = []; device = .unknown; myPublicKey = nil
     }
 
     // MARK: data
@@ -149,10 +157,56 @@ final class AppState: ObservableObject {
     func refreshRuns() async { if let c = api { runs = ((try? await c.artifacts(limit: 100)) ?? runs) } }
     func refreshUsage() async { if let c = api, !userId.isEmpty { usage = try? await c.usage(userId: userId) } }
 
+    #if DEBUG
+    /// Development only: keeps a sample approval on screen so its card can be captured.
+    var debugHoldApprovals = false
+    #endif
+
     func refreshApprovals() async {
+        #if DEBUG
+        if debugHoldApprovals { return }
+        #endif
         guard let c = api else { return }
         if !userId.isEmpty, let inbox = try? await c.inbox(userId: userId) { approvals = inbox.pendingApprovals; return }
         approvals = ((try? await c.approvals()) ?? []).filter(\.isPending)
+    }
+
+    /// Asks the host which devices it knows for this person and whether this Mac's key is one of them.
+    func refreshDevice() async {
+        let provide = keyProvider
+        guard let publicKey = await Task.detached(operation: { provide()?.publicKeyBase64 }).value else { device = .noKey; return }
+        myPublicKey = publicKey
+        guard let c = api, !userId.isEmpty, let list = try? await c.devices(userId: userId) else { device = .unknown; return }
+        device = .resolve(devices: list, publicKeyBase64: publicKey)
+    }
+
+    enum DecisionResult: Equatable { case decided(String), refused(String), failed(String) }
+
+    /// Approves or denies. A decision the host would refuse (no enrolment, or the signing window over) is not sent at all, and the
+    /// person is told why; the signature is made on this Mac and covers the exact text the host checks (`ApprovalSigner`).
+    func decide(_ a: Approval, _ d: Decision) async -> DecisionResult {
+        guard let c = api else { return .failed("Connect to a Keep host first.") }
+        var deviceId: String?, signature: String?
+        switch ApprovalGate.readiness(for: a, device: device) {
+        case .expired: return .refused("The signing window for this approval has passed. Ask the agent to try again.")
+        case .needsEnrolment: return .refused("This Mac is not enrolled as an approver yet, so the host would refuse the decision. Enrol it first.")
+        case .noKey: return .refused("This Mac has no Secure Enclave key available to Solvor, so it cannot sign a decision.")
+        case .ready(let signed):
+            if signed {
+                let provide = keyProvider
+                guard let id = device.deviceId, let signer = await Task.detached(operation: { provide().map { ApprovalSigner(key: $0, deviceId: id) } }).value
+                else { return .refused("This Mac's key is not available.") }
+                // The signature is made off the main thread, so waiting for the fingerprint does not freeze the app.
+                do { signature = try await Task.detached { try signer.signature(for: a, decision: d).signature }.value; deviceId = id }
+                catch { return .failed(error.localizedDescription) }
+            }
+        }
+        do {
+            try await c.decide(approval: a.id, d, deviceId: deviceId, signature: signature)
+        } catch { return .failed(error.localizedDescription) }
+        approvals.removeAll { $0.id == a.id }
+        await refreshApprovals()
+        return .decided("\(d == .approved ? "Approved" : "Denied"): \(ApprovalCard(a).title)")
     }
 
     /// One poll: refresh, then tell the person about approvals they have not been told about yet.
@@ -168,7 +222,8 @@ final class AppState: ObservableObject {
         poller?.cancel()
         poller = Task { [weak self] in
             while !Task.isCancelled {
-                guard let interval = self?.pollInterval else { return }
+                guard let me = self else { return }
+                let interval = NSApp?.isActive == true ? me.activePollInterval : me.pollInterval
                 try? await Task.sleep(nanoseconds: interval * 1_000_000_000)
                 guard let self, !Task.isCancelled else { return }
                 await self.pollApprovals()
@@ -252,16 +307,27 @@ final class AppState: ObservableObject {
 }
 
 @MainActor enum Notifier {
-    static func post(title: String, body: String) {
+    nonisolated static let approvalCategoryId = "keep.approval"
+    /// The one action a notification offers is to open the approval in the app. Deciding is never done from a notification: it needs the
+    /// person's fingerprint on the exact text, which only the approval card shows.
+    static var approvalCategory: UNNotificationCategory {
+        UNNotificationCategory(identifier: approvalCategoryId, actions: [UNNotificationAction(identifier: "open", title: "Review", options: [.foreground])], intentIdentifiers: [])
+    }
+    private static var asked = false
+
+    static func post(title: String, body: String, category: String? = nil) {
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            guard granted else { return }
+        func send() {
             let c = UNMutableNotificationContent(); c.title = title; c.body = body
+            if let category { c.categoryIdentifier = category }
             center.add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
         }
+        if asked { send(); return }
+        asked = true
+        center.setNotificationCategories([approvalCategory])
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in if granted { send() } }
     }
 }
-
 
 // MARK: voice and shortcuts
 
