@@ -53,6 +53,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
     /// Files dropped on the Dock icon or opened with the app.
     func application(_ application: NSApplication, open urls: [URL]) {
-        Task { @MainActor in DropRouter.route(urls.filter { $0.isFileURL }, app: AppState.shared) }
+        Task { @MainActor in DropRouter.route(urls.filter { $0.isFileURL }, app: AppState.shared, source: "dock") }
     }
 }

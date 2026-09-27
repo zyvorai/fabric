@@ -10,7 +10,7 @@ final class ServicesProvider: NSObject {
         }
         Task { @MainActor in
             NSApp.activate(ignoringOtherApps: true)
-            DropRouter.route(urls, app: AppState.shared)
+            DropRouter.route(urls, app: AppState.shared, source: "service")
         }
     }
 }

@@ -149,16 +149,23 @@ enum FileExpander {
 }
 
 enum DropRouter {
-    /// Dropped files with no chosen use case: run the best suggestion, or ask when several fit.
-    @MainActor static func route(_ urls: [URL], app: AppState) {
-        let files = FileExpander.files(from: urls)
-        guard let first = files.first else { return }
-        let suggestions = Catalog.suggestions(forFileNamed: first.lastPathComponent, among: app.demos)
-        guard let best = suggestions.first else { app.notice = "No use case reads .\(first.pathExtension) files. Pick a card and drop the file on it."; return }
-        let ext = Set(best.accepts.map { $0.lowercased() })
-        let matching = files.filter { ext.contains($0.pathExtension.lowercased()) }
-        if suggestions.count > 1 && files.count == 1 {
-            app.choice = AppState.ChoiceRequest(title: "Which use case should read \(first.lastPathComponent)?", files: matching, options: Array(suggestions.prefix(6)), source: "drop")
-        } else { app.run(demo: best.id, files: matching) }
+    /// Dropped files with no chosen use case, from anywhere (the window, the Dock icon, a Service, a Shortcut, a watched
+    /// folder): asks `IntakeCoordinator` what to do, then either runs it, asks the person to choose, or says why nothing
+    /// happened. A mixed drop that leaves files out says so — `IntakeCoordinator.leftOutNotice` — instead of going quiet.
+    @MainActor static func route(_ urls: [URL], app: AppState, source: String = "drop") {
+        let plan = IntakeCoordinator.plan(urls: urls, demos: app.demos)
+        switch plan.outcome {
+        case .none:
+            let files = FileExpander.files(from: urls)
+            let ext = files.first.map { ".\($0.pathExtension)" } ?? "that"
+            app.notice = files.isEmpty ? "Nothing there to read." : "No use case reads \(ext) files. Pick a card and drop the file on it."
+        case .choose(let files, let optionIds):
+            let options = optionIds.compactMap { id in app.demos.first { $0.id == id } }
+            let title = "Which use case should read \(files.first?.lastPathComponent ?? "this file")?"
+            app.choice = AppState.ChoiceRequest(title: title, files: files, options: options, source: source)
+        case .run(let demoId, let files):
+            app.run(demo: demoId, files: files, source: source)
+        }
+        if let notice = IntakeCoordinator.leftOutNotice(plan) { app.notice = notice }
     }
 }

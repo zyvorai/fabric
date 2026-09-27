@@ -23,6 +23,10 @@ public struct Demo: Codable, Equatable, Hashable, Identifiable, Sendable {
     public var hasSample: Bool?
     public var maxBytes: Int?
     public var egress: String?
+    public init(id: String, title: String, description: String, accepts: [String], builtin: Bool, hasSample: Bool? = nil, maxBytes: Int? = nil, egress: String? = nil) {
+        self.id = id; self.title = title; self.description = description; self.accepts = accepts; self.builtin = builtin
+        self.hasSample = hasSample; self.maxBytes = maxBytes; self.egress = egress
+    }
 }
 
 struct DemosResponse: Codable { var demos: [Demo] }

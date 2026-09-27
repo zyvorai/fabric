@@ -35,7 +35,14 @@ private final class StubHost: KeepAPI, @unchecked Sendable {
     func decide(approval id: String, _ decision: Decision, deviceId: String?, signature: String?) async throws {
         decisions.append((id, decision, deviceId, signature)); pending.removeAll { $0.id == id }
     }
-    func run(demo: String, files: [URL], maxBytes: Int?) async throws -> RunOutcome { throw KeepError.http(status: 500, message: "not in this test") }
+    var runDelaysUntilCancelled = false
+    func run(demo: String, files: [URL], maxBytes: Int?) async throws -> RunOutcome {
+        if runDelaysUntilCancelled {
+            while !Task.isCancelled { try? await Task.sleep(nanoseconds: 5_000_000) }
+            throw CancellationError()
+        }
+        throw KeepError.http(status: 500, message: "not in this test")
+    }
 }
 
 private final class Counter: @unchecked Sendable {
@@ -50,6 +57,13 @@ private func approval(_ id: String) -> Approval {
 private func signed(_ id: String, expiresIn seconds: Int = 300) -> Approval {
     let exp = Int(Date().timeIntervalSince1970) + seconds
     return try! JSONDecoder.keep.decode(Approval.self, from: Data(#"{"id":"\#(id)","kind":"gmail.send","subject":"Hi","status":"pending","sign":{"format":"keep-approval-v1","challenge":"ch","expires_at":\#(exp),"action_sha256":"ab"}}"#.utf8))
+}
+private func tempFile(_ name: String) -> URL {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("solvor-test-\(UUID().uuidString)")
+    try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let url = dir.appendingPathComponent(name)
+    try! Data("x".utf8).write(to: url)
+    return url
 }
 private func demo(_ id: String) -> Demo {
     try! JSONDecoder.keep.decode(Demo.self, from: Data(#"{"id":"\#(id)","title":"T","description":"d","accepts":[],"builtin":true}"#.utf8))
@@ -241,5 +255,50 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(c.actions.map(\.identifier), ["open"], "there is no approve or deny button on a notification")
         XCTAssertTrue(c.actions.allSatisfy { $0.options.contains(.foreground) })
         XCTAssertEqual(Notifier.approvalCategoryId, "keep.approval")
+    }
+
+    // MARK: cancel and retry
+
+    func testCancellingARunningJobStopsItAndTheLateErrorDoesNotOverwriteThat() async {
+        let app = makeApp()
+        host.demosResult = .success([demo("pdf-brief")])
+        await app.connect()
+        host.runDelaysUntilCancelled = true
+        let file = tempFile("r.pdf")
+        app.run(demo: "pdf-brief", files: [file])
+        let job = app.jobs[0]
+        guard case .running = job.state else { return XCTFail("should still be running") }
+        app.cancelJob(job.id)
+        guard case .failed(let m) = app.jobs[0].state else { return XCTFail("should be failed") }
+        XCTAssertEqual(m, "Cancelled")
+        try? await Task.sleep(nanoseconds: 60_000_000)   // give the cancelled task a chance to race in and overwrite it
+        guard case .failed(let m2) = app.jobs[0].state else { return XCTFail("should still be failed") }
+        XCTAssertEqual(m2, "Cancelled", "the task's own CancellationError must not replace the clean 'Cancelled' state")
+    }
+
+    func testCancellingAJobThatAlreadyFinishedDoesNothing() async {
+        let app = makeApp()
+        host.demosResult = .success([demo("pdf-brief")])
+        await app.connect()
+        let file = tempFile("r.pdf")
+        app.run(demo: "pdf-brief", files: [file])
+        let id = app.jobs[0].id
+        for _ in 0..<50 { if case .failed = app.jobs[0].state { break }; try? await Task.sleep(nanoseconds: 5_000_000) }
+        app.cancelJob(id)
+        guard case .failed(let m) = app.jobs[0].state else { return XCTFail() }
+        XCTAssertNotEqual(m, "Cancelled", "the run had already failed on its own; cancelling afterwards changes nothing")
+    }
+
+    func testRetryRunsTheSameFilesAndSourceAgainAsANewJob() async {
+        let app = makeApp()
+        host.demosResult = .success([demo("pdf-brief")])
+        await app.connect()
+        let file = tempFile("r.pdf")
+        app.run(demo: "pdf-brief", files: [file], source: "drop")
+        let first = app.jobs[0]
+        app.retry(first)
+        XCTAssertEqual(app.jobs.count, 2)
+        XCTAssertEqual(app.jobs[0].demo, "pdf-brief"); XCTAssertEqual(app.jobs[0].files, [file]); XCTAssertEqual(app.jobs[0].source, "drop")
+        XCTAssertNotEqual(app.jobs[0].id, first.id)
     }
 }
