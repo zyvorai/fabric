@@ -1227,6 +1227,69 @@ mod tests {
     }
 
     #[test]
+    fn the_documented_microsoft_examples_are_valid_narrow_per_person_descriptors() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/keep/connectors");
+        let text =
+            std::fs::read_to_string(dir.join("microsoft.per-person.credentials.json")).unwrap();
+        let map: HashMap<String, CredentialDescriptor> = serde_json::from_str(&text).unwrap();
+        assert_eq!(map.len(), 5);
+        for (name, d) in &map {
+            validate_descriptor(name, d).unwrap();
+            let o = d.oauth.as_ref().unwrap();
+            assert_eq!(
+                o.connection.as_deref(),
+                Some("microsoft"),
+                "{name}: rotating refresh tokens need a per-person connection"
+            );
+            assert!(o.client_secret_env.is_empty(), "{name}: a public client");
+            let scopes: Vec<&str> = o.scope.split_whitespace().collect();
+            assert_eq!(
+                scopes.len(),
+                2,
+                "{name}: offline_access and exactly one Graph permission: {scopes:?}"
+            );
+            assert_eq!(d.host, "graph.microsoft.com");
+            if d.allowed_methods.iter().any(|m| m == "POST") {
+                assert!(
+                    d.requires_approval.iter().any(|m| m == "POST")
+                        && d.require_device_signature
+                        && d.preview.is_some(),
+                    "{name}: a write needs a signed decision on a preview"
+                );
+                assert!(
+                    d.path_prefixes.iter().all(|p| p.ends_with('$')),
+                    "{name}: writes are exact paths"
+                );
+            }
+        }
+        let allows = |name: &str, method: reqwest::Method, path: &str| {
+            credential_allows_request(&map[name], &method, path, 443)
+        };
+        use reqwest::Method as M;
+        assert!(allows("outlook-read", M::GET, "/v1.0/me/messages/AAMk123"));
+        assert!(!allows("outlook-read", M::POST, "/v1.0/me/sendMail"));
+        assert!(allows("outlook-draft", M::POST, "/v1.0/me/messages"));
+        assert!(
+            !allows("outlook-draft", M::POST, "/v1.0/me/messages/AAMk123/send"),
+            "a draft credential cannot send a draft"
+        );
+        assert!(!allows("outlook-draft", M::POST, "/v1.0/me/sendMail"));
+        assert!(allows("outlook-send", M::POST, "/v1.0/me/sendMail"));
+        assert!(!allows("outlook-send", M::POST, "/v1.0/me/messages"));
+        assert!(allows("outlook-calendar-write", M::POST, "/v1.0/me/events"));
+        assert!(!allows(
+            "outlook-calendar-write",
+            M::POST,
+            "/v1.0/me/events/abc/accept"
+        ));
+        assert!(!allows(
+            "outlook-calendar-write",
+            M::DELETE,
+            "/v1.0/me/events"
+        ));
+    }
+
+    #[test]
     fn a_descriptor_uses_either_a_host_refresh_token_or_a_persons_connection() {
         let make = |oauth: serde_json::Value, extra: serde_json::Value| {
             let mut d = serde_json::json!({"host": "h", "header": "authorization", "kind": "oauth-refresh", "oauth": oauth});
