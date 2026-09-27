@@ -179,7 +179,9 @@ button { font: inherit; color: inherit; }
 .steps .st.done { color: #2e9e5b; }
 .steps .st.blocked, .steps .st.bad { color: var(--warn); }
 .steps .why { display: block; font-size: .76rem; color: var(--warn); }
-.goal-actions { display: flex; gap: 6px; margin-top: 8px; }
+.goal-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.plan-box { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.plan-box ol.prop { margin: 6px 0 0; padding-left: 20px; }
 .mem-item { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; background: var(--panel-2); border-radius: 12px; padding: 8px 10px; margin: 0 4px; }
 .mem-text { overflow-wrap: anywhere; }
 .badge { display: inline-block; font-size: .68rem; font-weight: 700; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--panel); color: var(--muted); }

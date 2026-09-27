@@ -32,6 +32,13 @@ MEM_ITEM = "55555555-5555-4555-8555-555555555555"
 MEM_PROPOSAL = "66666666-6666-4666-8666-666666666666"
 GOAL_MINE = "77777777-7777-4777-8777-777777777777"
 GOAL_OTHER_AGENT = "88888888-8888-4888-8888-888888888888"
+GOAL_NOPLAN = "99999999-9999-4999-8999-999999999999"
+SUG_MINE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+SUG_TAINTED = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+SUGGESTIONS = {"enabled": True, "decided": [{"id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "title": "old"}],
+               "pending": [{"id": SUG_MINE, "title": "Book the dentist", "reason": "a gap on Friday", "agent": "echo-agent", "proposed_by": "x", "session_id": "leak", "fingerprint": "leak", "tainted": False},
+                           {"id": SUG_TAINTED, "title": "Wire money", "reason": "", "agent": "echo-agent", "tainted": True},
+                           {"id": "not-a-uuid", "title": "bad"}]}
 MEMORY = {"enabled": True,
           "items": [{"id": MEM_ITEM, "text": "vegetarian", "kind": "fact", "pinned": True, "tainted": False, "origin": "user", "source": {"session_id": "s"}, "created_at": "x"}],
           "proposals": [{"id": MEM_PROPOSAL, "text": "likes aisles", "kind": "note", "pinned": False, "tainted": True, "origin": "agent"}]}
@@ -39,6 +46,8 @@ GOALS = {"items": [
     {"id": GOAL_MINE, "agent": "echo-agent", "user_id": "ana", "title": "Trip", "status": "open", "autorun": True, "updated_at": "t", "max_attempts": 3, "session_id": "leak",
      "plan": [{"id": "s1", "title": "a", "status": "done", "detail": "done", "attempts": 1, "input": {"secret": 1}, "session_id": "s"}]},
     {"id": GOAL_OTHER_AGENT, "agent": "someone-else", "user_id": "ana", "title": "No", "status": "open", "autorun": False, "plan": []},
+    {"id": GOAL_NOPLAN, "agent": "echo-agent", "user_id": "ana", "title": "Lisbon", "status": "open", "autorun": False, "plan": [], "planning_session_id": None, "updated_at": "t",
+     "proposed_plan": {"session_id": "leak", "tainted": True, "proposed_at": "t", "steps": [{"title": "Find flights", "input": {"message": "secret"}, "requires_approval": False}, {"title": "Book", "requires_approval": True}]}},
     {"id": "not-a-uuid", "agent": "echo-agent", "title": "bad", "plan": []},
 ]}
 BODIES = []   # (method, path, body) of every write the proxy made to the host
@@ -68,6 +77,8 @@ class Upstream(BaseHTTPRequestHandler):
             return self._json(200, MEMORY)
         if self.path.startswith("/v1/goals?"):
             return self._json(LIST_STATUS[0], GOALS)
+        if self.path.startswith("/v1/suggestions?"):
+            return self._json(200, SUGGESTIONS)
         if self.path.startswith("/v1/threads?"):
             return self._json(LIST_STATUS[0], THREADS)
         if self.path == f"/v1/threads/{MINE}/messages":
@@ -95,6 +106,14 @@ class Upstream(BaseHTTPRequestHandler):
             if data["text"] == "token ghp_x":
                 return self._json(400, {"error": "looks like a secret"})
             return self._json(201, {"id": MEM_ITEM, "text": data["text"], "kind": data["kind"], "pinned": data.get("pinned", False), "tainted": False, "origin": "user", "source": {}})
+        if self.path.startswith("/v1/suggestions/settings"):
+            return self._json(200, {"enabled": data["enabled"]})
+        if self.path.startswith("/v1/suggestions/"):
+            return self._json(200, {"suggestion": {"id": self.path.split("/")[3]}})
+        if self.path.startswith("/v1/goals/") and "/plan" in self.path:
+            if self.path.endswith("/plan"):
+                return self._json(202 if GOALS.get("_plan_ok", True) else 400, {"goal_id": "x"} if GOALS.get("_plan_ok", True) else {"error": "no planner agent"})
+            return self._json(200, {"id": self.path.split("/")[3]})
         if self.path == "/v1/goals":
             if data["title"] == "quota":
                 return self._json(429, {"error": "at most 5"})
@@ -112,7 +131,7 @@ class Upstream(BaseHTTPRequestHandler):
         self._write("PATCH")
 
     def do_POST(self):
-        if self.path.startswith("/v1/memory") or self.path.startswith("/v1/goals"):
+        if self.path.startswith("/v1/memory") or self.path.startswith("/v1/goals") or self.path.startswith("/v1/suggestions"):
             return self._write("POST")
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         data = json.loads(body)
@@ -353,8 +372,8 @@ class ChatProxy(unittest.TestCase):
         r, body, _ = self.req("GET", "/goals")
         self.assertEqual(r.status, 200)
         items = json.loads(body)["items"]
-        self.assertEqual([g["id"] for g in items], [GOAL_MINE], "another agent's goal and one with a bad id are not shown")
-        self.assertEqual(set(items[0]), {"id", "title", "status", "autorun", "updated_at", "plan"})
+        self.assertEqual([g["id"] for g in items], [GOAL_MINE, GOAL_NOPLAN], "another agent's goal and one with a bad id are not shown")
+        self.assertEqual(set(items[0]), {"id", "title", "status", "autorun", "updated_at", "plan", "planning", "proposed"})
         self.assertEqual(set(items[0]["plan"][0]), {"id", "title", "status", "detail", "attempts"}, "no step input, no session id")
         g = [c for c in CALLS if c[1].startswith("/v1/goals?")][0][1]
         self.assertIn("agent=echo-agent", g)
@@ -366,7 +385,7 @@ class ChatProxy(unittest.TestCase):
         sent = self.sent("POST", "/v1/goals")[0][2]
         self.assertEqual(sent, {"title": "Weekend trip", "agent": "echo-agent", "autorun": True, "plan": [{"title": "Find flights"}, {"title": "Book"}]}, "agent fixed, user token sends no user_id, nothing else forwarded")
         self.assertEqual(json.loads(body)["plan"][1]["title"], "Book")
-        for bad in ({"title": "", "steps": ["a"]}, {"title": "t", "steps": []}, {"title": "t", "steps": ["a"] * 21}, {"title": "t", "steps": ["a" * 201]}, {"title": "t" * 121, "steps": ["a"]}, {"title": "t", "steps": "a"}, [1]):
+        for bad in ({"title": "", "steps": ["a"]}, {"title": "t", "steps": [], "autorun": True}, {"title": "t", "steps": ["a"] * 21}, {"title": "t", "steps": ["a" * 201]}, {"title": "t" * 121, "steps": ["a"]}, {"title": "t", "steps": "a"}, [1]):
             self.assertEqual(self.req("POST", "/goals", bad)[0].status, 400, bad)
         self.assertEqual(self.req("POST", "/goals", {"title": "quota", "steps": ["a"], "autorun": True})[0].status, 429, "the host's limit is passed on")
 
@@ -383,6 +402,71 @@ class ChatProxy(unittest.TestCase):
         self.assertFalse(BODIES, "nothing else reached the host")
         self.assertEqual(self.req("DELETE", f"/goals/{GOAL_MINE}")[0].status, 404, "the page cannot delete goals")
         self.assertEqual(self.req("GET", f"/goals/{GOAL_MINE}")[0].status, 404)
+
+    def test_a_proposed_plan_reaches_the_page_as_titles_only(self):
+        r, body, _ = self.req("GET", "/goals")
+        g = [g for g in json.loads(body)["items"] if g["id"] == GOAL_NOPLAN][0]
+        self.assertEqual(g["proposed"], {"tainted": True, "steps": [{"title": "Find flights", "requires_approval": False}, {"title": "Book", "requires_approval": True}]}, "no step input, no session id")
+        self.assertEqual(g["planning"], False)
+
+    def test_planning_is_asked_for_and_accepted_only_for_a_listed_goal_with_a_filtered_body(self):
+        BODIES.clear(); CALLS.clear()
+        self.assertEqual(self.req("POST", f"/goals/{GOAL_NOPLAN}/plan", None, {"Content-Length": "0"})[0].status, 200)
+        self.assertEqual(self.sent("POST", f"/v1/goals/{GOAL_NOPLAN}/plan")[-1][2], {}, "no planner can be named from the page")
+        r, _, _ = self.req("POST", f"/goals/{GOAL_NOPLAN}/plan/accept", {"confirm_tainted": True, "autorun": True, "agent": "evil", "plan": [1], "planner": "evil"})
+        self.assertEqual(r.status, 200)
+        self.assertEqual(self.sent("POST", f"/v1/goals/{GOAL_NOPLAN}/plan/accept")[-1][2], {"confirm_tainted": True, "autorun": True}, "only the two switches are forwarded")
+        self.req("POST", f"/goals/{GOAL_NOPLAN}/plan/accept", {"confirm_tainted": "yes", "autorun": 1})
+        self.assertEqual(self.sent("POST", f"/v1/goals/{GOAL_NOPLAN}/plan/accept")[-1][2], {}, "only a real true counts")
+        self.assertEqual(self.req("POST", f"/goals/{GOAL_NOPLAN}/plan/reject", None, {"Content-Length": "0"})[0].status, 200)
+        n = len(BODIES)
+        for other in (GOAL_OTHER_AGENT, "44444444-4444-4444-8444-444444444444", "not-a-uuid"):
+            for tail in ("/plan", "/plan/accept", "/plan/reject"):
+                self.assertIn(self.req("POST", f"/goals/{other}{tail}", None, {"Content-Length": "0"})[0].status, (404,), (other, tail))
+        self.assertEqual(len(BODIES), n, "nothing reached the host for a goal it does not list for this agent")
+        self.assertEqual(self.req("POST", f"/goals/{GOAL_NOPLAN}/plan/accept", [1])[0].status, 400)
+        self.assertEqual(self.req("POST", f"/goals/{GOAL_NOPLAN}/plan/delete", None, {"Content-Length": "0"})[0].status, 404)
+
+    def test_the_host_saying_there_is_no_planner_reaches_the_page(self):
+        GOALS["_plan_ok"] = False
+        try:
+            r, body, _ = self.req("POST", f"/goals/{GOAL_NOPLAN}/plan", None, {"Content-Length": "0"})
+            self.assertEqual(r.status, 400)
+            self.assertIn(b"no planner agent", body)
+        finally:
+            GOALS.pop("_plan_ok", None)
+
+    def test_suggestions_are_read_with_only_what_the_page_shows_and_decided_only_if_listed(self):
+        r, body, _ = self.req("GET", "/suggestions")
+        v = json.loads(body)
+        self.assertEqual(r.status, 200)
+        self.assertEqual(v["enabled"], True)
+        self.assertEqual([s["id"] for s in v["pending"]], [SUG_MINE, SUG_TAINTED], "a bad id is not shown")
+        self.assertEqual(set(v["pending"][0]), {"id", "title", "reason", "agent", "tainted"}, "no session id, no digest")
+        self.assertNotIn("decided", v)
+        BODIES.clear()
+        self.assertEqual(self.req("PUT", "/suggestions/settings", {"enabled": False})[0].status, 204)
+        self.assertEqual(self.sent("PUT", "/v1/suggestions/settings")[-1][2], {"enabled": False})
+        for bad in ({"enabled": "yes"}, {}, [1]):
+            self.assertEqual(self.req("PUT", "/suggestions/settings", bad)[0].status, 400, bad)
+        self.assertEqual(self.req("POST", f"/suggestions/{SUG_MINE}/accept", None, {"Content-Length": "0"})[0].status, 200)
+        self.assertEqual(self.sent("POST", f"/v1/suggestions/{SUG_MINE}/accept")[-1][2], {}, "an untainted accept forwards no options")
+        self.assertEqual(self.req("POST", f"/suggestions/{SUG_TAINTED}/accept", {"confirm_tainted": True, "x": 1})[0].status, 200)
+        self.assertEqual(self.sent("POST", f"/v1/suggestions/{SUG_TAINTED}/accept")[-1][2], {"confirm_tainted": True})
+        self.assertEqual(self.req("POST", f"/suggestions/{SUG_MINE}/dismiss", {"confirm_tainted": True})[0].status, 200)
+        self.assertEqual(self.sent("POST", f"/v1/suggestions/{SUG_MINE}/dismiss")[-1][2], {}, "dismiss forwards nothing")
+        n = len(BODIES)
+        for other in ("44444444-4444-4444-8444-444444444444", "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "not-a-uuid"):
+            for action in ("accept", "dismiss"):
+                self.assertEqual(self.req("POST", f"/suggestions/{other}/{action}", None, {"Content-Length": "0"})[0].status, 404, (other, action))
+        self.assertEqual(len(BODIES), n, "nothing reached the host for a suggestion it does not list as pending")
+        self.assertEqual(self.req("DELETE", f"/suggestions/{SUG_MINE}")[0].status, 404)
+
+    def test_suggestion_and_plan_writes_need_the_same_origin_and_host(self):
+        for method, path, body in [("PUT", "/suggestions/settings", {"enabled": True}), ("POST", f"/suggestions/{SUG_MINE}/accept", {}),
+                                   ("POST", f"/suggestions/{SUG_MINE}/dismiss", {}), ("POST", f"/goals/{GOAL_NOPLAN}/plan", {}), ("POST", f"/goals/{GOAL_NOPLAN}/plan/accept", {})]:
+            self.assertEqual(self.req(method, path, body, {"Origin": "http://evil.example"})[0].status, 403, (method, path))
+            self.assertEqual(self.req(method, path, body, {"Host": "evil.example"})[0].status, 421, (method, path))
 
     def test_every_write_needs_the_same_origin_and_host(self):
         for method, path, body in [("PUT", "/memory/settings", {"enabled": True}), ("POST", "/memory", {"text": "x"}), ("POST", f"/memory/{MEM_PROPOSAL}/accept", {}),
@@ -432,7 +516,8 @@ class ChatProxy(unittest.TestCase):
         self.assertEqual(keep_chat.project_memory(None), {"enabled": False, "items": [], "proposals": []})
         self.assertEqual(keep_chat.project_goals({"items": [{"id": "x"}]}, "a"), [])
         with self.assertRaises(ValueError):
-            keep_chat.clean_goal_request({"title": "t", "steps": []})
+            keep_chat.clean_goal_request({"title": "t", "steps": [], "autorun": True})
+        self.assertEqual(keep_chat.clean_goal_request({"title": "t", "steps": []}), {"title": "t", "steps": [], "autorun": False}, "no steps: an agent can plan it")
         self.assertEqual(keep_chat.clean_goal_request({"title": "t", "steps": ["a", " "]}), {"title": "t", "steps": ["a"], "autorun": False})
 
     def test_force_agent_and_host_checks(self):
