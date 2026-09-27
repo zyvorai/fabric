@@ -67,9 +67,26 @@ def project_memory(view):
 
 
 def project_goal(g):
+    prop = g.get("proposed_plan") if isinstance(g.get("proposed_plan"), dict) else None
     return {
         "id": g.get("id"), "title": g.get("title"), "status": g.get("status"), "autorun": bool(g.get("autorun")), "updated_at": g.get("updated_at"),
         "plan": [{k: st.get(k) for k in ("id", "title", "status", "detail", "attempts")} for st in g.get("plan", []) if isinstance(st, dict)],
+        # a plan an agent proposed, waiting for the person: only what they need to read before accepting
+        "planning": bool(g.get("planning_session_id")),
+        "proposed": None if prop is None else {
+            "tainted": bool(prop.get("tainted")),
+            "steps": [{"title": s.get("title"), "requires_approval": bool(s.get("requires_approval"))} for s in prop.get("steps", []) if isinstance(s, dict)],
+        },
+    }
+
+
+def project_suggestions(view):
+    """The host's suggestions for this person, as the page shows them: the switch and what is waiting."""
+    view = view or {}
+    keep = ("id", "title", "reason", "agent", "tainted")
+    return {
+        "enabled": bool(view.get("enabled")),
+        "pending": [{k: s.get(k) for k in keep} for s in view.get("pending", []) if isinstance(s, dict) and UUID.fullmatch(str(s.get("id", "")))],
     }
 
 
@@ -79,15 +96,18 @@ def project_goals(listing, agent: str):
 
 
 def clean_goal_request(data):
-    """The browser's goal, reduced to a title, up to 20 step titles and the run-automatically switch. Raises ValueError otherwise."""
+    """The browser's goal, reduced to a title, up to 20 step titles (none: an agent can propose them) and the run-automatically switch.
+    Raises ValueError otherwise."""
     if not isinstance(data, dict):
         raise ValueError("the request must be a JSON object")
     title = str(data.get("title", "")).strip()
     steps = [str(x).strip() for x in data.get("steps", []) if str(x).strip()] if isinstance(data.get("steps", []), list) else None
     if not title or len(title) > 120:
         raise ValueError("a goal needs a title of at most 120 characters")
-    if not steps or len(steps) > 20 or any(len(x) > 200 for x in steps):
-        raise ValueError("a goal needs 1 to 20 steps of at most 200 characters")
+    if steps is None or len(steps) > 20 or any(len(x) > 200 for x in steps):
+        raise ValueError("a goal has at most 20 steps of at most 200 characters")
+    if not steps and data.get("autorun"):
+        raise ValueError("a goal with no steps cannot run automatically: ask for a plan and accept it first")
     return {"title": title, "steps": steps, "autorun": bool(data.get("autorun"))}
 
 
@@ -212,6 +232,26 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
                 self._send(400, b"bad json")
                 return None
 
+        def _optional_body(self):
+            """A small JSON object, or {} when there is no body. None (after answering) when the body is not an object."""
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                self._send(400, b"bad content-length")
+                return None
+            if length <= 0:
+                return {}
+            data = self._json_body()
+            if not isinstance(data, dict):
+                if data is not None:
+                    self._send(400, b"the body must be a JSON object")
+                return None
+            return data
+
+        def _suggestions_view(self, owner):
+            status, view = self._upstream("GET", "/v1/suggestions?" + urllib.parse.urlencode({"user_id": owner}))
+            return project_suggestions(view) if status == 200 else None
+
         def _memory_view(self, owner):
             status, view = self._upstream("GET", "/v1/memory?" + urllib.parse.urlencode({"user_id": owner}))
             return project_memory(view) if status == 200 else None
@@ -283,6 +323,53 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
                     if st == 201 and isinstance(goal, dict):
                         return self._json(201, project_goal(goal))
                     return self._send(429 if st == 429 else 400 if st in (400, 404) else 502, (json.dumps(goal) if isinstance(goal, dict) else "the Keep host refused").encode(), "application/json")
+                if path == "/suggestions" and method == "GET":
+                    view = self._suggestions_view(owner)
+                    return self._json(200, view) if view is not None else self._send(502, b"the Keep host did not return suggestions")
+                if path == "/suggestions/settings" and method == "PUT":
+                    data = self._json_body()
+                    if data is None:
+                        return
+                    if not isinstance(data, dict) or not isinstance(data.get("enabled"), bool):
+                        return self._send(400, b"enabled must be true or false")
+                    st, _ = self._upstream("PUT", "/v1/suggestions/settings" + q, {"enabled": data["enabled"]})
+                    return self._send(204 if st == 200 else 502)
+                m = re.fullmatch(r"/suggestions/([0-9a-f-]{36})/(accept|dismiss)", path)
+                if m and UUID.fullmatch(m.group(1)) and method == "POST":
+                    sid, action = m.group(1), m.group(2)
+                    data = self._optional_body()
+                    if data is None:
+                        return
+                    view = self._suggestions_view(owner)
+                    if view is None:
+                        return self._send(502, b"the Keep host did not return suggestions")
+                    if sid not in {s["id"] for s in view["pending"]}:
+                        return self._send(404, b"not found")
+                    body = {"confirm_tainted": True} if action == "accept" and data.get("confirm_tainted") is True else {}
+                    st, res = self._upstream("POST", f"/v1/suggestions/{sid}/{action}" + q, body)
+                    if st == 200:
+                        return self._json(200, {"ok": True})
+                    return self._send(409 if st == 409 else 429 if st == 429 else 502, (json.dumps(res) if isinstance(res, dict) else "the Keep host refused").encode(), "application/json")
+                m = re.fullmatch(r"/goals/([0-9a-f-]{36})/plan(?:/(accept|reject))?", path)
+                if m and UUID.fullmatch(m.group(1)) and method == "POST":
+                    gid, action = m.group(1), m.group(2)
+                    data = self._optional_body()
+                    if data is None:
+                        return
+                    goals = self._my_goals(owner)
+                    if goals is None:
+                        return self._send(502, b"the Keep host did not list goals")
+                    if gid not in {g["id"] for g in goals}:
+                        return self._send(404, b"not found")
+                    body = {}
+                    if action == "accept":
+                        for k in ("confirm_tainted", "autorun"):
+                            if data.get(k) is True:
+                                body[k] = True
+                    st, res = self._upstream("POST", f"/v1/goals/{gid}/plan" + (f"/{action}" if action else ""), body)
+                    if st in (200, 202):
+                        return self._json(200, {"ok": True})
+                    return self._send(st if st in (400, 404, 409, 429) else 502, (json.dumps(res) if isinstance(res, dict) else "the Keep host refused").encode(), "application/json")
                 m = re.fullmatch(r"/goals/([0-9a-f-]{36})", path)
                 if m and UUID.fullmatch(m.group(1)) and method == "PATCH":
                     data = self._json_body()
@@ -316,7 +403,7 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             path = self.path.split("?", 1)[0]
             if path == "/threads" or path.startswith("/threads/"):
                 return self._thread_route("GET", path)
-            if path in ("/memory", "/goals"):
+            if path in ("/memory", "/goals", "/suggestions"):
                 return self._person_route("GET", path)
             item = STATIC.get(path)
             if not item:
@@ -343,7 +430,7 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             if not self._host_ok() or not self._origin_ok():
                 return
             path = self.path.split("?", 1)[0]
-            if path.startswith("/memory") or path.startswith("/goals"):
+            if path.startswith(("/memory", "/goals", "/suggestions")):
                 return self._person_route(method, path)
             self._send(404, b"not found")
 
@@ -357,7 +444,12 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             if not self._host_ok():
                 return
             path = self.path.split("?", 1)[0]
-            if path in ("/memory", "/goals") or (path.startswith("/memory/") and path.endswith(("/accept", "/reject"))):
+            if (
+                path in ("/memory", "/goals")
+                or (path.startswith("/memory/") and path.endswith(("/accept", "/reject")))
+                or (path.startswith("/goals/") and "/plan" in path)
+                or (path.startswith("/suggestions/") and path.endswith(("/accept", "/dismiss")))
+            ):
                 if not self._origin_ok():
                     return
                 return self._person_route("POST", path)

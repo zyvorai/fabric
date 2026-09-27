@@ -256,13 +256,13 @@ function showTab(name) {
   tab = name;
   for (const k of Object.keys(tabs)) { const on = k === name; tabs[k].classList.toggle("active", on); tabs[k].setAttribute("aria-selected", String(on)); panes[k].hidden = !on; }
   listEl.classList.toggle("tab-goals", name === "goals"); listEl.classList.toggle("tab-memory", name === "memory");
-  if (name === "goals") refreshGoals(); if (name === "memory") refreshMemory();
+  if (name === "goals") { refreshGoals(); refreshSuggestions(); } if (name === "memory") refreshMemory();
   clearInterval(pollTimer);
-  pollTimer = setInterval(() => { if (document.hidden) return; if (tab === "goals") refreshGoals(); if (tab === "memory") refreshMemory(); }, 5000);
+  pollTimer = setInterval(() => { if (document.hidden) return; if (tab === "goals") { refreshGoals(); refreshSuggestions(); } if (tab === "memory") refreshMemory(); }, 5000);
 }
 for (const k of Object.keys(tabs)) tabs[k].addEventListener("click", () => showTab(k));
 // coming back to a tab that was in the background: catch up at once instead of waiting for the next tick
-document.addEventListener("visibilitychange", () => { if (document.hidden) return; if (tab === "goals") refreshGoals(); if (tab === "memory") refreshMemory(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) return; if (tab === "goals") { refreshGoals(); refreshSuggestions(); } if (tab === "memory") refreshMemory(); });
 
 async function api(method, path, body) {
   const res = await fetch(path, { method, headers: body === undefined ? {} : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -310,6 +310,7 @@ function renderGoals(items) {
       row.appendChild(label); steps.appendChild(row);
     }
     li.append(top, bar, el("div", "fine-print", finished + " of " + plan.length + " steps" + (g.autorun ? " · runs automatically" : " · paused")), steps);
+    if (plan.length === 0 && (g.status === "open" || g.status === "blocked")) li.appendChild(planBox(g));
     if (g.status === "open" || g.status === "blocked") {
       const actions = el("div", "goal-actions");
       const toggle = el("button", "ghost-btn", g.autorun ? "Pause" : "Run automatically"); toggle.type = "button";
@@ -321,6 +322,34 @@ function renderGoals(items) {
     goalsEl.appendChild(li);
   }
 }
+// A goal with no plan: ask the agent to propose one, read it, then accept or discard it. Nothing runs until it is accepted.
+function planBox(g) {
+  const box = el("div", "plan-box");
+  const done = () => { lastGoals = ""; refreshGoals(); };
+  const say = (r) => { goalMsg.classList.toggle("bad", !r.ok); goalMsg.textContent = r.ok ? "" : why(r); };
+  if (g.proposed) {
+    box.appendChild(el("strong", "", "Proposed plan"));
+    if (g.proposed.tainted) box.appendChild(el("p", "why", "The agent had read untrusted content while planning. Read every step before accepting."));
+    const ol = el("ol", "prop"); for (const s of g.proposed.steps) ol.appendChild(el("li", "", (s.title || "") + (s.requires_approval ? "  (asks you first)" : "")));
+    box.appendChild(ol);
+    const actions = el("div", "goal-actions");
+    const accept = el("button", "ghost-btn", "Accept"); accept.type = "button";
+    const run = el("button", "ghost-btn", "Accept and run"); run.type = "button";
+    const drop = el("button", "ghost-btn", "Discard"); drop.type = "button";
+    const decide = (autorun) => async () => { const r = await api("POST", "/goals/" + encodeURIComponent(g.id) + "/plan/accept", { confirm_tainted: g.proposed.tainted, autorun }); say(r); done(); };
+    if (g.proposed.tainted) { twoClick(accept, "Accept", decide(false)); twoClick(run, "Accept and run", decide(true)); }
+    else { accept.addEventListener("click", decide(false)); run.addEventListener("click", decide(true)); }
+    drop.addEventListener("click", async () => { const r = await api("POST", "/goals/" + encodeURIComponent(g.id) + "/plan/reject"); say(r); done(); });
+    actions.append(accept, run, drop); box.appendChild(actions);
+  } else if (g.planning) {
+    box.appendChild(el("p", "fine-print", "Your agent is planning this…"));
+  } else {
+    const ask = el("button", "ghost-btn", "Ask the agent for a plan"); ask.type = "button";
+    ask.addEventListener("click", async () => { ask.disabled = true; const r = await api("POST", "/goals/" + encodeURIComponent(g.id) + "/plan"); say(r); done(); });
+    box.appendChild(ask);
+  }
+  return box;
+}
 $("goal-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const title = $("goal-title").value.trim();
@@ -329,6 +358,36 @@ $("goal-form").addEventListener("submit", async (ev) => {
   goalMsg.classList.toggle("bad", !r.ok); goalMsg.textContent = r.ok ? "Added." : why(r);
   if (r.ok) { $("goal-title").value = ""; $("goal-steps").value = ""; lastGoals = ""; refreshGoals(); }
 });
+
+// ---- suggestions: things an agent thinks you might want done. Accepting one makes a goal; nothing else happens. ----
+const sugList = $("sug-list"), sugMsg = $("sug-msg");
+let sugEnabled = false, lastSug = "";
+async function refreshSuggestions() {
+  const r = await api("GET", "/suggestions");
+  if (!r.ok) return;
+  const snap = JSON.stringify(r.data);
+  if (snap === lastSug) return;
+  lastSug = snap; sugEnabled = !!r.data.enabled;
+  $("sug-state").textContent = sugEnabled ? "Suggestions are on" : "Suggestions are off";
+  $("sug-toggle").textContent = sugEnabled ? "Turn off" : "Turn on"; $("sug-toggle").setAttribute("aria-pressed", String(sugEnabled));
+  const items = r.data.pending || [];
+  $("sug-h").hidden = items.length === 0; sugList.textContent = "";
+  for (const s of items) {
+    const li = el("li", "mem-item");
+    const text = el("div", "mem-text");
+    text.appendChild(el("strong", "", s.title || ""));
+    if (s.reason) text.appendChild(el("div", "fine-print", s.reason));
+    if (s.tainted) text.appendChild(el("div", "why", "Made by an agent that had read untrusted content."));
+    const actions = el("div", "mem-actions");
+    const yes = el("button", "ghost-btn", "Make it a goal"); yes.type = "button";
+    const no = el("button", "ghost-btn", "Dismiss"); no.type = "button";
+    const act = (path, body) => async () => { const r2 = await api("POST", "/suggestions/" + encodeURIComponent(s.id) + "/" + path, body); sugMsg.classList.toggle("bad", !r2.ok); sugMsg.textContent = r2.ok ? "" : why(r2); lastSug = ""; lastGoals = ""; refreshSuggestions(); refreshGoals(); };
+    if (s.tainted) twoClick(yes, "Make it a goal", act("accept", { confirm_tainted: true })); else yes.addEventListener("click", act("accept"));
+    no.addEventListener("click", act("dismiss"));
+    actions.append(yes, no); li.append(text, actions); sugList.appendChild(li);
+  }
+}
+$("sug-toggle").addEventListener("click", async () => { const r = await api("PUT", "/suggestions/settings", { enabled: !sugEnabled }); sugMsg.classList.toggle("bad", !r.ok); sugMsg.textContent = r.ok ? "" : why(r); lastSug = ""; refreshSuggestions(); });
 
 // ---- memory ----
 const memItems = $("mem-items"), memProps = $("mem-props"), memMsg = $("mem-msg");

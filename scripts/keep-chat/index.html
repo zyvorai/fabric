@@ -27,17 +27,29 @@
       </section>
 
       <section id="pane-goals" class="pane" role="tabpanel" aria-labelledby="tab-goals" hidden>
+        <div class="card">
+          <div class="switch-row">
+            <div>
+              <strong id="sug-state">Suggestions are off</strong>
+              <p class="fine-print">Off: agents suggest nothing. On: an agent may suggest things to do; nothing happens until you accept one.</p>
+            </div>
+            <button id="sug-toggle" type="button" class="primary small" aria-pressed="false">Turn on</button>
+          </div>
+        </div>
+        <h3 id="sug-h" class="sub-h" hidden>Suggested for you</h3>
+        <ul id="sug-list" class="mem"></ul>
+        <p id="sug-msg" class="msgline" role="status"></p>
         <form id="goal-form" class="card form" autocomplete="off">
           <label class="sr" for="goal-title">Goal</label>
           <input id="goal-title" type="text" placeholder="A goal, e.g. Plan the weekend trip" maxlength="120" required>
           <label class="sr" for="goal-steps">Steps, one per line</label>
-          <textarea id="goal-steps" rows="3" placeholder="One step per line" required></textarea>
+          <textarea id="goal-steps" rows="3" placeholder="One step per line (or leave empty and ask your agent to plan it)"></textarea>
           <label class="check"><input id="goal-auto" type="checkbox"> Run the steps automatically</label>
           <button type="submit" class="primary">Add goal</button>
           <p id="goal-msg" class="msgline" role="status"></p>
         </form>
         <ul id="goals" class="goals"></ul>
-        <p id="goals-empty" class="list-empty" hidden>No goals yet.<br>Add one above.</p>
+        <p id="goals-empty" class="list-empty" hidden>No goals yet.<br>Add one above, or accept a suggestion.</p>
       </section>
 
       <section id="pane-memory" class="pane" role="tabpanel" aria-labelledby="tab-memory" hidden>
