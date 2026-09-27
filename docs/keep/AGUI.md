@@ -48,6 +48,7 @@ It is the lightest client, not a product: one agent, no search, and no attachmen
 | `session.log`, stderr | `CUSTOM` `keep.log` (not assistant text) |
 | `session.waiting`, `session.running` | `CUSTOM` `keep.waiting`, `keep.running` |
 | an event the agent emitted with `ctx.emit` | `CUSTOM` `keep.event` with `{kind, data}` |
+| `card.propose` from an agent whose manifest set `"card": true` ([cards](card/README.md)) | `CUSTOM` `keep.card` with `{kind, fields, artifact_id}` — a host-cleaned, read-only display, saved as an artifact too; never an approval, decides nothing |
 | `approval.requested` | `TEXT_MESSAGE_END` if open, then `CUSTOM` `keep.approval_requested` with the prompt |
 | an approval the host holds for the agent (a request that needs a person, e.g. sending mail), while it waits | `CUSTOM` `keep.approval_requested` with `{approval_id, kind, prompt, preview}` (`preview` is the host's rendering of what would be sent, when the credential has one; see [connectors](connectors/README.md)), then `CUSTOM` `keep.approval_decided` with `{approval_id, decision}` (`approved`, `denied` or `expired`) |
 | `session.result` | a text message if the result is a string, then `RUN_FINISHED` with `result` |

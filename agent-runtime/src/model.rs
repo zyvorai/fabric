@@ -86,6 +86,11 @@ pub struct AgentManifest {
     /// suggestions on. Off by default; a deployment that does not set it serializes exactly as before.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub suggestions: bool,
+    /// The agent may show a [card](crate::card) (`card.propose` events) — a rich, read-only, host-cleaned display that plays back in
+    /// the chat and is also saved as an artifact. It decides nothing and needs no other opt-in from the person. Off by default; a
+    /// deployment that does not set it serializes exactly as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub card: bool,
     #[serde(default)]
     pub ttl_seconds: Option<u64>,
     /// Maximum number of non-terminal sessions for this agent deployment.
@@ -1228,6 +1233,7 @@ mod home_volume_tests {
             runtime_port: 8080,
             memory: false,
             suggestions: false,
+            card: false,
             ttl_seconds: None,
             max_concurrent_sessions: Some(1),
             idle_hibernate_seconds: None,

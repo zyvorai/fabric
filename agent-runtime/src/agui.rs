@@ -210,6 +210,12 @@ impl Mapper {
             "session.waiting" | "session.running" => {
                 out.push(json!({"type": "CUSTOM", "name": format!("keep.{}", &ev.kind["session.".len()..]), "value": d}));
             }
+            // A card the host already cleaned and saved as an artifact (crate::card). Distinct from the generic `keep.event`
+            // fallthrough below: this one carries only host-checked kind/fields, never whatever shape the agent actually sent.
+            "card.rendered" => {
+                out.push(json!({"type": "CUSTOM", "name": "keep.card",
+                    "value": {"kind": d.get("kind"), "fields": d.get("fields"), "artifact_id": d.get("artifact_id")}}));
+            }
             "session.result" => {
                 self.close(&mut out);
                 if let Some(text) = d.as_str() {
@@ -717,6 +723,31 @@ mod tests {
         let (a, done) = m.map(&ev("session.waiting", json!({"timeout_ms": 5})), "t", "r");
         assert!(!done);
         assert_eq!(a[0]["name"], "keep.waiting");
+    }
+
+    #[test]
+    fn a_rendered_card_is_its_own_custom_event_not_the_generic_one() {
+        let mut m = Mapper::default();
+        let (e, done) = m.map(
+            &ev(
+                "card.rendered",
+                json!({"kind": "suggestion-digest", "fields": [{"label": "Headphones", "value": "dropped to 140"}], "artifact_id": "a1"}),
+            ),
+            "t",
+            "r",
+        );
+        assert!(!done);
+        assert_eq!(e[0]["type"], "CUSTOM");
+        assert_eq!(e[0]["name"], "keep.card");
+        assert_eq!(e[0]["value"]["kind"], "suggestion-digest");
+        assert_eq!(
+            e[0]["value"]["fields"],
+            json!([{"label": "Headphones", "value": "dropped to 140"}])
+        );
+        assert_eq!(e[0]["value"]["artifact_id"], "a1");
+        // a refused one (the manifest did not ask, or it failed validation) is not a card event: nothing to show
+        let (e, _) = m.map(&ev("card.refused", json!({"reason": "x"})), "t", "r");
+        assert_ne!(e[0]["name"], "keep.card");
     }
 
     #[test]

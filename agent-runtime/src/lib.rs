@@ -9,6 +9,7 @@ pub mod audit;
 pub mod authz;
 pub mod browse_ifc;
 pub mod browser;
+pub mod card;
 pub mod config;
 pub mod confine;
 pub mod connections;

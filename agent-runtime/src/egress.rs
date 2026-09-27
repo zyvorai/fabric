@@ -1155,6 +1155,7 @@ pub(crate) mod ask_tests {
             runtime_port: 8080,
             memory: false,
             suggestions: false,
+            card: false,
             ttl_seconds: None,
             max_concurrent_sessions: None,
             idle_hibernate_seconds: None,
