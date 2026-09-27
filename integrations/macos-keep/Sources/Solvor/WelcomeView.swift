@@ -14,24 +14,27 @@ struct WelcomeView: View {
                 Text("Drop a file. It is read inside a sealed cell that has no network. You get the answer, and the proof.").multilineTextAlignment(.center).foregroundStyle(.secondary).appear(delay: 0.65)
             }
             VStack(alignment: .leading, spacing: 14) {
-                step("1", "Connect", "Add the address of your Keep host and a user token in Settings. The token stays in your Keychain.", "link").appear(delay: 0.8)
+                step("1", "Connect", "Solvor looks for a host on this Mac. Otherwise add an address and a token; it stays in your Keychain.", "link").appear(delay: 0.8)
                 step("2", "Drop anything", "PDFs, statements, logs, chats, decks, or an email from your browser. Solvor suggests the right use case.", "square.and.arrow.down").appear(delay: 0.9)
                 step("3", "See the proof", "Every result shows how many outbound connections the cell made: zero.", "lock.shield").appear(delay: 1.0)
             }
             .padding(18).card()
-            HStack {
-                Button("Open Settings") { app.pane = .settings; app.welcomed = true; dismiss() }.primaryButton().controlSize(.large)
+            if app.connected {
+                Label("Connected\(app.userId.isEmpty ? "" : " as \(app.userId)")", systemImage: "checkmark.seal.fill").foregroundStyle(Brand.good).font(.headline).transition(.scale.combined(with: .opacity))
+                Button("Start") { app.welcomed = true; dismiss() }.primaryButton().controlSize(.large)
+            } else {
+                ConnectForm().padding(18).card().appear(delay: 1.1)
                 Button("Later") { app.welcomed = true; dismiss() }.secondaryButton().controlSize(.large)
-            }.appear(delay: 1.1)
+            }
         }
-        .padding(30).frame(width: 520)
+        .padding(30).frame(width: 560).animation(Motion.spring, value: app.connected)
         .background(AuroraBackground(intensity: 0.9))
     }
 
     private func step(_ n: String, _ title: String, _ text: String, _ icon: String) -> some View {
         HStack(alignment: .top, spacing: 14) {
             AccentTile(symbol: icon, size: 34)
-            VStack(alignment: .leading, spacing: 2) { Text(title).font(.headline); Text(text).font(.callout).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 2) { Text(title).font(.headline); Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
         }
     }
 }

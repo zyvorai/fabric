@@ -19,14 +19,24 @@ struct Job: Identifiable {
 final class AppState: ObservableObject {
     static let shared = AppState()
 
-    // Connection
-    @AppStorage("host") var host: String = ""
+    // Connection. The host and the user id live in `defaults`, so a test can use a scratch suite instead of the app's own.
+    let defaults: UserDefaults
+    var host: String {
+        get { defaults.string(forKey: "host") ?? "" }
+        set { objectWillChange.send(); defaults.set(newValue, forKey: "host") }
+    }
+    var userId: String {
+        get { defaults.string(forKey: "userId") ?? "" }
+        set { objectWillChange.send(); defaults.set(newValue, forKey: "userId") }
+    }
     @Published var connected = false
     @Published var status: KeepStatus?
-    @Published var connectionError: String?
+    @Published var problem: ConnectionProblem?
+    var connectionError: String? { problem.map { "\($0.title). \($0.hint)" } }
+    /// A `keep://connect` link waiting for the person's yes; nothing is contacted or stored until they give it.
+    @Published var pendingLink: ConnectionLink?
     @Published var usage: UsageReport?
-    let tokens: TokenStore = KeychainTokenStore()
-    @AppStorage("userId") var userId: String = ""
+    let tokens: TokenStore
 
     // Data
     @Published var demos: [Demo] = []
@@ -50,6 +60,12 @@ final class AppState: ObservableObject {
     private var seen = SeenFiles()
     private var poller: Task<Void, Never>?
     let watcher = FolderWatcher()
+    let supportDir: URL
+    private let makeClient: (URL, String) throws -> any KeepAPI
+    /// Approvals the person has already been told about. It outlives a reconnect, so reconnecting does not notify again.
+    private(set) var announcedApprovals = Set<String>()
+    var notifier: @MainActor (String, String) -> Void = { Notifier.post(title: $0, body: $1) }
+    var pollInterval: UInt64 = 20
 
     enum ActiveSheet: String, Identifiable { case email, voice, welcome, about; var id: String { rawValue } }
 
@@ -58,14 +74,16 @@ final class AppState: ObservableObject {
 
     struct PendingUpload: Identifiable { let id = UUID(); let demo: String; let files: [URL]; let findings: [String]; let source: String }
 
-    init() {
+    init(defaults: UserDefaults = .standard, tokens: TokenStore = KeychainTokenStore(), supportDir: URL = AppState.defaultSupportDir,
+         makeClient: @escaping (URL, String) throws -> any KeepAPI = { try KeepClient(baseURL: $0, token: $1) }) {
+        self.defaults = defaults; self.tokens = tokens; self.supportDir = supportDir; self.makeClient = makeClient
         loadRules(); loadSeen()
         watcher.onFile = { [weak self] rule, file in Task { @MainActor in await self?.handleWatched(rule: rule, file: file) } }
     }
 
     // MARK: connection
 
-    var client: KeepClient? {
+    private var credentials: (URL, String)? {
         var hostString = host
         var token = try? tokens.token()
         #if DEBUG
@@ -73,58 +91,87 @@ final class AppState: ObservableObject {
         if let h = ProcessInfo.processInfo.environment["KEEP_DEV_HOST"], let t = ProcessInfo.processInfo.environment["KEEP_DEV_TOKEN"] { hostString = h; token = t }
         #endif
         guard let url = URL(string: hostString.trimmingCharacters(in: .whitespaces)), let token, !token.isEmpty else { return nil }
-        return try? KeepClient(baseURL: url, token: token)
+        return (url, token)
     }
+
+    /// The host as the app state itself talks to it (a test supplies a stub through `makeClient`).
+    var api: (any KeepAPI)? { credentials.flatMap { try? makeClient($0.0, $0.1) } }
+
+    /// The concrete client the views use for chat, goals, memory and decisions.
+    var client: KeepClient? { credentials.flatMap { try? KeepClient(baseURL: $0.0, token: $0.1) } }
 
     func saveConnection(host: String, token: String) async {
         self.host = host
-        do { try tokens.save(token) } catch { connectionError = error.localizedDescription; return }
+        do { try tokens.save(token) } catch { problem = ConnectionProblem(error); return }
         await connect()
     }
 
     func connect() async {
-        connectionError = nil
-        guard let c = client else { connected = false; connectionError = "Enter the host address and a token."; return }
+        problem = nil
+        guard credentials != nil else {
+            connected = false
+            problem = URL(string: host.trimmingCharacters(in: .whitespaces)) == nil && !host.isEmpty ? ConnectionProblem(KeepError.badURL) : .missing
+            return
+        }
+        guard let c = api else { connected = false; problem = ConnectionProblem(KeepError.badURL); return }
         do {
-            // /v1/keep/status is an operator route: a user token gets a 403, and that must not stop it connecting. The list of use cases is
-            // what proves the host and the token work (a user token may read it).
+            // The list of use cases is what proves the host and the token work (any user token may read it). Two things are optional:
+            // /v1/keep/status is an operator route (a user token gets a 403), and whoami only tells us who the token belongs to.
             status = try? await c.status()
+            if let me = try? await c.whoami(), let id = me.userId, !id.isEmpty { userId = id }
             demos = try await c.demos()
             connected = true
             await refreshRuns(); await refreshApprovals(); await refreshUsage()
+            // Whatever is already waiting is on the screen the person opens; only what arrives later is announced.
+            announcedApprovals.formUnion(approvals.map(\.id))
             watcher.update(rules: folderRules)
             startPolling()
         } catch {
-            connected = false; connectionError = error.localizedDescription
+            connected = false; problem = ConnectionProblem(error)
         }
+    }
+
+    /// A `keep://connect` link opened from outside is never acted on by itself.
+    func offer(link: ConnectionLink) { pendingLink = link }
+    func acceptPendingLink() async {
+        guard let l = pendingLink else { return }
+        pendingLink = nil
+        await saveConnection(host: l.host.absoluteString, token: l.token)
     }
 
     func disconnect() {
         try? tokens.clear(); connected = false; status = nil; demos = []; runs = []; approvals = []; poller?.cancel(); watcher.update(rules: [])
+        announcedApprovals = []
     }
 
     // MARK: data
 
-    func refreshRuns() async { if let c = client { runs = ((try? await c.artifacts(limit: 100)) ?? runs) } }
-    func refreshUsage() async { if let c = client, !userId.isEmpty { usage = try? await c.usage(userId: userId) } }
+    func refreshRuns() async { if let c = api { runs = ((try? await c.artifacts(limit: 100)) ?? runs) } }
+    func refreshUsage() async { if let c = api, !userId.isEmpty { usage = try? await c.usage(userId: userId) } }
 
     func refreshApprovals() async {
-        guard let c = client else { return }
+        guard let c = api else { return }
         if !userId.isEmpty, let inbox = try? await c.inbox(userId: userId) { approvals = inbox.pendingApprovals; return }
         approvals = ((try? await c.approvals()) ?? []).filter(\.isPending)
+    }
+
+    /// One poll: refresh, then tell the person about approvals they have not been told about yet.
+    func pollApprovals() async {
+        await refreshApprovals()
+        for a in approvals where !announcedApprovals.contains(a.id) {
+            announcedApprovals.insert(a.id)
+            if notify { notifier("Approval needed", a.prompt ?? "\(a.kind) \(a.subject ?? "")") }
+        }
     }
 
     private func startPolling() {
         poller?.cancel()
         poller = Task { [weak self] in
-            var known = Set<String>()
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
-                guard let self else { return }
-                await self.refreshApprovals()
-                let fresh = self.approvals.filter { !known.contains($0.id) }
-                for a in fresh { Notifier.post(title: "Approval needed", body: a.prompt ?? "\(a.kind) \(a.subject ?? "")") }
-                known.formUnion(self.approvals.map(\.id))
+                guard let interval = self?.pollInterval else { return }
+                try? await Task.sleep(nanoseconds: interval * 1_000_000_000)
+                guard let self, !Task.isCancelled else { return }
+                await self.pollApprovals()
             }
         }
     }
@@ -135,7 +182,7 @@ final class AppState: ObservableObject {
 
     /// Starts a run, after the secret and size checks. Returns immediately; progress is in `jobs`.
     func run(demo: String, files: [URL], source: String = "manual", skipChecks: Bool = false) {
-        guard client != nil else { notice = "Connect to a Keep host first."; return }
+        guard api != nil else { notice = "Connect to a Keep host first."; return }
         if !skipChecks {
             var findings: [String] = []
             for f in files { for s in SecretScan.scan(fileURL: f) { findings.append("\(f.lastPathComponent): \(s.kind) (\(s.where_))") } }
@@ -147,7 +194,7 @@ final class AppState: ObservableObject {
         jobs.insert(job, at: 0); selectedJob = job.id
         let id = job.id, limit = self.demo(demo)?.maxBytes
         Task { [weak self] in
-            guard let self, let c = self.client else { return }
+            guard let self, let c = self.api else { return }
             do {
                 let outcome = try await c.run(demo: demo, files: files, maxBytes: limit)
                 self.finish(id, .done(outcome))
@@ -163,25 +210,24 @@ final class AppState: ObservableObject {
         jobs[i].state = state
         if notify {
             switch state {
-            case .done(let o): Notifier.post(title: "Keep: \(jobs[i].demo)", body: "\(o.items.filter(\.ok).count) of \(o.items.count) done, " + (o.isSimulated ? "simulated, not sealed" : "\(o.egressConnects) outbound connections"))
-            case .failed(let m): Notifier.post(title: "Keep: run failed", body: m)
+            case .done(let o): notifier("Keep: \(jobs[i].demo)", "\(o.items.filter(\.ok).count) of \(o.items.count) done, " + (o.isSimulated ? "simulated, not sealed" : "\(o.egressConnects) outbound connections"))
+            case .failed(let m): notifier("Keep: run failed", m)
             case .running: break
             }
         }
     }
-
     // MARK: watched folders
 
-    private var rulesURL: URL { Self.supportDir.appendingPathComponent("folder-rules.json") }
-    private var seenURL: URL { Self.supportDir.appendingPathComponent("seen.json") }
-    static var supportDir: URL {
+    private var rulesURL: URL { supportDir.appendingPathComponent("folder-rules.json") }
+    private var seenURL: URL { supportDir.appendingPathComponent("seen.json") }
+    nonisolated static var defaultSupportDir: URL {
         let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Solvor")
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true); return d
     }
     private func loadRules() { folderRules = (try? JSONDecoder().decode([FolderRule].self, from: Data(contentsOf: rulesURL))) ?? [] }
-    private func saveRules() { try? JSONEncoder().encode(folderRules).write(to: rulesURL); watcher.update(rules: connected ? folderRules : []) }
+    private func saveRules() { try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true); try? JSONEncoder().encode(folderRules).write(to: rulesURL); watcher.update(rules: connected ? folderRules : []) }
     private func loadSeen() { seen = (try? JSONDecoder().decode(SeenFiles.self, from: Data(contentsOf: seenURL))) ?? SeenFiles() }
-    private func saveSeen() { try? JSONEncoder().encode(seen).write(to: seenURL) }
+    private func saveSeen() { try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true); try? JSONEncoder().encode(seen).write(to: seenURL) }
 
     private func handleWatched(rule: FolderRule, file: URL) async {
         guard connected, let hash = try? ContentHash.sha256(of: file), !seen.contains(rule: rule.id, hash: hash) else { return }
@@ -207,7 +253,6 @@ final class AppState: ObservableObject {
 
 @MainActor enum Notifier {
     static func post(title: String, body: String) {
-        guard AppState.shared.notify else { return }
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }

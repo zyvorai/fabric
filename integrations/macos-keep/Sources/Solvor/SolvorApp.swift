@@ -28,8 +28,9 @@ struct SolvorApp: App {
         .menuBarExtraStyle(.window)
     }
 
-    /// keep://run?usecase=pdf-brief&path=/Users/me/report.pdf
+    /// keep://run?usecase=pdf-brief&path=/Users/me/report.pdf, and keep://connect?host=…&token=… (which only asks the person; it never connects by itself).
     private func handle(_ url: URL) {
+        if let link = ConnectionLink(url: url) { app.offer(link: link); return }
         guard url.scheme == "keep", url.host == "run", let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
               let demo = items.first(where: { $0.name == "usecase" })?.value, let path = items.first(where: { $0.name == "path" })?.value else { return }
         app.run(demo: demo, files: [URL(fileURLWithPath: path)], source: "url")

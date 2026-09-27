@@ -4,26 +4,22 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
-    @State private var host = ""
-    @State private var token = ""
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Form {
             Section("Keep host") {
-                TextField("Address", text: $host, prompt: Text("https://keep.example.com or http://127.0.0.1:9096"))
-                SecureField("User token", text: $token, prompt: Text(app.connected ? "•••••• stored in the Keychain" : "kut1…"))
-                TextField("Your user id", text: app.$userId, prompt: Text("needed for usage, approvals and the inbox"))
-                HStack {
-                    Button("Save and connect") { Task { await app.saveConnection(host: host, token: token.isEmpty ? ((try? app.tokens.token()) ?? "") : token); token = "" } }
-                        .primaryButton()
-                    if app.connected { Button("Forget the token") { app.disconnect() } }
-                    if let e = app.connectionError { Text(e).foregroundStyle(.red).font(.callout) }
-                }
-                if let s = app.status {
-                    Text("Connected. Keep mode: \(s.keepMode == true ? "on" : "off"). Use cases: \(s.demos.map { $0.builtin + $0.custom } ?? 0). Cell template: \(s.demoTemplate ?? "?").").font(.callout).foregroundStyle(.secondary)
-                }
+                if app.connected { LabeledContent("Connected to", value: URL(string: app.host)?.host ?? app.host) }
+                if app.connected, !app.userId.isEmpty { LabeledContent("Signed in as", value: app.userId) }
+                ConnectForm()
+                if app.connected { Button("Forget the token", role: .destructive) { app.disconnect() } }
                 if let u = app.usage { Text("Usage: \(u.usage.runs) runs, \(u.usage.artifacts) artifacts, \(u.usage.modelCalls) model calls.").font(.callout).foregroundStyle(.secondary) }
+            }
+            if app.connected, app.userId.isEmpty {
+                Section("Operator token") {
+                    TextField("User to act for", text: Binding(get: { app.userId }, set: { app.userId = $0 }), prompt: Text("needed for usage, approvals and the inbox"))
+                    Text("This token belongs to the operator, so the host does not say which person it is for. A user token needs nothing here.").font(.callout).foregroundStyle(.secondary)
+                }
             }
             Section("Behaviour") {
                 Toggle("Notifications", isOn: app.$notify)
@@ -38,6 +34,5 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped).navigationTitle("Settings")
-        .onAppear { host = app.host }
     }
 }

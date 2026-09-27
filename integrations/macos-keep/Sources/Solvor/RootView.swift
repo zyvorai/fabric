@@ -89,6 +89,12 @@ struct RootView: View {
             Button("Upload anyway", role: .destructive) { app.confirmPending() }
             Button("Cancel", role: .cancel) { app.pendingSecretWarning = nil }
         } message: { Text((app.pendingSecretWarning?.findings ?? []).joined(separator: "\n")) }
+        .alert("Connect to \(app.pendingLink?.host.host ?? "this host")?", isPresented: Binding(get: { app.pendingLink != nil }, set: { if !$0 { app.pendingLink = nil } })) {
+            Button("Connect") { Task { await app.acceptPendingLink() } }
+            Button("Cancel", role: .cancel) { app.pendingLink = nil }
+        } message: {
+            Text("A link asked Solvor to connect to \(app.pendingLink?.host.absoluteString ?? "") and store its token in your Keychain. Only continue if you started this.\(app.pendingLink?.isPlainRemote == true ? " This address uses plain http to another machine, so the token could be read on the network." : "")")
+        }
         .alert("Solvor", isPresented: Binding(get: { app.notice != nil }, set: { if !$0 { app.notice = nil } })) { Button("OK") { app.notice = nil } } message: { Text(app.notice ?? "") }
         .confirmationDialog(app.choice?.title ?? "", isPresented: Binding(get: { app.choice != nil }, set: { if !$0 { app.choice = nil } }), titleVisibility: .visible) {
             ForEach(app.choice?.options ?? []) { d in
@@ -115,13 +121,12 @@ struct NotConnectedView: View {
     let open: () -> Void
     @EnvironmentObject var app: AppState
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Space.m) {
             LogoTile(size: 72)
-            Text("Connect Solvor to a Keep host").font(.system(size: 24, weight: .bold, design: .rounded))
-            Text("Solvor reads each file in a sealed cell on a host you run. Enter its address and a user token.").foregroundStyle(.secondary).multilineTextAlignment(.center)
-            if let e = app.connectionError { Text(e).foregroundStyle(.red).font(.callout).multilineTextAlignment(.center) }
-            Button("Open Settings", action: open).primaryButton().controlSize(.large)
-        }.frame(maxWidth: 440).frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text("Connect Solvor to a Keep host").font(Typo.title)
+            Text("Solvor reads each file in a sealed cell on a host you run.").foregroundStyle(.secondary).multilineTextAlignment(.center)
+            ConnectForm().padding(Space.m).card()
+        }.frame(maxWidth: 480).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
