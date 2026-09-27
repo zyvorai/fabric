@@ -1,7 +1,9 @@
 import KeepKit
 import SwiftUI
 
-/// Zyvor's brand: the orange gradient and the Z. Values come from zyvor.dev (`--hs-accent-fill #ff5a15`, `--hs-accent #cc420a`, ink `#14161a`).
+/// The palette: an Apple-style blue carries the interface (the accent colour, the mark's fill); Zyvor's orange
+/// (`--hs-accent-fill #ff5a15` at zyvor.dev) is kept as one deliberate drop of warmth — the rings closing around a run,
+/// an approval waiting for you, a stamp landing. It is never the accent colour itself, so it keeps meaning "look here."
 enum Brand {
     static let orange = Color(red: 1.0, green: 0.353, blue: 0.082)
     static let deep = Color(red: 0.8, green: 0.259, blue: 0.039)
@@ -9,7 +11,12 @@ enum Brand {
     static let ink = Color(red: 0.078, green: 0.086, blue: 0.102)
     static let good = Color(red: 0.19, green: 0.78, blue: 0.45)
 
-    static var gradient: LinearGradient { LinearGradient(colors: [glow, orange, deep], startPoint: .topLeading, endPoint: .bottomTrailing) }
+    /// Apple.com's blue (the `#0071e3` used for its buttons and links).
+    static let blue = Color(red: 0.0, green: 0.443, blue: 0.851)
+    static let blueDeep = Color(red: 0.0, green: 0.263, blue: 0.545)
+    static let blueGlow = Color(red: 0.42, green: 0.70, blue: 1.0)
+
+    static var gradient: LinearGradient { LinearGradient(colors: [blueGlow, blue, blueDeep], startPoint: .topLeading, endPoint: .bottomTrailing) }
 
     static func color(_ g: CatalogGroup) -> Color {
         switch g {
@@ -38,7 +45,8 @@ enum Brand {
     }
 }
 
-/// The Zyvor Z (the path from the Zyvor favicon), scaled into any rect. Stroke it with round caps.
+/// The Zyvor Z (the path from the Zyvor favicon), scaled into any rect. Stroke it with round caps. Kept for anything
+/// that still wants the wordmark (docs, the menu-bar glyph); the app mark itself now draws `FaceMark`.
 struct ZMark: Shape {
     func path(in rect: CGRect) -> Path {
         // Favicon coordinates (64-unit box): 18.5,20.5 → 45.5,20.5 → 18.5,43.5 → 45.5,43.5. The Z occupies 27 x 23 units.
@@ -55,17 +63,35 @@ struct ZMark: Shape {
     }
 }
 
-/// The app mark: the orange squircle with the white Z.
+/// An original face — two eyes and a smile, nothing borrowed — in a 64-unit box like `ZMark`, so the mark reads as a
+/// small presence rather than a letter. One path (eyes, then the smile) so it can be drawn stroke-by-stroke.
+struct FaceMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 64
+        let ox = rect.midX - 32 * s, oy = rect.midY - 32 * s
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
+        var p = Path()
+        p.move(to: pt(22, 25)); p.addLine(to: pt(22, 35))
+        p.move(to: pt(42, 25)); p.addLine(to: pt(42, 35))
+        p.move(to: pt(17, 40)); p.addQuadCurve(to: pt(47, 40), control: pt(32, 57))
+        return p
+    }
+}
+
+/// The app mark: the blue squircle with an original face, and one drop of Zyvor orange.
 struct LogoTile: View {
     var size: CGFloat = 40
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: size * 0.23, style: .continuous).fill(Brand.gradient)
             RoundedRectangle(cornerRadius: size * 0.23, style: .continuous).strokeBorder(.white.opacity(0.25), lineWidth: 1)
-            ZMark().stroke(.white, style: StrokeStyle(lineWidth: size * 0.13, lineCap: .round, lineJoin: .round)).padding(size * 0.26)
+            FaceMark().stroke(.white, style: StrokeStyle(lineWidth: size * 0.11, lineCap: .round, lineJoin: .round)).padding(size * 0.24)
+            Circle().fill(Brand.orange).frame(width: size * 0.16, height: size * 0.16)
+                .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
+                .offset(x: size * 0.30, y: -size * 0.32)
         }
         .frame(width: size, height: size)
-        .shadow(color: Brand.deep.opacity(0.35), radius: size * 0.12, y: size * 0.06)
+        .shadow(color: Brand.blueDeep.opacity(0.35), radius: size * 0.12, y: size * 0.06)
     }
 }
 
@@ -133,7 +159,7 @@ struct SealedCellView: View {
                 }
                 RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Brand.orange.opacity(0.9), lineWidth: 4).frame(width: 130, height: 130)
                     .background(RoundedRectangle(cornerRadius: 30, style: .continuous).fill(Brand.orange.opacity(0.10)))
-                ZMark().stroke(Brand.gradient, style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)).frame(width: 58, height: 58)
+                FaceMark().stroke(Brand.gradient, style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)).frame(width: 58, height: 58)
             }
             .frame(width: 220, height: 220)
         }

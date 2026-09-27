@@ -11,7 +11,7 @@ struct SolvorApp: App {
     var body: some Scene {
         Window("Solvor", id: "main") {
             RootView().environmentObject(app)
-                .tint(Brand.orange)
+                .tint(Brand.blue)
                 .onOpenURL { handle($0) }
         }
         .commands {
@@ -22,7 +22,7 @@ struct SolvorApp: App {
             CommandGroup(replacing: .appInfo) { Button("About Solvor") { app.sheet = .about } }
         }
         MenuBarExtra {
-            MenuBarView().environmentObject(app).tint(Brand.orange)
+            MenuBarView().environmentObject(app).tint(Brand.blue)
         } label: {
             Image("MenuBarGlyph").renderingMode(.template)
         }

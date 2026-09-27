@@ -47,7 +47,8 @@ struct RootView: View {
                 if let id = app.selectedJob, app.pane == nil, let job = app.jobs.first(where: { $0.id == id }) { ResultView(job: job) }
                 else if !app.connected && app.pane != .settings { NotConnectedView(open: { app.pane = .settings }) }
                 else {
-                    switch app.pane ?? .useCases {
+                    switch app.pane ?? .home {
+                    case .home: HomeView()
                     case .useCases: UseCasesView()
                     case .runs: RunsView()
                     case .approvals: ApprovalsView()

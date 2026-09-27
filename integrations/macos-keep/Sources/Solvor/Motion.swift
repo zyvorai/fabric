@@ -111,8 +111,12 @@ extension View {
 /// Slow-drifting soft colour behind a screen: the brand orange and its neighbours. Still, and just as pretty, with Reduce Motion.
 struct AuroraBackground: View {
     var intensity: Double = 1
+    /// The default is Solvor's warm palette (used for the welcome and use-cases screens); pass a different one where orange
+    /// should not appear at all, such as behind the chat.
+    var palette: [Color] = [Brand.orange, Color(red: 1, green: 0.62, blue: 0.3), Color(red: 0.95, green: 0.35, blue: 0.55), Color(red: 0.55, green: 0.42, blue: 0.95)]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let palette: [Color] = [Brand.orange, Color(red: 1, green: 0.62, blue: 0.3), Color(red: 0.95, green: 0.35, blue: 0.55), Color(red: 0.55, green: 0.42, blue: 0.95)]
+    /// An all-blue palette, no orange anywhere in it.
+    static let blue: [Color] = [Brand.blue, Brand.blueGlow, Color(red: 0.42, green: 0.55, blue: 0.95), Color(red: 0.3, green: 0.75, blue: 0.9)]
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 24, paused: reduceMotion)) { ctx in
@@ -210,12 +214,18 @@ struct TypingDots: View {
     }
 }
 
-/// The Solvor mark, drawn on: the rings pulse outward, the squircle settles, and the Z is traced stroke by stroke. Still with Reduce Motion.
+/// The Solvor mark, drawn on: orange rings pulse outward, the squircle settles, the face is traced stroke by stroke, and it blinks
+/// once it has settled — a small sign of life, like the animated presence at the top of a chat while an agent works. Still with
+/// Reduce Motion (no rings, no blink; the face is simply there).
 struct AnimatedLogo: View {
     var size: CGFloat = 88
+    /// The rings and the small spark dot. Default is Zyvor's orange (Welcome, About); pass `Brand.blue` where orange must not appear.
+    var accent: Color = Brand.orange
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var settled = false
     @State private var trace: CGFloat = 0
+    @State private var blink = false
+    @State private var blinkTask: Task<Void, Never>?
     var body: some View {
         ZStack {
             if !reduceMotion {
@@ -225,7 +235,7 @@ struct AnimatedLogo: View {
                         ForEach(0..<3, id: \.self) { i in
                             let phase = (t * 0.45 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
                             RoundedRectangle(cornerRadius: size * 0.23 + phase * size * 0.2, style: .continuous)
-                                .strokeBorder(Brand.orange.opacity(0.5 * (1 - phase)), lineWidth: 2)
+                                .strokeBorder(accent.opacity(0.5 * (1 - phase)), lineWidth: 2)
                                 .frame(width: size * (1 + phase * 0.9), height: size * (1 + phase * 0.9))
                         }
                     }
@@ -234,11 +244,15 @@ struct AnimatedLogo: View {
             ZStack {
                 RoundedRectangle(cornerRadius: size * 0.23, style: .continuous).fill(Brand.gradient)
                 RoundedRectangle(cornerRadius: size * 0.23, style: .continuous).strokeBorder(.white.opacity(0.25), lineWidth: 1)
-                ZMark().trim(from: 0, to: reduceMotion ? 1 : trace)
-                    .stroke(.white, style: StrokeStyle(lineWidth: size * 0.13, lineCap: .round, lineJoin: .round)).padding(size * 0.26)
+                FaceMark().trim(from: 0, to: reduceMotion ? 1 : trace)
+                    .stroke(.white, style: StrokeStyle(lineWidth: size * 0.11, lineCap: .round, lineJoin: .round)).padding(size * 0.24)
+                    .scaleEffect(x: 1, y: blink ? 0.12 : 1, anchor: .init(x: 0.5, y: 0.42))
+                Circle().fill(accent).frame(width: size * 0.16, height: size * 0.16)
+                    .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
+                    .offset(x: size * 0.30, y: -size * 0.32)
             }
             .frame(width: size, height: size)
-            .shadow(color: Brand.deep.opacity(0.35), radius: size * 0.12, y: size * 0.06)
+            .shadow(color: Brand.blueDeep.opacity(0.35), radius: size * 0.12, y: size * 0.06)
             .scaleEffect(settled || reduceMotion ? 1 : 0.6)
             .opacity(settled || reduceMotion ? 1 : 0)
         }
@@ -247,7 +261,17 @@ struct AnimatedLogo: View {
             guard !reduceMotion else { return }
             withAnimation(Motion.bouncy) { settled = true }
             withAnimation(.easeInOut(duration: 1.1).delay(0.25)) { trace = 1 }
+            blinkTask = Task {
+                try? await Task.sleep(nanoseconds: 1_600_000_000)
+                while !Task.isCancelled {
+                    withAnimation(.easeInOut(duration: 0.09)) { blink = true }
+                    try? await Task.sleep(nanoseconds: 90_000_000)
+                    withAnimation(.easeInOut(duration: 0.12)) { blink = false }
+                    try? await Task.sleep(nanoseconds: UInt64.random(in: 2_600_000_000...4_200_000_000))
+                }
+            }
         }
+        .onDisappear { blinkTask?.cancel() }
         .accessibilityLabel("Solvor")
     }
 }

@@ -11,6 +11,9 @@ public struct ChatThread: Codable, Equatable, Hashable, Identifiable, Sendable {
     public var updatedAt: String?
     public var messageCount: Int?
     public var updatedDate: Date? { updatedAt.flatMap(KeepDates.parse) }
+    public init(id: String, agent: String, title: String, clientThreadId: String? = nil, updatedAt: String? = nil, messageCount: Int? = nil) {
+        self.id = id; self.agent = agent; self.title = title; self.clientThreadId = clientThreadId; self.updatedAt = updatedAt; self.messageCount = messageCount
+    }
 }
 
 struct ThreadsResponse: Codable { var items: [ChatThread] }
@@ -44,6 +47,7 @@ public struct ApprovalNotice: Equatable, Hashable, Sendable {
     public var kind: String
     public var prompt: String
     public var preview: ApprovalPreview?
+    public init(id: String, kind: String, prompt: String, preview: ApprovalPreview? = nil) { self.id = id; self.kind = kind; self.prompt = prompt; self.preview = preview }
 }
 
 public enum AGUIEvent: Equatable, Sendable {
@@ -98,6 +102,17 @@ public enum AGUI {
         }
     }
 }
+
+/// What Agent Home needs from a host: threads, messages and the streamed run. Deliberately smaller than `KeepAPI` (no approvals,
+/// no devices, no run/upload), so a chat view built against it cannot decide an approval or touch a file upload by construction.
+public protocol ChatAPI: Sendable {
+    func threads(agent: String?) async throws -> [ChatThread]
+    func messages(thread id: String) async throws -> [ChatMessage]
+    func deleteThread(_ id: String) async throws
+    func chat(agent: String, threadId: String, runId: String, text: String) -> AsyncThrowingStream<AGUIEvent, Error>
+}
+
+extension KeepClient: ChatAPI {}
 
 extension KeepClient {
     /// The conversations the host holds for this person, newest first, optionally only those with one agent.
