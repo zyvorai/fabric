@@ -48,6 +48,9 @@ final class AppState: ObservableObject {
     @Published var notice: String?
     @Published var pane: Pane? = .home
     @Published var sheet: ActiveSheet?
+    /// Set by the menu bar's ask box or the quick-ask panel; `HomeView` sends it through its own `ChatModel` the moment
+    /// it appears, then clears it, so a message asked from outside Home behaves exactly like typing it there would.
+    @Published var pendingHomeMessage: String?
     @Published var choice: ChoiceRequest?
     @AppStorage("welcomed") var welcomed = false
     @AppStorage("speechLanguage") var speechLanguage = ""   // empty = the Mac's language
@@ -76,7 +79,7 @@ final class AppState: ObservableObject {
     /// This Mac's public key, known once `refreshDevice` has run. Only the public half is ever held here.
     @Published private(set) var myPublicKey: String?
 
-    enum ActiveSheet: String, Identifiable { case email, voice, welcome, about; var id: String { rawValue } }
+    enum ActiveSheet: String, Identifiable { case email, voice, welcome, about, menuBarPreview; var id: String { rawValue } }
 
     /// A choice the person has to make before a run: which use case reads this file.
     struct ChoiceRequest: Identifiable { let id = UUID(); let title: String; let files: [URL]; let options: [Demo]; let source: String }

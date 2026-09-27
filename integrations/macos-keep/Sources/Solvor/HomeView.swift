@@ -37,6 +37,11 @@ struct HomeView: View {
         .navigationTitle("Solvor")
         .task { await chat.loadThreads() }
         .onChange(of: chat.agent) { _, a in UserDefaults.standard.set(a, forKey: "homeAgent"); Task { await chat.loadThreads() } }
+        .task(id: app.pendingHomeMessage) {
+            guard let text = app.pendingHomeMessage else { return }
+            app.pendingHomeMessage = nil
+            chat.send(text)
+        }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             Task { @MainActor in
                 var urls: [URL] = []
