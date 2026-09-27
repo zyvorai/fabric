@@ -32,7 +32,7 @@ struct HomeView: View {
                 composer
             }
         }
-        .background(AuroraBackground(intensity: 0.35))
+        .background(AuroraBackground(intensity: 0.35, palette: AuroraBackground.blue))
         .animation(Motion.spring, value: showThreads)
         .navigationTitle("Solvor")
         .task { await chat.loadThreads() }
@@ -60,7 +60,7 @@ struct HomeView: View {
             if !app.approvals.isEmpty {
                 Button { app.pane = .approvals } label: {
                     Label("\(app.approvals.count) waiting", systemImage: "checkmark.seal.fill").font(.callout.weight(.semibold))
-                }.secondaryButton().tint(.orange)
+                }.secondaryButton()
             }
             Button { chat.newThread() } label: { Image(systemName: "square.and.pencil") }.buttonStyle(.plain).help("New chat")
         }.padding(Space.m)
@@ -84,12 +84,12 @@ struct HomeView: View {
     private var starterState: some View {
         VStack(spacing: Space.l) {
             Spacer()
-            AnimatedLogo(size: 56).frame(height: 80)
+            AnimatedLogo(size: 56, accent: Brand.blue).frame(height: 80)
             Text("What can I do for you?").font(Typo.title)
             VStack(alignment: .leading, spacing: Space.xs) {
                 ForEach(Self.starters, id: \.self) { s in
                     Button { input = s; focused = true } label: {
-                        HStack { Image(systemName: "sparkle").foregroundStyle(Brand.orange); Text(s); Spacer() }
+                        HStack { Image(systemName: "sparkle").foregroundStyle(Brand.blue); Text(s); Spacer() }
                             .padding(.horizontal, Space.m).padding(.vertical, Space.s)
                             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                     }.buttonStyle(.plain)
@@ -143,8 +143,8 @@ private struct BubbleView: View {
         case .decided(let decision): Label(decision == "approved" ? "Approved" : "Denied", systemImage: decision == "approved" ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.callout).foregroundStyle(decision == "approved" ? Brand.good : .secondary)
         case .status: Label(bubble.text, systemImage: "ellipsis.circle").font(.callout).foregroundStyle(.secondary)
-        case .error: Label(bubble.text, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
-                .padding(Space.s).background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.chip))
+        case .error: Label(bubble.text, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.red)
+                .padding(Space.s).background(.red.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.chip))
         case .text: textBubble
         }
     }
@@ -170,7 +170,7 @@ private struct ApprovalNoticeCard: View {
     @EnvironmentObject var app: AppState
     var body: some View {
         HStack(spacing: Space.s) {
-            Image(systemName: "touchid").font(.title3).foregroundStyle(Brand.orange)
+            Image(systemName: "touchid").font(.title3).foregroundStyle(Brand.blue)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Waiting for your Mac").font(.headline)
                 Text(notice.preview?.fields.first?.value ?? notice.prompt).font(.callout).foregroundStyle(.secondary).lineLimit(2)

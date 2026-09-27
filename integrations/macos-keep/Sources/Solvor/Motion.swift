@@ -111,8 +111,12 @@ extension View {
 /// Slow-drifting soft colour behind a screen: the brand orange and its neighbours. Still, and just as pretty, with Reduce Motion.
 struct AuroraBackground: View {
     var intensity: Double = 1
+    /// The default is Solvor's warm palette (used for the welcome and use-cases screens); pass a different one where orange
+    /// should not appear at all, such as behind the chat.
+    var palette: [Color] = [Brand.orange, Color(red: 1, green: 0.62, blue: 0.3), Color(red: 0.95, green: 0.35, blue: 0.55), Color(red: 0.55, green: 0.42, blue: 0.95)]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let palette: [Color] = [Brand.orange, Color(red: 1, green: 0.62, blue: 0.3), Color(red: 0.95, green: 0.35, blue: 0.55), Color(red: 0.55, green: 0.42, blue: 0.95)]
+    /// An all-blue palette, no orange anywhere in it.
+    static let blue: [Color] = [Brand.blue, Brand.blueGlow, Color(red: 0.42, green: 0.55, blue: 0.95), Color(red: 0.3, green: 0.75, blue: 0.9)]
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 24, paused: reduceMotion)) { ctx in
@@ -215,6 +219,8 @@ struct TypingDots: View {
 /// Reduce Motion (no rings, no blink; the face is simply there).
 struct AnimatedLogo: View {
     var size: CGFloat = 88
+    /// The rings and the small spark dot. Default is Zyvor's orange (Welcome, About); pass `Brand.blue` where orange must not appear.
+    var accent: Color = Brand.orange
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var settled = false
     @State private var trace: CGFloat = 0
@@ -229,7 +235,7 @@ struct AnimatedLogo: View {
                         ForEach(0..<3, id: \.self) { i in
                             let phase = (t * 0.45 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
                             RoundedRectangle(cornerRadius: size * 0.23 + phase * size * 0.2, style: .continuous)
-                                .strokeBorder(Brand.orange.opacity(0.5 * (1 - phase)), lineWidth: 2)
+                                .strokeBorder(accent.opacity(0.5 * (1 - phase)), lineWidth: 2)
                                 .frame(width: size * (1 + phase * 0.9), height: size * (1 + phase * 0.9))
                         }
                     }
@@ -241,7 +247,7 @@ struct AnimatedLogo: View {
                 FaceMark().trim(from: 0, to: reduceMotion ? 1 : trace)
                     .stroke(.white, style: StrokeStyle(lineWidth: size * 0.11, lineCap: .round, lineJoin: .round)).padding(size * 0.24)
                     .scaleEffect(x: 1, y: blink ? 0.12 : 1, anchor: .init(x: 0.5, y: 0.42))
-                Circle().fill(Brand.orange).frame(width: size * 0.16, height: size * 0.16)
+                Circle().fill(accent).frame(width: size * 0.16, height: size * 0.16)
                     .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
                     .offset(x: size * 0.30, y: -size * 0.32)
             }
