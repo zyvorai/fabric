@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0B9E766EEEBF0603BD1D8DA6 /* KeepKit in Frameworks */ = {isa = PBXBuildFile; productRef = 15869258260610970298394E /* KeepKit */; };
+		3F6D9EDBDE7A898A8C6E72E1 /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0232EE35EA0B4E83264F337 /* MemoryView.swift */; };
 		51F34030940DF1F462E02A2C /* ChatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DDEE1E5F2B3229E416262E1 /* ChatsView.swift */; };
 		6CC549794A92F1016DC153F3 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF6E8194FC47565DF90E56A0 /* AppModel.swift */; };
 		71222044B34DEE781CB76738 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D6C00757C12636AB9BDB8C /* ChatView.swift */; };
@@ -23,6 +24,7 @@
 		25A76FE5D1890353C8B4F964 /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
 		2BCE13A54294EF20CE88492D /* ApprovalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalsView.swift; sourceTree = "<group>"; };
 		3535254826B9FF3CAE8A95D7 /* KeepPhone.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KeepPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0232EE35EA0B4E83264F337 /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
 		AF6E8194FC47565DF90E56A0 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		C4D6C00757C12636AB9BDB8C /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		D834924B30632589A64AD6E3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -74,6 +76,7 @@
 				C4D6C00757C12636AB9BDB8C /* ChatView.swift */,
 				25A76FE5D1890353C8B4F964 /* GoalsView.swift */,
 				F3AB1191A41736B0EB6BFB4B /* KeepPhoneApp.swift */,
+				A0232EE35EA0B4E83264F337 /* MemoryView.swift */,
 				D834924B30632589A64AD6E3 /* SettingsView.swift */,
 			);
 			path = KeepPhone;
@@ -157,6 +160,7 @@
 				51F34030940DF1F462E02A2C /* ChatsView.swift in Sources */,
 				A45E5ECDB1349603DA571684 /* GoalsView.swift in Sources */,
 				99FDFEC2E72F7AFB6400B3BD /* KeepPhoneApp.swift in Sources */,
+				3F6D9EDBDE7A898A8C6E72E1 /* MemoryView.swift in Sources */,
 				D3FE0FC143BE18A25A7C767A /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
