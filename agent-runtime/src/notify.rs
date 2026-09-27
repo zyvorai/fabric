@@ -323,7 +323,7 @@ pub fn run_payload(run: &RunNotice) -> Vec<u8> {
 /// `ZYVOR_AGENT_PUSH_NOTICE_TEXT=1`, in which case `detail_title` and `detail_body` are used instead.
 #[derive(Clone, Debug)]
 pub struct Notice {
-    /// `goal.blocked`, `goal.done`, `memory.proposed`, `run.finished`, `run.failed`.
+    /// `goal.blocked`, `goal.done`, `memory.proposed`, `suggestion.proposed`, `run.finished`, `run.failed`.
     pub event: &'static str,
     pub title: String,
     pub body: String,

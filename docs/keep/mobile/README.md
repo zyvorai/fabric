@@ -46,7 +46,7 @@ message into your platform's push. Retries: twice, then an `approval.push` failu
 
 ### Notices (not approvals)
 
-The same relays also get **notices**: things a person should know that are not decisions. `x-zyvor-event` is one of `goal.blocked` (a goal stopped on a problem), `goal.done`, `memory.proposed` (an agent suggested a memory entry to review), `run.finished` or `run.failed`. The body is signed exactly like the approval message and looks like this:
+The same relays also get **notices**: things a person should know that are not decisions. `x-zyvor-event` is one of `goal.blocked` (a goal stopped on a problem), `goal.done`, `memory.proposed` (an agent suggested a memory entry to review), `suggestion.proposed` (an agent suggested something to do; open it to make it a goal or dismiss it), `run.finished` or `run.failed`. The body is signed exactly like the approval message and looks like this:
 
 ```json
 { "event": "goal.blocked", "channel": "out_of_band", "kind": "notice",

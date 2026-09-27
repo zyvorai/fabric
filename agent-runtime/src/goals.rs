@@ -967,6 +967,7 @@ pub(crate) mod tests {
             thread_retention_days: None,
             receipt_retention_days: None,
             memory_proposal_retention_days: None,
+            suggestion_retention_days: None,
             goal_tick_ms: 5000,
             goal_retry_base_secs: 15,
             planner_agent: None,
