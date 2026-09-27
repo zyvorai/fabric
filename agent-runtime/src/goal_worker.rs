@@ -509,11 +509,18 @@ async fn open_approval(
         subject: Some(format!("goal:{}:{}", goal.id, step.id)),
         planned_action: Some(json!({
             "goal_id": goal.id, "step_id": step.id, "title": step.title, "agent": goal.agent, "input_sha256": sha256_hex(&input),
+            "approval_reason": step.approval_reason,
         })),
-        prompt: format!(
-            "Goal '{}': step '{}' finished. Continue?",
-            goal.title, step.title
-        ),
+        prompt: match &step.approval_reason {
+            Some(reason) => format!(
+                "Goal '{}': step '{}' finished. Continue? The agent said: {}",
+                goal.title, step.title, reason
+            ),
+            None => format!(
+                "Goal '{}': step '{}' finished. Continue?",
+                goal.title, step.title
+            ),
+        },
         status: ApprovalStatus::Pending,
         comment: None,
         created_at: Utc::now(),
@@ -784,6 +791,50 @@ mod tests {
             a,
             default_input(&g, &s),
             "the same input every time, so a retry of a start is the same request"
+        );
+    }
+
+    #[tokio::test]
+    async fn opening_an_approval_puts_the_planners_reason_in_the_prompt_and_the_planned_action() {
+        let state = crate::goals::tests::test_state().await;
+        let g = crate::goals::test_goal(vec![]);
+        let with_reason = PlanStep {
+            id: "s1".into(),
+            title: "Book the flight".into(),
+            requires_approval: true,
+            approval_reason: Some("it costs money".into()),
+            session_id: Some(Uuid::new_v4()),
+            ..Default::default()
+        };
+        let id = open_approval(&state, &g, &with_reason).await.unwrap();
+        let saved = state.store.get_approval(id).await.unwrap();
+        assert!(
+            saved.prompt.contains("The agent said: it costs money"),
+            "{}",
+            saved.prompt
+        );
+        assert_eq!(
+            saved.planned_action.unwrap()["approval_reason"],
+            "it costs money"
+        );
+
+        let without_reason = PlanStep {
+            id: "s2".into(),
+            title: "Book the flight".into(),
+            requires_approval: true,
+            session_id: Some(Uuid::new_v4()),
+            ..Default::default()
+        };
+        let id = open_approval(&state, &g, &without_reason).await.unwrap();
+        let saved = state.store.get_approval(id).await.unwrap();
+        assert!(
+            !saved.prompt.contains("The agent said"),
+            "no reason, no invented one: {}",
+            saved.prompt
+        );
+        assert_eq!(
+            saved.planned_action.unwrap()["approval_reason"],
+            Value::Null
         );
     }
 }

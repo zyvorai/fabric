@@ -69,6 +69,9 @@ pub struct PlanStep {
     /// When true, completing this step opens an approval before marking done.
     #[serde(default)]
     pub requires_approval: bool,
+    /// Why, in the planner's own words; carried onto the approval this step opens (`goal_worker::open_approval`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -201,6 +204,9 @@ pub struct CreatePlanStep {
     pub title: String,
     #[serde(default)]
     pub requires_approval: bool,
+    /// Why this step needs a yes; shown on the approval it opens, alongside the usual prompt.
+    #[serde(default)]
+    pub approval_reason: Option<String>,
     #[serde(default)]
     pub detail: Option<String>,
     /// What the agent is given for this step when the goal worker runs it (JSON, at most 16 KiB).
@@ -393,6 +399,7 @@ pub(crate) async fn create_goal(
             title: s.title,
             status: PlanStepStatus::Pending,
             requires_approval: s.requires_approval,
+            approval_reason: s.approval_reason,
             approval_id: None,
             artifact_id: None,
             detail: s.detail,
@@ -406,6 +413,16 @@ pub(crate) async fn create_goal(
             .is_some_and(|v| v.to_string().len() > 16 * 1024)
     }) {
         return Err(ApiError::bad_request("a step input may be at most 16 KiB"));
+    }
+    if plan.iter().any(|s| {
+        s.approval_reason
+            .as_ref()
+            .is_some_and(|r| r.chars().count() > crate::goal_plan::MAX_REASON_CHARS)
+    }) {
+        return Err(ApiError::bad_request(format!(
+            "a step's approval_reason may be at most {} characters",
+            crate::goal_plan::MAX_REASON_CHARS
+        )));
     }
     let max_attempts = req.max_attempts.unwrap_or_else(default_max_attempts);
     if !(1..=10).contains(&max_attempts) {
@@ -1006,12 +1023,14 @@ pub(crate) mod tests {
                     CreatePlanStep {
                         title: "Read alerts".into(),
                         requires_approval: false,
+                        approval_reason: None,
                         detail: None,
                         input: None,
                     },
                     CreatePlanStep {
                         title: "Restart VM".into(),
                         requires_approval: true,
+                        approval_reason: None,
                         detail: None,
                         input: None,
                     },
@@ -1116,6 +1135,7 @@ pub(crate) mod tests {
                 plan: vec![CreatePlanStep {
                     title: "Restart".into(),
                     requires_approval: true,
+                    approval_reason: None,
                     detail: None,
                     input: None,
                 }],
@@ -1436,6 +1456,7 @@ pub(crate) mod tests {
         CreatePlanStep {
             title: title.into(),
             requires_approval: false,
+            approval_reason: None,
             detail: None,
             input: None,
         }

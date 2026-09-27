@@ -1917,7 +1917,7 @@ async fn a_plan_is_proposed_by_the_planner_and_only_the_owner_can_accept_or_reje
 
     // a session that was not started to plan this goal cannot propose anything
     let ana_session = w.state.store.get_session(w.ana.session).await.unwrap();
-    let data = json!({"steps": [{"title": "Find flights", "input": {"message": "flights to Lisbon"}}, {"title": "Book one", "requires_approval": true}]});
+    let data = json!({"steps": [{"title": "Find flights", "input": {"message": "flights to Lisbon"}}, {"title": "Book one", "requires_approval": true, "approval_reason": "it costs money"}]});
     crate::goal_plan::record_proposal(&w.state, &ana_session, &data).await;
     let events = w.state.store.events_after(ana_session.id, 0).await.unwrap();
     assert!(
@@ -2043,6 +2043,15 @@ async fn a_plan_is_proposed_by_the_planner_and_only_the_owner_can_accept_or_reje
         json!({"message": "flights to Lisbon"})
     );
     assert_eq!(v["plan"][1]["requires_approval"], true);
+    assert_eq!(
+        v["plan"][1]["approval_reason"], "it costs money",
+        "carried from the proposal to the accepted plan"
+    );
+    assert_eq!(
+        v["plan"][0]["approval_reason"],
+        Value::Null,
+        "a step with no reason has none"
+    );
     assert_eq!(v["autorun"], true);
     assert!(v.get("proposed_plan").is_none());
     // a goal with a plan cannot be planned again
