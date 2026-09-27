@@ -198,7 +198,7 @@ public enum KeepDates {
 }
 
 extension JSONDecoder {
-    static var keep: JSONDecoder {
+    public static var keep: JSONDecoder {
         let d = JSONDecoder(); d.keyDecodingStrategy = .convertFromSnakeCase; return d
     }
 }

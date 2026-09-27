@@ -89,6 +89,12 @@ struct RootView: View {
             Button("Upload anyway", role: .destructive) { app.confirmPending() }
             Button("Cancel", role: .cancel) { app.pendingSecretWarning = nil }
         } message: { Text((app.pendingSecretWarning?.findings ?? []).joined(separator: "\n")) }
+        .alert("Connect to \(app.pendingLink?.host.host ?? "this host")?", isPresented: Binding(get: { app.pendingLink != nil }, set: { if !$0 { app.pendingLink = nil } })) {
+            Button("Connect") { Task { await app.acceptPendingLink() } }
+            Button("Cancel", role: .cancel) { app.pendingLink = nil }
+        } message: {
+            Text("A link asked Solvor to connect to \(app.pendingLink?.host.absoluteString ?? "") and store its token in your Keychain. Only continue if you started this.\(app.pendingLink?.isPlainRemote == true ? " This address uses plain http to another machine, so the token could be read on the network." : "")")
+        }
         .alert("Solvor", isPresented: Binding(get: { app.notice != nil }, set: { if !$0 { app.notice = nil } })) { Button("OK") { app.notice = nil } } message: { Text(app.notice ?? "") }
         .confirmationDialog(app.choice?.title ?? "", isPresented: Binding(get: { app.choice != nil }, set: { if !$0 { app.choice = nil } }), titleVisibility: .visible) {
             ForEach(app.choice?.options ?? []) { d in
@@ -115,13 +121,12 @@ struct NotConnectedView: View {
     let open: () -> Void
     @EnvironmentObject var app: AppState
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Space.m) {
             LogoTile(size: 72)
-            Text("Connect Solvor to a Keep host").font(.system(size: 24, weight: .bold, design: .rounded))
-            Text("Solvor reads each file in a sealed cell on a host you run. Enter its address and a user token.").foregroundStyle(.secondary).multilineTextAlignment(.center)
-            if let e = app.connectionError { Text(e).foregroundStyle(.red).font(.callout).multilineTextAlignment(.center) }
-            Button("Open Settings", action: open).primaryButton().controlSize(.large)
-        }.frame(maxWidth: 440).frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text("Connect Solvor to a Keep host").font(Typo.title)
+            Text("Solvor reads each file in a sealed cell on a host you run.").foregroundStyle(.secondary).multilineTextAlignment(.center)
+            ConnectForm().padding(Space.m).card()
+        }.frame(maxWidth: 480).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -142,6 +147,17 @@ enum DebugLaunch {
             case "folders": app.pane = .folders
             case "settings": app.pane = .settings
             default: break
+            }
+        }
+        if d.bool(forKey: "SolvorDemoApproval") {
+            let exp = Int(Date().timeIntervalSince1970) + 272
+            let json = #"{"id":"demo-1","kind":"http.request","status":"pending","sign":{"format":"keep-approval-v1","challenge":"c","expires_at":\#(exp),"action_sha256":"ab"},"preview":{"kind":"gmail-message","fields":[{"label":"To","value":"ana@example.com"},{"label":"Subject","value":"Lunch on Friday?"},{"label":"Text","value":"Hi Ana, are you free for lunch on Friday at 12:30? I found a place near the office."}]}}"#
+            Task { @MainActor in
+                for _ in 0..<40 { if app.connected { break }; try? await Task.sleep(nanoseconds: 250_000_000) }
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                app.debugHoldApprovals = true
+                app.approvals = [try! JSONDecoder.keep.decode(Approval.self, from: Data(json.utf8))]
+                app.device = .enrolled(deviceId: "work-mac")
             }
         }
         if d.bool(forKey: "SolvorDemoRun") {

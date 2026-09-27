@@ -94,7 +94,10 @@ cat <<OUT
     KEEP_API=http://127.0.0.1:$API_PORT KEEP_TOKEN=$USER_TOKEN $ROOT/scripts/keep-demo.sh csv-clean
     KEEP_API=http://127.0.0.1:$API_PORT KEEP_TOKEN=$USER_TOKEN $ROOT/scripts/keep-demo.sh list
 
-  Solvor (Mac app): Settings, Host http://127.0.0.1:$API_PORT, User demo, Token above
+  Solvor (Mac app) finds this host by itself. Paste the token into its first screen, or copy this link and paste it there:
+
+    keep://connect?host=http://127.0.0.1:$API_PORT&token=$USER_TOKEN
+    (or: Settings, Host http://127.0.0.1:$API_PORT, Token above)
     or, in the Solvor repo:  make run KEEP_HOST=http://127.0.0.1:$API_PORT KEEP_TOKEN=$USER_TOKEN
 
   Chat with the example agent in a browser (a token stays on your machine; the page never sees it):

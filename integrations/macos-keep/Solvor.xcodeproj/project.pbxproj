@@ -26,10 +26,13 @@
 		749B310728F33271010458AA /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4FCFE958880846D3D00F5B /* RootView.swift */; };
 		837416067EEA52CBCA734061 /* SolvorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C627E4EEE2E4776B93706067 /* SolvorApp.swift */; };
 		84B3ACAD6F966641D7783768 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A53985133A752408370771 /* Intents.swift */; };
+		8BAB2097F4F098AD1FDDEF45 /* ConnectionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A026A7B427FF632F5A01E3 /* ConnectionModel.swift */; };
 		98FBFE531CF61AFBAC8E073E /* UseCasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBEADEA6361352382B37C42F /* UseCasesView.swift */; };
+		A662969BD1CDA434BDC19150 /* ConnectForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83D24D813CAF3ABF719F19C /* ConnectForm.swift */; };
 		BD4EDE01C80628EF88FF644E /* EmailReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B867A19BC06152670EEE182 /* EmailReaderView.swift */; };
 		C637062174A9079B5A9584E3 /* BrowserReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D9F209AA6B51BDAD3E4D04 /* BrowserReader.swift */; };
 		CBE2CB6EE14C12BD635F304E /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F56A7FFC6E3EF39554B789B /* WelcomeView.swift */; };
+		D232B7FD59213E308B22780F /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E9D1C1CF91E3056365A6AF /* AppStateTests.swift */; };
 		D8B19AE86C25D4A17E31AB47 /* FolderWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 025A6C0620C82F564B96515A /* FolderWatcher.swift */; };
 		E54EBD6D2538AEC3F19CCEDF /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E479CEE05B441769F54EAB58 /* SettingsView.swift */; };
 		F3807F3171E67E073B843777 /* GoalsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E2C4FA2967240B9FDCDD05 /* GoalsPane.swift */; };
@@ -67,8 +70,11 @@
 		C2D9F209AA6B51BDAD3E4D04 /* BrowserReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserReader.swift; sourceTree = "<group>"; };
 		C3454D0692FA79A293DFCA03 /* MemoryPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPane.swift; sourceTree = "<group>"; };
 		C627E4EEE2E4776B93706067 /* SolvorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolvorApp.swift; sourceTree = "<group>"; };
+		C7E9D1C1CF91E3056365A6AF /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
+		C83D24D813CAF3ABF719F19C /* ConnectForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectForm.swift; sourceTree = "<group>"; };
 		CB722859887C4C223CAF221C /* ResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultView.swift; sourceTree = "<group>"; };
 		D4FAE475CF1EBB9FEE1DDE7A /* SolvorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SolvorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D8A026A7B427FF632F5A01E3 /* ConnectionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionModel.swift; sourceTree = "<group>"; };
 		D96797DA3D342B8A4BEFFFFA /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		E0DBB85581AC67EC339A885C /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		E1D72598DFAA76B86DB69778 /* VoiceListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceListener.swift; sourceTree = "<group>"; };
@@ -129,6 +135,8 @@
 				FED6772782E8E615F95F8EEB /* AppState.swift */,
 				C2D9F209AA6B51BDAD3E4D04 /* BrowserReader.swift */,
 				D96797DA3D342B8A4BEFFFFA /* Components.swift */,
+				C83D24D813CAF3ABF719F19C /* ConnectForm.swift */,
+				D8A026A7B427FF632F5A01E3 /* ConnectionModel.swift */,
 				1B867A19BC06152670EEE182 /* EmailReaderView.swift */,
 				025A6C0620C82F564B96515A /* FolderWatcher.swift */,
 				37E2C4FA2967240B9FDCDD05 /* GoalsPane.swift */,
@@ -165,6 +173,7 @@
 		E825642CEED1952252904A60 /* SolvorTests */ = {
 			isa = PBXGroup;
 			children = (
+				C7E9D1C1CF91E3056365A6AF /* AppStateTests.swift */,
 				93C673583C7CA149127EBE51 /* MarkdownTests.swift */,
 			);
 			path = SolvorTests;
@@ -282,6 +291,8 @@
 				624B2BD241B2BA9989D9D047 /* ApprovalsView.swift in Sources */,
 				C637062174A9079B5A9584E3 /* BrowserReader.swift in Sources */,
 				7464DE02A8B2A8537ECF0C78 /* Components.swift in Sources */,
+				A662969BD1CDA434BDC19150 /* ConnectForm.swift in Sources */,
+				8BAB2097F4F098AD1FDDEF45 /* ConnectionModel.swift in Sources */,
 				BD4EDE01C80628EF88FF644E /* EmailReaderView.swift in Sources */,
 				D8B19AE86C25D4A17E31AB47 /* FolderWatcher.swift in Sources */,
 				F3807F3171E67E073B843777 /* GoalsPane.swift in Sources */,
@@ -309,6 +320,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D232B7FD59213E308B22780F /* AppStateTests.swift in Sources */,
 				4D68848577B4E702DEB45E23 /* MarkdownTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
