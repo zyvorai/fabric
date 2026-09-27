@@ -30,6 +30,7 @@ Thumbs.db
 *.so
 *.dylib
 *.dll
+/artifacts/
 
 # Config
 *.local

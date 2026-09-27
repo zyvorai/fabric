@@ -39,6 +39,7 @@ pub mod proxy;
 pub mod receipts;
 pub mod retention;
 pub mod schedules;
+pub mod scoreboard;
 pub mod sentinel;
 pub mod skills;
 pub mod store;

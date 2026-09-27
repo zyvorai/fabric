@@ -1,5 +1,7 @@
 # Keep — phases complete (local)
 
+Scoreboard (ahead-of-Muse gate, software-test only): [`AHEAD.md`](AHEAD.md) · `./scripts/keep-scoreboard.sh` · `agent-runtime/src/scoreboard.rs`.
+
 | Phase | Status | Where |
 |---|---|---|
 | FluxVM Phase 6 | Merged (`security_profile` / measured) | [zyvorai/fluxvm](https://github.com/zyvorai/fluxvm) |
