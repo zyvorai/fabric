@@ -18,6 +18,7 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             ChatsView().tabItem { Label("Chats", systemImage: "bubble.left.and.bubble.right") }.tag(0)
+            GoalsView().tabItem { Label("Goals", systemImage: "checklist") }.tag(3)
             ApprovalsView().tabItem { Label("Approvals", systemImage: "checkmark.shield") }
                 .badge(model.pendingCount).tag(1)
             SettingsView().tabItem { Label("Settings", systemImage: "gearshape") }.tag(2)

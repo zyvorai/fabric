@@ -127,8 +127,9 @@ public struct KeepClient: Sendable {
 
     func request(_ path: String, method: String = "GET", query: [URLQueryItem] = []) -> URLRequest {
         var c = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
-        let base = c.path.hasSuffix("/") ? String(c.path.dropLast()) : c.path
-        c.path = base + path
+        // `path` arrives already percent-escaped (see `escape`), so it must not be escaped a second time.
+        let base = c.percentEncodedPath.hasSuffix("/") ? String(c.percentEncodedPath.dropLast()) : c.percentEncodedPath
+        c.percentEncodedPath = base + path
         c.queryItems = query.isEmpty ? nil : query
         var r = URLRequest(url: c.url!)
         r.httpMethod = method

@@ -13,12 +13,14 @@
 		71222044B34DEE781CB76738 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D6C00757C12636AB9BDB8C /* ChatView.swift */; };
 		99FDFEC2E72F7AFB6400B3BD /* KeepPhoneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3AB1191A41736B0EB6BFB4B /* KeepPhoneApp.swift */; };
 		A198D5BF8203953EEE973A17 /* ApprovalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCE13A54294EF20CE88492D /* ApprovalsView.swift */; };
+		A45E5ECDB1349603DA571684 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25A76FE5D1890353C8B4F964 /* GoalsView.swift */; };
 		D3FE0FC143BE18A25A7C767A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D834924B30632589A64AD6E3 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		06E143982C0D99FBD5360BA1 /* macos-keep */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "macos-keep"; path = "../macos-keep"; sourceTree = SOURCE_ROOT; };
 		1DDEE1E5F2B3229E416262E1 /* ChatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatsView.swift; sourceTree = "<group>"; };
+		25A76FE5D1890353C8B4F964 /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
 		2BCE13A54294EF20CE88492D /* ApprovalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalsView.swift; sourceTree = "<group>"; };
 		3535254826B9FF3CAE8A95D7 /* KeepPhone.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KeepPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF6E8194FC47565DF90E56A0 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -70,6 +72,7 @@
 				2BCE13A54294EF20CE88492D /* ApprovalsView.swift */,
 				1DDEE1E5F2B3229E416262E1 /* ChatsView.swift */,
 				C4D6C00757C12636AB9BDB8C /* ChatView.swift */,
+				25A76FE5D1890353C8B4F964 /* GoalsView.swift */,
 				F3AB1191A41736B0EB6BFB4B /* KeepPhoneApp.swift */,
 				D834924B30632589A64AD6E3 /* SettingsView.swift */,
 			);
@@ -152,6 +155,7 @@
 				A198D5BF8203953EEE973A17 /* ApprovalsView.swift in Sources */,
 				71222044B34DEE781CB76738 /* ChatView.swift in Sources */,
 				51F34030940DF1F462E02A2C /* ChatsView.swift in Sources */,
+				A45E5ECDB1349603DA571684 /* GoalsView.swift in Sources */,
 				99FDFEC2E72F7AFB6400B3BD /* KeepPhoneApp.swift in Sources */,
 				D3FE0FC143BE18A25A7C767A /* SettingsView.swift in Sources */,
 			);
