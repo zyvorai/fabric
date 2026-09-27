@@ -86,6 +86,11 @@ pub struct OAuthRefresh {
     /// (`PUT /v1/connections/{name}`), and the access token is minted for them on first use. A session with no user cannot use it.
     #[serde(default)]
     pub connection: Option<String>,
+    /// Space-separated scopes to ask the token endpoint for (`scope` in the refresh request). Narrows the access token to what this credential
+    /// needs, e.g. a read-only credential asking for `Mail.Read` only, even though the person consented to more. Microsoft accepts it (and its
+    /// refresh tokens rotate, which per-person connections follow); Google's endpoint does not need it. Empty: send none.
+    #[serde(default)]
+    pub scope: String,
     /// Refresh this many seconds before the access token expires. Default 300.
     #[serde(default = "default_refresh_margin")]
     pub refresh_margin_secs: u64,
@@ -106,23 +111,37 @@ fn env_secret(var: &str, required: bool) -> Result<String> {
     }
 }
 
+/// An access token, how long it lives, and a **new refresh token** when the endpoint rotated it (Microsoft does, on every use).
+struct Minted {
+    token: String,
+    lifetime: Duration,
+    rotated: Option<String>,
+}
+
 /// The refresh-token grant against the token endpoint. The client id and secret come from host env; `refresh_token` is passed in. The error
-/// text carries Google's error code at most, never a secret.
+/// text carries the provider's error code at most, never a secret.
 async fn mint_access_token(
     oauth: &OAuthRefresh,
     refresh_token: &str,
     name: &str,
     http: &reqwest::Client,
-) -> Result<(String, Duration)> {
-    let body = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair("grant_type", "refresh_token")
-        .append_pair("client_id", &env_secret(&oauth.client_id_env, true)?)
-        .append_pair(
-            "client_secret",
-            &env_secret(&oauth.client_secret_env, false)?,
-        )
-        .append_pair("refresh_token", refresh_token)
-        .finish();
+) -> Result<Minted> {
+    // built in its own block: the serializer is not `Sync`, so it must not be alive across the await below
+    let body = {
+        let mut form = url::form_urlencoded::Serializer::new(String::new());
+        form.append_pair("grant_type", "refresh_token")
+            .append_pair("client_id", &env_secret(&oauth.client_id_env, true)?);
+        // a public client (Microsoft's desktop and mobile apps) has no secret, and sending an empty one is refused
+        let secret = env_secret(&oauth.client_secret_env, false)?;
+        if !secret.is_empty() {
+            form.append_pair("client_secret", &secret);
+        }
+        form.append_pair("refresh_token", refresh_token);
+        if !oauth.scope.trim().is_empty() {
+            form.append_pair("scope", oauth.scope.trim());
+        }
+        form.finish()
+    };
     let response = http
         .post(&oauth.token_url)
         .header("content-type", "application/x-www-form-urlencoded")
@@ -154,7 +173,16 @@ async fn mint_access_token(
             .unwrap_or(3600)
             .max(1),
     );
-    Ok((token.to_string(), lifetime))
+    let rotated = json
+        .get("refresh_token")
+        .and_then(|v| v.as_str())
+        .filter(|t| !t.is_empty() && *t != refresh_token)
+        .map(str::to_string);
+    Ok(Minted {
+        token: token.to_string(),
+        lifetime,
+        rotated,
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -328,7 +356,16 @@ impl CredentialVault {
                 format!("credential '{name}' is not a host-wide oauth-refresh credential")
             })?;
         let refresh_token = env_secret(&oauth.refresh_token_env, true)?;
-        let (token, lifetime) = mint_access_token(oauth, &refresh_token, name, http).await?;
+        let Minted {
+            token,
+            lifetime,
+            rotated,
+        } = mint_access_token(oauth, &refresh_token, name, http).await?;
+        if rotated.is_some() {
+            // A host-wide refresh token lives in the host's environment and cannot be replaced from here: the old one keeps working until its
+            // own expiry, so say so instead of silently drifting.
+            tracing::warn!(credential = %name, "the token endpoint rotated the refresh token, but a host-wide one cannot be updated; use a per-person connection for providers that rotate");
+        }
         self.tokens
             .write()
             .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
@@ -374,13 +411,14 @@ impl CredentialVault {
 
     /// Makes sure `user` has a valid access token for the per-person credential `name`, minting one from `refresh_token` (the person's own,
     /// from their connection) when there is none or it is about to expire. A missing connection or a refusal is an error that names no secret.
+    /// Returns the **new refresh token** when the endpoint rotated it, for the caller to store (`ConnectionStore::rotate`).
     pub async fn ensure_user_token(
         &self,
         name: &str,
         user: &str,
         refresh_token: Option<&str>,
         http: &reqwest::Client,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         let descriptor = self
             .descriptor(name)
             .with_context(|| format!("credential '{name}' is not configured"))?;
@@ -398,7 +436,7 @@ impl CredentialVault {
             .get(&key)
             .is_some_and(|t| t.valid_until > Instant::now() + margin);
         if fresh {
-            return Ok(());
+            return Ok(None);
         }
         let refresh_token = refresh_token.with_context(|| {
             format!(
@@ -406,7 +444,11 @@ impl CredentialVault {
                 oauth.connection.as_deref().unwrap_or("account")
             )
         })?;
-        let (token, lifetime) = mint_access_token(oauth, refresh_token, name, http).await?;
+        let Minted {
+            token,
+            lifetime,
+            rotated,
+        } = mint_access_token(oauth, refresh_token, name, http).await?;
         self.user_tokens
             .write()
             .map_err(|_| anyhow::anyhow!("token cache lock poisoned"))?
@@ -417,7 +459,7 @@ impl CredentialVault {
                     valid_until: Instant::now() + lifetime,
                 },
             );
-        Ok(())
+        Ok(rotated)
     }
 
     /// Drops the cached access tokens of `user` for every credential that uses `connection` (after they disconnect or replace it).
@@ -1246,6 +1288,95 @@ mod tests {
         assert!(
             seen.lock().unwrap().is_empty(),
             "no host refresh token exists for a per-person credential"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_scope_narrows_the_token_and_a_public_client_sends_no_secret() {
+        let (url, seen) = fake_token_endpoint(
+            200,
+            serde_json::json!({"access_token": "at", "expires_in": 3600}),
+        )
+        .await;
+        std::env::set_var("SC_ID", "app-id");
+        std::env::remove_var("SC_NO_SECRET");
+        let make = |scope: &str| {
+            let d: CredentialDescriptor = serde_json::from_value(serde_json::json!({
+                "host": "graph.microsoft.com", "header": "authorization", "kind": "oauth-refresh", "allowed_methods": ["GET"],
+                "oauth": {"token_url": url, "client_id_env": "SC_ID", "client_secret_env": "SC_NO_SECRET", "connection": "microsoft", "scope": scope}
+            }))
+            .unwrap();
+            validate_descriptor("outlook", &d).unwrap();
+            CredentialVault::from_descriptors(HashMap::from([("outlook".to_string(), d)]))
+        };
+        let http = reqwest::Client::new();
+        make("https://graph.microsoft.com/Mail.Read offline_access")
+            .ensure_user_token("outlook", "ana", Some("rt-1"), &http)
+            .await
+            .unwrap();
+        make("")
+            .ensure_user_token("outlook", "ana", Some("rt-1"), &http)
+            .await
+            .unwrap();
+        let bodies = seen.lock().unwrap().clone();
+        assert!(
+            bodies[0]
+                .contains("scope=https%3A%2F%2Fgraph.microsoft.com%2FMail.Read+offline_access"),
+            "{}",
+            bodies[0]
+        );
+        assert!(
+            !bodies[1].contains("scope="),
+            "no scope when none is set: {}",
+            bodies[1]
+        );
+        for b in &bodies {
+            assert!(
+                b.contains("client_id=app-id") && !b.contains("client_secret"),
+                "a public client has no secret to send: {b}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_rotated_refresh_token_is_handed_back_only_when_it_changed() {
+        let (url, _) = fake_token_endpoint(
+            200,
+            serde_json::json!({"access_token": "at", "expires_in": 3600, "refresh_token": "rt-2"}),
+        )
+        .await;
+        std::env::set_var("RT_ID", "app-id");
+        let d: CredentialDescriptor = serde_json::from_value(serde_json::json!({
+            "host": "graph.microsoft.com", "header": "authorization", "kind": "oauth-refresh", "allowed_methods": ["GET"],
+            "oauth": {"token_url": url, "client_id_env": "RT_ID", "client_secret_env": "", "connection": "microsoft"}
+        }))
+        .unwrap();
+        let vault = CredentialVault::from_descriptors(HashMap::from([("outlook".to_string(), d)]));
+        let http = reqwest::Client::new();
+        assert_eq!(
+            vault
+                .ensure_user_token("outlook", "ana", Some("rt-1"), &http)
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("rt-2"),
+            "the endpoint rotated it"
+        );
+        assert_eq!(
+            vault
+                .ensure_user_token("outlook", "ana", Some("rt-1"), &http)
+                .await
+                .unwrap(),
+            None,
+            "a cached token asks nothing"
+        );
+        assert_eq!(
+            vault
+                .ensure_user_token("outlook", "ben", Some("rt-2"), &http)
+                .await
+                .unwrap(),
+            None,
+            "the same refresh token echoed back is not a change"
         );
     }
 }

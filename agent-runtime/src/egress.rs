@@ -322,11 +322,27 @@ pub(crate) async fn proxy_inner(
                     .connections
                     .refresh_token(user, connection)
                     .await;
-                state
+                let rotated = state
                     .credentials
                     .ensure_user_token(name, user, refresh_token.as_deref(), &state.egress_http)
                     .await
                     .map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?;
+                // A provider that rotates refresh tokens (Microsoft) hands back a new one each time; keep it, or the connection dies when
+                // the old one finally expires.
+                if let (Some(new), Some(old)) = (rotated, refresh_token.as_deref()) {
+                    match state
+                        .store
+                        .connections
+                        .rotate(user, connection, old, &new)
+                        .await
+                    {
+                        Ok(true) => {}
+                        Ok(false) => {}
+                        Err(e) => {
+                            tracing::warn!(error = %e, credential = %name, "could not store the rotated refresh token")
+                        }
+                    }
+                }
             }
             state
                 .credentials
@@ -2009,7 +2025,10 @@ pub(crate) mod ask_tests {
                     .find(|(k, _)| k == "refresh_token")
                     .map(|(_, v)| v.to_string())
                     .unwrap_or_default();
-                axum::Json(json!({"access_token": format!("at-{rt}"), "expires_in": 3600}))
+                // like Microsoft, hand back a new refresh token every time
+                axum::Json(
+                    json!({"access_token": format!("at-{rt}"), "expires_in": 3600, "refresh_token": format!("{rt}~")}),
+                )
             }),
         );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -2135,6 +2154,19 @@ pub(crate) mod ask_tests {
             *seen.lock().unwrap(),
             ["Bearer at-1//ana-refresh", "Bearer at-1//ben-refresh"]
         );
+        // the rotated refresh tokens were kept, each person's own
+        for (who, want) in [("ana", "1//ana-refresh~"), ("ben", "1//ben-refresh~")] {
+            assert_eq!(
+                state
+                    .store
+                    .connections
+                    .refresh_token(who, "google")
+                    .await
+                    .as_deref(),
+                Some(want),
+                "{who}"
+            );
+        }
         // ana disconnecting closes her at once; ben is unaffected
         state
             .store
@@ -2149,6 +2181,15 @@ pub(crate) mod ask_tests {
             .1
             .contains("connect your google account first"));
         assert!(read(ben).await.is_ok(), "ben is still connected");
+        assert!(
+            state
+                .store
+                .connections
+                .refresh_token("ana", "google")
+                .await
+                .is_none(),
+            "a rotation never brings a disconnected person back"
+        );
     }
 
     #[tokio::test]
