@@ -23,7 +23,7 @@ while you hold the policy, the credentials and the approvals. Open source, Apach
 </div>
 
 <p align="center">
-  <img src="../assets/keep/demo-static.svg" alt="Real output of ./scripts/keep-e2e.sh: 40 checks passed, 0 failed" width="760">
+  <img src="../assets/keep/demo-static.svg" alt="Real output of ./scripts/keep-e2e.sh: 39 checks passed, 0 failed" width="760">
 </p>
 
 <p align="center"><sub>Real output of <code>./scripts/keep-e2e.sh</code>, condensed. Record your own GIF with <code>./scripts/keep-record-demo.sh</code>.</sub></p>
@@ -187,7 +187,7 @@ git clone https://github.com/zyvorai/fabric && cd fabric
 cargo test --manifest-path agent-runtime/Cargo.toml --lib
 
 # 2. End to end: live runtime + FluxVM sandbox stub + keepctl
-./scripts/keep-e2e.sh          # ends with: passed=40 failed=0
+./scripts/keep-e2e.sh          # ends with: passed=39 failed=0
 
 # 3. On a FluxVM host with a node22-agent template (./scripts/keep-bake-node22-agent.sh builds it)
 ./scripts/keep-live-lab.sh
