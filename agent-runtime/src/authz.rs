@@ -277,6 +277,14 @@ pub fn user_route(method: &Method, path: &str) -> UserRoute {
                 None => UserRoute::Denied,
             }
         }
+        // Suggestions agents made to this person: read, turn on or off, accept (makes a goal) or dismiss.
+        ["v1", "suggestions"] if read => UserRoute::Open(Scope::Read),
+        ["v1", "suggestions", "settings"] if *method == Method::PUT => UserRoute::Open(Scope::Run),
+        ["v1", "suggestions", sid, "accept" | "dismiss"]
+            if *method == Method::POST && id(sid).is_some() =>
+        {
+            UserRoute::Open(Scope::Run)
+        }
         ["v1", "approvals"] if read => UserRoute::Open(Scope::Read),
         ["v1", "approvals", aid] if *method == Method::POST => match id(aid) {
             Some(aid) => UserRoute::Approval(aid, Scope::Approve),
@@ -510,6 +518,32 @@ mod tests {
                 UserRoute::Approval(aid, Scope::Approve),
             ),
             (Method::POST, "/v1/approvals".into(), UserRoute::Denied),
+            (
+                Method::GET,
+                "/v1/suggestions".into(),
+                UserRoute::Open(Scope::Read),
+            ),
+            (
+                Method::PUT,
+                "/v1/suggestions/settings".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::POST,
+                "/v1/suggestions/00000000-0000-4000-8000-000000000000/accept".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (
+                Method::POST,
+                "/v1/suggestions/00000000-0000-4000-8000-000000000000/dismiss".into(),
+                UserRoute::Open(Scope::Run),
+            ),
+            (Method::POST, "/v1/suggestions".into(), UserRoute::Denied),
+            (
+                Method::POST,
+                "/v1/suggestions/not-an-id/accept".into(),
+                UserRoute::Denied,
+            ),
             (
                 Method::GET,
                 "/v1/receipts".into(),

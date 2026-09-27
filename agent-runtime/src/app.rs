@@ -396,6 +396,19 @@ pub fn public_router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/memory/{id}/accept", post(crate::memory::accept_memory))
         .route("/v1/memory/{id}/reject", post(crate::memory::reject_memory))
+        .route("/v1/suggestions", get(crate::suggestions::list))
+        .route(
+            "/v1/suggestions/settings",
+            axum::routing::put(crate::suggestions::put_settings),
+        )
+        .route(
+            "/v1/suggestions/{id}/accept",
+            post(crate::suggestions::accept),
+        )
+        .route(
+            "/v1/suggestions/{id}/dismiss",
+            post(crate::suggestions::dismiss),
+        )
         .route("/v1/goals/{id}/browse", post(crate::goals::goal_browse))
         .route("/v1/keep/status", get(crate::demos::keep_status))
         .route(
@@ -1850,6 +1863,10 @@ async fn sync_session(state: &Arc<AppState>, session: SessionRecord) -> Result<(
             }
             "goal.plan_proposed" => {
                 crate::goal_plan::record_proposal(state, &session, &event.data).await;
+            }
+            "suggestion.propose" => {
+                crate::suggestions::record_proposal(state, &session, &agent.manifest, &event.data)
+                    .await;
             }
             "memory.propose" => {
                 crate::memory::record_proposal(state, &session, &agent.manifest, &event.data).await;
@@ -3315,8 +3332,19 @@ async fn inbox(
         .filter(|i| i.status == crate::memory::Status::Proposed)
         .map(|i| json!({ "id": i.id, "text": i.text, "kind": i.kind, "tainted": i.tainted, "session_id": i.source.session_id }))
         .collect();
+    // Things an agent thinks you might want done, waiting for a decision.
+    let suggestions: Vec<Value> = state
+        .store
+        .suggestions
+        .get(&user)
+        .await
+        .items
+        .into_iter()
+        .filter(|i| i.status == crate::suggestions::Status::Pending)
+        .map(|i| json!({ "id": i.id, "title": i.title, "reason": i.reason, "agent": i.agent, "tainted": i.tainted }))
+        .collect();
     Ok(Json(
-        json!({ "user_id": user, "pending_approvals": pending, "memory_proposals": memory_proposals, "recent_runs": recent }),
+        json!({ "user_id": user, "pending_approvals": pending, "memory_proposals": memory_proposals, "suggestions": suggestions, "recent_runs": recent }),
     ))
 }
 

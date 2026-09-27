@@ -13,6 +13,7 @@
 | [`mail-compose`](./mail-compose/) | Drafts or sends a plain-text mail; every use waits for a phone-signed approval that shows the real text |
 | [`calendar-agent`](./calendar-agent/) | Reads your next day, or adds an event after a phone-signed approval |
 | [`goal-planner`](./goal-planner/) | Proposes the steps of a goal from a model socket; the person accepts or rejects them |
+| [`suggestion-example`](./suggestion-example/) | The smallest agent that proposes suggestions the person accepts (as a goal) or dismisses |
 | [`_fabric`](./_fabric/) | Shared client + credential/policy recipes |
 
 ```bash

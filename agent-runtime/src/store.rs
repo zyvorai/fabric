@@ -59,6 +59,8 @@ pub struct Store {
     pub threads: crate::threads::ThreadStore,
     /// Opt-in personal memory, per user.
     pub memory: crate::memory::MemoryStore,
+    /// Opt-in suggestions agents make to a person, per user.
+    pub suggestions: crate::suggestions::SuggestionStore,
     /// Receipts for approved actions, and the answers to repeated keyed requests.
     pub receipts: crate::receipts::ReceiptStore,
     /// A person's own connections to outside accounts (refresh tokens, write-only).
@@ -74,6 +76,8 @@ impl Store {
         let skills = SkillStore::open(root.join("skills")).await?;
         let threads = crate::threads::ThreadStore::open(root.join("threads")).await?;
         let memory = crate::memory::MemoryStore::open(root.join("memory")).await?;
+        let suggestions =
+            crate::suggestions::SuggestionStore::open(root.join("suggestions")).await?;
         let receipts = crate::receipts::ReceiptStore::open(root.join("receipts")).await?;
         let connections =
             crate::connections::ConnectionStore::open(root.join("connections")).await?;
@@ -83,6 +87,7 @@ impl Store {
             skills,
             threads,
             memory,
+            suggestions,
             receipts,
             connections,
             root,
@@ -1287,6 +1292,7 @@ mod tests {
                 allow_private_networks: false,
                 runtime_port: 8080,
                 memory: false,
+                suggestions: false,
                 ttl_seconds: None,
                 max_concurrent_sessions: None,
                 idle_hibernate_seconds: None,
@@ -1339,6 +1345,7 @@ mod tests {
                     allow_private_networks: false,
                     runtime_port: 8080,
                     memory: false,
+                    suggestions: false,
                     ttl_seconds: None,
                     max_concurrent_sessions: None,
                     idle_hibernate_seconds: None,
@@ -1376,6 +1383,7 @@ mod tests {
                     allow_private_networks: false,
                     runtime_port: 8080,
                     memory: false,
+                    suggestions: false,
                     ttl_seconds: None,
                     max_concurrent_sessions: None,
                     idle_hibernate_seconds: None,

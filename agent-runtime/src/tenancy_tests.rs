@@ -166,6 +166,23 @@ async fn world() -> World {
     }
 }
 
+/// A POST that says it is JSON but has no body, as a client that always sets the header sends for "no options".
+async fn post_empty_json(app: &Router, path: &str, token: &str) -> (StatusCode, String) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(path)
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    let status = resp.status();
+    let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    (status, String::from_utf8_lossy(&bytes).into_owned())
+}
+
 fn ids(v: &Value, key: &str) -> Vec<String> {
     v["items"]
         .as_array()
@@ -1869,6 +1886,11 @@ async fn a_plan_is_proposed_by_the_planner_and_only_the_owner_can_accept_or_reje
     let uid: Uuid = gid.parse().unwrap();
     let plan_path = format!("/v1/goals/{gid}/plan");
 
+    let (st, msg) = post_empty_json(&w.app, &plan_path, &w.ana.token).await;
+    assert!(
+        st == StatusCode::BAD_REQUEST && msg.contains("no planner agent"),
+        "an empty JSON body is read as no options (then: no planner named): {st} {msg}"
+    );
     // asking for a plan: refused without a planner, or with one that is not deployed; someone else's goal is a 404
     let (st, v) = call(&w.app, "POST", &plan_path, ana, None).await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
@@ -2048,4 +2070,244 @@ async fn a_plan_is_proposed_by_the_planner_and_only_the_owner_can_accept_or_reje
         v.get("proposed_plan").is_none() && v["plan"].as_array().unwrap().len() == 2,
         "{v}"
     );
+}
+
+#[tokio::test]
+async fn suggestions_are_opt_in_private_bounded_and_only_the_owner_turns_them_into_goals() {
+    let w = world().await;
+    let (ana, ben) = (Some(w.ana.token.as_str()), Some(w.ben.token.as_str()));
+    let agent = w
+        .state
+        .store
+        .get_session(w.ana.session)
+        .await
+        .unwrap()
+        .agent;
+    let mut manifest = crate::egress::ask_tests::manifest(crate::model::EgressMode::Deny, Some(30));
+    manifest.suggestions = true;
+    w.state
+        .store
+        .deploy_agent(crate::model::DeployAgentRequest {
+            name: agent.clone(),
+            bundle_base64: base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                "export default 1",
+            ),
+            manifest: manifest.clone(),
+        })
+        .await
+        .unwrap();
+    let session = w.state.store.get_session(w.ana.session).await.unwrap();
+    let refused_events = |sid: Uuid| {
+        let state = w.state.clone();
+        async move {
+            state
+                .store
+                .events_after(sid, 0)
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|e| e.kind == "suggestion.refused")
+                .count()
+        }
+    };
+    let propose = |title: &str, s: SessionRecord, m: crate::model::AgentManifest| {
+        let state = w.state.clone();
+        let data = json!({"title": title, "reason": "you have a gap on Friday"});
+        async move { crate::suggestions::record_proposal(&state, &s, &m, &data).await }
+    };
+
+    // off by default: a proposal is refused and nothing is kept
+    let (_, v) = call(&w.app, "GET", "/v1/suggestions", ana, None).await;
+    assert_eq!(
+        (v["enabled"].clone(), v["pending"].as_array().unwrap().len()),
+        (json!(false), 0)
+    );
+    propose("Book the dentist", session.clone(), manifest.clone()).await;
+    assert_eq!(refused_events(session.id).await, 1);
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/suggestions/{}/accept", Uuid::new_v4()),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+
+    // turned on, a proposal waits; a repeat, an agent that did not ask, a session with no user and a secret are refused
+    let (st, v) = call(
+        &w.app,
+        "PUT",
+        "/v1/suggestions/settings",
+        ana,
+        Some(json!({"enabled": true})),
+    )
+    .await;
+    assert_eq!((st, v["enabled"].clone()), (StatusCode::OK, json!(true)));
+    propose("Book the dentist", session.clone(), manifest.clone()).await;
+    propose("  book  THE dentist ", session.clone(), manifest.clone()).await;
+    let mut quiet = manifest.clone();
+    quiet.suggestions = false;
+    propose("Not allowed", session.clone(), quiet).await;
+    let mut nobody = session.clone();
+    nobody.user_id = None;
+    propose("No user", nobody.clone(), manifest.clone()).await;
+    propose(
+        "Use token ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+        session.clone(),
+        manifest.clone(),
+    )
+    .await;
+    assert_eq!(
+        refused_events(session.id).await,
+        5,
+        "the first (off), the repeat, the quiet agent, and the secret"
+    );
+    assert_eq!(
+        refused_events(nobody.id).await,
+        5,
+        "same session id, counted together"
+    );
+    let (_, v) = call(&w.app, "GET", "/v1/suggestions", ana, None).await;
+    let pending = v["pending"].as_array().unwrap();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0]["agent"], agent.as_str());
+    let sid = pending[0]["id"].as_str().unwrap().to_string();
+
+    // another person sees none and can decide none; the inbox shows hers
+    let (_, v) = call(&w.app, "GET", "/v1/suggestions", ben, None).await;
+    assert!(v["pending"].as_array().unwrap().is_empty());
+    for path in [
+        format!("/v1/suggestions/{sid}/accept"),
+        format!("/v1/suggestions/{sid}/dismiss"),
+    ] {
+        let (st, _) = call(&w.app, "POST", &path, ben, None).await;
+        assert_eq!(st, StatusCode::NOT_FOUND, "{path}");
+    }
+    let (_, v) = call(&w.app, "GET", "/v1/inbox", ana, None).await;
+    assert_eq!(v["suggestions"][0]["title"], "Book the dentist");
+    let (_, v) = call(&w.app, "GET", "/v1/inbox", ben, None).await;
+    assert!(v["suggestions"].as_array().unwrap().is_empty());
+    let journal =
+        serde_json::to_string(&w.state.store.audit.list(None, 200).await.unwrap()).unwrap();
+    assert!(
+        journal.contains("keep.suggestion.proposed")
+            && !journal.contains("dentist")
+            && !journal.contains("gap on Friday"),
+        "{journal}"
+    );
+
+    // accepting makes an ordinary goal for her: no plan, nothing running
+    let (st, msg) = post_empty_json(
+        &w.app,
+        &format!("/v1/suggestions/{}/accept", Uuid::new_v4()),
+        &w.ana.token,
+    )
+    .await;
+    assert_eq!(
+        st,
+        StatusCode::NOT_FOUND,
+        "an empty JSON body is read as no options, not a 400: {msg}"
+    );
+    let (st, v) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/suggestions/{sid}/accept"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(v["goal"]["user_id"], "ana");
+    assert_eq!(
+        (v["goal"]["title"].clone(), v["goal"]["autorun"].clone()),
+        (json!("Book the dentist"), json!(false))
+    );
+    assert!(v["goal"]["plan"].as_array().unwrap().is_empty());
+    assert_eq!(v["suggestion"]["status"], "accepted");
+    let (_, g) = call(&w.app, "GET", "/v1/goals", ben, None).await;
+    assert!(g["items"].as_array().unwrap().is_empty());
+    let (st, _) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/suggestions/{sid}/accept"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::NOT_FOUND, "already decided");
+
+    // a session that had read untrusted content needs an explicit confirmation; dismissing suppresses a repeat
+    let mut tainted = session.clone();
+    tainted.tainted_by = vec!["evil.example".into()];
+    propose("Wire the money", tainted.clone(), manifest.clone()).await;
+    let (_, v) = call(&w.app, "GET", "/v1/suggestions", ana, None).await;
+    let tid = v["pending"][0]["id"].as_str().unwrap().to_string();
+    assert_eq!(v["pending"][0]["tainted"], true);
+    let (st, v) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/suggestions/{tid}/accept"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT, "{v}");
+    let (st, v) = call(
+        &w.app,
+        "POST",
+        &format!("/v1/suggestions/{tid}/dismiss"),
+        ana,
+        None,
+    )
+    .await;
+    assert_eq!(
+        (st, v["status"].clone()),
+        (StatusCode::OK, json!("dismissed"))
+    );
+    let before = refused_events(session.id).await;
+    propose("Wire the money", session.clone(), manifest.clone()).await;
+    assert_eq!(
+        refused_events(session.id).await,
+        before + 1,
+        "a dismissed suggestion is not made again"
+    );
+
+    // a person's list is bounded
+    for i in 0..crate::suggestions::MAX_PENDING + 3 {
+        propose(
+            &format!("Idea number {i}"),
+            session.clone(),
+            manifest.clone(),
+        )
+        .await;
+    }
+    let (_, v) = call(&w.app, "GET", "/v1/suggestions", ana, None).await;
+    assert_eq!(
+        v["pending"].as_array().unwrap().len(),
+        crate::suggestions::MAX_PENDING
+    );
+
+    // the operator must name whose, and it is journaled; anonymous is refused
+    let opt = op();
+    let (st, _) = call(&w.app, "GET", "/v1/suggestions", Some(opt.as_str()), None).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, v) = call(
+        &w.app,
+        "GET",
+        "/v1/suggestions?user_id=ana",
+        Some(opt.as_str()),
+        None,
+    )
+    .await;
+    assert_eq!(
+        (st, v["pending"].as_array().unwrap().len()),
+        (StatusCode::OK, crate::suggestions::MAX_PENDING)
+    );
+    let journal =
+        serde_json::to_string(&w.state.store.audit.list(None, 400).await.unwrap()).unwrap();
+    assert!(journal.contains("keep.suggestion.operator_access"));
+    let (st, _) = call(&w.app, "GET", "/v1/suggestions", None, None).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
 }

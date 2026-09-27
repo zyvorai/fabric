@@ -34,6 +34,19 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// An optional JSON body: an empty body means "all defaults" whatever the content type says (a client that always sends
+/// `content-type: application/json` must not get a 400 for having nothing to say).
+pub(crate) fn optional_json<T: serde::de::DeserializeOwned + Default>(
+    body: &[u8],
+) -> Result<T, ApiError> {
+    if body.iter().all(u8::is_ascii_whitespace) {
+        return Ok(T::default());
+    }
+    serde_json::from_slice(body).map_err(|e| {
+        ApiError::bad_request(format!("the body is not valid JSON for this request: {e}"))
+    })
+}
+
 pub const MAX_STEPS: usize = 10;
 pub const MAX_TITLE_CHARS: usize = 120;
 pub const MAX_INPUT_BYTES: usize = 4096;
@@ -132,8 +145,9 @@ pub struct StartPlanning {
 pub(crate) async fn start_planning(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
-    body: Option<Json<StartPlanning>>,
+    body: axum::body::Bytes,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
+    let body: StartPlanning = optional_json(&body)?;
     let mut goal = state
         .store
         .get_goal(id)
@@ -160,7 +174,7 @@ pub(crate) async fn start_planning(
         }
     }
     let planner = body
-        .and_then(|Json(b)| b.planner)
+        .planner
         .or_else(|| state.config.planner_agent.clone())
         .ok_or_else(|| {
             ApiError::bad_request(
@@ -283,9 +297,9 @@ pub(crate) async fn accept_plan(
     State(state): State<Arc<AppState>>,
     Extension(principal): Extension<Principal>,
     Path(id): Path<Uuid>,
-    body: Option<Json<AcceptPlan>>,
+    body: axum::body::Bytes,
 ) -> ApiResult<Json<GoalRecord>> {
-    let req = body.map(|Json(b)| b).unwrap_or_default();
+    let req: AcceptPlan = optional_json(&body)?;
     let mut goal = state
         .store
         .get_goal(id)

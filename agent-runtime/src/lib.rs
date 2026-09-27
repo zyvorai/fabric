@@ -41,6 +41,7 @@ pub mod schedules;
 pub mod sentinel;
 pub mod skills;
 pub mod store;
+pub mod suggestions;
 #[cfg(test)]
 mod tenancy_tests;
 pub mod threads;

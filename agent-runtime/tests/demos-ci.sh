@@ -1336,6 +1336,38 @@ r=$(g_run "$GINA" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "the run after
 [[ "$r" == *"connect your google account first"* ]] || fail "after disconnecting, the agent must be refused again: $r"
 ok "disconnecting closes her at once"
 
+echo "demos-ci: suggestions (an agent that asked, a person who turned them on, a goal only when accepted)"
+SUGPACK="$WORK/suggestion-example"; cp -R "$ROOT/examples/keep-agents/suggestion-example" "$SUGPACK"
+printf 'version: 1\ndefault_egress: deny\nallow: []\n' > "$SUGPACK/keep.policy.yaml"
+KEEP_POLICY_SEED="$SEED" FABRIC_AGENT_URL="$MEM_BASE" node "$CLI" pack deploy "$SUGPACK" >"$WORK/suggestion-example.out" 2>&1 || fail "suggestion-example deploy failed: $(cat "$WORK/suggestion-example.out")"
+sug_run() {   # $1 token: runs the agent and waits; prints its session id
+  local sid; sid=$(mem_api "$1" POST /v1/sessions -d '{"agent":"suggestion-example","input":{"suggestions":[{"title":"Review last month\u0027s expenses","reason":"the month just ended","agent":"memory-agent"}]}}' | json id) || return 1
+  for _ in $(seq 1 100); do [[ "$(mem_api "$1" GET "/v1/sessions/$sid" | json status)" == "completed" ]] && break; sleep 0.3; done
+  echo "$sid"
+}
+sug_events() { curl -sN --max-time 5 -H "Authorization: Bearer $1" "$MEM_BASE/v1/sessions/$2/events?after=0" | grep -o "suggestion\.[a-z]*" | sort | uniq -c | tr -s ' ' | tr '\n' ';'; }
+sid=$(sug_run "$CAM") || fail "cam's suggestion run failed"
+[[ "$(sug_events "$CAM" "$sid")" == *"suggestion.refused"* ]] || fail "with suggestions off the proposal must be refused: $(sug_events "$CAM" "$sid")"
+[[ "$(mem_api "$CAM" GET /v1/suggestions | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["pending"]))')" == "0" ]] || fail "nothing may wait while suggestions are off"
+ok "suggestions off (the default): the agent's proposal is refused and nothing is kept"
+mem_api "$CAM" PUT /v1/suggestions/settings -d '{"enabled":true}' >/dev/null
+sid=$(sug_run "$CAM") || fail "cam's second suggestion run failed"
+mem_api "$CAM" GET /v1/suggestions | python3 -c 'import json,sys
+v=json.load(sys.stdin); p=v["pending"]
+assert v["enabled"] and len(p)==1 and p[0]["title"]=="Review last month\u0027s expenses" and p[0]["agent"]=="memory-agent" and p[0]["tainted"] is False, v' || fail "the suggestion should wait for cam: $(mem_api "$CAM" GET /v1/suggestions)"
+SUGID=$(mem_api "$CAM" GET /v1/suggestions | json pending.0.id)
+mem_mine=$(mem_api "$CAM" GET /v1/inbox | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["suggestions"]))')
+[[ "$mem_mine" == "1" ]] || fail "the inbox should list it"
+[[ "$(mem_api "$DAN" GET /v1/suggestions | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["pending"]))')" == "0" && "$(mem_api "$DAN" POST "/v1/suggestions/$SUGID/accept" -o /dev/null -w '%{http_code}')" == "404" ]] || fail "another user must not see or accept it: $(mem_api "$DAN" GET /v1/suggestions) / $(mem_api "$DAN" POST "/v1/suggestions/$SUGID/accept" -w ' %{http_code}')"
+[[ "$(mem_api "$CAM" GET /v1/goals | python3 -c 'import json,sys; print(sum(1 for g in json.load(sys.stdin)["items"] if g["title"].startswith("Review last month")))')" == "0" ]] || fail "a suggestion alone must not create a goal"
+ok "turned on, the proposal waits for cam only (list and inbox); no goal exists yet"
+mem_api "$CAM" POST "/v1/suggestions/$SUGID/accept" | python3 -c 'import json,sys
+v=json.load(sys.stdin); g=v["goal"]
+assert v["suggestion"]["status"]=="accepted" and g["user_id"]=="cam" and g["agent"]=="memory-agent" and g["plan"]==[] and g["autorun"] is False and g["description"]=="the month just ended", v' || fail "accepting should make a plan-less, not-running goal for cam"
+sid=$(sug_run "$CAM") || fail "cam's third suggestion run failed"
+[[ "$(mem_api "$CAM" GET /v1/suggestions | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["pending"]))')" == "0" && "$(sug_events "$CAM" "$sid")" == *"suggestion.refused"* ]] || fail "the same suggestion must not be made again after it was accepted"
+ok "accepting makes an ordinary goal (no plan, not running); the same suggestion is not made again"
+
 echo "demos-ci: two users on one shard (user tokens, isolation, quota, revocation)"
 mint() { curl -s -X POST -H "Authorization: Bearer $KEEP_TOKEN_VALUE" -H 'content-type: application/json' -d "{\"user_id\":\"$1\",\"ttl_seconds\":600}" "$KEEP_BASE/v1/user-tokens" | json token; }
 as() { local tok=$1; shift; curl -s -H "Authorization: Bearer $tok" "$@"; }
