@@ -46,7 +46,7 @@ final class AppState: ObservableObject {
     @Published var selectedJob: UUID?
     @Published var folderRules: [FolderRule] = [] { didSet { saveRules() } }
     @Published var notice: String?
-    @Published var pane: Pane? = .useCases
+    @Published var pane: Pane? = .home
     @Published var sheet: ActiveSheet?
     @Published var choice: ChoiceRequest?
     @AppStorage("welcomed") var welcomed = false
@@ -374,10 +374,11 @@ extension AppState {
 }
 
 enum Pane: String, CaseIterable, Identifiable {
-    case useCases = "Use cases", runs = "Runs", approvals = "Approvals", goals = "Goals", memory = "Memory", done = "Done", folders = "Watch folders", settings = "Settings"
+    case home = "Home", useCases = "Use cases", runs = "Runs", approvals = "Approvals", goals = "Goals", memory = "Memory", done = "Done", folders = "Watch folders", settings = "Settings"
     var id: String { rawValue }
     var icon: String {
         switch self {
+        case .home: return "bubble.left.and.text.bubble.right.fill"
         case .useCases: return "square.grid.2x2.fill"
         case .runs: return "clock.arrow.circlepath"
         case .approvals: return "checkmark.seal.fill"

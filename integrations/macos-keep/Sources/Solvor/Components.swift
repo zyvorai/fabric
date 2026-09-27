@@ -150,6 +150,7 @@ extension Pane {
     /// Each sidebar entry has its own colour, so the sidebar reads as a set of places, not a column of identical grey icons.
     var tint: Color {
         switch self {
+        case .home: return Brand.orange
         case .useCases: return Color(red: 0.36, green: 0.55, blue: 1.0)
         case .runs: return Color(red: 0.62, green: 0.45, blue: 0.95)
         case .approvals: return Brand.orange
