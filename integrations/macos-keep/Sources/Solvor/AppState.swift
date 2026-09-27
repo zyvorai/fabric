@@ -59,6 +59,7 @@ final class AppState: ObservableObject {
 
     private var seen = SeenFiles()
     private var poller: Task<Void, Never>?
+    private var runTasks: [UUID: Task<Void, Never>] = [:]
     let watcher = FolderWatcher()
     let supportDir: URL
     private let makeClient: (URL, String) throws -> any KeepAPI
@@ -248,15 +249,30 @@ final class AppState: ObservableObject {
         var job = Job(demo: demo, files: files); job.source = source
         jobs.insert(job, at: 0); selectedJob = job.id
         let id = job.id, limit = self.demo(demo)?.maxBytes
-        Task { [weak self] in
+        runTasks[id] = Task { [weak self] in
             guard let self, let c = self.api else { return }
             do {
                 let outcome = try await c.run(demo: demo, files: files, maxBytes: limit)
+                self.runTasks[id] = nil
                 self.finish(id, .done(outcome))
                 await self.refreshRuns(); await self.refreshUsage()
-            } catch { self.finish(id, .failed(error.localizedDescription)) }
+            } catch {
+                self.runTasks[id] = nil
+                guard !Task.isCancelled else { return }   // cancelJob already set the "Cancelled" state
+                self.finish(id, .failed(error.localizedDescription))
+            }
         }
     }
+
+    /// Stops a running job. The host may still finish the cell it already started; Solvor just stops waiting for it.
+    func cancelJob(_ id: UUID) {
+        guard let task = runTasks[id] else { return }
+        task.cancel(); runTasks[id] = nil
+        finish(id, .failed("Cancelled"))
+    }
+
+    /// Runs the same files again.
+    func retry(_ job: Job) { run(demo: job.demo, files: job.files, source: job.source, skipChecks: true) }
 
     func confirmPending() { if let p = pendingSecretWarning { pendingSecretWarning = nil; run(demo: p.demo, files: p.files, source: p.source, skipChecks: true) } }
 
