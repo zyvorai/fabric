@@ -1135,24 +1135,29 @@ openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$G/
 printf 'subjectAltName=IP:127.0.0.1\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n' > "$G/ext.cnf"
 openssl x509 -req -in "$G/api.csr" -CA "$G/ca.pem" -CAkey "$G/ca.key" -CAcreateserial -out "$G/api.pem" -days 2 -extfile "$G/ext.cnf" >/dev/null 2>&1 || fail "could not sign the test certificate"
 : >"$G/api.log"
-GOOGLE_STUB_LOG="$G/api.log" python3 "$ROOT/agent-runtime/tests/google_stub.py" "$GAPI" "$GTOK" "$G/api.pem" "$G/api.key" >"$G/stub.log" 2>&1 &
+GOOGLE_STUB_LOG="$G/api.log" TOKEN_STUB_LOG="$G/token.log" python3 "$ROOT/agent-runtime/tests/google_stub.py" "$GAPI" "$GTOK" "$G/api.pem" "$G/api.key" >"$G/stub.log" 2>&1 &
 PIDS+=($!)
 # the shipped per-person descriptors, pointed at the fake
-python3 - "$ROOT/docs/keep/connectors/google.per-person.credentials.json" "$G/creds.json" "$GAPI" "$GTOK" <<'PY'
+python3 - "$ROOT/docs/keep/connectors" "$G/creds.json" "$GAPI" "$GTOK" <<'PY'
 import json, sys
-d = json.load(open(sys.argv[1]))
-assert len(d) == 5, list(d)
+d = json.load(open(sys.argv[1] + "/google.per-person.credentials.json"))
+m = json.load(open(sys.argv[1] + "/microsoft.per-person.credentials.json"))
+assert len(d) == 5 and len(m) == 5 and not set(d) & set(m), (list(d), list(m))
+for v in d.values():
+    v["oauth"]["client_id_env"], v["oauth"]["client_secret_env"] = "GE_CLIENT_ID", "GE_CLIENT_SECRET"
+for v in m.values():   # a public client: no secret variable, the shipped narrow scopes are kept
+    v["oauth"]["client_id_env"] = "GE_MS_CLIENT_ID"
+d.update(m)
 for v in d.values():
     v["host"] = "127.0.0.1"
     v["allowed_ports"] = [int(sys.argv[3])]
     v["oauth"]["token_url"] = "http://127.0.0.1:%s/token" % sys.argv[4]
-    v["oauth"]["client_id_env"], v["oauth"]["client_secret_env"] = "GE_CLIENT_ID", "GE_CLIENT_SECRET"
 json.dump(d, open(sys.argv[2], "w"))
 PY
 start_runtime google-runtime "$GRT" "$GREG" ZYVOR_AGENT_GOAL_TICK_MS=300 ZYVOR_AGENT_KEEP_MODE=1 ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS="$PUB" ZYVOR_AGENT_API_TOKEN="$KEEP_TOKEN_VALUE" \
-  ZYVOR_AGENT_CREDENTIALS_FILE="$G/creds.json" ZYVOR_AGENT_EXTRA_CA_FILE="$G/ca.pem" GE_CLIENT_ID=ci-client GE_CLIENT_SECRET=ci-secret
+  ZYVOR_AGENT_CREDENTIALS_FILE="$G/creds.json" ZYVOR_AGENT_EXTRA_CA_FILE="$G/ca.pem" GE_CLIENT_ID=ci-client GE_CLIENT_SECRET=ci-secret GE_MS_CLIENT_ID=ms-app
 wait_http "$GBASE/healthz" || fail "the google-test runtime did not start: $(tail -5 "$WORK/google-runtime.log")"
-for a in gmail-triage mail-compose calendar-agent; do
+for a in gmail-triage mail-compose calendar-agent outlook-triage outlook-compose outlook-calendar; do
   cp -R "$ROOT/examples/keep-agents/$a" "$G/$a"
   python3 - "$G/$a/pack.json" <<'PY'
 import json, sys
@@ -1335,6 +1340,92 @@ ok "a chat client is shown the held approval with the host's preview while the a
 r=$(g_run "$GINA" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "the run after disconnecting failed"
 [[ "$r" == *"connect your google account first"* ]] || fail "after disconnecting, the agent must be refused again: $r"
 ok "disconnecting closes her at once"
+
+echo "demos-ci: Outlook agents against a fake Microsoft Graph (public client, narrow scopes, rotating refresh tokens, host-rendered approvals)"
+: >"$G/api.log"; : >"$G/token.log"
+GM="https://127.0.0.1:$GAPI"
+r=$(g_run "$GINA" outlook-triage "{\"graphBase\":\"$GM\"}") || fail "the outlook triage run failed"
+[[ "$r" == *"connect your microsoft account first"* ]] || fail "before connecting, the Outlook agent must say to connect: $r"
+[[ ! -s "$G/api.log" && ! -s "$G/token.log" ]] || fail "nothing may reach Microsoft before anyone connects"
+[[ "$(gas "$GINA" -X PUT -H 'content-type: application/json' -d '{"refresh_token":"gina-ms-refresh"}' -o /dev/null -w '%{http_code}' "$GBASE/v1/connections/microsoft")" =~ ^20 ]] || fail "gina could not connect Microsoft"
+gas "$GINA" "$GBASE/v1/connections" | python3 -c 'import json,sys; v=json.load(sys.stdin); t=json.dumps(v); assert "microsoft" in t and "gina-ms-refresh" not in t, v' || fail "connections must list microsoft and never a token"
+r=$(g_run "$GINA" outlook-triage "{\"graphBase\":\"$GM\"}") || fail "the connected outlook triage run failed"
+[[ "$r" == *"1 unread message"* && "$r" == *"Board notes"* ]] || fail "gina's unread Outlook mail should be listed: $r"
+r=$(g_run "$HAL" outlook-triage "{\"graphBase\":\"$GM\"}") || fail "hal's outlook triage run failed"
+[[ "$r" == *"connect your microsoft account first"* && "$r" != *"Board notes"* ]] || fail "hal has not connected Microsoft: $r"
+r=$(g_run "$GINA" outlook-calendar "{\"action\":\"agenda\",\"graphBase\":\"$GM\"}") || fail "the outlook agenda run failed"
+[[ "$r" == *"dinner"* ]] || fail "gina's Outlook agenda should be read: $r"
+python3 - "$G/token.log" "$G/api.log" <<'PY' || fail "the token endpoint and Graph should show a narrow scope, no secret, and the rotated refresh token being used"
+import json, sys
+tok = [json.loads(l) for l in open(sys.argv[1])]
+api = [json.loads(l) for l in open(sys.argv[2])]
+assert len(tok) == 2, tok
+assert all(t["client_secret"] is False for t in tok), "a public client sends no secret"
+assert tok[0]["scope"] == "offline_access https://graph.microsoft.com/Mail.Read", tok[0]
+assert tok[1]["scope"] == "offline_access https://graph.microsoft.com/Calendars.Read", tok[1]
+assert tok[0]["refresh_token"] == "gina-ms-refresh", tok[0]
+assert tok[1]["refresh_token"] == "gina-ms-refresh~", "the second mint must use the refresh token the first one rotated to: %s" % tok[1]
+assert [a["auth"] for a in api] == ["Bearer at-gina-ms-refresh", "Bearer at-gina-ms-refresh~"], api
+PY
+ok "Microsoft: told to connect first and nothing is sent; her mail and agenda are read with her own token; narrow scopes, no client secret, and the rotated refresh token is the one used next"
+mail_in_ms() { python3 -c 'import json,sys; print(json.dumps({"action":sys.argv[1],"to":sys.argv[2],"subject":sys.argv[3],"body":sys.argv[4],"graphBase":sys.argv[5]}))' "$1" "$2" "$3" "$4" "$GM"; }
+g_run "$GINA" outlook-compose "$(mail_in_ms draft "ana@example.com, boss@example.com" "Quarterly numbers" $'Hi Ana,\nthe numbers are attached below.')" > "$G/od.out" &
+ODPID=$!
+wait_pending || fail "the Outlook draft did not open an approval"
+python3 - "$G/pending.json" <<'PY' || fail "the approval should show what the host read out of the Graph request"
+import json, sys
+a = json.load(open(sys.argv[1]))
+f = {x["label"]: x["value"] for x in a["preview"]["fields"]}
+assert a["preview"]["kind"] == "graph-message", a
+assert f["To"] == "ana@example.com, boss@example.com" and f["Subject"] == "Quarterly numbers" and f["Message"] == "Hi Ana,\nthe numbers are attached below.", f
+assert len(a["planned_action"]["preview_sha256"]) == 64 and "sign" in a, a
+for text in (a["prompt"], json.dumps(a["planned_action"])):
+    assert "ana@example.com" not in text and "Quarterly" not in text, text
+PY
+[[ "$(api_lines POST /v1.0/me/messages)" == "0" ]] || fail "nothing may be created before the decision"
+[[ "$(gas "$GINA" -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"decision":"approved"}' "$GBASE/v1/approvals/$(json id < "$G/pending.json")")" == "403" ]] || fail "an unsigned decision must be refused"
+[[ "$(decide approved)" == "200" ]] || fail "the phone-signed approval of the Outlook draft was refused"
+wait "$ODPID" || fail "the Outlook draft run failed"
+[[ "$(cat "$G/od.out")" == "Saved as a draft (AAMkDraft1…). Nothing was sent." ]] || fail "unexpected Outlook draft reply: $(cat "$G/od.out")"
+python3 - "$G/api.log" <<'PY' || fail "Graph should have seen exactly the approved draft, with gina's rotated token"
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if '"POST"' in l]
+assert len(rows) == 1 and rows[0]["path"] == "/v1.0/me/messages" and rows[0]["auth"].startswith("Bearer at-gina-ms-refresh~"), rows
+m = json.loads(rows[0]["body"])
+assert m["subject"] == "Quarterly numbers" and [r["emailAddress"]["address"] for r in m["toRecipients"]] == ["ana@example.com", "boss@example.com"] and m["body"] == {"contentType": "Text", "content": "Hi Ana,\nthe numbers are attached below."}, m
+PY
+gop "$GBASE/v1/audit?limit=1000" | python3 -c 'import sys; t=sys.stdin.read(); assert not any(s in t for s in ("ana@example.com","boss@example.com","Quarterly numbers","numbers are attached")), "personal text in the journal"' || fail "the journal must hold no Outlook recipients, subject or text"
+ok "an Outlook draft waits for gina's phone: the approval shows the real recipients, subject and text from the Graph request; unsigned is refused; signed lets exactly that draft through; the journal never held it"
+g_run "$GINA" outlook-compose "$(mail_in_ms send ana@example.com "Too soon" "Not ready.")" > "$G/os1.out" &
+OSPID=$!
+wait_pending || fail "the Outlook send did not open an approval"
+[[ "$(decide denied)" == "200" ]] || fail "the signed denial was refused"
+wait "$OSPID" || fail "the denied Outlook send run failed"
+[[ "$(cat "$G/os1.out")" == "Not sent: "* ]] || fail "a denied send should say it was not sent: $(cat "$G/os1.out")"
+[[ "$(api_lines POST /v1.0/me/sendMail)" == "0" ]] || fail "a denied send must never reach Graph"
+g_run "$GINA" outlook-compose "$(mail_in_ms send ana@example.com "Ready" "Here it is.")" > "$G/os2.out" &
+OSPID=$!
+wait_pending || fail "the second Outlook send did not open an approval"
+[[ "$(decide approved)" == "200" ]] || fail "the signed approval of the Outlook send was refused"
+wait "$OSPID" || fail "the approved Outlook send run failed"
+[[ "$(cat "$G/os2.out")" == "Sent to 1 recipient." && "$(api_lines POST /v1.0/me/sendMail)" == "1" ]] || fail "exactly one send should have reached Graph: $(cat "$G/os2.out")"
+ok "a denied Outlook send never reaches Graph; an approved one does, once"
+r=$(g_run "$GINA" outlook-calendar "{\"action\":\"add\",\"title\":\"Dinner\",\"start\":\"2026-10-01T19:00:00+02:00\",\"end\":\"2026-10-01T21:00:00+02:00\",\"guests\":\"ana@example.com\",\"graphBase\":\"$GM\"}") || fail "the guests-without-notify run failed"
+[[ "$r" == *"Microsoft emails every guest"* && "$(api_lines POST /v1.0/me/events)" == "0" ]] || fail "guests without notify must be refused before any request: $r"
+g_run "$GINA" outlook-calendar "{\"action\":\"add\",\"title\":\"Dinner\",\"start\":\"2026-10-01T19:00:00+02:00\",\"end\":\"2026-10-01T21:00:00+02:00\",\"guests\":\"ana@example.com\",\"notify\":\"yes\",\"graphBase\":\"$GM\"}" > "$G/oc.out" &
+OCPID=$!
+wait_pending || fail "the Outlook event did not open an approval"
+python3 - "$G/pending.json" <<'PY' || fail "the approval should show the event, the guests and that Microsoft emails them"
+import json, sys
+a = json.load(open(sys.argv[1]))
+f = {x["label"]: x["value"] for x in a["preview"]["fields"]}
+assert a["preview"]["kind"] == "graph-event" and f["Title"] == "Dinner" and f["Guests"] == "ana@example.com" and f["Guests are emailed"].startswith("yes"), f
+assert f["Starts"] == "2026-10-01T17:00:00 UTC", f
+PY
+[[ "$(decide approved)" == "200" ]] || fail "the signed approval of the Outlook event was refused"
+wait "$OCPID" || fail "the Outlook event run failed"
+[[ "$(cat "$G/oc.out")" == 'Added "Dinner". Your guests were emailed.' && "$(api_lines POST /v1.0/me/events)" == "1" ]] || fail "unexpected Outlook event reply: $(cat "$G/oc.out")"
+ok "an Outlook event with guests is refused until you say they may be emailed, then waits for the phone and shows who Microsoft will email"
 
 echo "demos-ci: suggestions (an agent that asked, a person who turned them on, a goal only when accepted)"
 SUGPACK="$WORK/suggestion-example"; cp -R "$ROOT/examples/keep-agents/suggestion-example" "$SUGPACK"
