@@ -6,24 +6,31 @@ struct WatchFoldersView: View {
     @State private var editing: FolderRule?
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("When a file that matches appears in a folder, Keep runs a use case on it once and can save the summary next to the file. The app must be running.")
-                .foregroundStyle(.secondary).padding([.horizontal, .top])
-            List {
-                ForEach($app.folderRules) { $rule in
-                    HStack {
-                        Toggle("", isOn: $rule.enabled).labelsHidden()
-                        VStack(alignment: .leading) {
-                            Text(rule.folder.path).font(.headline)
-                            Text("\(rule.patterns.joined(separator: ", "))  →  \(app.demo(rule.demo)?.title ?? rule.demo)").font(.callout).foregroundStyle(.secondary)
+                .foregroundStyle(.secondary).padding(Space.l).padding(.bottom, 0)
+            if app.folderRules.isEmpty {
+                EmptyState(symbol: "folder.badge.gearshape", title: "No watched folders", message: "Pick a folder and a use case, and new matching files are read for you as they appear.")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Space.s) {
+                        ForEach($app.folderRules) { $rule in
+                            HStack {
+                                Toggle("", isOn: $rule.enabled).labelsHidden()
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(rule.folder.path).font(.headline)
+                                    Text("\(rule.patterns.joined(separator: ", "))  →  \(app.demo(rule.demo)?.title ?? rule.demo)").font(.callout).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                StatusChip(kind: rule.enabled ? .running : .info, label: rule.enabled ? "Watching" : "Paused")
+                                Button("Edit") { editing = rule }.secondaryButton().controlSize(.small)
+                                Button(role: .destructive) { app.folderRules.removeAll { $0.id == rule.id } } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
+                            }.padding(Space.m).card()
                         }
-                        Spacer()
-                        Button("Edit") { editing = rule }
-                        Button(role: .destructive) { app.folderRules.removeAll { $0.id == rule.id } } label: { Image(systemName: "trash") }
-                    }
+                    }.padding(Space.l)
                 }
             }
-            .overlay { if app.folderRules.isEmpty { EmptyState(symbol: "folder.badge.gearshape", title: "No watched folders", message: "Pick a folder and a use case, and new matching files are read for you as they appear.") } }
             HStack { Spacer(); Button("Add a watched folder…") { pickFolder() }.primaryButton() }.padding()
         }
         .navigationTitle("Watch folders")

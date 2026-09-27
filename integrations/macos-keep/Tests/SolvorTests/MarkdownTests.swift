@@ -79,6 +79,14 @@ final class ComponentTests: XCTestCase {
         for p in Pane.allCases { XCTAssertFalse(p.icon.isEmpty) }
     }
 
+    /// Sidebar order is `Pane.allCases`, i.e. its declaration order: Home first (the default landing pane), Approvals
+    /// right after it (it carries the live waiting-count badge), Settings last. A reorder here should be deliberate.
+    func testSidebarOrderPutsHomeFirstApprovalsSecondAndSettingsLast() {
+        XCTAssertEqual(Pane.allCases.first, .home)
+        XCTAssertEqual(Pane.allCases.dropFirst().first, .approvals)
+        XCTAssertEqual(Pane.allCases.last, .settings)
+    }
+
     func testSpacingIsOnAFourPointGrid() {
         for v in [Space.xxs, Space.xs, Space.s, Space.m, Space.l, Space.xl, Space.xxl] { XCTAssertEqual(v.truncatingRemainder(dividingBy: 4), 0) }
     }

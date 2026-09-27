@@ -390,7 +390,9 @@ extension AppState {
 }
 
 enum Pane: String, CaseIterable, Identifiable {
-    case home = "Home", useCases = "Use cases", runs = "Runs", approvals = "Approvals", goals = "Goals", memory = "Memory", done = "Done", folders = "Watch folders", settings = "Settings"
+    // Declaration order is sidebar order (`CaseIterable.allCases`): Home first, Approvals next (it carries the live badge),
+    // Goals and Memory (the proactive, personal-feeling panes), then the two file-oriented panes, Runs, Done, Settings last.
+    case home = "Home", approvals = "Approvals", goals = "Goals", memory = "Memory", useCases = "Use cases", folders = "Watch folders", runs = "Runs", done = "Done", settings = "Settings"
     var id: String { rawValue }
     var icon: String {
         switch self {

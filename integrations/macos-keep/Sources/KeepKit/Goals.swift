@@ -16,6 +16,9 @@ public struct GoalStep: Codable, Equatable, Hashable, Identifiable, Sendable {
 public struct ProposedStep: Codable, Equatable, Hashable, Sendable {
     public var title: String
     public var requiresApproval: Bool?
+    /// Why the planner thinks this step needs a person's approval (`agent-runtime/src/goal_plan.rs`), shown next to the step. Optional and capped
+    /// server-side; a step without one is unchanged from before this existed.
+    public var approvalReason: String?
 }
 
 /// A plan an agent proposed for a goal, waiting for the person. `tainted`: the planner had read untrusted content while planning.

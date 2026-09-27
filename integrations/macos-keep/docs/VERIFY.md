@@ -46,11 +46,23 @@ reads only the selection), and repeat. Try each browser you use.
 
 - **Services:** in Finder, right-click a small text file, Services, **Send to Keep**. Pass: Solvor opens and runs it (first run may need Finder
   Services enabled in System Settings, Keyboard, Keyboard Shortcuts, Services).
-- **Menu bar:** the Solvor glyph appears; drop a file on it; recent runs are listed.
+- **Menu bar:** the Solvor glyph appears; type a question in the ask box and press Return, it should open the main window on Agent Home with that
+  message already sent; drop a file on the dashed target, it routes the same way a window drop does; recent runs and waiting approvals are listed.
 - **URL scheme:** `open "keep://run?usecase=csv-clean&path=$HOME/Desktop/test.csv"` with a small CSV there. LaunchServices only binds the scheme for an
   app in `/Applications`, so copy the app there first (`cp -R build/DerivedData/Build/Products/Debug/Solvor.app /Applications/`).
 
-## 5. Approving a waiting request (Touch ID)
+## 5. The ⌥Space quick-ask hotkey
+
+1. With Solvor running (windowed or just the menu-bar item), press **⌥Space** from any other app.
+2. A small panel should appear near the top of the screen with a text field. Type something and press Return.
+3. Press **⌥Space** again while the panel is open: it should close (a toggle, not a second panel).
+
+**Pass:** the panel appears without macOS asking for Accessibility permission (it uses local/global `NSEvent` monitors, not a system-wide event
+tap), and the message you typed shows up in Agent Home (Solvor's main window) as if you had typed it there.
+**Send back:** whether ⌥Space conflicts with another app's shortcut on your Mac (Option-Space is also a common "next input source" shortcut in
+some layouts) — if it does, that is worth a follow-up to make the hotkey configurable.
+
+## 6. Approving a waiting request (Touch ID)
 
 This needs a request waiting for you and a device enrolled in the Secure Enclave, which needs an operator token once. It is the longest check, so do it
 with me: I set up the waiting approval on the lab host with `scripts/keep-live-tenancy.sh` (needs `KEEP_POLICY_SEED`) and you approve it in
@@ -58,5 +70,5 @@ with me: I set up the waiting approval on the lab host with `scripts/keep-live-t
 
 **Pass:** the approval shows the action text, Touch ID approves it, the host accepts the signature, and the agent continues. Denying works the same way.
 
-## When all five pass
+## When all six pass
 Move the item from "Built but not verified" to "Verified" in [README.md](../README.md) and in `docs/keep/MACOS-APP.md` (in the fabric repo), with the date and macOS version.

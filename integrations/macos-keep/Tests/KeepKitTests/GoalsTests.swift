@@ -10,7 +10,7 @@ final class GoalsTests: XCTestCase {
     let goalsJSON = #"""
     {"items":[
       {"id":"g1","title":"Trip","agent":"a","status":"open","autorun":true,"updated_at":"2026-09-20T10:00:00Z","plan":[{"id":"s1","title":"Find","status":"done"},{"id":"s2","title":"Book","status":"pending","requires_approval":true}]},
-      {"id":"g2","title":"Lisbon","agent":"a","status":"open","autorun":false,"updated_at":"2026-09-26T10:00:00Z","plan":[],"proposed_plan":{"tainted":true,"steps":[{"title":"Flights","requires_approval":false},{"title":"Hotel","requires_approval":true}]}},
+      {"id":"g2","title":"Lisbon","agent":"a","status":"open","autorun":false,"updated_at":"2026-09-26T10:00:00Z","plan":[],"proposed_plan":{"tainted":true,"steps":[{"title":"Flights","requires_approval":false},{"title":"Hotel","requires_approval":true,"approval_reason":"Books a non-refundable room over $200"}]}},
       {"id":"g3","title":"Fresh","agent":"a","status":"open","plan":[],"updated_at":"2026-09-25T10:00:00Z"},
       {"id":"g4","title":"Asked","agent":"a","status":"open","plan":[],"planning_session_id":"sess"},
       {"id":"g5","title":"Done","agent":"a","status":"done","plan":[]}
@@ -26,6 +26,8 @@ final class GoalsTests: XCTestCase {
         XCTAssertEqual(g["g1"]?.steps.last?.requiresApproval, true)
         XCTAssertEqual(g["g2"]?.proposedPlan?.tainted, true)
         XCTAssertEqual(g["g2"]?.proposedPlan?.steps.map(\.title), ["Flights", "Hotel"])
+        XCTAssertNil(g["g2"]?.proposedPlan?.steps.first?.approvalReason, "a step with no reason decodes to nil, not a crash")
+        XCTAssertEqual(g["g2"]?.proposedPlan?.steps.last?.approvalReason, "Books a non-refundable room over $200")
         XCTAssertEqual(g["g2"]?.needsPlan, false, "it has a proposal to read")
         XCTAssertEqual(g["g3"]?.needsPlan, true)
         XCTAssertEqual(g["g4"]?.isPlanning, true)

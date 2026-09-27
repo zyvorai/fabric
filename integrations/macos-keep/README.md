@@ -33,6 +33,8 @@ host allows it), returns the summary, and throws the cell away. Solvor shows the
 | | |
 |---|---|
 | **Drop anything** | Drag a file on the window (or a card, the menu bar, Finder's Services menu). Solvor suggests the use case from the file type; several files run as one batch, one cell each. |
+| **Ask anywhere** | ⌥Space opens a small chat panel over whatever app you're in, wired to the same Agent Home conversation. No approval can be decided from it — a pending one still opens the full window. |
+| **Agent Home** | A chat with your agent that remembers threads, shows waiting approvals as cards (never decides them), and takes a dropped file. |
 | **60+ use cases** | Documents, phone exports, Mac and Windows reports, developer tools, browser exports and office sheets. The list comes from your host, so your own packs appear too. |
 | **Read an email from your browser** | One click reads the front tab of Safari, Chrome, Brave, Edge or Arc. You review and edit the text, redaction hides one-time codes, long account numbers and tracking parameters, and Solvor suggests the matching use case. |
 | **Talk to it** | Speak in your language; Speech transcribes, Apple's on-device Translation makes English, a fixed set of commands is recognised, and Solvor asks before it acts. Siri and Shortcuts can start the same actions. |
@@ -111,7 +113,8 @@ email pipeline (page text to `.eml` to a use case), and approval signing against
 
 Built but **not verified** here, because each needs your permission or your hardware (a step-by-step checklist is in [docs/VERIFY.md](docs/VERIFY.md)): reading a real logged-in webmail page (needs
 macOS Automation permission and the browser's "Allow JavaScript from Apple Events"), Siri and Shortcuts registration, the microphone,
-Speech and Translation, the Services entry, the `keep://` URL scheme, and approving a waiting request.
+Speech and Translation, the Services entry, the `keep://` URL scheme, approving a waiting request, and the ⌥Space quick-ask panel actually
+opening on a real keypress (only its key-matching logic is unit-tested; no interactive click-through of the panel itself).
 
 Not included: a signed, notarized or App Store build (it is ad-hoc signed and runs on the Mac that built it), a push relay (approvals are
 polled every 20 s while the app runs), a Share-sheet extension, and Firefox email reading (Firefox has no scripting interface).
