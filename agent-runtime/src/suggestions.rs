@@ -257,6 +257,41 @@ impl SuggestionStore {
         .await
     }
 
+    /// Forgets suggestions from before `cutoff`: ones nobody decided (by when they were made) and decided ones (by when they were decided).
+    /// Returns (undecided, decided). A forgotten *dismissed* suggestion can be proposed again, since the memory of the dismissal goes with it.
+    pub async fn purge_before(&self, cutoff: DateTime<Utc>) -> Result<(usize, usize)> {
+        let _guard = self.write.lock().await;
+        let mut changed: Vec<(String, UserSuggestions)> = Vec::new();
+        let (mut undecided, mut decided) = (0usize, 0usize);
+        for (user, s) in self.users.read().await.iter() {
+            let mut next = s.clone();
+            next.items.retain(|i| {
+                let when = i.decided_at.unwrap_or(i.created_at);
+                if when >= cutoff {
+                    return true;
+                }
+                if i.status == Status::Pending {
+                    undecided += 1;
+                } else {
+                    decided += 1;
+                }
+                false
+            });
+            if next.items.len() != s.items.len() {
+                changed.push((user.clone(), next));
+            }
+        }
+        for (user, s) in changed {
+            atomic_write(
+                self.root.join(format!("{user}.json")),
+                &serde_json::to_vec_pretty(&s)?,
+            )
+            .await?;
+            self.users.write().await.insert(user, s);
+        }
+        Ok((undecided, decided))
+    }
+
     /// Marks a pending suggestion accepted (with its goal) or dismissed. `None` when there is no such pending suggestion.
     pub async fn decide(
         &self,
@@ -347,6 +382,19 @@ pub async fn record_proposal(
                     json!({ "user_id": user, "suggestion_id": item.id, "tainted": tainted }),
                 )
                 .await;
+            // the person is told there is something to look at (generic text; the suggestion itself only if the operator allows it)
+            crate::notify::notify_user(
+                state,
+                user,
+                crate::notify::Notice {
+                    event: "suggestion.proposed",
+                    title: "Your agent has an idea".into(),
+                    body: "Open Keep to make it a goal or dismiss it.".into(),
+                    detail_title: format!("Suggestion from {}", session.agent),
+                    detail_body: item.title.chars().take(140).collect(),
+                    data: json!({ "suggestion_id": item.id, "tainted": tainted }),
+                },
+            );
         }
         Err(e) => refuse(e.to_string()).await,
     }

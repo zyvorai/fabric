@@ -12,6 +12,8 @@
 //! * `ZYVOR_AGENT_RECEIPT_RETENTION_DAYS`: action receipts older than that are forgotten. A forgotten receipt no longer answers a repeat of
 //!   its idempotency key, so keep this longer than any agent retries.
 //! * `ZYVOR_AGENT_MEMORY_PROPOSAL_RETENTION_DAYS`: memory proposals nobody accepted or rejected for that long are dropped.
+//! * `ZYVOR_AGENT_SUGGESTION_RETENTION_DAYS`: suggestions nobody decided for that long, and decided ones that long after the decision. A
+//!   forgotten dismissal can be proposed again.
 //! * Always, with no setting: memory entries whose **expiry** the user set have passed are deleted from disk (until now they were only
 //!   hidden). Accepted entries without an expiry are never removed by the sweep.
 //!
@@ -34,6 +36,8 @@ pub struct Swept {
     pub receipts: usize,
     pub memory_expired: usize,
     pub memory_proposals: usize,
+    pub suggestions_undecided: usize,
+    pub suggestions_decided: usize,
 }
 
 /// One sweep as of `now`, using the configured periods. Public so a test (or an operator tool) can run it directly.
@@ -91,6 +95,15 @@ pub async fn sweep(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<Swept
         .await?;
     swept.memory_expired = expired;
     swept.memory_proposals = stale;
+    if let Some(days) = state.config.suggestion_retention_days {
+        let (undecided, decided) = state
+            .store
+            .suggestions
+            .purge_before(now - Days::days(days as i64))
+            .await?;
+        swept.suggestions_undecided = undecided;
+        swept.suggestions_decided = decided;
+    }
     if swept != Swept::default() {
         let _ = state
             .store
@@ -100,7 +113,7 @@ pub async fn sweep(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<Swept
                 AuditPhase::Performed,
                 "keep.retention.sweep",
                 None,
-                json!({ "threads": swept.threads, "messages": swept.messages, "event_logs": swept.event_logs, "receipts": swept.receipts, "memory_expired": swept.memory_expired, "memory_proposals": swept.memory_proposals }),
+                json!({ "threads": swept.threads, "messages": swept.messages, "event_logs": swept.event_logs, "receipts": swept.receipts, "memory_expired": swept.memory_expired, "memory_proposals": swept.memory_proposals, "suggestions_undecided": swept.suggestions_undecided, "suggestions_decided": swept.suggestions_decided }),
             )
             .await;
     }
@@ -113,6 +126,7 @@ pub async fn retention_loop(state: Arc<AppState>) {
         event_days = ?state.config.event_retention_days,
         receipt_days = ?state.config.receipt_retention_days,
         memory_proposal_days = ?state.config.memory_proposal_retention_days,
+        suggestion_days = ?state.config.suggestion_retention_days,
         "retention sweep enabled"
     );
     tokio::time::sleep(Duration::from_secs(60)).await;
@@ -477,6 +491,123 @@ mod tests {
                 && !journal.contains("nobody looked")
                 && !journal.contains("accepted long ago"),
             "{journal}"
+        );
+    }
+
+    #[tokio::test]
+    async fn old_suggestions_are_forgotten_undecided_ones_by_age_decided_ones_by_the_decision_and_a_dismissal_can_be_made_again(
+    ) {
+        let (state, _) = state_and_session_cfg(|c| c.suggestion_retention_days = Some(30)).await;
+        let s = &state.store.suggestions;
+        s.set_enabled("ana", true).await.unwrap();
+        let sid = uuid::Uuid::new_v4();
+        let make = |title: &str| {
+            let title = title.to_string();
+            async move {
+                s.propose("ana", &title, "why", "echo", "echo", sid, false)
+                    .await
+                    .unwrap()
+            }
+        };
+        let waiting = make("Nobody looked at this").await;
+        let accepted = make("Book the dentist").await;
+        let dismissed = make("Wire the money").await;
+        s.decide("ana", accepted.id, Some(uuid::Uuid::new_v4()))
+            .await
+            .unwrap();
+        s.decide("ana", dismissed.id, None).await.unwrap();
+
+        assert_eq!(
+            sweep(&state, Utc::now() + Days::days(10)).await.unwrap(),
+            Swept::default(),
+            "too new"
+        );
+        let swept = sweep(&state, Utc::now() + Days::days(31)).await.unwrap();
+        assert_eq!(
+            (swept.suggestions_undecided, swept.suggestions_decided),
+            (1, 2)
+        );
+        assert!(s.get("ana").await.items.is_empty());
+        assert!(!waiting.title.is_empty());
+        // the file agrees, so a restart does not bring them back
+        let reopened =
+            crate::suggestions::SuggestionStore::open(state.config.state_dir.join("suggestions"))
+                .await
+                .unwrap();
+        assert!(reopened.get("ana").await.items.is_empty());
+        assert!(
+            reopened.get("ana").await.enabled,
+            "the person's switch is not a suggestion and stays"
+        );
+        // with the memory of the dismissal gone, the same suggestion may be made again
+        assert!(s
+            .propose("ana", "Wire the money", "why", "echo", "echo", sid, false)
+            .await
+            .is_ok());
+        // the journal has counts, not text
+        let journal =
+            serde_json::to_string(&state.store.audit.list(None, 50).await.unwrap()).unwrap();
+        assert!(
+            journal.contains("suggestions_decided")
+                && !journal.contains("dentist")
+                && !journal.contains("Wire the money"),
+            "{journal}"
+        );
+    }
+
+    #[tokio::test]
+    async fn suggestions_are_kept_when_no_period_is_set() {
+        let (state, _) = state_and_session_cfg(|_| {}).await;
+        let s = &state.store.suggestions;
+        s.set_enabled("ana", true).await.unwrap();
+        s.propose(
+            "ana",
+            "Old idea",
+            "",
+            "echo",
+            "echo",
+            uuid::Uuid::new_v4(),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            sweep(&state, Utc::now() + Days::days(4000)).await.unwrap(),
+            Swept::default()
+        );
+        assert_eq!(s.get("ana").await.items.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_decided_suggestion_is_judged_by_when_it_was_decided_not_when_it_was_made() {
+        let (state, _) = state_and_session_cfg(|_| {}).await;
+        let s = &state.store.suggestions;
+        s.set_enabled("ana", true).await.unwrap();
+        let made = s
+            .propose(
+                "ana",
+                "Made long ago, decided just now",
+                "",
+                "echo",
+                "echo",
+                uuid::Uuid::new_v4(),
+                false,
+            )
+            .await
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        let cutoff = Utc::now();
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        s.decide("ana", made.id, None).await.unwrap();
+        assert_eq!(
+            s.purge_before(cutoff).await.unwrap(),
+            (0, 0),
+            "decided after the cutoff, so it stays whatever its age"
+        );
+        assert_eq!(s.get("ana").await.items.len(), 1);
+        assert_eq!(
+            s.purge_before(Utc::now() + Days::days(1)).await.unwrap(),
+            (0, 1)
         );
     }
 }

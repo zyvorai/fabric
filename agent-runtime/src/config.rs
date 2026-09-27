@@ -56,6 +56,9 @@ pub struct Config {
     /// Forget action receipts this many days old (`ZYVOR_AGENT_RECEIPT_RETENTION_DAYS`); `None` keeps them. A forgotten receipt no longer
     /// answers a repeat of its idempotency key, so keep this longer than any agent retries.
     pub receipt_retention_days: Option<u64>,
+    /// Forget suggestions (`ZYVOR_AGENT_SUGGESTION_RETENTION_DAYS`): undecided ones after this many days, decided ones this many days after the
+    /// decision. `None` keeps them (the last 200 decided per person are kept regardless). A forgotten dismissal can be proposed again.
+    pub suggestion_retention_days: Option<u64>,
     /// Drop memory proposals nobody reviewed after this many days (`ZYVOR_AGENT_MEMORY_PROPOSAL_RETENTION_DAYS`); `None` keeps them.
     pub memory_proposal_retention_days: Option<u64>,
     /// Delete the event log of sessions that ended this many days ago (`ZYVOR_AGENT_EVENT_RETENTION_DAYS`); `None` keeps it.
@@ -132,6 +135,7 @@ impl Config {
             event_retention_days: env_days("ZYVOR_AGENT_EVENT_RETENTION_DAYS")?,
             receipt_retention_days: env_days("ZYVOR_AGENT_RECEIPT_RETENTION_DAYS")?,
             memory_proposal_retention_days: env_days("ZYVOR_AGENT_MEMORY_PROPOSAL_RETENTION_DAYS")?,
+            suggestion_retention_days: env_days("ZYVOR_AGENT_SUGGESTION_RETENTION_DAYS")?,
             idle_scan_interval_ms: env_parse("ZYVOR_AGENT_IDLE_SCAN_INTERVAL_MS", "1000")?,
             warm_pool_reconcile_interval_ms: env_parse(
                 "ZYVOR_AGENT_WARM_POOL_RECONCILE_INTERVAL_MS",

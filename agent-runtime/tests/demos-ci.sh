@@ -1463,6 +1463,21 @@ mem_mine=$(mem_api "$CAM" GET /v1/inbox | python3 -c 'import json,sys; print(len
 [[ "$(mem_api "$DAN" GET /v1/suggestions | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["pending"]))')" == "0" && "$(mem_api "$DAN" POST "/v1/suggestions/$SUGID/accept" -o /dev/null -w '%{http_code}')" == "404" ]] || fail "another user must not see or accept it: $(mem_api "$DAN" GET /v1/suggestions) / $(mem_api "$DAN" POST "/v1/suggestions/$SUGID/accept" -w ' %{http_code}')"
 [[ "$(mem_api "$CAM" GET /v1/goals | python3 -c 'import json,sys; print(sum(1 for g in json.load(sys.stdin)["items"] if g["title"].startswith("Review last month")))')" == "0" ]] || fail "a suggestion alone must not create a goal"
 ok "turned on, the proposal waits for cam only (list and inbox); no goal exists yet"
+for _ in $(seq 1 100); do grep -q "suggestion.proposed" "$WORK/notice-relay.log" && break; sleep 0.3; done
+python3 - "$WORK/notice-relay.log" <<'PY' || fail "cam's phone relay should have got a signed, generic suggestion notice: $(tail -c 600 "$WORK/notice-relay.log")"
+import json, sys, hmac, hashlib
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+got = [r for r in rows if r["event"] == "suggestion.proposed"]
+assert len(got) == 1, [r["event"] for r in rows]
+r = got[0]
+assert r["sig"] == "sha256=" + hmac.new(b"notice-relay-secret", r["body"].encode(), hashlib.sha256).hexdigest(), "signed with the relay secret"
+b = json.loads(r["body"])
+assert b["device"]["id"] == "cam-phone" and b["kind"] == "notice" and "suggestion_id" in b["data"], b
+for absent in ("sign", "decide", "approval"):
+    assert absent not in b, "a notice must not carry anything to decide with: " + absent
+assert "expenses" not in json.dumps(b), "generic text only: " + json.dumps(b["ui"])
+PY
+ok "cam's phone was told about the suggestion with a signed, generic notice (no title, only an id); nothing in it can decide anything"
 mem_api "$CAM" POST "/v1/suggestions/$SUGID/accept" | python3 -c 'import json,sys
 v=json.load(sys.stdin); g=v["goal"]
 assert v["suggestion"]["status"]=="accepted" and g["user_id"]=="cam" and g["agent"]=="memory-agent" and g["plan"]==[] and g["autorun"] is False and g["description"]=="the month just ended", v' || fail "accepting should make a plan-less, not-running goal for cam"
