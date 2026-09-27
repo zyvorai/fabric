@@ -1227,6 +1227,23 @@ mod tests {
     }
 
     #[test]
+    fn the_documented_price_watch_example_is_a_valid_plain_provider_descriptor() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/keep/connectors");
+        let text = std::fs::read_to_string(dir.join("price-watch.credentials.json")).unwrap();
+        let map: HashMap<String, CredentialDescriptor> = serde_json::from_str(&text).unwrap();
+        assert_eq!(map.len(), 1);
+        let d = &map["price-watch-read"];
+        validate_descriptor("price-watch-read", d).unwrap();
+        assert_eq!(
+            d.kind,
+            default_kind(),
+            "the plain, default kind: no OAuth, no Rust code needed to add it"
+        );
+        assert!(d.oauth.is_none());
+        assert_eq!(d.allowed_methods, vec!["GET".to_string()]);
+    }
+
+    #[test]
     fn the_documented_microsoft_examples_are_valid_narrow_per_person_descriptors() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/keep/connectors");
         let text =

@@ -130,3 +130,25 @@ One live run, on 2026-09-27, by the owner on a personal Gmail account, using [`s
 
 The runtime, the credentials and the approval code were unchanged for the run. Where the fake Google and the real one could have differed (scope names, response shapes, the token response), nothing needed changing on this run.
 
+## A plain API-key connector, with no OAuth at all: price-watch
+
+Google and Microsoft above are the involved case — OAuth, refresh tokens, per-person connections, host-rendered previews. Most services need none of that: `CredentialDescriptor`'s default `kind` (`"provider"`, used implicitly by `anthropic` and `openai` in [`credentials.example.json`](../../../agent-runtime/credentials.example.json)) is a plain API key injected into one header, and it needs **no Rust code at all** to add — only a JSON descriptor, an env var, and an agent that lists it.
+
+[`price-watch.credentials.json`](price-watch.credentials.json) is the smallest possible example:
+
+```json
+{
+  "price-watch-read": {
+    "host": "api.pricewatch.example",
+    "header": "x-api-key",
+    "env": "PRICE_WATCH_API_KEY",
+    "allowed_methods": ["GET"],
+    "path_prefixes": ["/v1/"]
+  }
+}
+```
+
+`api.pricewatch.example` is a placeholder (the reserved `.example` domain, RFC 2606) — this is not an integration with any real vendor. To point it at a real price-tracking API you use, change `host`, `header` and `path_prefixes` to match that API and put its key in `PRICE_WATCH_API_KEY`; nothing else changes.
+
+[`calendar-suggestions`](../../../examples/keep-agents/calendar-suggestions/) (above, [suggestions](../suggestions/README.md)) is the "keeps working" half of a personal agent; [`price-watch`](../../../examples/keep-agents/price-watch/) is the "connects to anything" half — a `suggestions: true` agent that checks a few tracked items against a target price and proposes one when it drops, meant to run on the same kind of schedule. **Tested against a fake `ctx.fetch` only** (`sdk/agent-runtime/test/price-watch.test.js`), the same way every example agent's own logic is unit-tested; nothing here was run against a real price API, because there is no real vendor behind it to run against.
+
