@@ -14,6 +14,7 @@
 | [`calendar-agent`](./calendar-agent/) | Reads your next day, or adds an event after a phone-signed approval |
 | [`goal-planner`](./goal-planner/) | Proposes the steps of a goal from a model socket; the person accepts or rejects them |
 | [`suggestion-example`](./suggestion-example/) | The smallest agent that proposes suggestions the person accepts (as a goal) or dismisses |
+| [`calendar-suggestions`](./calendar-suggestions/) | Reads the next day of calendar and proposes prep reminders and missing-location suggestions, by plain rules — no model |
 | [`price-watch`](./price-watch/) | Suggests a tracked item once it drops to its target price, through a plain API-key connector (no OAuth) |
 | [`outlook-triage`](./outlook-triage/) | Lists unread Outlook mail with a read-only Graph credential (per-person Microsoft account) |
 | [`outlook-compose`](./outlook-compose/) | Drafts or sends a plain-text Outlook mail; every use waits for a phone-signed approval that shows the real text |
