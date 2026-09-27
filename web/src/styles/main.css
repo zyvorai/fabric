@@ -83,10 +83,26 @@ body {
   letter-spacing: -0.022em;
 }
 
+/* Apple's monospace on Apple platforms (SF Mono via ui-monospace), Menlo elsewhere: the same look as the rest of the page, and no font
+   download for the names and ids this class is used on. */
 code,
 pre,
 .font-mono {
-  font-family: 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* apple.com does not use one tracking for every size. SF Pro sets its letter-spacing by point size: 17px -0.022em (the body above),
+   14px -0.016em, 13px -0.013em, 12px -0.01em, 11px -0.006em. Inheriting the body's -0.022em down to a 12px table cell packs the
+   letters tighter than apple.com does, which reads as "not Apple". Tailwind's text sizes only set size and line height, so give each
+   its Apple tracking here. */
+.text-sm { letter-spacing: -0.016em; }
+.text-\[13px\] { letter-spacing: -0.013em; }
+.text-xs { letter-spacing: -0.01em; }
+.text-\[11px\] { letter-spacing: -0.006em; }
+/* numbers in tables line up in columns (SF Pro's tabular figures), as in apple.com's comparison tables */
+td,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 a {
