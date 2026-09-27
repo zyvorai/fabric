@@ -20,6 +20,9 @@ use sha2::{Digest, Sha256};
 
 pub const GMAIL_MESSAGE: &str = "gmail-message";
 pub const CALENDAR_EVENT: &str = "calendar-event";
+/// Microsoft Graph: a message to send or to save as a draft, and an event to create.
+pub const GRAPH_MESSAGE: &str = "graph-message";
+pub const GRAPH_EVENT: &str = "graph-event";
 
 const MAX_VALUE_CHARS: usize = 1000;
 const MAX_TEXT_CHARS: usize = 1500;
@@ -28,7 +31,10 @@ const MAX_EVENT_BYTES: usize = 64 * 1024;
 
 /// Whether `kind` is a preview this host can render.
 pub fn is_known(kind: &str) -> bool {
-    matches!(kind, GMAIL_MESSAGE | CALENDAR_EVENT)
+    matches!(
+        kind,
+        GMAIL_MESSAGE | CALENDAR_EVENT | GRAPH_MESSAGE | GRAPH_EVENT
+    )
 }
 
 /// A rendered request: a kind and labelled, plain-text fields in a fixed order.
@@ -63,6 +69,8 @@ pub fn render(kind: &str, body: &[u8], query: Option<&str>) -> Result<Preview> {
     match kind {
         GMAIL_MESSAGE => gmail_message(body),
         CALENDAR_EVENT => calendar_event(body, query),
+        GRAPH_MESSAGE => graph_message(body),
+        GRAPH_EVENT => graph_event(body),
         other => bail!("unknown preview kind '{other}'"),
     }
 }
@@ -390,6 +398,231 @@ fn calendar_event(body: &[u8], query: Option<&str>) -> Result<Preview> {
     Ok(p)
 }
 
+/// `{"emailAddress": {"address": ..., "name": ...}}` entries as `address (name)`, the address first because the name is free text.
+fn graph_recipients(v: &Value, what: &str) -> Result<Vec<String>> {
+    let Some(list) = v.as_array() else {
+        bail!("'{what}' is not a list");
+    };
+    let mut out = Vec::new();
+    for r in list {
+        let Some(addr) = r.pointer("/emailAddress/address").and_then(Value::as_str) else {
+            bail!("a recipient in '{what}' has no email address");
+        };
+        out.push(
+            match r.pointer("/emailAddress/name").and_then(Value::as_str) {
+                Some(n) if !n.trim().is_empty() && n != addr => format!("{addr} ({n})"),
+                _ => addr.to_string(),
+            },
+        );
+    }
+    Ok(out)
+}
+
+/// A Graph `body` object: plain text only. HTML cannot be shown faithfully, so it is refused.
+fn graph_text_body(v: &Value, what: &str) -> Result<String> {
+    match v {
+        Value::Null => Ok(String::new()),
+        Value::Object(o) => {
+            let kind = o
+                .get("contentType")
+                .and_then(Value::as_str)
+                .unwrap_or("text");
+            if !kind.eq_ignore_ascii_case("text") {
+                bail!("only plain-text {what} can be reviewed here (not {kind})");
+            }
+            Ok(o.get("content")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string())
+        }
+        _ => bail!("the {what} body is not an object"),
+    }
+}
+
+fn graph_message(body: &[u8]) -> Result<Preview> {
+    let v = json_body(body, MAX_MAIL_BYTES)?;
+    // sendMail wraps the message ({"message": {...}, "saveToSentItems": ...}); creating a draft posts the message itself
+    let (m, wrapped) = match v.get("message") {
+        Some(inner) => (inner, true),
+        None => (&v, false),
+    };
+    let Some(msg) = m.as_object() else {
+        bail!("the request has no message to review");
+    };
+    if msg.is_empty() {
+        bail!("the request has no message to review");
+    }
+    if wrapped
+        && v.as_object()
+            .is_some_and(|o| o.keys().any(|k| k != "message" && k != "saveToSentItems"))
+    {
+        bail!("the request has fields next to the message that cannot be reviewed");
+    }
+    if msg.contains_key("attachments") {
+        bail!("a message with attachments cannot be reviewed here");
+    }
+    let mut p = Preview {
+        kind: GRAPH_MESSAGE,
+        fields: vec![],
+    };
+    let mut any_recipient = false;
+    for (key, label) in [
+        ("toRecipients", "To"),
+        ("ccRecipients", "Cc"),
+        ("bccRecipients", "Bcc (hidden from the others)"),
+        ("replyTo", "Replies go to"),
+    ] {
+        if let Some(list) = msg.get(key) {
+            let r = graph_recipients(list, key)?;
+            any_recipient |= !r.is_empty() && key != "replyTo";
+            if !r.is_empty() {
+                p.push(label, r.join(", "));
+            }
+        }
+    }
+    if !any_recipient {
+        p.fields.insert(0, ("To".into(), "(no recipient)".into()));
+    }
+    for key in ["from", "sender"] {
+        if let Some(f) = msg.get(key) {
+            p.push(
+                if key == "from" { "From" } else { "Sender" },
+                graph_recipients(&Value::Array(vec![f.clone()]), key)?.join(", "),
+            );
+        }
+    }
+    p.push(
+        "Subject",
+        msg.get("subject")
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+    );
+    let text = graph_text_body(msg.get("body").unwrap_or(&Value::Null), "mail")?;
+    let total = text.chars().count();
+    p.fields
+        .push(("Message".into(), clean(text.trim(), MAX_TEXT_CHARS)));
+    if total > MAX_TEXT_CHARS {
+        p.push(
+            "Length",
+            format!("{total} characters; only the first {MAX_TEXT_CHARS} are shown"),
+        );
+    }
+    let other: Vec<&str> = msg
+        .keys()
+        .map(String::as_str)
+        .filter(|k| {
+            !matches!(
+                *k,
+                "subject"
+                    | "body"
+                    | "toRecipients"
+                    | "ccRecipients"
+                    | "bccRecipients"
+                    | "replyTo"
+                    | "from"
+                    | "sender"
+                    | "importance"
+            )
+        })
+        .collect();
+    if !other.is_empty() {
+        p.push("Also sets", other.join(", "));
+    }
+    if let Some(i) = msg.get("importance").and_then(Value::as_str) {
+        p.push("Importance", i);
+    }
+    Ok(p)
+}
+
+fn graph_event(body: &[u8]) -> Result<Preview> {
+    let v = json_body(body, MAX_EVENT_BYTES)?;
+    let Some(event) = v.as_object() else {
+        bail!("the request is not a calendar event");
+    };
+    let when = |key: &str| -> Result<String> {
+        let Some(o) = event.get(key).and_then(Value::as_object) else {
+            bail!("the event has no '{key}' time");
+        };
+        let Some(at) = o.get("dateTime").and_then(Value::as_str) else {
+            bail!("the event's '{key}' time has no dateTime");
+        };
+        Ok(match o.get("timeZone").and_then(Value::as_str) {
+            Some(z) => format!("{at} {z}"),
+            None => at.to_string(),
+        })
+    };
+    let mut p = Preview {
+        kind: GRAPH_EVENT,
+        fields: vec![],
+    };
+    p.push(
+        "Title",
+        event
+            .get("subject")
+            .and_then(Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or("(no title)"),
+    );
+    p.push("Starts", when("start")?);
+    p.push("Ends", when("end")?);
+    if event.get("isAllDay").and_then(Value::as_bool) == Some(true) {
+        p.push("All day", "yes");
+    }
+    if let Some(loc) = event.get("location") {
+        let name = loc
+            .get("displayName")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow::anyhow!("the event's location has no displayName"))?;
+        p.push("Where", name);
+    }
+    let mut guests = 0usize;
+    if let Some(list) = event.get("attendees") {
+        let r = graph_recipients(list, "attendees")?;
+        guests = r.len();
+        if guests > 0 {
+            p.push("Guests", r.join(", "));
+        }
+    }
+    if guests > 0 {
+        // Graph emails the invitation to every attendee when the event is created; there is no switch for it.
+        p.push(
+            "Guests are emailed",
+            "yes, all of them (Microsoft sends the invitation when the event is created)",
+        );
+    }
+    if event.get("isOnlineMeeting").and_then(Value::as_bool) == Some(true) {
+        p.push("Online meeting", "yes, a meeting link is added");
+    }
+    if let Some(rule) = event.get("recurrence").filter(|r| !r.is_null()) {
+        p.push("Repeats", rule.to_string());
+    }
+    if let Some(b) = event.get("body") {
+        p.push("Notes", clean(&graph_text_body(b, "event notes")?, 600));
+    }
+    let extra: Vec<&str> = event
+        .keys()
+        .map(String::as_str)
+        .filter(|k| {
+            !matches!(
+                *k,
+                "subject"
+                    | "start"
+                    | "end"
+                    | "isAllDay"
+                    | "location"
+                    | "attendees"
+                    | "isOnlineMeeting"
+                    | "recurrence"
+                    | "body"
+            )
+        })
+        .collect();
+    if !extra.is_empty() {
+        p.push("Also sets", extra.join(", "));
+    }
+    Ok(p)
+}
+
 fn query_value(query: Option<&str>, key: &str) -> Option<String> {
     url::form_urlencoded::parse(query?.as_bytes())
         .find(|(k, _)| k == key)
@@ -632,5 +865,116 @@ mod tests {
         assert_eq!(a.sha256(), same.sha256());
         assert_ne!(a.sha256(), other.sha256());
         assert_eq!(a.sha256().len(), 64);
+    }
+
+    fn graph(v: Value) -> Vec<u8> {
+        v.to_string().into_bytes()
+    }
+
+    #[test]
+    fn a_graph_message_shows_recipients_first_by_address_and_the_text() {
+        let send = graph(json!({"message": {
+            "subject": "Numbers",
+            "body": {"contentType": "Text", "content": "Attached below."},
+            "toRecipients": [{"emailAddress": {"address": "ana@example.com", "name": "boss@corp.example"}}],
+            "ccRecipients": [{"emailAddress": {"address": "ben@example.com"}}],
+            "bccRecipients": [{"emailAddress": {"address": "spy@evil.test"}}]
+        }, "saveToSentItems": true}));
+        let p = render(GRAPH_MESSAGE, &send, None).unwrap();
+        assert_eq!(
+            field(&p, "To"),
+            ["ana@example.com (boss@corp.example)"],
+            "the address leads, the free-text name cannot pose as it"
+        );
+        assert_eq!(field(&p, "Cc"), ["ben@example.com"]);
+        assert_eq!(field(&p, "Bcc (hidden from the others)"), ["spy@evil.test"]);
+        assert_eq!(field(&p, "Subject"), ["Numbers"]);
+        assert_eq!(field(&p, "Message"), ["Attached below."]);
+        // a draft posts the message itself
+        let draft = graph(
+            json!({"subject": "Hi", "body": {"contentType": "text", "content": "x"}, "toRecipients": [{"emailAddress": {"address": "a@b.co"}}]}),
+        );
+        assert_eq!(
+            field(&render(GRAPH_MESSAGE, &draft, None).unwrap(), "To"),
+            ["a@b.co"]
+        );
+        let none = graph(json!({"subject": "notes"}));
+        assert_eq!(
+            field(&render(GRAPH_MESSAGE, &none, None).unwrap(), "To"),
+            ["(no recipient)"]
+        );
+    }
+
+    #[test]
+    fn what_a_graph_message_hides_or_cannot_be_shown_is_refused_or_listed() {
+        let ok = |m: Value| render(GRAPH_MESSAGE, &graph(m), None);
+        let base = || json!({"subject": "s", "body": {"contentType": "Text", "content": "b"}, "toRecipients": [{"emailAddress": {"address": "a@b.co"}}]});
+        assert!(
+            ok(json!({"subject": "s", "body": {"contentType": "HTML", "content": "<b>x</b>"}}))
+                .is_err(),
+            "html"
+        );
+        let mut with_attachment = base();
+        with_attachment["attachments"] = json!([{"name": "x.exe"}]);
+        assert!(ok(with_attachment).is_err(), "attachments");
+        assert!(
+            ok(json!({"message": base(), "extra": 1})).is_err(),
+            "fields beside the message"
+        );
+        assert!(
+            ok(json!({})).is_err() && ok(json!({"message": {}})).is_err(),
+            "nothing to show"
+        );
+        assert!(
+            ok(json!({"toRecipients": [{"emailAddress": {}}]})).is_err(),
+            "a recipient with no address"
+        );
+        assert!(ok(json!({"toRecipients": "a@b.co"})).is_err());
+        let mut odd = base();
+        odd["internetMessageHeaders"] = json!([{"name": "x", "value": "y"}]);
+        assert_eq!(
+            field(&ok(odd).unwrap(), "Also sets"),
+            ["internetMessageHeaders"],
+            "what it cannot show it names"
+        );
+        assert!(render(GRAPH_MESSAGE, b"nope", None).is_err());
+    }
+
+    #[test]
+    fn a_graph_event_says_guests_are_emailed_because_microsoft_always_does() {
+        let body = graph(json!({
+            "subject": "Dinner", "location": {"displayName": "Home"}, "isOnlineMeeting": true,
+            "start": {"dateTime": "2026-10-01T19:00:00", "timeZone": "Europe/Berlin"},
+            "end": {"dateTime": "2026-10-01T21:00:00", "timeZone": "Europe/Berlin"},
+            "attendees": [{"emailAddress": {"address": "ana@example.com"}, "type": "required"}],
+            "body": {"contentType": "Text", "content": "Bring wine"}
+        }));
+        let p = render(GRAPH_EVENT, &body, None).unwrap();
+        assert_eq!(field(&p, "Title"), ["Dinner"]);
+        assert_eq!(field(&p, "Starts"), ["2026-10-01T19:00:00 Europe/Berlin"]);
+        assert_eq!(field(&p, "Where"), ["Home"]);
+        assert_eq!(field(&p, "Guests"), ["ana@example.com"]);
+        assert!(field(&p, "Guests are emailed")[0].starts_with("yes"));
+        assert!(field(&p, "Online meeting")[0].starts_with("yes"));
+        assert_eq!(field(&p, "Notes"), ["Bring wine"]);
+        let solo = render(GRAPH_EVENT, &graph(json!({"start": {"dateTime": "d"}, "end": {"dateTime": "d"}, "reminderMinutesBeforeStart": 5})), None).unwrap();
+        assert!(
+            field(&solo, "Guests are emailed").is_empty(),
+            "no guests, no email"
+        );
+        assert_eq!(field(&solo, "Title"), ["(no title)"]);
+        assert_eq!(field(&solo, "Also sets"), ["reminderMinutesBeforeStart"]);
+        for bad in [
+            json!({"subject": "x"}),
+            json!({"start": {"dateTime": "d"}, "end": {"dateTime": "d"}, "body": {"contentType": "html", "content": "<b>"}}),
+            json!({"start": {"dateTime": "d"}, "end": {"dateTime": "d"}, "attendees": [{"type": "required"}]}),
+            json!({"start": {"dateTime": "d"}, "end": {"dateTime": "d"}, "location": {"address": {}}}),
+            json!([1]),
+        ] {
+            assert!(
+                render(GRAPH_EVENT, &graph(bad.clone()), None).is_err(),
+                "{bad}"
+            );
+        }
     }
 }

@@ -7,7 +7,8 @@
 
 The API is HTTPS (the broker injects credentials only over TLS; CERT is signed by a throwaway CA the runtime is told to trust). The token
 endpoint is plain loopback HTTP and answers `access_token = "at-" + refresh_token`. Every API request is appended to GOOGLE_STUB_LOG as one JSON
-line: method, path (with query), the Authorization header it arrived with, and the body.
+line: method, path (with query), the Authorization header it arrived with, and the body. It also answers the Microsoft Graph paths the Outlook
+agents use; for client id "ms-app" the token endpoint rotates the refresh token and logs each request to TOKEN_STUB_LOG.
 """
 
 import json
@@ -63,6 +64,19 @@ class Api(BaseHTTPRequestHandler):
             return self.reply(200, {"items": [{"start": {"dateTime": "2026-09-28T19:00:00+02:00"}, "summary": f"{who} dinner", "location": "Home"}]})
         if m == ("POST", "/calendar/v3/calendars/primary/events"):
             return self.reply(200, {"id": "event-1"})
+        # Microsoft Graph
+        if m == ("GET", "/v1.0/me/mailFolders/inbox/messages"):
+            return self.reply(200, {"value": [{"from": {"emailAddress": {"name": "Board", "address": f"{who}-friend@example.com"}}, "subject": "Board notes", "receivedDateTime": "2026-09-28T08:00:00Z"}]})
+        if m == ("POST", "/v1.0/me/messages"):
+            return self.reply(201, {"id": "AAMkDraft1"})
+        if m == ("POST", "/v1.0/me/sendMail"):
+            self.send_response(202); self.send_header("content-length", "0"); self.send_header("connection", "close"); self.end_headers()
+            self.close_connection = True
+            return
+        if m == ("GET", "/v1.0/me/calendarView"):
+            return self.reply(200, {"value": [{"subject": f"{who} dinner", "start": {"dateTime": "2026-09-28T17:00:00.0000000"}, "location": {"displayName": "Home"}}]})
+        if m == ("POST", "/v1.0/me/events"):
+            return self.reply(201, {"id": "ev1"})
         return self.reply(404, {"error": {"message": "not found"}})
 
     do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = handle_any
@@ -75,10 +89,18 @@ class Token(BaseHTTPRequestHandler):
     def do_POST(self):
         form = urllib.parse.parse_qs(self.rfile.read(int(self.headers.get("content-length", "0"))).decode())
         rt = form.get("refresh_token", [""])[0]
+        microsoft = form.get("client_id", [""])[0] == "ms-app"
+        if microsoft and os.environ.get("TOKEN_STUB_LOG"):
+            # what the token endpoint was asked: the refresh token used, the scope, and whether a client secret came along
+            with open(os.environ["TOKEN_STUB_LOG"], "a") as f:
+                f.write(json.dumps({"refresh_token": rt, "scope": form.get("scope", [""])[0], "client_secret": "client_secret" in form}) + "\n")
         if rt.startswith("revoked"):
             data, status = json.dumps({"error": "invalid_grant"}).encode(), 400
         else:
-            data, status = json.dumps({"access_token": "at-" + rt, "expires_in": 3600}).encode(), 200
+            reply = {"access_token": "at-" + rt, "expires_in": 3600}
+            if microsoft:
+                reply["refresh_token"] = rt + "~"   # Microsoft hands back a new refresh token every time
+            data, status = json.dumps(reply).encode(), 200
         self.send_response(status)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(data)))

@@ -128,6 +128,22 @@ impl ConnectionStore {
         Ok(())
     }
 
+    /// Replaces the stored refresh token with the one the provider rotated to, but only if the connection still exists and still holds
+    /// `old`: a person who disconnected, or replaced it, meanwhile keeps what they chose. `connected_at` is unchanged. Returns whether it changed.
+    pub async fn rotate(&self, user: &str, name: &str, old: &str, new: &str) -> Result<bool> {
+        let _guard = self.write.lock().await;
+        let Some(mut map) = self.users.read().await.get(user).cloned() else {
+            return Ok(false);
+        };
+        match map.get_mut(name) {
+            Some(stored) if stored.refresh_token == old => stored.refresh_token = new.to_string(),
+            _ => return Ok(false),
+        }
+        self.save(user, &map).await?;
+        self.users.write().await.insert(user.to_string(), map);
+        Ok(true)
+    }
+
     /// The person's refresh token for a connection: for the host's own use, never returned by an API.
     pub async fn refresh_token(&self, user: &str, name: &str) -> Option<String> {
         self.users
@@ -401,5 +417,56 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().contains(".tmp-"))
             .collect();
         assert!(leftovers.is_empty(), "no temporary copy is left behind");
+    }
+
+    #[tokio::test]
+    async fn a_rotated_token_replaces_only_the_one_that_was_used_and_never_revives_a_removed_connection(
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ConnectionStore::open(dir.path()).await.unwrap();
+        store.set("ana", "microsoft", "rt-1").await.unwrap();
+        let connected = store.connected_at("ana").await;
+        assert!(store
+            .rotate("ana", "microsoft", "rt-1", "rt-2")
+            .await
+            .unwrap());
+        assert_eq!(
+            store.refresh_token("ana", "microsoft").await.as_deref(),
+            Some("rt-2")
+        );
+        assert_eq!(
+            store.connected_at("ana").await,
+            connected,
+            "the time she connected does not change"
+        );
+        // she connected again meanwhile: what she chose stays
+        store.set("ana", "microsoft", "rt-new").await.unwrap();
+        assert!(!store
+            .rotate("ana", "microsoft", "rt-2", "rt-3")
+            .await
+            .unwrap());
+        assert_eq!(
+            store.refresh_token("ana", "microsoft").await.as_deref(),
+            Some("rt-new")
+        );
+        // she disconnected while the token was being refreshed
+        store.remove("ana", "microsoft").await.unwrap();
+        assert!(!store
+            .rotate("ana", "microsoft", "rt-new", "rt-4")
+            .await
+            .unwrap());
+        assert!(store.refresh_token("ana", "microsoft").await.is_none());
+        assert!(!store.rotate("nobody", "microsoft", "a", "b").await.unwrap());
+        // and it survives a restart
+        store.set("ben", "microsoft", "b-1").await.unwrap();
+        store
+            .rotate("ben", "microsoft", "b-1", "b-2")
+            .await
+            .unwrap();
+        let again = ConnectionStore::open(dir.path()).await.unwrap();
+        assert_eq!(
+            again.refresh_token("ben", "microsoft").await.as_deref(),
+            Some("b-2")
+        );
     }
 }
