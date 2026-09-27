@@ -90,6 +90,12 @@ pub struct ChainStatus {
 impl AuditLog {
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
+        // The only real caller joins a fixed literal ("audit.jsonl") onto the operator's configured data
+        // root, so nothing here is ever attacker-influenced — but this is a public constructor, and checking
+        // costs nothing, so a future caller cannot reintroduce a traversal by passing an unchecked value.
+        if path.to_string_lossy().contains("..") {
+            bail!("refusing a path with '..' segments");
+        }
         let entries = read_entries(&path).await?;
         let tail = match entries.last() {
             Some(last) => Tail {
@@ -264,6 +270,22 @@ mod tests {
         assert!(status.chain_ok);
         assert_eq!(status.entries, 2);
         let _ = fs::remove_file(path).await;
+    }
+
+    /// `AuditLog::open` takes an arbitrary path (its only real caller joins a fixed literal onto the
+    /// operator's data root, but it is a public constructor), so it refuses one with `..` in it rather
+    /// than trust every future caller.
+    #[tokio::test]
+    async fn open_refuses_a_path_with_traversal_segments() {
+        let path = std::env::temp_dir().join(format!("zyvor-audit-{}", Uuid::new_v4()));
+        let traversal = path.join("..").join("etc").join("audit.jsonl");
+        match AuditLog::open(&traversal).await {
+            Ok(_) => panic!("expected a traversal refusal"),
+            Err(error) => assert!(
+                error.to_string().contains(".."),
+                "expected a traversal refusal, got: {error}"
+            ),
+        }
     }
 
     #[tokio::test]

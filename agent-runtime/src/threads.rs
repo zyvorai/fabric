@@ -117,13 +117,20 @@ impl ThreadStore {
         })
     }
 
-    fn dir(&self, id: Uuid) -> PathBuf {
-        self.root.join(id.to_string())
+    /// A `Uuid`'s `Display` output is always the fixed `xxxxxxxx-xxxx-...` form and can never contain a path
+    /// separator or `..`, but this checks anyway (matching [`atomic_write`]'s own guard) rather than trust that
+    /// every future caller of this private helper keeps passing a real `Uuid`.
+    fn dir(&self, id: Uuid) -> Result<PathBuf> {
+        let segment = id.to_string();
+        if segment.contains("..") || segment.contains(['/', '\\']) {
+            bail!("refusing path traversal");
+        }
+        Ok(self.root.join(segment))
     }
 
     async fn persist(&self, record: &ThreadRecord) -> Result<()> {
         atomic_write(
-            self.dir(record.id).join("thread.json"),
+            self.dir(record.id)?.join("thread.json"),
             &serde_json::to_vec_pretty(record)?,
         )
         .await
@@ -227,7 +234,7 @@ impl ThreadStore {
         let mut file = fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(self.dir(thread_id).join("messages.jsonl"))
+            .open(self.dir(thread_id)?.join("messages.jsonl"))
             .await?;
         file.write_all(&serde_json::to_vec(&message)?).await?;
         file.write_all(b"\n").await?;
@@ -244,7 +251,7 @@ impl ThreadStore {
         after: u64,
         limit: usize,
     ) -> Result<Vec<MessageRecord>> {
-        let file = match fs::File::open(self.dir(thread_id).join("messages.jsonl")).await {
+        let file = match fs::File::open(self.dir(thread_id)?.join("messages.jsonl")).await {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(e) => return Err(e.into()),
@@ -309,7 +316,7 @@ impl ThreadStore {
         let _guard = self.write.lock().await;
         let existed = self.threads.write().await.remove(&thread_id).is_some();
         if existed {
-            match fs::remove_dir_all(self.dir(thread_id)).await {
+            match fs::remove_dir_all(self.dir(thread_id)?).await {
                 Ok(()) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
                 Err(e) => return Err(e.into()),

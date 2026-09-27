@@ -126,6 +126,11 @@ async fn mint_access_token(
     name: &str,
     http: &reqwest::Client,
 ) -> Result<Minted> {
+    // Re-checked here, not only at descriptor-validate time: a descriptor built via
+    // `CredentialVault::from_descriptors` never went through `validate_descriptor`, and the request below
+    // carries the client secret and refresh token in its body, so a plain-http endpoint would send both
+    // in cleartext.
+    require_https_or_loopback(name, &oauth.token_url)?;
     // built in its own block: the serializer is not `Sync`, so it must not be alive across the await below
     let body = {
         let mut form = url::form_urlencoded::Serializer::new(String::new());
@@ -586,6 +591,21 @@ pub struct ResolveContext<'a> {
     pub user_id: Option<&'a str>,
 }
 
+/// Refuses a token endpoint that would send an OAuth client secret and refresh token in cleartext:
+/// `https` always allowed, plain `http` only to loopback (local testing). Checked at descriptor-validate
+/// time (`validate_descriptor`, for the normal `CredentialVault::load` path) *and* again right before the
+/// actual request (`mint_access_token`), because `CredentialVault::from_descriptors` is a public
+/// constructor for tests and embedders that does not itself call `validate_descriptor`.
+fn require_https_or_loopback(name: &str, token_url: &str) -> Result<url::Url> {
+    let url = url::Url::parse(token_url)
+        .with_context(|| format!("credential '{name}' has an invalid oauth token_url"))?;
+    let loopback = matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]"));
+    if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
+        bail!("credential '{name}' oauth token_url must be https (http only for loopback)");
+    }
+    Ok(url)
+}
+
 fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
     if name.is_empty() || d.host.trim().is_empty() || d.header.trim().is_empty() {
         bail!("credential descriptors require non-empty name, host and header");
@@ -594,12 +614,7 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
         let Some(o) = &d.oauth else {
             bail!("credential '{name}' has kind oauth-refresh and needs an oauth block");
         };
-        let url = url::Url::parse(&o.token_url)
-            .with_context(|| format!("credential '{name}' has an invalid oauth token_url"))?;
-        let loopback = matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]"));
-        if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
-            bail!("credential '{name}' oauth token_url must be https (http only for loopback)");
-        }
+        require_https_or_loopback(name, &o.token_url)?;
         if o.client_id_env.trim().is_empty() {
             bail!("credential '{name}' oauth needs client_id_env");
         }
@@ -919,6 +934,37 @@ mod tests {
         .unwrap();
         validate_descriptor("google", &d).unwrap();
         CredentialVault::from_descriptors(HashMap::from([("google".to_string(), d)]))
+    }
+
+    /// `from_descriptors` is a public constructor for tests and embedders that skips `validate_descriptor`
+    /// (unlike `CredentialVault::load`), so the https-or-loopback rule has to hold again right where the
+    /// client secret and refresh token actually go on the wire, not only at descriptor-validate time.
+    #[tokio::test]
+    async fn a_descriptor_that_skipped_validation_still_cannot_refresh_over_plain_http() {
+        std::env::set_var("OA_SKIP_ID", "client-id-1");
+        std::env::set_var("OA_SKIP_SECRET", "client-secret-1");
+        std::env::set_var("OA_SKIP_REFRESH", "refresh-token-1");
+        let d: CredentialDescriptor = serde_json::from_value(serde_json::json!({
+            "host": "gmail.googleapis.com", "header": "authorization", "kind": "oauth-refresh",
+            "allowed_methods": ["GET"],
+            "oauth": {
+                "token_url": "http://oauth2.example/token", // plain http, not loopback: never validated
+                "client_id_env": "OA_SKIP_ID",
+                "client_secret_env": "OA_SKIP_SECRET",
+                "refresh_token_env": "OA_SKIP_REFRESH",
+            }
+        }))
+        .unwrap();
+        // Deliberately not calling validate_descriptor, unlike every other test in this module.
+        let vault = CredentialVault::from_descriptors(HashMap::from([("google".to_string(), d)]));
+        let error = vault
+            .refresh_now("google", &reqwest::Client::new())
+            .await
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("https"),
+            "expected an https refusal, got: {error}"
+        );
     }
 
     #[tokio::test]
