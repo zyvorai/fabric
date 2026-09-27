@@ -9,6 +9,7 @@
 
 use crate::{
     app::{self, ApiError},
+    audit::AuditPhase,
     model::{
         CreateLoopRequest, CreateScheduleRequest, CreateSessionRequest, CreateWebhookRequest,
         CreateWebhookResponse, LoopRecord, ScheduleRecord, SessionEvent, SessionStatus,
@@ -366,6 +367,17 @@ pub(crate) async fn create_schedule(
         .save_schedule(record.clone())
         .await
         .map_err(ApiError::internal)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.schedule.created",
+            Some(record.agent.clone()),
+            json!({ "schedule_id": record.id, "cron": record.cron, "user_id": record.user_id }),
+        )
+        .await;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -381,6 +393,17 @@ pub(crate) async fn delete_schedule(
     {
         return Err(ApiError::not_found("schedule not found"));
     }
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.schedule.deleted",
+            None,
+            json!({ "schedule_id": id }),
+        )
+        .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -421,6 +444,17 @@ pub(crate) async fn create_webhook(
         .save_webhook(record.clone())
         .await
         .map_err(ApiError::internal)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.webhook.created",
+            Some(record.agent.clone()),
+            json!({ "webhook_id": record.id, "user_id": record.user_id }),
+        )
+        .await;
     Ok((
         StatusCode::CREATED,
         Json(CreateWebhookResponse {
@@ -442,6 +476,17 @@ pub(crate) async fn delete_webhook(
     {
         return Err(ApiError::not_found("webhook not found"));
     }
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.webhook.deleted",
+            None,
+            json!({ "webhook_id": id }),
+        )
+        .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -486,6 +531,17 @@ pub(crate) async fn create_loop(
         .save_loop(record.clone())
         .await
         .map_err(ApiError::internal)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.loop.created",
+            Some(record.agent.clone()),
+            json!({ "loop_id": record.id, "user_id": record.user_id }),
+        )
+        .await;
     Ok((StatusCode::CREATED, Json(record)))
 }
 
@@ -501,6 +557,17 @@ pub(crate) async fn delete_loop(
     {
         return Err(ApiError::not_found("loop not found"));
     }
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.loop.deleted",
+            None,
+            json!({ "loop_id": id }),
+        )
+        .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -807,5 +874,105 @@ mod tests {
         assert_eq!(bounds.stop_reason(1, 0, 0.0, 0), None);
         assert!(bounds.is_bounded());
         assert!(!LoopBounds::default().is_bounded());
+    }
+
+    async fn journal_kinds(state: &AppState) -> Vec<String> {
+        state
+            .store
+            .audit
+            .list(None, 50)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.action)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn creating_and_deleting_a_schedule_a_webhook_and_a_loop_are_all_journaled() {
+        let (state, session) = crate::egress::ask_tests::state_and_session_cfg(|_| {}).await;
+        let agent = session.agent.clone();
+        state
+            .store
+            .deploy_agent(crate::model::DeployAgentRequest {
+                name: agent.clone(),
+                bundle_base64: base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    "export default 1",
+                ),
+                manifest: crate::egress::ask_tests::manifest(
+                    crate::model::EgressMode::Deny,
+                    Some(30),
+                ),
+            })
+            .await
+            .unwrap();
+
+        let (_, Json(sched)) = create_schedule(
+            State(state.clone()),
+            Json(CreateScheduleRequest {
+                agent: agent.clone(),
+                cron: "0 7 * * *".into(),
+                input: Value::Null,
+                bounds: Default::default(),
+                user_id: None,
+            }),
+        )
+        .await
+        .unwrap();
+        assert!(journal_kinds(&state)
+            .await
+            .contains(&"keep.schedule.created".to_string()));
+        delete_schedule(State(state.clone()), Path(sched.id))
+            .await
+            .unwrap();
+        assert!(journal_kinds(&state)
+            .await
+            .contains(&"keep.schedule.deleted".to_string()));
+
+        let (_, Json(resp)) = create_webhook(
+            State(state.clone()),
+            Json(CreateWebhookRequest {
+                agent: agent.clone(),
+                input: Value::Null,
+                bounds: Default::default(),
+                user_id: None,
+            }),
+        )
+        .await
+        .unwrap();
+        assert!(journal_kinds(&state)
+            .await
+            .contains(&"keep.webhook.created".to_string()));
+        delete_webhook(State(state.clone()), Path(resp.webhook.id))
+            .await
+            .unwrap();
+        assert!(journal_kinds(&state)
+            .await
+            .contains(&"keep.webhook.deleted".to_string()));
+
+        let (_, Json(lp)) = create_loop(
+            State(state.clone()),
+            Json(CreateLoopRequest {
+                agent,
+                input: Value::Null,
+                bounds: LoopBounds {
+                    max_runs: Some(1),
+                    ..Default::default()
+                },
+                user_id: None,
+            }),
+        )
+        .await
+        .unwrap();
+        assert!(journal_kinds(&state)
+            .await
+            .contains(&"keep.loop.created".to_string()));
+        delete_loop(State(state.clone()), Path(lp.id))
+            .await
+            .unwrap();
+        assert!(journal_kinds(&state)
+            .await
+            .contains(&"keep.loop.deleted".to_string()));
     }
 }
