@@ -21,15 +21,17 @@ continues it after the agent's session ended, and sends the stored messages to a
 
 **Limits.** 500 threads per user, 32 KiB per message (refused, not cut), 120-character titles, 500 messages per page.
 
-**Retention.** Off by default: nothing is removed unless the operator sets a period, and threads are otherwise kept until the user forgets them. Two settings, each a whole number of days (1 to 3650; unset or 0 keeps everything):
+**Retention.** Off by default: nothing is removed unless the operator sets a period, and threads are otherwise kept until the user forgets them. Four settings, each a whole number of days (1 to 3650; unset or 0 keeps everything):
 
 | Variable | What it removes |
 |---|---|
 | `ZYVOR_AGENT_THREAD_RETENTION_DAYS` | Threads (and their messages) untouched for that long. A thread whose session is still running is never removed. |
 | `ZYVOR_AGENT_EVENT_RETENTION_DAYS` | The event log (`events.jsonl`) of sessions that ended that long ago. The session record, artifacts and approvals stay; reading the events of such a session returns none. |
+| `ZYVOR_AGENT_RECEIPT_RETENTION_DAYS` | [Action receipts](../receipts/README.md) made that long ago. A forgotten receipt no longer answers a repeat of its idempotency key (that key can be used again), so keep this longer than any agent retries. |
+| `ZYVOR_AGENT_MEMORY_PROPOSAL_RETENTION_DAYS` | [Memory](../memory/README.md) proposals an agent made that nobody accepted or rejected for that long. Accepted entries are never removed by this. |
 
-An hourly sweep applies them (the first one a minute after start). A sweep that removes something is journaled as `keep.retention.sweep` with counts only, never names or text. Tests: `retention::tests`, including that a running session's thread survives and that nothing is removed when no period is set.
+Separately, and with no setting: memory entries whose **expiry** the person set have passed are now deleted from disk (they were only hidden before). An hourly sweep applies all of this (the first one a minute after start). A sweep that removes something is journaled as `keep.retention.sweep` with counts only, never names or text. Tests: `retention::tests`, including that a running session's thread survives, that nothing is removed when no period is set, that a forgotten receipt's key is free again while a recent one still answers, that expired memory (and a stale proposal only when a period is set) is deleted from the file while accepted entries stay, and that the journal holds counts only.
 This is deletion from the host's files, not secure erasure: copies in backups, snapshots or the disk's free space are not touched.
 
-**Not built yet.** Search and attachments in the chat page, and memory. Like the vault, the operator of the host can read this data; it is not
+**Not built yet.** Search and attachments in the chat page. Like the vault, the operator of the host can read this data; it is not
 encrypted to the user.
