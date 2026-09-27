@@ -51,6 +51,9 @@ struct RootView: View {
                     case .useCases: UseCasesView()
                     case .runs: RunsView()
                     case .approvals: ApprovalsView()
+                    case .goals: GoalsPane()
+                    case .memory: MemoryPane()
+                    case .done: DonePane()
                     case .folders: WatchFoldersView()
                     case .settings: SettingsView()
                     }
