@@ -1871,6 +1871,9 @@ async fn sync_session(state: &Arc<AppState>, session: SessionRecord) -> Result<(
             "memory.propose" => {
                 crate::memory::record_proposal(state, &session, &agent.manifest, &event.data).await;
             }
+            "card.propose" => {
+                crate::card::record_card(state, &session, &agent.manifest, &event.data).await;
+            }
             _ => {}
         }
         state
