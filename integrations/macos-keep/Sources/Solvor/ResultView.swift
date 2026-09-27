@@ -27,7 +27,10 @@ struct ResultView: View {
                     Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.red).textSelection(.enabled)
                 case .done(let outcome):
                     ProofPill(egress: outcome.egressConnects, evidence: outcome.items.first?.result?.badge?.evidence, simulated: outcome.isSimulated)
-                    ForEach(Array(outcome.items.enumerated()), id: \.offset) { _, item in FileResultCard(item: item) }
+                        .stamp()
+                        .background { SparkBurst(trigger: outcome.isSimulated ? 0 : 1).frame(width: 300, height: 220) }
+                        .task { if !outcome.isSimulated { try? await Task.sleep(nanoseconds: 350_000_000); Haptics.success() } }
+                    ForEach(Array(outcome.items.enumerated()), id: \.offset) { i, item in FileResultCard(item: item).appear(delay: 0.25 + Motion.stagger(i)) }
                 }
             }
             .padding(20)

@@ -75,8 +75,10 @@ struct Card: ViewModifier {
         content
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.accentColor.opacity(hover ? 0.7 : 0), lineWidth: 1.5))
-            .scaleEffect(hover ? 1.01 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: hover)
+            .shadow(color: .black.opacity(hover ? 0.22 : 0.06), radius: hover ? 16 : 4, y: hover ? 9 : 2)
+            .scaleEffect(hover ? 1.02 : 1)
+            .offset(y: hover ? -2 : 0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hover)
     }
 }
 extension View { func card(hover: Bool = false) -> some View { modifier(Card(hover: hover)) } }
@@ -142,8 +144,8 @@ struct SealedCellView: View {
 
 
 // MARK: macOS 26 look
-// Buttons use the system styles: Liquid Glass on macOS 26 (glass / glassProminent), and the standard bordered styles before it. Both follow the
-// person's system accent colour, so nothing here forces a brand colour onto a control.
+// Buttons use the system styles: Liquid Glass on macOS 26 (glass / glassProminent). The app sets its tint to the brand orange at the window root
+// (SolvorApp), so controls, selections and chips match the logo instead of the system blue; `Color.accentColor` below therefore resolves to it.
 extension View {
     @ViewBuilder func primaryButton() -> some View {
         self.buttonStyle(.glassProminent).buttonBorderShape(.capsule)
@@ -153,7 +155,7 @@ extension View {
     }
 }
 
-/// A filled icon tile in the system accent colour (used where the app used to paint a brand-orange tile).
+/// A filled icon tile in the app's tint (the brand orange, set at the window root).
 struct AccentTile: View {
     let symbol: String
     var size: CGFloat = 40

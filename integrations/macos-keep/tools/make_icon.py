@@ -20,34 +20,65 @@ def zpath(k=K, cx=512, cy=512, ox=0, oy=0):
     return "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in pts)
 
 def icon_svg():
+    """The app icon: the Zyvor Z inside a sealed cell whose rings are closing around it, on a deep-to-bright orange with a glass sheen and a
+    few sparks. Layered so it reads at 16 px (the Z and the squircle) and rewards a look at 1024 (rings, sheen, sparks)."""
+    def star(cx, cy, r, op):
+        k = r * 0.18
+        return (f'<path d="M{cx},{cy-r} Q{cx+k},{cy-k} {cx+r},{cy} Q{cx+k},{cy+k} {cx},{cy+r} Q{cx-k},{cy+k} {cx-r},{cy} Q{cx-k},{cy-k} {cx},{cy-r} Z" '
+                f'fill="#fff" fill-opacity="{op}"/>')
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <linearGradient id="bg" x1="150" y1="110" x2="880" y2="930" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ff7a3d"/><stop offset="0.55" stop-color="#ff5a15"/><stop offset="1" stop-color="#c9440a"/>
+    <linearGradient id="bg" x1="130" y1="90" x2="900" y2="950" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff9a5c"/><stop offset="0.38" stop-color="#ff5a15"/><stop offset="0.82" stop-color="#d4460b"/><stop offset="1" stop-color="#8f2a04"/>
     </linearGradient>
-    <radialGradient id="glow" cx="30%" cy="18%" r="75%">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/><stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
+    <radialGradient id="light" cx="26%" cy="14%" r="70%">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.55"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vig" cx="50%" cy="46%" r="72%">
+      <stop offset="0.62" stop-color="#3a0d00" stop-opacity="0"/><stop offset="1" stop-color="#3a0d00" stop-opacity="0.42"/>
     </radialGradient>
     <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/><stop offset="1" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0.75"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.08"/><stop offset="1" stop-color="#ffb890" stop-opacity="0.35"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="zfill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffd8c0"/>
+    </linearGradient>
+    <linearGradient id="cell" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.30"/><stop offset="1" stop-color="#fff" stop-opacity="0.06"/>
     </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
-      <feDropShadow dx="0" dy="22" stdDeviation="26" flood-color="#5a1a00" flood-opacity="0.38"/>
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#4a1500" flood-opacity="0.45"/>
     </filter>
-    <filter id="zshadow" x="-20%" y="-20%" width="140%" height="150%">
-      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#7a2400" flood-opacity="0.35"/>
+    <filter id="zshadow" x="-25%" y="-25%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#6a1f00" flood-opacity="0.5"/>
     </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
+    <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="188"/></clipPath>
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="188" fill="url(#bg)" filter="url(#shadow)"/>
-  <rect x="100" y="100" width="824" height="824" rx="188" fill="url(#glow)"/>
-  <rect x="103" y="103" width="818" height="818" rx="185" fill="none" stroke="url(#edge)" stroke-width="6"/>
-  <!-- the sealed cell -->
-  <rect x="262" y="262" width="500" height="500" rx="108" fill="#ffffff" fill-opacity="0.10" stroke="#ffffff" stroke-opacity="0.42" stroke-width="26"/>
+  <g clip-path="url(#sq)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#light)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#vig)"/>
+    <ellipse cx="640" cy="880" rx="330" ry="120" fill="#ff8a3a" fill-opacity="0.35" filter="url(#soft)"/>
+    <!-- the rings closing around the cell -->
+    <rect x="182" y="182" width="660" height="660" rx="150" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="10"/>
+    <rect x="222" y="222" width="580" height="580" rx="132" fill="none" stroke="#fff" stroke-opacity="0.26" stroke-width="12"/>
+    <rect x="262" y="262" width="500" height="500" rx="114" fill="none" stroke="#fff" stroke-opacity="0.40" stroke-width="14"/>
+  </g>
+  <!-- the sealed cell: glass -->
+  <rect x="312" y="312" width="400" height="400" rx="92" fill="url(#cell)" stroke="#fff" stroke-opacity="0.55" stroke-width="10"/>
+  <path d="M330,420 Q330,330 420,330 L604,330 Q694,330 694,420 Q512,470 330,420 Z" fill="url(#sheen)" fill-opacity="0.55"/>
   <!-- the Zyvor Z -->
-  <path d="{zpath()}" fill="none" stroke="#ffffff" stroke-width="{8.3 * K:.1f}" stroke-linecap="round" stroke-linejoin="round" filter="url(#zshadow)"/>
-  <!-- the seal latch -->
-  <rect x="452" y="238" width="120" height="48" rx="24" fill="#ffffff"/>
-  <circle cx="512" cy="262" r="9" fill="#ff5a15"/>
+  <path d="{zpath(8.4, 512, 520)}" fill="none" stroke="url(#zfill)" stroke-width="{7.6 * 8.4:.1f}" stroke-linecap="round" stroke-linejoin="round" filter="url(#zshadow)"/>
+  <path d="{zpath(8.4, 512, 512)}" fill="none" stroke="#fff" stroke-opacity="0.0" stroke-width="2"/>
+  <!-- sparks -->
+  {star(786, 262, 46, 0.95)}
+  {star(262, 774, 26, 0.7)}
+  {star(742, 742, 16, 0.55)}
+  <rect x="103" y="103" width="818" height="818" rx="185" fill="none" stroke="url(#edge)" stroke-width="6"/>
 </svg>
 '''
 
@@ -97,5 +128,6 @@ write_json(os.path.join(glyph, "Contents.json"), {"images": files, "info": {"ver
 # The Z mark alone, for the in-app logo where a bitmap is wanted, and a docs image.
 write_json(os.path.join(assets, "Contents.json"), {"info": {"version": 1, "author": "xcode"}})
 render(svg, 512, docs_png)
-render(svg, 1024, "/tmp/solvor-icon-1024.png")
+import tempfile
+render(svg, 1024, os.path.join(tempfile.gettempdir(), "solvor-icon-1024.png"))
 print("icon written:", os.path.relpath(iconset), "and", os.path.relpath(glyph))

@@ -30,6 +30,7 @@ struct RunsView: View {
                         if let f = a.metadata?.filename { Text(f).font(.caption2).foregroundStyle(.tertiary) }
                     }.tag(a.id)
                 }
+                .overlay { if rows.isEmpty { EmptyState(symbol: "clock.arrow.circlepath", title: filter.isEmpty ? "No runs yet" : "No runs match", message: filter.isEmpty ? "Drop a file on a use case and the result is kept here." : "Try a different filter.") } }
                 HStack {
                     Button("Compare two runs") { compare() }.disabled(selection.count != 2)
                     Spacer()
