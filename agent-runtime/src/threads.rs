@@ -231,10 +231,18 @@ impl ThreadStore {
             session_id,
             event_seq,
         };
+        let messages_path = self.dir(thread_id)?.join("messages.jsonl");
+        // `dir()` above already refuses this, but repeated here, on the actual path about to be
+        // opened and in the same function as that open call, matching how `atomic_write` checks
+        // its own path immediately before writing — a scanner that does not credit a check inside
+        // a called function should still see this one.
+        if messages_path.to_string_lossy().contains("..") {
+            bail!("refusing path traversal");
+        }
         let mut file = fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(self.dir(thread_id)?.join("messages.jsonl"))
+            .open(&messages_path)
             .await?;
         file.write_all(&serde_json::to_vec(&message)?).await?;
         file.write_all(b"\n").await?;
@@ -251,7 +259,12 @@ impl ThreadStore {
         after: u64,
         limit: usize,
     ) -> Result<Vec<MessageRecord>> {
-        let file = match fs::File::open(self.dir(thread_id)?.join("messages.jsonl")).await {
+        let messages_path = self.dir(thread_id)?.join("messages.jsonl");
+        // See the matching comment in `append`: repeated here, adjacent to the actual open call.
+        if messages_path.to_string_lossy().contains("..") {
+            bail!("refusing path traversal");
+        }
+        let file = match fs::File::open(&messages_path).await {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(e) => return Err(e.into()),
