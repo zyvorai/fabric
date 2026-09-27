@@ -21,6 +21,7 @@ struct RootView: View {
             GoalsView().tabItem { Label("Goals", systemImage: "checklist") }.tag(3)
             ApprovalsView().tabItem { Label("Approvals", systemImage: "checkmark.shield") }
                 .badge(model.pendingCount).tag(1)
+            MeView().tabItem { Label("You", systemImage: "person.crop.circle") }.tag(4)
             SettingsView().tabItem { Label("Settings", systemImage: "gearshape") }.tag(2)
         }
         .onAppear { if !model.isConnected { tab = 2 } }

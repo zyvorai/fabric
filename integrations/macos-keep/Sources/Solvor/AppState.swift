@@ -261,13 +261,16 @@ extension AppState {
 }
 
 enum Pane: String, CaseIterable, Identifiable {
-    case useCases = "Use cases", runs = "Runs", approvals = "Approvals", folders = "Watch folders", settings = "Settings"
+    case useCases = "Use cases", runs = "Runs", approvals = "Approvals", goals = "Goals", memory = "Memory", done = "Done", folders = "Watch folders", settings = "Settings"
     var id: String { rawValue }
     var icon: String {
         switch self {
         case .useCases: return "square.grid.2x2.fill"
         case .runs: return "clock.arrow.circlepath"
         case .approvals: return "checkmark.seal.fill"
+        case .goals: return "checklist"
+        case .memory: return "brain.head.profile"
+        case .done: return "checkmark.circle"
         case .folders: return "folder.badge.gearshape"
         case .settings: return "gearshape.fill"
         }
