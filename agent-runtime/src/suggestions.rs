@@ -80,8 +80,15 @@ pub struct Suggestion {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct UserSuggestions {
     pub enabled: bool,
+    /// This person's own retention, in days, in place of the operator's `ZYVOR_AGENT_SUGGESTION_RETENTION_DAYS`. `None` defers to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retention_days: Option<u32>,
     pub items: Vec<Suggestion>,
 }
+
+/// A person's `retention_days` is 1 to this many days (about 10 years) — long enough that it is not a practical limit, short enough that
+/// a mistyped value cannot mean "forever" by accident.
+pub const MAX_RETENTION_DAYS: u32 = 3650;
 
 pub struct SuggestionStore {
     root: PathBuf,
@@ -195,6 +202,15 @@ impl SuggestionStore {
         .await
     }
 
+    /// `None` clears it (back to the operator's default).
+    pub async fn set_retention_days(&self, user: &str, retention_days: Option<u32>) -> Result<()> {
+        self.edit(user, |s| {
+            s.retention_days = retention_days;
+            Ok(())
+        })
+        .await
+    }
+
     /// An agent's suggestion. Needs suggestions to be on for the person; refuses a repeat and a full list.
     #[allow(clippy::too_many_arguments)]
     pub async fn propose(
@@ -257,13 +273,23 @@ impl SuggestionStore {
         .await
     }
 
-    /// Forgets suggestions from before `cutoff`: ones nobody decided (by when they were made) and decided ones (by when they were decided).
+    /// Forgets suggestions from before each person's own cutoff: their own `retention_days` (`PUT /v1/suggestions/settings`) when they set
+    /// one, otherwise `default_days` (the operator's `ZYVOR_AGENT_SUGGESTION_RETENTION_DAYS`); a person with neither is not swept at all.
+    /// "Before its cutoff" means: nobody decided it (by when it was made) or it was decided (by when it was decided) that long ago.
     /// Returns (undecided, decided). A forgotten *dismissed* suggestion can be proposed again, since the memory of the dismissal goes with it.
-    pub async fn purge_before(&self, cutoff: DateTime<Utc>) -> Result<(usize, usize)> {
+    pub async fn purge_before(
+        &self,
+        now: DateTime<Utc>,
+        default_days: Option<u64>,
+    ) -> Result<(usize, usize)> {
         let _guard = self.write.lock().await;
         let mut changed: Vec<(String, UserSuggestions)> = Vec::new();
         let (mut undecided, mut decided) = (0usize, 0usize);
         for (user, s) in self.users.read().await.iter() {
+            let Some(days) = s.retention_days.map(u64::from).or(default_days) else {
+                continue;
+            };
+            let cutoff = now - chrono::Duration::days(days as i64);
             let mut next = s.clone();
             next.items.retain(|i| {
                 let when = i.decided_at.unwrap_or(i.created_at);
@@ -412,6 +438,9 @@ pub struct UserQuery {
 #[derive(Debug, Deserialize)]
 pub struct SettingsRequest {
     pub enabled: bool,
+    /// This person's own retention, replacing the operator's default; 1 to `MAX_RETENTION_DAYS` days, or omitted/null to defer to it.
+    #[serde(default)]
+    pub retention_days: Option<u32>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -454,7 +483,7 @@ async fn subject(
 fn view(s: &UserSuggestions) -> Value {
     let (pending, decided): (Vec<_>, Vec<_>) =
         s.items.iter().partition(|i| i.status == Status::Pending);
-    json!({ "enabled": s.enabled, "pending": pending, "decided": decided.into_iter().rev().take(20).collect::<Vec<_>>() })
+    json!({ "enabled": s.enabled, "retention_days": s.retention_days, "pending": pending, "decided": decided.into_iter().rev().take(20).collect::<Vec<_>>() })
 }
 
 pub(crate) async fn list(
@@ -473,10 +502,24 @@ pub(crate) async fn put_settings(
     Json(req): Json<SettingsRequest>,
 ) -> Result<Json<Value>, ApiError> {
     let user = subject(&state, &principal, &q, "settings").await?;
+    if req
+        .retention_days
+        .is_some_and(|d| d == 0 || d > MAX_RETENTION_DAYS)
+    {
+        return Err(ApiError::bad_request(format!(
+            "retention_days must be 1 to {MAX_RETENTION_DAYS}"
+        )));
+    }
     state
         .store
         .suggestions
         .set_enabled(&user, req.enabled)
+        .await
+        .map_err(ApiError::internal)?;
+    state
+        .store
+        .suggestions
+        .set_retention_days(&user, req.retention_days)
         .await
         .map_err(ApiError::internal)?;
     Ok(Json(view(&state.store.suggestions.get(&user).await)))

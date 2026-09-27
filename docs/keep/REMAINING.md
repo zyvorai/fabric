@@ -54,7 +54,7 @@ Roughly in the order I would do them. "Can't run here" means the code can be wri
 | Android app | Kotlin, StrongBox P-256 signing, the same API as the iPhone app | Can't run here (no emulator set up) |
 | Chat page | Search, attachments, a phone-width pass (the receipts view is done, #269) | |
 | Solvor | Open and click the new Goals, Memory and Done panes (#271); the panes need a user token | A Mac and a person to drive the UI |
-| Suggestions | A retention setting; a real finder (for example a scheduled agent that reads your calendar); notifications for a new suggestion (push events exist for goals and approvals) | |
+| Suggestions | A real finder that proposes something rarer than every run (a heuristic one, `calendar-suggestions`, ships now; a model-backed one still wants your model endpoint) | |
 | Goal planning quality | Try a real model for `goal-planner`, tune the prompt, add step-level `requires_approval` from the model with the person's confirmation | A model endpoint and key from you |
 | Memory in more agents | Put accepted memory into the context of model-backed and CLI-harness agents, under the same rules (data, never instructions) | |
 | AG-UI | Tool-call events, `STATE_SNAPSHOT`/`STATE_DELTA`, token streaming; try a real CopilotKit or other AG-UI client ([TODO.md](TODO.md)) | |
@@ -104,4 +104,4 @@ silent training on trajectories. (See also [ROADMAP.md](ROADMAP.md#what-we-will-
 
 ## 8. Documentation that was out of date and is fixed
 
-Statements corrected in this change: the goals page said there was no planner; the memory page listed retention as not built; the agent-apps page said no agent-UI protocol existed. Each now says what is true. (The vendors table's line that phone-signed approvals were "not yet run with a waiting agent on a real cell" was left as it is: I could not confirm it either way.)
+Statements corrected in this change: the goals page said there was no planner; the memory page listed retention as not built; the agent-apps page said no agent-UI protocol existed. Each now says what is true. (The vendors table's line that phone-signed approvals were "not yet run with a waiting agent on a real cell" was left as it is: I could not confirm it either way.) This page's own suggestions row said a per-user retention setting and push notifications for a new suggestion were both unbuilt: the retention setting was real (a per-user `retention_days` now exists, `PUT /v1/suggestions/settings`); the notification was already fully built and tested (`notify::Notice`, `suggestions.rs`) — the row was simply wrong, corrected here rather than left to keep looking like open work.

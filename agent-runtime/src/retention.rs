@@ -95,15 +95,14 @@ pub async fn sweep(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<Swept
         .await?;
     swept.memory_expired = expired;
     swept.memory_proposals = stale;
-    if let Some(days) = state.config.suggestion_retention_days {
-        let (undecided, decided) = state
-            .store
-            .suggestions
-            .purge_before(now - Days::days(days as i64))
-            .await?;
-        swept.suggestions_undecided = undecided;
-        swept.suggestions_decided = decided;
-    }
+    // Runs even with no operator default: a person may have set their own retention (`PUT /v1/suggestions/settings`).
+    let (undecided, decided) = state
+        .store
+        .suggestions
+        .purge_before(now, state.config.suggestion_retention_days)
+        .await?;
+    swept.suggestions_undecided = undecided;
+    swept.suggestions_decided = decided;
     if swept != Swept::default() {
         let _ = state
             .store
@@ -579,6 +578,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_persons_own_retention_overrides_the_operators_default_and_works_with_no_default_at_all(
+    ) {
+        let (state, _) = state_and_session_cfg(|c| c.suggestion_retention_days = Some(30)).await;
+        let s = &state.store.suggestions;
+        s.set_enabled("ana", true).await.unwrap();
+        s.set_enabled("ben", true).await.unwrap();
+        s.set_retention_days("ana", Some(5)).await.unwrap();
+        for user in ["ana", "ben"] {
+            s.propose(
+                user,
+                "Old idea",
+                "",
+                "echo",
+                "echo",
+                uuid::Uuid::new_v4(),
+                false,
+            )
+            .await
+            .unwrap();
+        }
+        // 10 days on: ana asked for 5, so hers is gone; ben still has the operator's 30
+        let swept = sweep(&state, Utc::now() + Days::days(10)).await.unwrap();
+        assert_eq!(swept.suggestions_undecided, 1);
+        assert!(s.get("ana").await.items.is_empty());
+        assert_eq!(s.get("ben").await.items.len(), 1);
+
+        // with no operator default at all, ana's own 5 days still applies to a fresh one; a person with no setting keeps everything
+        let (state2, _) = state_and_session_cfg(|_| {}).await;
+        let s2 = &state2.store.suggestions;
+        s2.set_enabled("ana", true).await.unwrap();
+        s2.set_enabled("ben", true).await.unwrap();
+        s2.set_retention_days("ana", Some(5)).await.unwrap();
+        for user in ["ana", "ben"] {
+            s2.propose(
+                user,
+                "Old idea",
+                "",
+                "echo",
+                "echo",
+                uuid::Uuid::new_v4(),
+                false,
+            )
+            .await
+            .unwrap();
+        }
+        let swept = sweep(&state2, Utc::now() + Days::days(10)).await.unwrap();
+        assert_eq!(
+            swept.suggestions_undecided, 1,
+            "ana's own 5 days still applies with no operator default; ben's has neither, so it stays"
+        );
+        assert!(s2.get("ana").await.items.is_empty());
+        assert_eq!(s2.get("ben").await.items.len(), 1);
+    }
+
+    #[tokio::test]
     async fn a_decided_suggestion_is_judged_by_when_it_was_decided_not_when_it_was_made() {
         let (state, _) = state_and_session_cfg(|_| {}).await;
         let s = &state.store.suggestions;
@@ -600,13 +654,15 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(30)).await;
         s.decide("ana", made.id, None).await.unwrap();
         assert_eq!(
-            s.purge_before(cutoff).await.unwrap(),
+            s.purge_before(cutoff, Some(0)).await.unwrap(),
             (0, 0),
             "decided after the cutoff, so it stays whatever its age"
         );
         assert_eq!(s.get("ana").await.items.len(), 1);
         assert_eq!(
-            s.purge_before(Utc::now() + Days::days(1)).await.unwrap(),
+            s.purge_before(Utc::now() + Days::days(1), Some(0))
+                .await
+                .unwrap(),
             (0, 1)
         );
     }

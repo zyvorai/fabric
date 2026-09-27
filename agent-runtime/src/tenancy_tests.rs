@@ -2153,7 +2153,47 @@ async fn suggestions_are_opt_in_private_bounded_and_only_the_owner_turns_them_in
         Some(json!({"enabled": true})),
     )
     .await;
-    assert_eq!((st, v["enabled"].clone()), (StatusCode::OK, json!(true)));
+    assert_eq!(
+        (st, v["enabled"].clone(), v["retention_days"].clone()),
+        (StatusCode::OK, json!(true), Value::Null),
+        "no retention_days sent, none stored"
+    );
+    let (st, v) = call(
+        &w.app,
+        "PUT",
+        "/v1/suggestions/settings",
+        ana,
+        Some(json!({"enabled": true, "retention_days": 14})),
+    )
+    .await;
+    assert_eq!(
+        (st, v["retention_days"].clone()),
+        (StatusCode::OK, json!(14))
+    );
+    for bad in [json!(0), json!(3651)] {
+        let (st, _) = call(
+            &w.app,
+            "PUT",
+            "/v1/suggestions/settings",
+            ana,
+            Some(json!({"enabled": true, "retention_days": bad})),
+        )
+        .await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "retention_days {bad}");
+    }
+    // another user's settings are untouched by ana's
+    let (st, v) = call(
+        &w.app,
+        "PUT",
+        "/v1/suggestions/settings",
+        ben,
+        Some(json!({"enabled": true})),
+    )
+    .await;
+    assert_eq!(
+        (st, v["retention_days"].clone()),
+        (StatusCode::OK, Value::Null)
+    );
     propose("Book the dentist", session.clone(), manifest.clone()).await;
     propose("  book  THE dentist ", session.clone(), manifest.clone()).await;
     let mut quiet = manifest.clone();
