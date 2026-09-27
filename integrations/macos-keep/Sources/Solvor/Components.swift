@@ -107,6 +107,9 @@ struct SectionHeader<Accessory: View>: View {
     let title: String
     var subtitle: String?
     @ViewBuilder var accessory: () -> Accessory
+    init(_ title: String, subtitle: String? = nil, @ViewBuilder accessory: @escaping () -> Accessory) {
+        self.title = title; self.subtitle = subtitle; self.accessory = accessory
+    }
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
@@ -119,7 +122,7 @@ struct SectionHeader<Accessory: View>: View {
     }
 }
 extension SectionHeader where Accessory == EmptyView {
-    init(_ title: String, subtitle: String? = nil) { self.init(title: title, subtitle: subtitle) { EmptyView() } }
+    init(_ title: String, subtitle: String? = nil) { self.init(title, subtitle: subtitle) { EmptyView() } }
 }
 
 /// Glass shapes that sit next to each other blend and morph as one surface on macOS 26. Wrap them in this instead of a bare stack.

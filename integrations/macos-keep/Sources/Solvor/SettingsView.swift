@@ -9,11 +9,16 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Keep host") {
+                HStack { Text("Status"); Spacer(); StatusChip(kind: app.connected ? .done : .waiting, label: app.connected ? "Connected" : "Not connected") }
                 if app.connected { LabeledContent("Connected to", value: URL(string: app.host)?.host ?? app.host) }
                 if app.connected, !app.userId.isEmpty { LabeledContent("Signed in as", value: app.userId) }
                 ConnectForm()
                 if app.connected { Button("Forget the token", role: .destructive) { app.disconnect() } }
-                if let u = app.usage { Text("Usage: \(u.usage.runs) runs, \(u.usage.artifacts) artifacts, \(u.usage.modelCalls) model calls.").font(.callout).foregroundStyle(.secondary) }
+                if let u = app.usage {
+                    HStack(spacing: Space.l) {
+                        statStack(u.usage.runs, "Runs"); statStack(u.usage.artifacts, "Artifacts"); statStack(u.usage.modelCalls, "Model calls")
+                    }.padding(.top, Space.xxs)
+                }
             }
             if app.connected, app.userId.isEmpty {
                 Section("Operator token") {
@@ -34,5 +39,12 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped).navigationTitle("Settings")
+    }
+
+    private func statStack(_ value: Int, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(value)").font(.title3.weight(.semibold))
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

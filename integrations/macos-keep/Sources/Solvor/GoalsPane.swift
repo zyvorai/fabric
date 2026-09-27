@@ -36,11 +36,15 @@ struct GoalsPane: View {
                 }
                 Section("Goals") {
                     ForEach(goals) { g in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack { Text(g.title).lineLimit(2); Spacer(); Text(g.status).font(.caption2.bold()).foregroundStyle(.secondary) }
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack { Text(g.title).lineLimit(2); Spacer(); StatusChip(kind: g.statusKind, label: g.status.capitalized) }
                             if !g.steps.isEmpty { ProgressView(value: g.progress) }
                             else if g.proposedPlan != nil { Label("A plan is waiting for you", systemImage: "list.bullet.clipboard").font(.caption).foregroundStyle(.orange) }
-                        }.tag(g.id)
+                        }.tag(g.id).padding(.vertical, 2)
+                    }
+                    if goals.isEmpty {
+                        EmptyState(symbol: "checklist", title: "No goals yet", message: "Add one above, or make a suggestion into one.")
+                            .scaleEffect(0.85).frame(minHeight: 180)
                     }
                 }
             }
@@ -57,36 +61,52 @@ struct GoalsPane: View {
 
     @ViewBuilder private var detail: some View {
         if let id = selected, let g = goals.first(where: { $0.id == id }) {
-            List {
-                if let message { Text(message).font(.callout).foregroundStyle(.red) }
-                if let d = g.description, !d.isEmpty { Text(d) }
-                if let p = g.proposedPlan {
-                    Section {
-                        ForEach(Array(p.steps.enumerated()), id: \.offset) { _, s in Text(s.title + (s.requiresApproval == true ? "  (asks you first)" : "")) }
-                        if p.tainted == true { Label("The agent had read untrusted content while planning. Read every step first.", systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.m) {
+                    HStack { Text(g.title).font(Typo.title); Spacer(); StatusChip(kind: g.statusKind, label: g.status.capitalized) }
+                    if let message { Label(message, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.red) }
+                    if let d = g.description, !d.isEmpty { Text(d).foregroundStyle(.secondary) }
+                    if let p = g.proposedPlan {
+                        VStack(alignment: .leading, spacing: Space.s) {
+                            SectionHeader("Proposed plan", subtitle: "Nothing runs until you accept it")
+                            PlanTimeline(rows: p.steps.enumerated().map { i, s in
+                                PlanTimeline.Row(id: i, title: s.title, state: .pending, subtitle: s.approvalReason, waitsForApproval: s.requiresApproval == true)
+                            })
+                            if p.tainted == true { Label("The agent had read untrusted content while planning. Read every step first.", systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(.orange) }
+                            HStack {
+                                Button("Accept") { accept(g, p, autorun: false) }.primaryButton()
+                                Button("Accept and run") { accept(g, p, autorun: true) }.secondaryButton()
+                                Button("Discard", role: .destructive) { act { try await $0.rejectPlan(goal: g.id) } }.secondaryButton()
+                            }
+                        }.padding(Space.m).card()
+                    }
+                    if !g.steps.isEmpty {
+                        VStack(alignment: .leading, spacing: Space.s) {
+                            SectionHeader("Steps") { ProgressView(value: g.progress).frame(width: 90) }
+                            PlanTimeline(rows: g.steps.enumerated().map { i, s in
+                                let state: PlanTimeline.State = s.isDone ? .done : s.status == "blocked" ? .blocked : (g.steps.firstIndex { !$0.isDone } == i ? .current : .pending)
+                                return PlanTimeline.Row(id: i, title: s.title, state: state, subtitle: s.status == "blocked" ? s.detail : nil, waitsForApproval: s.requiresApproval == true)
+                            })
+                        }.padding(Space.m).card()
+                    }
+                    if g.needsPlan {
+                        EmptyState(symbol: "list.bullet.clipboard", title: "No plan yet",
+                                   message: "Ask the agent to propose steps for this goal. Nothing runs until you accept them.",
+                                   actionTitle: g.isPlanning ? "Planning…" : "Ask the agent for a plan") { act { try await $0.requestPlan(goal: g.id) } }
+                            .frame(minHeight: 220)
+                    }
+                    if g.isOpen {
                         HStack {
-                            Button("Accept") { accept(g, p, autorun: false) }
-                            Button("Accept and run") { accept(g, p, autorun: true) }
-                            Button("Discard", role: .destructive) { act { try await $0.rejectPlan(goal: g.id) } }
-                        }
-                    } header: { Text("Proposed plan (nothing runs until you accept it)") }
-                }
-                if !g.steps.isEmpty {
-                    Section("Steps") {
-                        ForEach(g.steps) { s in
-                            Label { VStack(alignment: .leading) { Text(s.title); if s.status == "blocked", let d = s.detail { Text(d).font(.caption).foregroundStyle(.secondary) } } }
-                                icon: { Image(systemName: s.isDone ? "checkmark.circle.fill" : s.status == "blocked" ? "exclamationmark.circle.fill" : "circle").foregroundStyle(s.isDone ? .green : s.status == "blocked" ? .orange : .secondary) }
+                            if !g.steps.isEmpty { Toggle("Run automatically", isOn: Binding(get: { g.autorun == true }, set: { on in act { try await $0.setGoalAutorun(g.id, on) } })) }
+                            Spacer()
+                            Button("Cancel goal", role: .destructive) { act { try await $0.cancelGoal(g.id) } }.secondaryButton()
                         }
                     }
-                }
-                if g.needsPlan { Button(g.isPlanning ? "Planning…" : "Ask the agent for a plan") { act { try await $0.requestPlan(goal: g.id) } }.disabled(g.isPlanning) }
-                if g.isOpen {
-                    if !g.steps.isEmpty { Toggle("Run automatically", isOn: Binding(get: { g.autorun == true }, set: { on in act { try await $0.setGoalAutorun(g.id, on) } })) }
-                    Button("Cancel goal", role: .destructive) { act { try await $0.cancelGoal(g.id) } }
-                }
+                }.padding(Space.l)
             }
         } else {
-            Text("Select a goal, or make a suggestion into one.").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            EmptyState(symbol: "checklist", title: "Select a goal", message: "Or make a suggestion into one from the list.")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -122,5 +142,53 @@ struct GoalsPane: View {
         guard let c = app.client else { return }
         do { async let g = c.goals(); async let s = c.suggestions(); (goals, suggestions) = try await (g, s); message = nil }
         catch { message = error.localizedDescription }
+    }
+}
+
+private extension Goal {
+    var statusKind: StatusKind {
+        switch status {
+        case "done": return .done
+        case "cancelled", "failed": return .failed
+        case "blocked": return .waiting
+        default: return proposedPlan != nil ? .waiting : .running
+        }
+    }
+}
+
+/// A goal's plan, drawn as a line of dots joined by a rail — done steps behind you, one current step, the rest still ahead.
+/// Read-only: it never decides anything, it only shows where a plan (proposed or accepted) currently stands.
+struct PlanTimeline: View {
+    enum State { case done, current, pending, blocked }
+    struct Row: Identifiable { let id: Int; let title: String; let state: State; var subtitle: String?; var waitsForApproval: Bool = false }
+    let rows: [Row]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { r in
+                HStack(alignment: .top, spacing: Space.s) {
+                    VStack(spacing: 0) {
+                        dot(for: r.state)
+                        if r.id != rows.count - 1 { Rectangle().fill(r.state == .done ? Brand.good.opacity(0.5) : Color.secondary.opacity(0.25)).frame(width: 2).frame(minHeight: 22) }
+                    }.frame(width: 16)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: Space.xxs) {
+                            Text(r.title).font(.callout).strikethrough(r.state == .done).foregroundStyle(r.state == .done ? .secondary : .primary)
+                            if r.waitsForApproval { StatusChip(kind: .waiting, label: "Asks you first") }
+                        }
+                        if let subtitle = r.subtitle, !subtitle.isEmpty { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+                    }.padding(.bottom, r.id == rows.count - 1 ? 0 : Space.s)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func dot(for state: State) -> some View {
+        switch state {
+        case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.good)
+        case .current: Image(systemName: "circle.inset.filled").foregroundStyle(Brand.blue).symbolEffect(.pulse, options: .repeating)
+        case .blocked: Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+        case .pending: Image(systemName: "circle").foregroundStyle(.secondary)
+        }
     }
 }
