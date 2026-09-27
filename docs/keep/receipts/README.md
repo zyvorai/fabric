@@ -28,7 +28,7 @@ A key belongs to the **person and the credential**, not the session, because a r
 - This covers the **JSON egress broker** (`ctx.fetch`), not the CONNECT proxy or intercepted TLS.
 - It protects only requests that needed approval; other requests are not recorded or deduplicated.
 - A receipt is written after the upstream answers; if the runtime dies between the send and the write, that one action has no receipt and a retry with its key would be asked about again. (Forwarding the key upstream is the second line of defence.)
-- Recent receipts (the last 10,000) are held in memory for lookups; the file keeps all of them and nothing prunes it yet. There is no receipts view in the chat page or Solvor yet.
+- Recent receipts (the last 10,000) are held in memory for lookups; the file keeps all of them unless the operator sets `ZYVOR_AGENT_RECEIPT_RETENTION_DAYS` (see [retention](../threads/README.md#threads-and-messages); a forgotten receipt no longer answers a repeat of its key). The chat page has a read-only **Done** tab that lists them (when, method, host and path, the answer, the agent, whether you approved it; never the body, its digest, the query or the key), checked in a real browser against a fake host and by 5 more proxy tests. Solvor and the iPhone app have no receipts view yet.
 - As with the rest of the host's data, the operator can read the file.
 
 ## Tests

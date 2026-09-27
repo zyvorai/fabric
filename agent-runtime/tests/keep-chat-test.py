@@ -50,6 +50,13 @@ GOALS = {"items": [
      "proposed_plan": {"session_id": "leak", "tainted": True, "proposed_at": "t", "steps": [{"title": "Find flights", "input": {"message": "secret"}, "requires_approval": False}, {"title": "Book", "requires_approval": True}]}},
     {"id": "not-a-uuid", "agent": "echo-agent", "title": "bad", "plan": []},
 ]}
+RECEIPTS = {"items": [
+    {"id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd", "at": "2026-09-27T10:00:00Z", "user_id": "ana", "session_id": "leak", "agent": "mail-compose", "credential": "gmail-send",
+     "method": "POST", "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send", "body_bytes": 812, "body_sha256": "leak-digest",
+     "approval_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "idempotency_key": "leak-key", "status": 200, "fingerprint": "leak-fp"},
+    {"id": "ffffffff-ffff-4fff-8fff-ffffffffffff", "at": "2026-09-27T09:00:00Z", "agent": "x", "method": "POST", "url": "not a url", "status": 502, "approval_id": None},
+    {"id": "not-a-uuid", "url": "https://x.example/"},
+]}
 BODIES = []   # (method, path, body) of every write the proxy made to the host
 FIRST_SENT = threading.Event()
 RELEASE = threading.Event()
@@ -79,6 +86,8 @@ class Upstream(BaseHTTPRequestHandler):
             return self._json(LIST_STATUS[0], GOALS)
         if self.path.startswith("/v1/suggestions?"):
             return self._json(200, SUGGESTIONS)
+        if self.path.startswith("/v1/receipts?"):
+            return self._json(200, RECEIPTS)
         if self.path.startswith("/v1/threads?"):
             return self._json(LIST_STATUS[0], THREADS)
         if self.path == f"/v1/threads/{MINE}/messages":
@@ -467,6 +476,22 @@ class ChatProxy(unittest.TestCase):
                                    ("POST", f"/suggestions/{SUG_MINE}/dismiss", {}), ("POST", f"/goals/{GOAL_NOPLAN}/plan", {}), ("POST", f"/goals/{GOAL_NOPLAN}/plan/accept", {})]:
             self.assertEqual(self.req(method, path, body, {"Origin": "http://evil.example"})[0].status, 403, (method, path))
             self.assertEqual(self.req(method, path, body, {"Host": "evil.example"})[0].status, 421, (method, path))
+
+    def test_receipts_are_read_for_the_person_with_only_what_the_page_shows(self):
+        CALLS.clear()
+        r, body, _ = self.req("GET", "/receipts")
+        self.assertEqual(r.status, 200)
+        items = json.loads(body)["items"]
+        self.assertEqual([i["id"] for i in items], ["dddddddd-dddd-4ddd-8ddd-dddddddddddd", "ffffffff-ffff-4fff-8fff-ffffffffffff"], "a bad id is not shown")
+        self.assertEqual(set(items[0]), {"id", "at", "agent", "credential", "method", "host", "path", "status", "approved"}, "no body digest, no key, no session, no query")
+        self.assertEqual((items[0]["host"], items[0]["path"], items[0]["approved"], items[0]["status"]), ("gmail.googleapis.com", "/gmail/v1/users/me/messages/send", True, 200))
+        self.assertEqual((items[1]["host"], items[1]["approved"]), ("", False), "a malformed url is shown as nothing, not as an error")
+        for leak in (b"leak-digest", b"leak-key", b"leak-fp", b"leak"):
+            self.assertNotIn(leak, body)
+        c = [c for c in CALLS if c[1].startswith("/v1/receipts?")][0][1]
+        self.assertIn("limit=50", c)
+        for method in ("POST", "PUT", "PATCH", "DELETE"):
+            self.assertEqual(self.req(method, "/receipts", {})[0].status, 404, method)
 
     def test_every_write_needs_the_same_origin_and_host(self):
         for method, path, body in [("PUT", "/memory/settings", {"enabled": True}), ("POST", "/memory", {"text": "x"}), ("POST", f"/memory/{MEM_PROPOSAL}/accept", {}),

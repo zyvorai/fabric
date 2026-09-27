@@ -9,12 +9,13 @@
 </head>
 <body>
   <div class="app" id="app">
-    <aside class="list" aria-label="Chats, goals and memory">
+    <aside class="list" aria-label="Chats, goals, memory and what was done">
       <header class="list-head">
         <div class="tabs" role="tablist" aria-label="Sections">
           <button id="tab-chats" type="button" role="tab" aria-selected="true" aria-controls="pane-chats" class="tab active">Chats</button>
           <button id="tab-goals" type="button" role="tab" aria-selected="false" aria-controls="pane-goals" class="tab">Goals</button>
           <button id="tab-memory" type="button" role="tab" aria-selected="false" aria-controls="pane-memory" class="tab">Memory</button>
+          <button id="tab-done" type="button" role="tab" aria-selected="false" aria-controls="pane-done" class="tab">Done</button>
         </div>
         <button id="new" type="button" class="icon" aria-label="New chat" title="New chat">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
@@ -50,6 +51,12 @@
         </form>
         <ul id="goals" class="goals"></ul>
         <p id="goals-empty" class="list-empty" hidden>No goals yet.<br>Add one above, or accept a suggestion.</p>
+      </section>
+
+      <section id="pane-done" class="pane" role="tabpanel" aria-labelledby="tab-done" hidden>
+        <p class="fine-print pad">What was actually done after you approved it, newest first. The message itself is not kept here, only what it was and how it ended.</p>
+        <ul id="done" class="done"></ul>
+        <p id="done-empty" class="list-empty" hidden>Nothing yet.<br>A send or a new event you approve shows up here.</p>
       </section>
 
       <section id="pane-memory" class="pane" role="tabpanel" aria-labelledby="tab-memory" hidden>

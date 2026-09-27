@@ -6,7 +6,7 @@
     KEEP_API=http://127.0.0.1:9096 KEEP_TOKEN=... ./scripts/keep-chat.py --agent echo-agent      # then open http://127.0.0.1:8787
 
 It serves one static page, forwards the chat run (POST /agui) and lets the page list, reopen and forget this agent's conversations
-(GET /threads, GET /threads/<id>/messages, DELETE /threads/<id>), manage the person's memory (/memory: read, turn on or off, add, delete, accept or
+(GET /threads, GET /threads/<id>/messages, DELETE /threads/<id>), read what was done after you approved (/receipts, read-only), manage the person's memory (/memory: read, turn on or off, add, delete, accept or
 refuse an agent's proposal) and their goals for this agent (/goals: list, create, pause or resume, cancel). Your token stays in this process: the browser never sees it. The agent is
 fixed by --agent (the page cannot choose another), and a conversation is reachable only if the Keep host itself lists it for this agent (and,
 with the operator token, for --user): the page cannot name any other thread. Nothing else on the Keep host is reachable through it, it listens
@@ -88,6 +88,19 @@ def project_suggestions(view):
         "enabled": bool(view.get("enabled")),
         "pending": [{k: s.get(k) for k in keep} for s in view.get("pending", []) if isinstance(s, dict) and UUID.fullmatch(str(s.get("id", "")))],
     }
+
+
+def project_receipts(listing):
+    """What was done after the person approved, as the page shows it: when, what (method, host, path), the answer, which agent. The
+    request body, its digest, the query string and the idempotency key never reach the page."""
+    out = []
+    for r in (listing or {}).get("items", []):
+        if not isinstance(r, dict) or not UUID.fullmatch(str(r.get("id", ""))):
+            continue
+        u = urllib.parse.urlparse(str(r.get("url", "")))
+        out.append({"id": r["id"], "at": r.get("at"), "agent": r.get("agent"), "credential": r.get("credential"), "method": r.get("method"),
+                    "host": u.hostname or "", "path": u.path, "status": r.get("status"), "approved": bool(r.get("approval_id"))})
+    return out
 
 
 def project_goals(listing, agent: str):
@@ -252,6 +265,10 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             status, view = self._upstream("GET", "/v1/suggestions?" + urllib.parse.urlencode({"user_id": owner}))
             return project_suggestions(view) if status == 200 else None
 
+        def _my_receipts(self, owner):
+            status, listing = self._upstream("GET", "/v1/receipts?" + urllib.parse.urlencode({"user_id": owner, "limit": 50}))
+            return project_receipts(listing) if status == 200 else None
+
         def _memory_view(self, owner):
             status, view = self._upstream("GET", "/v1/memory?" + urllib.parse.urlencode({"user_id": owner}))
             return project_memory(view) if status == 200 else None
@@ -323,6 +340,9 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
                     if st == 201 and isinstance(goal, dict):
                         return self._json(201, project_goal(goal))
                     return self._send(429 if st == 429 else 400 if st in (400, 404) else 502, (json.dumps(goal) if isinstance(goal, dict) else "the Keep host refused").encode(), "application/json")
+                if path == "/receipts" and method == "GET":
+                    items = self._my_receipts(owner)
+                    return self._json(200, {"items": items}) if items is not None else self._send(502, b"the Keep host did not return receipts")
                 if path == "/suggestions" and method == "GET":
                     view = self._suggestions_view(owner)
                     return self._json(200, view) if view is not None else self._send(502, b"the Keep host did not return suggestions")
@@ -403,7 +423,7 @@ def make_handler(upstream: str, token: str, agent: str, port: int, user: str = "
             path = self.path.split("?", 1)[0]
             if path == "/threads" or path.startswith("/threads/"):
                 return self._thread_route("GET", path)
-            if path in ("/memory", "/goals", "/suggestions"):
+            if path in ("/memory", "/goals", "/suggestions", "/receipts"):
                 return self._person_route("GET", path)
             item = STATIC.get(path)
             if not item:
