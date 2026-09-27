@@ -61,3 +61,8 @@ integrations/machina/desktop/src-tauri/target/
 integrations/machina/desktop/src-tauri/gen/
 tools/fabric-doctor/bin/
 .backend_routes_list_tmp.txt
+
+# demo consent output: never commit a refresh token
+google-refresh-token.env
+microsoft-refresh-token.env
+client_secret_*.json

@@ -43,15 +43,18 @@ The downloaded file holds the client secret in plain text: keep it out of the re
   The chat shows "Waiting for your phone" with the recipients, subject and text. The terminal shows the same and asks; answer `y`. The draft appears in your Gmail Drafts. Nothing is sent. Use `send` in place of `draft` to send it, and try answering `n` to see that a denied send never reaches Google.
 - **Calendar:** in the third address say `agenda`, or add an event (the [agent README](../../../examples/keep-agents/calendar-agent/README.md) has the format). Guests are only emailed if you say `notify: yes`.
 
-Ctrl-C stops everything and deletes the temporary state. **Revoke access** any time at <https://myaccount.google.com/permissions>. The consent step writes `google-refresh-token.env` in the directory you ran it from (mode 0600): delete it when you are done.
+Ctrl-C stops everything and deletes the temporary state. **Revoke access** any time at <https://myaccount.google.com/permissions>. The consent step writes `google-refresh-token.env` in the directory you ran it from (mode 0600): delete it when you are done. It is listed in `.gitignore` (with `microsoft-refresh-token.env` and `client_secret_*.json`) so `git add -A` cannot pick it up; GitHub's push protection also refused a push that had it in a commit.
 
 ## What to expect, honestly
 
 - While the app is in Testing, Google expires the refresh token after **7 days**; run the consent step again then.
-- The three agents were only ever run against a fake Google until now ([README](README.md#verified-and-what-is-not)). This demo is the first run against the real thing, so expect to find something: a wrong scope name, a response shape I assumed, a quota. If a step fails, the chat says why (Google's error code, never a token). Send me that message and I will fix it.
+- The demo has worked end to end on a real Gmail account ([what was covered](README.md#verified-against-real-google)); an approved send and creating a calendar event are the parts that run has not exercised yet. If a step fails, the chat says why (Google's error code, never a token), so the message is safe to share.
+- **"Access blocked ... has not completed the Google verification process" (error 403 access_denied)** means the Google address you signed in with is not in the app's **Test users** list (Google Auth Platform → Audience). Add it and run the script again.
 - The terminal approver is not a phone: the key file is on this machine, so it shows the flow and the signature, not the protection a phone's Secure Enclave gives. `scripts/keep-approve.py` is the same signing path a phone app uses.
 - Sending real mail from a demo is real: use your own address as the recipient.
 
-## What was tested without your account
+## What was tested
 
-The script's own plumbing ran end to end with a made-up client id: the runtime started, the agents deployed, the connection was stored, and a chat run reached Google's real token endpoint, which refused the made-up client (`invalid_client`); the chat showed that, and the made-up token appeared nowhere in the output. The approval flow (preview, signature, the terminal approver) ran against the fake Google in `demos-ci.sh`. Nothing in this repository has yet run with a real Google account.
+With a real Gmail account (2026-09-27): consent, a read of unread headers, a draft that waited for the approver and landed in Drafts, a denied send that never reached Google, and the calendar agenda ([details](README.md#verified-against-real-google)).
+
+Without an account: the script's plumbing ran end to end with a made-up client id (the runtime started, the agents deployed, the connection was stored, and Google's real token endpoint refused the made-up client with `invalid_client`, which the chat showed with the made-up token nowhere in the output), and the approval flow ran against the fake Google in `demos-ci.sh`.
