@@ -1331,6 +1331,17 @@ assert ev[-1]["type"] == "RUN_FINISHED" and ev[-1]["result"] == "drafted", ev[-1
 PY
 ok "a chat client is shown the held approval with the host's preview while the agent waits, then the decision, and never a way to decide it"
 
+# the terminal stand-in phone (scripts/keep-approve.py) shows what the host read and signs the decision like a phone
+DRAFTS_BEFORE=$(api_lines POST /drafts)
+g_run "$GINA" mail-compose "$(mail_in draft "zoe@example.com" "Approver test" "Sent through the terminal approver.")" > "$G/ap.out" &
+APPID=$!
+wait_pending || fail "the draft for the terminal approver did not open an approval"
+KEEP_API="$GBASE" KEEP_TOKEN="$GINA" python3 "$ROOT/scripts/keep-approve.py" --key "$G/gina.key" --device gina-phone --once --decision approved > "$G/approver.out" 2>&1 || fail "the approver failed: $(cat "$G/approver.out")"
+wait "$APPID" || fail "the draft run after the approver failed"
+grep -q "zoe@example.com" "$G/approver.out" && grep -q "Approver test" "$G/approver.out" && grep -q "Sent through the terminal approver." "$G/approver.out" && grep -q "approved." "$G/approver.out" || fail "the approver should show the recipients, subject and text and say approved: $(cat "$G/approver.out")"
+[[ "$(api_lines POST /drafts)" == "$((DRAFTS_BEFORE + 1))" ]] || fail "the draft approved through the terminal approver should have reached Google once"
+ok "the terminal stand-in phone shows the real recipients, subject and text, signs the decision, and lets exactly that draft through"
+
 [[ "$(gas "$GINA" -X DELETE -o /dev/null -w '%{http_code}' "$GBASE/v1/connections/google")" =~ ^20 ]] || fail "gina could not disconnect"
 r=$(g_run "$GINA" gmail-triage "{\"gmailBase\":\"$GH\"}") || fail "the run after disconnecting failed"
 [[ "$r" == *"connect your google account first"* ]] || fail "after disconnecting, the agent must be refused again: $r"

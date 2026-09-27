@@ -81,7 +81,7 @@ The rendering is on the approval (`preview`, in `GET /v1/inbox` and `GET /v1/app
 | [`mail-compose`](../../../examples/keep-agents/mail-compose/) | saves a plain-text mail as a draft (the default), or sends it; refuses anything that could add a header or hide a recipient | `gmail-draft`, `gmail-send` |
 | [`calendar-agent`](../../../examples/keep-agents/calendar-agent/) | lists your next 24 hours (up to 14 days), or adds one event; guests are emailed only when asked and only if there are any | `calendar-read`, `calendar-write` |
 
-Talk to them from the chat page (`scripts/keep-chat.py --agent mail-compose`) or set structured input (`action`, `to`, `subject`, `body`; see each `agent.ts`). A refusal from the host (no Google account connected yet, denied on the phone, no answer within `egress_approval_timeout_seconds`, at most 240) is said in the reply instead of failing the run. The inputs `gmailBase` and `calendarBase` exist so tests can point an agent at a fake Google; the credential's host binding means a real credential still goes only to Google.
+**To try them on your own Gmail in a few minutes, see [GOOGLE_DEMO.md](GOOGLE_DEMO.md).** Talk to them from the chat page (`scripts/keep-chat.py --agent mail-compose`) or set structured input (`action`, `to`, `subject`, `body`; see each `agent.ts`). A refusal from the host (no Google account connected yet, denied on the phone, no answer within `egress_approval_timeout_seconds`, at most 240) is said in the reply instead of failing the run. The inputs `gmailBase` and `calendarBase` exist so tests can point an agent at a fake Google; the credential's host binding means a real credential still goes only to Google.
 
 ## Verified, and what is not
 
