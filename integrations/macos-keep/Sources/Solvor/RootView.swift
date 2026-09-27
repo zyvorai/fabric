@@ -78,6 +78,7 @@ struct RootView: View {
             case .voice: VoiceView().environmentObject(app)
             case .welcome: WelcomeView().environmentObject(app)
             case .about: AboutView()
+            case .menuBarPreview: MenuBarView().environmentObject(app)   // debug only: screenshotting the popover's own view
             }
         }
         .onAppear {
@@ -147,6 +148,7 @@ enum DebugLaunch {
             case "approvals": app.pane = .approvals
             case "folders": app.pane = .folders
             case "settings": app.pane = .settings
+            case "menubar": app.sheet = .menuBarPreview
             default: break
             }
         }

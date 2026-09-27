@@ -40,11 +40,18 @@ struct SolvorApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let services = ServicesProvider()
+    private var quickAsk: QuickAskController?
+    private let hotkey = GlobalHotkey(keyCode: 49, modifiers: .option)   // ⌥Space
+
+    @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = services
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().setNotificationCategories([Notifier.approvalCategory])
         NSUpdateDynamicServices()
+        let quickAsk = QuickAskController(app: AppState.shared)
+        self.quickAsk = quickAsk
+        hotkey.start { quickAsk.toggle() }
     }
     /// Tapping an approval notification, or its Review action, opens the approvals. Nothing is decided from here.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {

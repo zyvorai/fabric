@@ -42,6 +42,11 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: dev.zyvor.solvor
             CFBundleURLSchemes: [keep]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Any File
+            LSItemContentTypes: [public.data]
+            LSHandlerRank: Alternate
+            CFBundleTypeRole: Viewer
         NSServices:
           - NSMenuItem:
               default: Send to Keep
