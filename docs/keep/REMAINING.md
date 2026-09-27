@@ -64,7 +64,7 @@ Roughly in the order I would do them. "Can't run here" means the code can be wri
 
 ## 4. Needs a design decision first
 
-Each of these needs a decision, and often a partner, before it is code. I have not started any.
+Each of these needs a decision, and often a partner, before it is code. **Design notes with a recommendation and the decisions to make are in [design/](design/README.md)** for browser workflows, payments, mail approvals, agent-proposed tools and a Windows companion. None is started.
 
 - **Browser workflows** with takeover and confirm-before-submit: today only a heuristic witness exists ([browser/README.md](browser/README.md)); input takeover is not implemented.
 - **Payments:** through a provider's tokenised, limited-use credentials only; an agent must never see a card number. Needs a provider, and a threat model for spend limits.
