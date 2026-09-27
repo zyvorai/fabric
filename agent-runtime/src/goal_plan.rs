@@ -50,6 +50,7 @@ pub(crate) fn optional_json<T: serde::de::DeserializeOwned + Default>(
 pub const MAX_STEPS: usize = 10;
 pub const MAX_TITLE_CHARS: usize = 120;
 pub const MAX_INPUT_BYTES: usize = 4096;
+pub const MAX_REASON_CHARS: usize = 240;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProposedStep {
@@ -59,6 +60,10 @@ pub struct ProposedStep {
     /// Ask the person before the step counts as done (see `PlanStep::requires_approval`).
     #[serde(default)]
     pub requires_approval: bool,
+    /// Why this step needs a yes, in the planner's own words (shown on the approval, alongside its usual prompt).
+    /// Only meaningful with `requires_approval: true` — a bare bool with no explanation was the whole gap this closes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -125,10 +130,33 @@ pub fn validate_steps(data: &Value) -> Result<Vec<ProposedStep>, String> {
                 ))
             }
         };
+        let approval_reason = match s.get("approval_reason") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(text)) => {
+                if !requires_approval {
+                    return Err(format!(
+                        "step {} has an approval_reason but requires_approval is not true",
+                        i + 1
+                    ));
+                }
+                let cleaned = clean(text, MAX_REASON_CHARS);
+                if cleaned.is_empty() {
+                    return Err(format!("approval_reason of step {} is empty", i + 1));
+                }
+                Some(cleaned)
+            }
+            Some(_) => {
+                return Err(format!(
+                    "approval_reason of step {} must be a string",
+                    i + 1
+                ))
+            }
+        };
         out.push(ProposedStep {
             title,
             input,
             requires_approval,
+            approval_reason,
         });
     }
     Ok(out)
@@ -344,6 +372,7 @@ pub(crate) async fn accept_plan(
             title: s.title.clone(),
             status: PlanStepStatus::Pending,
             requires_approval: s.requires_approval,
+            approval_reason: s.approval_reason.clone(),
             input: s.input.clone(),
             ..Default::default()
         })
@@ -442,5 +471,45 @@ mod tests {
         }
         let long = validate_steps(&json!({"steps": [{"title": "x".repeat(500)}]})).unwrap();
         assert_eq!(long[0].title.chars().count(), MAX_TITLE_CHARS);
+    }
+
+    #[test]
+    fn an_approval_reason_needs_the_approval_flag_and_is_bounded_plain_text() {
+        let ok = validate_steps(&json!({"steps": [
+            {"title": "Book the flight", "requires_approval": true, "approval_reason": "  it costs money \u{202e} "}
+        ]}))
+        .unwrap();
+        assert_eq!(ok[0].approval_reason.as_deref(), Some("it costs money"));
+
+        let none = validate_steps(&json!({"steps": [{"title": "a"}]})).unwrap();
+        assert_eq!(
+            none[0].approval_reason, None,
+            "no reason given, none stored"
+        );
+
+        for (why, bad) in [
+            (
+                "reason without the approval flag",
+                json!({"steps": [{"title": "a", "approval_reason": "because"}]}),
+            ),
+            (
+                "reason not a string",
+                json!({"steps": [{"title": "a", "requires_approval": true, "approval_reason": 1}]}),
+            ),
+            (
+                "reason empty after cleaning",
+                json!({"steps": [{"title": "a", "requires_approval": true, "approval_reason": "\u{200b}"}]}),
+            ),
+        ] {
+            assert!(validate_steps(&bad).is_err(), "{why}");
+        }
+        let long = validate_steps(&json!({"steps": [
+            {"title": "a", "requires_approval": true, "approval_reason": "x".repeat(500)}
+        ]}))
+        .unwrap();
+        assert_eq!(
+            long[0].approval_reason.as_ref().unwrap().chars().count(),
+            MAX_REASON_CHARS
+        );
     }
 }
