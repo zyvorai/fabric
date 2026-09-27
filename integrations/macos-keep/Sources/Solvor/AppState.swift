@@ -86,7 +86,9 @@ final class AppState: ObservableObject {
         connectionError = nil
         guard let c = client else { connected = false; connectionError = "Enter the host address and a token."; return }
         do {
-            status = try await c.status()
+            // /v1/keep/status is an operator route: a user token gets a 403, and that must not stop it connecting. The list of use cases is
+            // what proves the host and the token work (a user token may read it).
+            status = try? await c.status()
             demos = try await c.demos()
             connected = true
             await refreshRuns(); await refreshApprovals(); await refreshUsage()

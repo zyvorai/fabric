@@ -23,6 +23,7 @@ struct WatchFoldersView: View {
                     }
                 }
             }
+            .overlay { if app.folderRules.isEmpty { EmptyState(symbol: "folder.badge.gearshape", title: "No watched folders", message: "Pick a folder and a use case, and new matching files are read for you as they appear.") } }
             HStack { Spacer(); Button("Add a watched folder…") { pickFolder() }.primaryButton() }.padding()
         }
         .navigationTitle("Watch folders")

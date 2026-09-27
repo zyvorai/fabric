@@ -33,7 +33,7 @@ struct ApprovalsView: View {
             }.padding()
             Divider()
             if app.approvals.isEmpty {
-                Text("Nothing is waiting for you.").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+                EmptyState(symbol: "checkmark.seal", title: "Nothing is waiting for you", message: "When an agent wants to send, buy or change something, the details show up here and you decide.")
             } else {
                 List(app.approvals) { a in ApprovalRow(approval: a, deviceId: deviceId, message: $message) }
             }

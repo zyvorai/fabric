@@ -17,7 +17,7 @@ struct RootView: View {
                 }.padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 8)
                 List(selection: Binding(get: { app.pane }, set: { app.pane = $0; if $0 != nil { app.selectedJob = nil } })) {
                     ForEach(Pane.allCases) { p in
-                        Label { Text(p.rawValue) } icon: { Image(systemName: p.icon) }
+                        Label { Text(p.rawValue) } icon: { Image(systemName: p.icon).foregroundStyle(p.tint) }
                             .badge(p == .approvals ? app.approvals.count : 0)
                             .tag(Optional(p))
                     }

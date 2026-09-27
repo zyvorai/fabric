@@ -28,12 +28,12 @@ struct UseCasesView: View {
                     TextField("Search", text: $search).textFieldStyle(.roundedBorder).frame(width: 200)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 14)], spacing: 14) {
-                    ForEach(filtered) { d in UseCaseCard(demo: d) }
+                    ForEach(Array(filtered.enumerated()), id: \.element.id) { i, d in UseCaseCard(demo: d).appear(delay: Motion.stagger(i)) }
                 }
                 Text("\(filtered.count) of \(app.demos.count) use cases").font(.caption).foregroundStyle(.tertiary)
             }.padding(24)
         }
-        .background(alignment: .topTrailing) { Circle().fill(Color.accentColor.opacity(0.12)).frame(width: 420, height: 420).blur(radius: 90).offset(x: 120, y: -140) }
+        .background { AuroraBackground(intensity: 0.8) }
         .dropDestination(for: URL.self) { urls, _ in DropRouter.route(urls, app: app); return true } isTargeted: { targeted = $0 }
         .overlay { if targeted { DropOverlay() } }
         .navigationTitle("Use cases")
@@ -42,7 +42,7 @@ struct UseCasesView: View {
     private var hero: some View {
         HStack(alignment: .center, spacing: 26) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Drop anything.\nGet answers.").font(.system(size: 38, weight: .bold, design: .rounded)).lineSpacing(-2)
+                Text("Drop anything.\nGet answers.").font(Typo.hero).lineSpacing(-2).appear()
                 Text("Every file is read inside a sealed cell that has no network. Nothing leaves it but the summary, and you see the proof.")
                     .font(.title3).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
@@ -53,6 +53,7 @@ struct UseCasesView: View {
             Spacer(minLength: 20)
             VStack(spacing: 10) {
                 Image(systemName: "arrow.down.doc.fill").font(.system(size: 44)).foregroundStyle(Color.accentColor.gradient)
+                    .symbolEffect(.bounce.down, options: .repeat(.periodic(delay: 2.6)))
                 Text("Drop a file here").font(.headline)
                 Text("Solvor suggests the use case").font(.caption).foregroundStyle(.secondary)
             }
