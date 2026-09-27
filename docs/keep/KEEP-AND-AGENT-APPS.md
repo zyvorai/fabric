@@ -35,7 +35,7 @@ layer is good at and how they fit, not which is better.
 - **Clients.** The web console and Solvor (macOS 26). No chat client and no iOS or Android app.
 - **Connectors.** A browser-tab email reader in Solvor; no first-party mail or calendar connector.
 - **Long-running personal work.** Sessions with steer, cancel, resume and hibernate, plus schedules and triggers; no plan or goal interface.
-- **Protocols.** An HTTP API, an MCP endpoint and signed webhooks; not yet the agent-UI protocols chat frameworks use.
+- **Protocols.** An HTTP API, an MCP endpoint, signed webhooks, and AG-UI (`POST /v1/agui`, see [AGUI.md](AGUI.md); tried with the repo's own chat page, not yet with a third-party AG-UI client).
 
 ## How they fit
 
