@@ -109,7 +109,7 @@ Full capability tour and metrics: **[docs/PRODUCT_OVERVIEW.md](docs/PRODUCT_OVER
 ## Keep — open agent workstation
 
 <p align="center">
-  <a href="docs/keep/README.md"><img src="docs/assets/keep/demo-static.svg" alt="Real output of ./scripts/keep-e2e.sh: 40 checks passed, 0 failed" width="640"></a>
+  <a href="docs/keep/README.md"><img src="docs/assets/keep/demo-static.svg" alt="Real output of ./scripts/keep-e2e.sh: 39 checks passed, 0 failed" width="640"></a>
 </p>
 
 **Drop a file. Get answers. Nothing leaves the cell.** Keep reads your files, and runs your agents, inside a sealed cell: a throw-away microVM whose network policy the host sets, with secrets that never enter the cell and approvals signed on your own device.
@@ -125,7 +125,7 @@ You run it, you read it, you take it with you. 60+ ready use cases (statements, 
 | **Know what was actually tested** | [VERIFICATION.md](docs/keep/VERIFICATION.md) · [threat model](docs/keep/THREAT-MODEL.md) · [what still needs a person or a resource](docs/keep/TODO.md) |
 
 ```bash
-./scripts/keep-e2e.sh   # live runtime + FluxVM stub + keepctl, no KVM. passed=40 failed=0
+./scripts/keep-e2e.sh   # live runtime + FluxVM stub + keepctl, no KVM. passed=39 failed=0
 ```
 
 **Be precise about the guarantee.** The cell has no network, and a result reports the outbound-connection count as a cross-check; the guarantee is the deny-all policy the host applies before the file enters the cell. The evidence class is `software-test`: whoever operates the host can still read a cell's memory, so run the host yourself. Until Keep 0.2 on real SNP/TDX with a user-held key, this is never marketed as "the operator cannot read this."
