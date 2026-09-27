@@ -249,20 +249,20 @@ $("new").addEventListener("click", () => { if (!busy) newChat(); });
 $("back").addEventListener("click", () => { app.classList.add("show-list"); });
 // ---- tabs: chats, goals, memory ----
 const listEl = document.querySelector(".list");
-const tabs = { chats: $("tab-chats"), goals: $("tab-goals"), memory: $("tab-memory") };
-const panes = { chats: $("pane-chats"), goals: $("pane-goals"), memory: $("pane-memory") };
+const tabs = { chats: $("tab-chats"), goals: $("tab-goals"), memory: $("tab-memory"), done: $("tab-done") };
+const panes = { chats: $("pane-chats"), goals: $("pane-goals"), memory: $("pane-memory"), done: $("pane-done") };
 let tab = "chats", pollTimer = null;
 function showTab(name) {
   tab = name;
   for (const k of Object.keys(tabs)) { const on = k === name; tabs[k].classList.toggle("active", on); tabs[k].setAttribute("aria-selected", String(on)); panes[k].hidden = !on; }
-  listEl.classList.toggle("tab-goals", name === "goals"); listEl.classList.toggle("tab-memory", name === "memory");
-  if (name === "goals") { refreshGoals(); refreshSuggestions(); } if (name === "memory") refreshMemory();
+  listEl.classList.toggle("tab-goals", name === "goals"); listEl.classList.toggle("tab-memory", name === "memory"); listEl.classList.toggle("tab-done", name === "done");
+  if (name === "goals") { refreshGoals(); refreshSuggestions(); } if (name === "memory") refreshMemory(); if (name === "done") refreshDone();
   clearInterval(pollTimer);
-  pollTimer = setInterval(() => { if (document.hidden) return; if (tab === "goals") { refreshGoals(); refreshSuggestions(); } if (tab === "memory") refreshMemory(); }, 5000);
+  pollTimer = setInterval(() => { if (document.hidden) return; if (tab === "goals") { refreshGoals(); refreshSuggestions(); } if (tab === "memory") refreshMemory(); if (tab === "done") refreshDone(); }, 5000);
 }
 for (const k of Object.keys(tabs)) tabs[k].addEventListener("click", () => showTab(k));
 // coming back to a tab that was in the background: catch up at once instead of waiting for the next tick
-document.addEventListener("visibilitychange", () => { if (document.hidden) return; if (tab === "goals") { refreshGoals(); refreshSuggestions(); } if (tab === "memory") refreshMemory(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) return; if (tab === "goals") { refreshGoals(); refreshSuggestions(); } if (tab === "memory") refreshMemory(); if (tab === "done") refreshDone(); });
 
 async function api(method, path, body) {
   const res = await fetch(path, { method, headers: body === undefined ? {} : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -388,6 +388,28 @@ async function refreshSuggestions() {
   }
 }
 $("sug-toggle").addEventListener("click", async () => { const r = await api("PUT", "/suggestions/settings", { enabled: !sugEnabled }); sugMsg.classList.toggle("bad", !r.ok); sugMsg.textContent = r.ok ? "" : why(r); lastSug = ""; refreshSuggestions(); });
+
+// ---- done: receipts of what happened after an approval (read-only) ----
+const doneEl = $("done"), doneEmpty = $("done-empty");
+let lastDone = "";
+async function refreshDone() {
+  const r = await api("GET", "/receipts");
+  if (!r.ok) return;
+  const snap = JSON.stringify(r.data.items || []);
+  if (snap === lastDone) return;
+  lastDone = snap;
+  const items = r.data.items || [];
+  doneEl.textContent = ""; doneEmpty.hidden = items.length > 0;
+  for (const x of items) {
+    const li = el("li", "done-item");
+    const ok = typeof x.status === "number" && x.status < 400;
+    const top = el("div", "goal-top");
+    top.append(el("span", "goal-title", (x.method || "") + " " + (x.host || "") + (x.path || "")), el("span", "pill " + (ok ? "done" : "blocked"), String(x.status ?? "")));
+    const when = x.at ? new Date(x.at) : null;
+    li.append(top, el("div", "fine-print", [x.agent, x.approved ? "approved by you" : "", when && !Number.isNaN(when.getTime()) ? dayLabel(when) + " " + clock(when) : ""].filter(Boolean).join(" · ")));
+    doneEl.appendChild(li);
+  }
+}
 
 // ---- memory ----
 const memItems = $("mem-items"), memProps = $("mem-props"), memMsg = $("mem-msg");
