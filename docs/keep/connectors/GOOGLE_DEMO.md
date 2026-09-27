@@ -16,10 +16,18 @@ Use a personal Gmail address if you can. A Google Workspace account (an address 
 ## Run it
 
 ```bash
+./scripts/keep-demo-google.sh --client-json ~/Downloads/client_secret_XXXX.apps.googleusercontent.com.json
+```
+
+That is the JSON Google lets you download when you create the client; the script reads the id and secret from it itself and never prints them. Or export them yourself:
+
+```bash
 export GOOGLE_CLIENT_ID=...apps.googleusercontent.com
 export GOOGLE_CLIENT_SECRET=...
 ./scripts/keep-demo-google.sh
 ```
+
+The downloaded file holds the client secret in plain text: keep it out of the repository and delete it when you are done (you can always download it again from Credentials, or reset the secret there).
 
 - Your browser opens Google's consent page. Because the app is in Testing and unverified, Google shows a warning ("Google hasn't verified this app"): choose your test account, **Advanced → continue**. It asks for read access to mail and calendar, and, for the demo, drafts, sending and creating events. Each of those three stays behind an approval here.
 - The script prints three chat addresses (mail reading, composing, calendar) and this terminal becomes the approver.

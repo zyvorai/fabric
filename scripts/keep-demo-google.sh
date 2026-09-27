@@ -5,6 +5,7 @@
 # keep-demo-google — try the Gmail and Calendar agents on YOUR Google account, on this laptop. NOT SEALED.
 # ============================================================================
 #   GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... ./scripts/keep-demo-google.sh
+#   ./scripts/keep-demo-google.sh --client-json ~/Downloads/client_secret_....json    # the file Google lets you download
 #   ./scripts/keep-demo-google.sh --dry-run     # check the tools and print the plan
 #
 # You need a Google OAuth client and a test account: docs/keep/connectors/GOOGLE_DEMO.md walks through it (about 10 minutes, in your own
@@ -34,12 +35,30 @@ EGRESS_PORT="${KEEP_LOCAL_EGRESS_PORT:-18082}"
 CHAT_PORT="${KEEP_CHAT_PORT:-8787}"
 TOKEN_FILE="${KEEP_GOOGLE_TOKEN_FILE:-google-refresh-token.env}"
 DRY=0
-case "${1:-}" in
-  --dry-run) DRY=1 ;;
-  -h|--help) sed -n '5,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-  "") ;;
-  *) echo "unknown option: $1" >&2; exit 64 ;;
-esac
+CLIENT_JSON=""
+while (( $# )); do
+  case "$1" in
+    --dry-run) DRY=1 ;;
+    --client-json) shift; CLIENT_JSON="${1:-}"; [[ -n "$CLIENT_JSON" ]] || { echo "--client-json needs a file" >&2; exit 64; } ;;
+    -h|--help) sed -n '5,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 64 ;;
+  esac
+  shift
+done
+# The JSON Google offers to download ({"installed": {"client_id": ..., "client_secret": ...}}). It is read here, in this process, and the values go
+# only into this script's environment and the runtime it starts; they are never printed.
+if [[ -n "$CLIENT_JSON" ]]; then
+  [[ -r "$CLIENT_JSON" ]] || { echo "cannot read $CLIENT_JSON" >&2; exit 1; }
+  CREDS="$(python3 - "$CLIENT_JSON" 2>/dev/null <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+c = c.get("installed") or c.get("web") or {}
+print(c["client_id"]); print(c["client_secret"])
+PY
+  )" || { echo "$CLIENT_JSON is not a Google OAuth client JSON (expected an \"installed\" object with client_id and client_secret)" >&2; exit 1; }
+  GOOGLE_CLIENT_ID="$(printf '%s\n' "$CREDS" | sed -n 1p)"; GOOGLE_CLIENT_SECRET="$(printf '%s\n' "$CREDS" | sed -n 2p)"; CREDS=""
+  export GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
+fi
 
 MISSING=0
 need() { command -v "$1" >/dev/null 2>&1 || { echo "missing: $1 ($2)" >&2; MISSING=1; }; }
