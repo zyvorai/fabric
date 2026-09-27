@@ -24,6 +24,8 @@ public protocol KeepAPI: Sendable {
     func approvals() async throws -> [Approval]
     func usage(userId: String?) async throws -> UsageReport
     func run(demo: String, files: [URL], maxBytes: Int?) async throws -> RunOutcome
+    func devices(userId: String) async throws -> [DeviceInfo]
+    func decide(approval id: String, _ decision: Decision, deviceId: String?, signature: String?) async throws
 }
 
 extension KeepClient: KeepAPI {}
