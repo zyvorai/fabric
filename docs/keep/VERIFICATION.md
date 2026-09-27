@@ -4,7 +4,7 @@ sidebar_position: 9
 
 # Verification
 
-*2026-09-26. What was actually run, where, with what result, and where each claim stops. Nothing here is a promise about a build that has not been
+*2026-09-27. What was actually run, where, with what result, and where each claim stops. Nothing here is a promise about a build that has not been
 tested. Commands are given so you can reproduce a number; where a check needs a host that cannot be shared, it says so.*
 
 ## The lab host
@@ -17,13 +17,13 @@ environment, not a hardware-attested one ([SECURITY-PROFILES.md](SECURITY-PROFIL
 
 | Suite | Result | Run with |
 |---|---|---|
-| Runtime unit tests | **276 passed**, 0 failed | `cargo test --manifest-path agent-runtime/Cargo.toml --lib` |
+| Runtime unit tests | **403 passed**, 0 failed | `cargo test --manifest-path agent-runtime/Cargo.toml --lib` |
 | Runtime lint | clippy `-D warnings` and `cargo fmt --check` clean | CI `keep-unit` |
 | Pack lint | every shipped use-case pack and the contributor template validate with the runtime's own checks | `cargo test --lib every_shipped` |
-| Use cases end to end (stub cell) | **127 checks passed** | `bash agent-runtime/tests/demos-ci.sh` |
-| Solvor client library | **55 tests passed**, 6 skipped (they need a live host) | `swift test` in `integrations/macos-keep` |
+| Use cases end to end (stub cell) | **170 checks passed** | `bash agent-runtime/tests/demos-ci.sh` |
+| Solvor client library | **82 tests passed**, 6 skipped (they need a live host) | `swift test` in `integrations/macos-keep` |
 | Web console | **419 tests passed** | `npx vitest run` in `web/` |
-| SDK | **38 tests passed** | `npm test` in `sdk/agent-runtime` |
+| SDK | **77 tests passed** | `npm test` in `sdk/agent-runtime` |
 | Shell tooling | `keep-up.sh` (8 checks), the template bake (3), shellcheck | `agent-runtime/tests/keep-up.sh`, `bake-fresh-image.sh` |
 
 The stub-cell suites run the fixed extractors as ordinary processes: they prove the runtime, the packs and the API, **not** isolation.

@@ -4,7 +4,7 @@ Record with a synthetic file only (the repo has samples under `examples/keep-age
 
 | Time | Shot | Say |
 |---|---|---|
-| 0:00 | Solvor home, "Drop anything. Get answers." | "This is Solvor. Every file is read inside a sealed cell with no network." |
+| 0:00 | Solvor opens on Agent Home; switch to **Use cases**, "Drop anything. Get answers." | "This is Solvor. Every file is read inside a sealed cell with no network." |
 | 0:08 | Drag `examples/keep-agents/card-statement/sample.csv` onto the drop zone | "Drop a statement." |
 | 0:14 | The suggested use case, then the sealed-cell animation | "It picks the use case and reads it in a throw-away microVM." |
 | 0:24 | The result: totals by category; the green pill "0 outbound connections" | "You get the answer and the proof: zero outbound connections." |

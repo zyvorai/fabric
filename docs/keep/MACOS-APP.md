@@ -64,8 +64,18 @@ Screenshots are of the window only, from a debug build against a lab host, with 
 
 `GET /v1/keep/status`, `GET /v1/demos`, `POST /v1/demos/{id}` (multipart, repeated `file` fields for a batch), `GET /v1/artifacts`,
 `GET /v1/artifacts/{id}`, `GET /v1/artifacts/{a}/diff/{b}`, `GET /v1/inbox`, `GET /v1/approvals`, `POST /v1/approvals/{id}`
-(`decision`, `device_id`, `signature`), `POST /v1/users/{id}/devices` (operator only), `GET /v1/usage`. The signed text is
-[documented here](mobile/README.md) and pinned by `docs/keep/mobile/test-vectors.json`.
+(`decision`, `device_id`, `signature`), `POST /v1/users/{id}/devices` (operator only), `GET /v1/usage`, `GET /v1/whoami`. The signed
+text is [documented here](mobile/README.md) and pinned by `docs/keep/mobile/test-vectors.json`.
+
+Goals, Memory, Done and Agent Home each add their own routes, all needing a *user* token: `GET /v1/goals`, `POST /v1/goals`,
+`PATCH /v1/goals/{id}` (`status`, `autorun`), `POST /v1/goals/{id}/plan` (ask the planner), `POST /v1/goals/{id}/plan/accept`
+(`confirm_tainted`, `autorun`), `POST /v1/goals/{id}/plan/reject`; `GET /v1/suggestions`, `PUT /v1/suggestions/settings`
+(`enabled`), `POST /v1/suggestions/{id}/accept` (`confirm_tainted`), `POST /v1/suggestions/{id}/dismiss`; `GET /v1/memory`,
+`PUT /v1/memory/settings` (`enabled`), `POST /v1/memory` (add a note), `DELETE /v1/memory/{id}`,
+`POST /v1/memory/{id}/accept|reject` (a proposal), `DELETE /v1/memory` (forget everything); `GET /v1/receipts`;
+`GET /v1/threads`, `GET /v1/threads/{id}/messages`, `DELETE /v1/threads/{id}` and `POST /v1/agui` (Server-Sent Events) for
+Agent Home's chat, which streams the same `keep.*` CUSTOM events documented in [AGUI.md](AGUI.md), including a pending
+approval surfaced as a chat-only notice — never a decision made from the stream.
 
 ## Limits and next steps
 

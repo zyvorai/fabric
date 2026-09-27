@@ -13,9 +13,13 @@ to itself freely, it can add **authority** to itself, which is the thing Keep ex
   (`POST /v1/agents`) is the operator's, and a user token cannot reach it ([TENANCY.md](../TENANCY.md)).
 - A credential an agent lists is checked against the vault at deploy; a use of it is still checked at the egress broker (host, method, path, port,
   approval, device signature).
-- Sessions run in sealed cells; an agent can only propose memory entries, suggestions and plans (events the host validates), never act on
-  its own configuration.
+- Sessions run in sealed cells; an agent can only propose memory entries, suggestions, plans and cards (events the host validates), never act
+  on its own configuration.
 - A session that read untrusted content is `tainted`, and taint marks what it proposes.
+- Cards (`card.propose`, [card/README.md](../card/README.md)) are a separate, narrower mechanism added since this note was first written: a
+  read-only display an agent can hand the host, gated on `manifest.card`. A card decides nothing and grants no authority — it is pure display,
+  not capability. `tool.propose` below is unrelated to it: this proposal is about adding capability and the authority that comes with it, which
+  cards never do.
 
 ## The principle
 

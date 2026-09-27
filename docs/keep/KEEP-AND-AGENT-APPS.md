@@ -32,9 +32,11 @@ layer is good at and how they fit, not which is better.
 
 - **Setup.** Sealed cells need a Linux host with KVM. [`scripts/keep-up.sh`](../../scripts/keep-up.sh) is the one-command path (tested with fake facts; a clean-machine
   run is still open, see [TODO.md](TODO.md)), and [`scripts/keep-demo-local.sh`](../../scripts/keep-demo-local.sh) runs a clearly labelled, **not sealed** simulator on a laptop.
-- **Clients.** The web console and Solvor (macOS 26). No chat client and no iOS or Android app.
-- **Connectors.** A browser-tab email reader in Solvor; no first-party mail or calendar connector.
-- **Long-running personal work.** Sessions with steer, cancel, resume and hibernate, plus schedules and triggers; no plan or goal interface.
+- **Clients.** The web console and Solvor (macOS 26), which now has an in-app chat client ("Agent Home"). No iOS or Android app.
+- **Connectors.** A browser-tab email reader in Solvor, plus a first-party Google mail/calendar connector in the runtime (OAuth, per-person
+  or shared credentials; see [connectors/README.md](connectors/README.md)), live-verified against real Gmail and Calendar.
+- **Long-running personal work.** Sessions with steer, cancel, resume and hibernate, plus schedules and triggers, and a goal/plan interface
+  in Solvor (a visual timeline for a proposed or accepted plan's steps).
 - **Protocols.** An HTTP API, an MCP endpoint, signed webhooks, and AG-UI (`POST /v1/agui`, see [AGUI.md](AGUI.md); tried with the repo's own chat page, not yet with a third-party AG-UI client).
 
 ## How they fit

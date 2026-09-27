@@ -159,7 +159,9 @@ Do **not** say:
 - **"Your phone's secure chip holds your vault."** The phone key signs *approvals*. It does not unlock the vault.
 - **"Compliant with"** any national or industry rule. Keep makes no compliance claim.
 - **"Your data never leaves the country"** unless the shard, the model endpoint and the push path all stay there.
-- Anything about connectors Keep does not have: live mail and calendar, payments.
+- Anything about connectors Keep does not have: payments. (Gmail/Calendar and Outlook/Graph connectors are now built and live-tested —
+  see [connectors/README.md](connectors/README.md) — but only for a person who has connected their own account; do not imply it works
+  for someone who hasn't.)
 
 ## Questions to take to your own counsel and security team
 

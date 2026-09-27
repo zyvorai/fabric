@@ -39,7 +39,7 @@ KEEP_E2E_TEMPLATE=node22-agent ./scripts/keep-pilot-gate.sh
 
 Latest archived run: [pilot-runs/20260924T182930Z](pilot-runs/20260924T182930Z/)
 (**Firecracker** `node22-fc` / `flux-vm`, `guest_worker=ok`). Prior QEMU:
-[20260924T172304Z](pilot-runs/20260924T172304Z/),
+[20260924T141927Z](pilot-runs/20260924T141927Z/),
 [20260924T154950Z](pilot-runs/20260924T154950Z/). Bake FC with
 [`scripts/keep-bake-fc-rootfs.sh`](../../scripts/keep-bake-fc-rootfs.sh);
 pilot gate prefers `node22-fc` when registered.

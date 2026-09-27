@@ -99,6 +99,14 @@ Run it on a schedule with **Task Scheduler** (an action that starts `pwsh -File 
 - **Another agent (Claude, Codex, a script):** `POST /mcp` speaks MCP over JSON-RPC (`tools/list`, `tools/call`) on the same bearer
   token, and the plain HTTP calls above work from any agent that can run `curl`. No change is needed on the Keep side.
 
+## A pack that watches for you, on its own schedule
+
+The two-call flow above is for a `kind: usecase` pack you run on demand. A `kind: agent` pack with `"suggestions": true` (for example
+`examples/keep-agents/calendar-suggestions` or `examples/keep-agents/price-watch`) instead runs on a cron you set with
+`POST /v1/schedules` and proposes a suggestion when it finds something, rather than returning an artifact from a single call. And
+whatever an agent shows you as a card (`docs/keep/card/README.md`) — a small read-only digest, never an approval — is retrievable the
+same way as any other artifact, `GET /v1/artifacts/{id}`.
+
 ## What these recipes do not do
 
 They send a file you choose and bring back a summary. They do not give Siri, Shortcuts or a Windows task any access to your files
