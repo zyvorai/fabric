@@ -12,4 +12,4 @@ where: Home
 notify: yes                            <- only then are the guests emailed
 ```
 
-No edit or delete: the `calendar-write` credential allows only creating an event. Not run against real Google.
+No edit or delete: the `calendar-write` credential allows only creating an event. Run against a real Google Calendar once (2026-09-27): the agenda was read. Creating an event has only been run against the fake Google. See [what was verified](../../../docs/keep/connectors/README.md#verified-against-real-google).
