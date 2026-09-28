@@ -456,5 +456,5 @@ cd backend && cargo test -p openstack-compat
 1. Reference: [OpenStack Compatibility](../openstack-compat.md)  
 2. Native first VM: [Tutorial 01](01-first-vm.md)  
 3. Configuration: [daemon.listen / public_url](../getting-started/03-Configuration.md)  
-4. Deploy: [README deploy](../../README.md#deploy) · [KUBERNETES.md](../KUBERNETES.md)  
+4. Deploy: [Deploy](../deploy.md) · [KUBERNETES.md](../KUBERNETES.md)  
 5. SCIM (enterprise IdP): [scim-identity.md](../scim-identity.md)  

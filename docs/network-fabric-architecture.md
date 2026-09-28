@@ -1,6 +1,6 @@
 # Network Fabric architecture (how it works)
 
-This is the deep technical dive into Fabric's VM-edge dataplane. For the short version, see [README.md — Architecture](../README.md#architecture-fluxvm--guestkit); for the operator guide (enablement, troubleshooting, UX checklist), see [docs/guides/vm-drivers/fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md).
+This is the deep technical dive into Fabric's VM-edge dataplane. For the short version, see [Architecture: FluxVM + GuestKit](architecture-fluxvm-guestkit.md); for the operator guide (enablement, troubleshooting, UX checklist), see [docs/guides/vm-drivers/fluxvm-dataplane.md](guides/vm-drivers/fluxvm-dataplane.md).
 
 Fabric exposes FluxVM **Network Fabric schema v4** (TC/eBPF VM-edge dataplane) as first-class API, CLI, and UI — while keeping Fabric's own host SDN separate. Kernel program source of truth: [FluxVM Network Fabric](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works).
 
