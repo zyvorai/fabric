@@ -5,7 +5,7 @@ import MarketingLayout from '../../components/MarketingLayout'
 
 const SURFACES = [
   { name: 'Web', detail: 'Apple-minimal console for day-2 operations.' },
-  { name: 'CLI', detail: 'zyvorctl — scriptable table, JSON, and YAML output.' },
+  { name: 'CLI', detail: 'fabricctl — scriptable table, JSON, and YAML output.' },
   { name: 'Operator', detail: 'Kubernetes VirtualMachine CRDs reconciled to Fabric.' },
   { name: 'Terraform', detail: 'Declare VMs with the zyvor-fabricd provider.' },
 ]

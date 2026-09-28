@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! TTY-aware ANSI styling for zyvorctl (Cilium-like colorful output).
+//! TTY-aware ANSI styling for fabricctl (Cilium-like colorful output).
 
 use clap::ValueEnum;
 use std::io::IsTerminal;

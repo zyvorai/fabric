@@ -16,7 +16,7 @@ _zyvor_fabricd_ctl() {
             COMPREPLY=( $(compgen -W "--no-web" -- "$cur") )
             return
             ;;
-        zyvorctl|./zyvorctl)
+        fabricctl|./fabricctl)
             COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
             return
             ;;

@@ -16,7 +16,7 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 | **Analogy** | Proxmox-class UX + KubeVirt-style operations, single Rust daemon |
 | **Runtime** | `zyvor-fabricd` — one binary, one config; runs under systemd (still fully supported) or standalone |
 | **Scope** | VMs, network fabric, security policy, storage, HA, migration, observability |
-| **Interfaces** | CLI (`zyvorctl`), Web UI, K8s operator, Terraform provider |
+| **Interfaces** | CLI (`fabricctl`), Web UI, K8s operator, Terraform provider |
 
 ### Elevator pitch
 
@@ -29,8 +29,8 @@ Part of the [Zyvor](https://zyvor.dev) product family from ZyvorAI Labs.
 | Persona | Role | What they care about | Where Fabric fits |
 |---------|------|----------------------|--------------------|
 | **Economic buyer** — VP Infrastructure / CTO at a mid-size org | Owns the build-vs-buy decision and the budget | Total cost of ownership vs. VMware/OpenStack licensing, operational headcount, vendor lock-in risk, time-to-value | One binary instead of a multi-server stack; Apache-2.0 core with paid enterprise support as an option, not a requirement — see [License & Support](#license--support) below |
-| **Platform engineer** ("Morgan" in [USER_STORIES.md](USER_STORIES.md)) | Builds the infrastructure other teams consume | Kubernetes operator, Terraform provider, GitOps-friendly declarative config | `VirtualMachine` CRD + `zyvorctl apply -f config.yaml`, both backed by the same REST API as the UI |
-| **Private cloud admin** ("Alex" in [USER_STORIES.md](USER_STORIES.md)) | Day-2 VM lifecycle, backups, incident response | A UI and CLI that don't drift from each other, audit trail for every action | Web console + `zyvorctl`, both hitting the identical 780+-endpoint API |
+| **Platform engineer** ("Morgan" in [USER_STORIES.md](USER_STORIES.md)) | Builds the infrastructure other teams consume | Kubernetes operator, Terraform provider, GitOps-friendly declarative config | `VirtualMachine` CRD + `fabricctl apply -f config.yaml`, both backed by the same REST API as the UI |
+| **Private cloud admin** ("Alex" in [USER_STORIES.md](USER_STORIES.md)) | Day-2 VM lifecycle, backups, incident response | A UI and CLI that don't drift from each other, audit trail for every action | Web console + `fabricctl`, both hitting the identical 780+-endpoint API |
 | **Developer** ("Jordan" in [USER_STORIES.md](USER_STORIES.md)) | Needs VMs for testing/dev without filing a ticket | Self-service, scriptable, fast | CLI + REST API, VM creation in one command |
 
 The economic-buyer row is the one most positioning docs skip. The short version for that persona: Fabric's core is Apache-2.0 (free to run in production, no licensing fee, no per-VM tax); the cost you're actually evaluating against VMware/OpenStack is **operational** — one 15MB binary and one config file vs. hundreds to thousands of packages and multiple dependent services (see the [Comparison Matrix](guides/decision-support/comparison-matrix.md) for the itemized breakdown). Paid Enterprise support/SLAs are available but not required to run Fabric in production.
@@ -43,7 +43,7 @@ The economic-buyer row is the one most positioning docs skip. The short version 
 |-------|------|-------|
 | **Product** | Zyvor Fabric | Marketing, UI, documentation, sales |
 | **Daemon** | `zyvor-fabricd` | systemd unit, config paths, APIs — stable technical identifier |
-| **CLI** | `zyvorctl`, `zyvor-fabricd-ctl` | Operational tools |
+| **CLI** | `fabricctl`, `zyvor-fabricd-ctl` | Operational tools |
 | **Repo** | [zyvorai/fabric](https://github.com/zyvorai/fabric) | Canonical GitHub org repo |
 
 Keeping `zyvor-fabricd` as the daemon name avoids breaking installs, Ansible roles, and automation. User-facing surfaces say **Zyvor Fabric**; ops runbooks reference `zyvor-fabricd` where commands and paths matter.

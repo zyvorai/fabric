@@ -145,4 +145,4 @@ The crate covers:
 
 ## Follow-up integration
 
-The safest follow-up is to wire this engine into `zyvor-fabricd` and persist `MaintenanceJob` entities in `StateStore`, then expose the routes above and add `zyvorctl host maintenance` commands. That wiring should use the existing host-agent/driver APIs rather than introduce a second VM control transport.
+The safest follow-up is to wire this engine into `zyvor-fabricd` and persist `MaintenanceJob` entities in `StateStore`, then expose the routes above and add `fabricctl host maintenance` commands. That wiring should use the existing host-agent/driver APIs rather than introduce a second VM control transport.

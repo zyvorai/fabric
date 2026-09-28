@@ -15,10 +15,10 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 async fn main() -> Result<()> {
     // Initialize tracing with ZYVOR_FABRICD_LOG_LEVEL or RUST_LOG support
     let env_filter = if let Ok(level) = std::env::var("ZYVOR_FABRICD_LOG_LEVEL") {
-        tracing_subscriber::EnvFilter::new(format!("zyvorctl={level}"))
+        tracing_subscriber::EnvFilter::new(format!("fabricctl={level}"))
     } else {
         tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "zyvorctl=warn".into())
+            .unwrap_or_else(|_| "fabricctl=warn".into())
     };
 
     tracing_subscriber::registry()
@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer().with_target(false))
         .init();
 
-    tracing::debug!("zyvorctl starting");
+    tracing::debug!("fabricctl starting");
 
     let mut cmd = Cli::command_with_grouped_help();
     let matches = cmd.get_matches_mut();

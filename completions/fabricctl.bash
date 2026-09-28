@@ -1,5 +1,5 @@
-# Bash completion for zyvorctl
-_zyvorctl() {
+# Bash completion for fabricctl
+_fabricctl() {
     local cur prev commands
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -16,7 +16,7 @@ _zyvorctl() {
             COMPREPLY=( $(compgen -f -- "$cur") )
             return
             ;;
-        zyvorctl)
+        fabricctl)
             COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
             return
             ;;
@@ -26,4 +26,4 @@ _zyvorctl() {
         COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
     fi
 }
-complete -F _zyvorctl zyvorctl
+complete -F _fabricctl fabricctl

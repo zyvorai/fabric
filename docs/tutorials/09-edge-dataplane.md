@@ -22,7 +22,7 @@ bridged (`network_tap`) VM
 3. Create security groups and attach by name/labels
 4. Apply a CNP document and inspect effective merge
 5. Use observe, identities, ipcache, and refresh-dns
-6. Drive the same flows from the console and `zyvorctl`
+6. Drive the same flows from the console and `fabricctl`
 
 ---
 
@@ -197,10 +197,10 @@ curl -sk "$FABRIC_HOST/api/vms/$VM/dataplane/flows?limit=20" "${AUTH[@]}" | jq '
 3. **Infrastructure → Edge Dataplane** (`/app/edge-dataplane`)
 
 ```bash
-zyvorctl dataplane health -o json
-zyvorctl dataplane group list -o json
-zyvorctl dataplane effective "$VM" -o json
-zyvorctl dataplane observe -o json
+fabricctl dataplane health -o json
+fabricctl dataplane group list -o json
+fabricctl dataplane effective "$VM" -o json
+fabricctl dataplane observe -o json
 ```
 
 ---

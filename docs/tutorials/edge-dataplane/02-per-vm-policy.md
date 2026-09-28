@@ -66,7 +66,7 @@ cat >/tmp/dp-policy.json <<'EOF'
   "sample_rate": 1
 }
 EOF
-zyvorctl dataplane policy set "$VM" --file /tmp/dp-policy.json -o json
+fabricctl dataplane policy set "$VM" --file /tmp/dp-policy.json -o json
 ```
 
 ## Next

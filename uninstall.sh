@@ -72,7 +72,7 @@ fi
 
 # Remove binaries
 step "Removing binaries"
-for bin in zyvor-fabricd zyvorctl; do
+for bin in zyvor-fabricd fabricctl zyvorctl; do
     for dir in /usr/bin /usr/local/bin; do
         if [[ -f "$dir/$bin" ]]; then
             rm -f "$dir/$bin"
@@ -99,7 +99,7 @@ step "Removing configuration"
 rm -rf /etc/zyvor-fabricd 2>/dev/null && info "Removed /etc/zyvor-fabricd" || true
 rm -f /etc/modules-load.d/zyvor-fabricd.conf 2>/dev/null
 rm -f /etc/logrotate.d/zyvor-fabricd 2>/dev/null
-rm -f /etc/bash_completion.d/zyvorctl 2>/dev/null
+rm -f /etc/bash_completion.d/fabricctl /etc/bash_completion.d/zyvorctl 2>/dev/null
 
 # Remove data
 if $PURGE; then

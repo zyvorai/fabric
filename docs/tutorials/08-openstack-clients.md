@@ -411,7 +411,7 @@ Fabric’s native Terraform provider for real VMs today:
 
 | Goal | Use |
 |------|-----|
-| Real Fabric VMs / FluxVM | `/api/v1/vms`, web UI, `zyvorctl` |
+| Real Fabric VMs / FluxVM | `/api/v1/vms`, web UI, `fabricctl` |
 | OpenStack CLI / OS Terraform | `/identity`, `/compute`, … (this tutorial) |
 | Entra ID / Okta user provisioning | `/scim/v2` — [scim-identity.md](../scim-identity.md) |
 

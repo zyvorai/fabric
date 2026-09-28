@@ -60,13 +60,13 @@ export ZYVOR_FABRIC_TOKEN="$TOKEN"
 
 | Task | Command |
 |------|---------|
-| Health | `zyvorctl dataplane health -o json` |
-| Groups | `zyvorctl dataplane group list\|get\|create\|delete` |
-| CNP | `zyvorctl dataplane cnp list\|apply\|delete` |
-| Effective | `zyvorctl dataplane effective NAME -o json` |
-| Observe | `zyvorctl dataplane observe -o json` |
-| Ipcache / refresh | `zyvorctl dataplane ipcache\|refresh-dns -o json` |
-| Per-VM | `zyvorctl dataplane status\|policy\|stats\|flows NAME` |
+| Health | `fabricctl dataplane health -o json` |
+| Groups | `fabricctl dataplane group list\|get\|create\|delete` |
+| CNP | `fabricctl dataplane cnp list\|apply\|delete` |
+| Effective | `fabricctl dataplane effective NAME -o json` |
+| Observe | `fabricctl dataplane observe -o json` |
+| Ipcache / refresh | `fabricctl dataplane ipcache\|refresh-dns -o json` |
+| Per-VM | `fabricctl dataplane status\|policy\|stats\|flows NAME` |
 
 ## Automated check
 

@@ -26,7 +26,7 @@ This is the user-facing onboarding guide — how to access the product, your fir
 **How to access it**
 
 - **Web:** React dashboard served by the `zyvor-fabricd` daemon at http://localhost:9095 — light Apple-style console with marketing site.  It shares the daemon's origin (no separate web server); generate the TLS cert with `./zyvor-fabricd-ctl tls`.
-- **CLI:** `zyvorctl` — scriptable client with table/JSON/YAML output (`--output json`). Examples: `zyvorctl list`, `zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096`, `zyvorctl start web-01`, `zyvorctl apply -f config.yaml`. 
+- **CLI:** `fabricctl` — scriptable client with table/JSON/YAML output (`--output json`). Examples: `fabricctl list`, `fabricctl create web-01 --image fedora-41 --cpus 2 --memory 4096`, `fabricctl start web-01`, `fabricctl apply -f config.yaml`. 
 - **API:** REST + WebSocket exposed by the `zyvor-fabricd` daemon (780+ endpoints under `/api/...`). Obtain a token with `POST /api/auth/login`, then pass `Authorization: Bearer ` on every call. The same API also backs the Terraform provider, the Kubernetes `VirtualMachine` CRD operator, and the Rust/Python/Ansible SDKs.
 - **Login:** Username `admin`; the initial password is auto-generated on first run — read it with `./zyvor-fabricd-ctl password` (or `sudo cat /var/lib/zyvor-fabricd/.admin_password`). JWT tokens last 24h by default (`auth.token_expiration_hours`); 3-tier RBAC (admin/user/viewer) is enforced on every endpoint, with optional TOTP 2FA.
 - **Needs:** A Linux host with systemd 256+ and KVM; install and bring the daemon up with `sudo systemctl enable --now zyvor-fabric`.
@@ -36,13 +36,13 @@ This is the user-facing onboarding guide — how to access the product, your fir
 - **Launch your first VM in five minutes**
   1. Start the daemon: `sudo systemctl enable --now zyvor-fabric`, then read the admin password with `./zyvor-fabricd-ctl password`.
   1. Pull a cloud image from the built-in catalog (`POST /api/images/cloud/download` with `{"name":"fedora-41"}`), or list options first with `GET /api/images/cloud`.
-  1. Create the VM: `zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096`.
-  1. Start it: `zyvorctl start web-01`, then confirm `state: running` with `zyvorctl list`.
+  1. Create the VM: `fabricctl create web-01 --image fedora-41 --cpus 2 --memory 4096`.
+  1. Start it: `fabricctl start web-01`, then confirm `state: running` with `fabricctl list`.
   1. Open a console from the web dashboard (http://localhost:9095).
 - **Manage VMs declaratively (GitOps)**
   1. Describe one or more VMs (name, cpus, memory, disk, image, tags/labels) in a YAML file.
-  1. Reconcile them into the fabric: `zyvorctl apply -f config.yaml`.
-  1. Commit `config.yaml` to git as the source of truth; re-run `zyvorctl apply -f config.yaml` to converge after edits.
+  1. Reconcile them into the fabric: `fabricctl apply -f config.yaml`.
+  1. Commit `config.yaml` to git as the source of truth; re-run `fabricctl apply -f config.yaml` to converge after edits.
   1. For K8s shops, express the same VMs as `VirtualMachine` CRDs and let the Helm-installed operator reconcile them continuously.
 - **Wire up VM networking**
   1. Create a bridge (virtual switch): `POST /api/networkd/bridges` with a name, address, and MTU — every change writes `.netdev`/`.network` files and reloads networkd.
@@ -72,17 +72,17 @@ This is the user-facing onboarding guide — how to access the product, your fir
 _Create, run, and reshape virtual machines with declarative or interactive workflows, backed by FluxVM._
 
 - **Full VM Lifecycle** — Create, start, stop, restart, pause, resume, hibernate, and delete VMs backed by KVM, via FluxVM. — _One consistent lifecycle across CLI, web, Terraform, and Kubernetes._
-  - **How:** CLI `zyvorctl start|stop|restart|delete <name>` (pause/resume are REST/Web only) · Web dashboard VM-list quick actions VMs view (`s`/`t`/`r`/`d`) · REST `POST /api/vms/:name/{start,stop,restart,pause,resume}` and `DELETE /api/vms/:name`.
-- **Declarative Apply** — Define VMs in YAML and reconcile them with zyvorctl apply -f config.yaml. — _GitOps-friendly infrastructure without a control-plane rewrite._
-  - **How:** CLI `zyvorctl apply -f config.yaml` reconciles a YAML spec (version it in git); equivalent imperative path is REST `POST /api/vms`, or a `VirtualMachine` CRD via the K8s operator.
+  - **How:** CLI `fabricctl start|stop|restart|delete <name>` (pause/resume are REST/Web only) · Web dashboard VM-list quick actions VMs view (`s`/`t`/`r`/`d`) · REST `POST /api/vms/:name/{start,stop,restart,pause,resume}` and `DELETE /api/vms/:name`.
+- **Declarative Apply** — Define VMs in YAML and reconcile them with fabricctl apply -f config.yaml. — _GitOps-friendly infrastructure without a control-plane rewrite._
+  - **How:** CLI `fabricctl apply -f config.yaml` reconciles a YAML spec (version it in git); equivalent imperative path is REST `POST /api/vms`, or a `VirtualMachine` CRD via the K8s operator.
 - **Cloning & Templates** — Full and linked copy-on-write clones plus reusable templates for rapid deployment. — _Stand up fleets from a golden image in seconds, not minutes._
-  - **How:** REST `POST /api/vms/:name/clone` (`linked_clone: true|false`) · templates via `POST /api/templates` and `POST /api/templates/:id/deploy` · Web Templates / VM Cloning pages (REST/Web only — no `zyvorctl` clone command).
+  - **How:** REST `POST /api/vms/:name/clone` (`linked_clone: true|false`) · templates via `POST /api/templates` and `POST /api/templates/:id/deploy` · Web Templates / VM Cloning pages (REST/Web only — no `fabricctl` clone command).
 - **Hibernate & Checkpoint** — Suspend-to-disk hibernate, resume from snapshot, and VM checkpoint/restore and forking. — _Pause idle workloads and restore exact machine state on demand._
-  - **How:** REST `POST /api/vms/:name/snapshots` — `Disk` (default; live via QMP internal sync) or `Full` (live via `snapshot-save`, disk + memory) · revert with `POST .../snapshots/:id/revert` (VM stopped) · Web VM detail Snapshots tab (REST/Web only — no `zyvorctl` snapshot command).
+  - **How:** REST `POST /api/vms/:name/snapshots` — `Disk` (default; live via QMP internal sync) or `Full` (live via `snapshot-save`, disk + memory) · revert with `POST .../snapshots/:id/revert` (VM stopped) · Web VM detail Snapshots tab (REST/Web only — no `fabricctl` snapshot command).
 - **Live Hotplug** — Hotplug CPU, memory, disk, and NIC into running VMs without a reboot. — _Scale a VM to demand while it keeps serving traffic._
   - **How:** Web VM detail Hotplug tab (live CPU/memory/disk/NIC) · REST resource endpoints under `/api/system/vms/:name/...` · emits `cpu_hotplug`/`memory_hotplug`/`disk_attached` events on the SSE stream.
 - **Disk Import & Conversion** — Import VMs from VMDK, VDI, and VHD with auto-conversion to qcow2, and online disk resize via QMP. — _Bring machines off VMware or VirtualBox without downtime._
-  - **How:** REST `POST /api/images/import` (VMDK/VDI/VHD → qcow2) and online resize `POST /api/images/:id/resize` · Web VM Create from imported image (REST/Web only — no `zyvorctl` image command).
+  - **How:** REST `POST /api/images/import` (VMDK/VDI/VHD → qcow2) and online resize `POST /api/images/:id/resize` · Web VM Create from imported image (REST/Web only — no `fabricctl` image command).
 - **Golden Images** — Turn any configured VM's current disk into a new, independent, catalog-registered base image — not a template's config recipe or a live copy-on-write fork, an actual standalone qcow2 file other VMs can boot from even after the source VM is gone. — _Get a workload exactly the way you want it once, then stamp out fleets from it._
   - **How:** REST `POST /api/images/from-vm/:name` (async job, poll `GET /api/images/convert/:id`) · Web Create VM → "Create golden image from a VM." Each image is certified with [GuestKit](https://github.com/zyvorai/guestkit)'s offline `doctor` boot-readiness analysis (not qemu-guest-agent — Zyvor Fabric uses GuestKit for all guest/image inspection) as soon as conversion finishes; the score attaches to the job once ready and requires no agent running inside the guest.
 - **OS Image Catalog** — Download ready-made Ubuntu, Fedora, Debian, AlmaLinux, or Flatcar cloud images straight into the local catalog, reusing an already-downloaded copy instead of re-fetching it. — _Skip hunting for cloud-image URLs before your first VM._
@@ -97,7 +97,7 @@ _Six pluggable backends, live disk mobility, and a built-in cloud-image catalog.
 - **Six Storage Backends** — Pool and volume management across Local, NFS, LVM, LVM-thin, ZFS, and Ceph/RBD. — _Use the storage you already run — no dedicated SAN required._
   - **How:** REST `POST /api/storage/pools/{local,nfs,lvm,lvm-thin,zfs,ceph}`, list with `GET /api/storage/pools` · Web Storage page Storage view (type auto-detected).
 - **Volume Management** — Full volume CRUD with attach/detach, online resize, and clone operations. — _Reshape storage for a workload without recreating the VM._
-  - **How:** Volume CRUD + attach/detach/resize/clone via the `/api/storage/...` volume endpoints · Web Storage → Volumes (capacity + attachment info) · `zyvorctl ceph` covers Ceph pools/images specifically; other backends and generic volume CRUD are REST/Web only.
+  - **How:** Volume CRUD + attach/detach/resize/clone via the `/api/storage/...` volume endpoints · Web Storage → Volumes (capacity + attachment info) · `fabricctl ceph` covers Ceph pools/images specifically; other backends and generic volume CRUD are REST/Web only.
 - **Snapshots & Retention** — Create and restore snapshots with configurable retention policies. — _Roll back a bad change in seconds and prune old state automatically._
   - **How:** REST `POST /api/vms/:name/snapshots`, `GET .../snapshots/tree`, `POST .../snapshots/:id/revert` · Web VM Snapshots tab · retention applied per backup/snapshot policy.
 - **Storage Live Migration** — Move VM disks between pools with no downtime, guided by SDRS recommendations. — _Rebalance or evacuate storage while VMs stay online._
@@ -152,7 +152,7 @@ _JWT auth, enterprise SSO, RBAC, multi-tenancy, and encryption on every endpoint
 _Live migration, fault tolerance, and multi-site recovery._
 
 - **Live Migration** — Move VMs between hosts: production **disk-copy** (iterative rsync pre-copy + cutover) with progress/cancel; **native** FluxVM VMM transport + receivers is **preview**. — _Drain a host for maintenance without stopping workloads._
-  - **How:** Disk-copy via `/api/migrations` · Web → Operations → Migrations. Native: `/api/vms/{name}/migration/native/*` + receivers (see FLUXVM-FABRIC-BOUNDARY) · CLI `zyvorctl runtime migrate`.
+  - **How:** Disk-copy via `/api/migrations` · Web → Operations → Migrations. Native: `/api/vms/{name}/migration/native/*` + receivers (see FLUXVM-FABRIC-BOUNDARY) · CLI `fabricctl runtime migrate`.
 - **Fault Tolerance & Fencing** — Continuous VM replication with automatic failover detection, fencing, and FT metrics. — _Survive a node loss with minimal recovery time._
   - **How:** Continuous replication + automatic failover detection + fencing via the fault-tolerance REST endpoints (FT metrics exposed) · Web Site Operations → Fault tolerance.
 - **Predictive DRS** — Distributed resource scheduling with demand forecasting, proactive placement, and affinity/anti-affinity rules. — _Keep clusters balanced before hotspots become outages._
@@ -167,7 +167,7 @@ _Live migration, fault tolerance, and multi-site recovery._
 _Low-level control over CPU topology, memory, accelerators, and firmware._
 
 - **GPU Passthrough** — Pass a physical NVIDIA or AMD GPU through to a VM via VFIO once it's bound to `vfio-pci` (generic PCI passthrough — no vGPU/mediated-device support). — _Run AI, rendering, and CAD workloads at near-bare-metal speed._
-  - **How:** REST `GET /api/system/pci-devices`, `POST`/`DELETE /api/vms/:name/devices/pci` · Web VM detail Devices tab; requires matching IOMMU/hardware and manually binding the device to `vfio-pci` first (no `zyvorctl` command for this).
+  - **How:** REST `GET /api/system/pci-devices`, `POST`/`DELETE /api/vms/:name/devices/pci` · Web VM detail Devices tab; requires matching IOMMU/hardware and manually binding the device to `vfio-pci` first (no `fabricctl` command for this).
 - **CPU Pinning & NUMA** — CPU topology control, pinning, NUMA-aware placement, and nested virtualization. — _Squeeze predictable performance from latency-sensitive VMs._
   - **How:** REST `GET /api/system/numa-topology`, placement hint `GET /api/system/numa/placement`, and `POST /api/system/vms/:name/cpu-pinning` (Auto/NumaNode/Socket/Explicit) · Web VM advanced CPU settings.
 - **Memory Optimization** — Memory ballooning, hugepages, and KSM page deduplication via a system resource manager. — _Fit more VMs per host without starving any of them._
@@ -202,13 +202,13 @@ _Four first-class ways to drive the same daemon — pick per task, not per produ
 
 | Interface | Best for | Highlights |
 |---|---|---|
-| zyvorctl CLI | Scripting & automation | JSON/YAML/table output, apply -f |
+| fabricctl CLI | Scripting & automation | JSON/YAML/table output, apply -f |
 | Web dashboard | Operators & teams | 85+ console pages under `/app` plus marketing routes, Ctrl+K palette, bulk ops |
 | K8s operator | GitOps / K8s shops | VirtualMachine CRD reconciliation |
 | Terraform / SDK | Infra-as-code | plan/apply, typed Rust + Python + Ansible |
 
-- **zyvorctl CLI** — Scriptable command-line client with JSON/YAML/table output covering VM, policy, storage, and network operations. — _Automate anything the platform can do from a shell script._
-  - **How:** Install the `zyvorctl` binary and point it at the daemon: `zyvorctl list`, `zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096`, `zyvorctl apply -f config.yaml`, with `--output json|yaml|table` (or `-o`).
+- **fabricctl CLI** — Scriptable command-line client with JSON/YAML/table output covering VM, policy, storage, and network operations. — _Automate anything the platform can do from a shell script._
+  - **How:** Install the `fabricctl` binary and point it at the daemon: `fabricctl list`, `fabricctl create web-01 --image fedora-41 --cpus 2 --memory 4096`, `fabricctl apply -f config.yaml`, with `--output json|yaml|table` (or `-o`).
 
 - **Web Dashboard** — Hybrid marketing + `/app` console, Ctrl+K palette, light Apple UI, live WebSocket updates, and bulk operations. — _Give operators a full GUI without giving up the API._
   - **How:** Browse to http://localhost:9095, sign in at `/sign-in`, open `/app` and log in as `admin`; `Ctrl+K` command palette, 85+ console pages under `/app` plus marketing routes, bulk ops, and live WebSocket/SSE updates — served by the daemon itself. A fresh install with no VMs yet shows a "Getting Started" panel instead of an empty table, linking straight to VM creation, templates, the playground, and access control. Deleting a VM is undoable for a few seconds via an Undo bar before the delete actually fires.
@@ -240,7 +240,7 @@ _Datacenter hierarchy, resource pools, chargeback, and lifecycle compliance at s
 
 1. **Install in one command** — Clone the repo and run make build && sudo make install, or ./zyvor-fabricd-ctl deploy for an auto-sudo end-to-end setup.
 2. **Start the service** — Run sudo systemctl enable --now zyvor-fabric, then read the auto-generated admin password with ./zyvor-fabricd-ctl password.
-3. **Create your first VM** — Use zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096, or declare it in YAML and run zyvorctl apply -f config.yaml.
+3. **Create your first VM** — Use fabricctl create web-01 --image fedora-41 --cpus 2 --memory 4096, or declare it in YAML and run fabricctl apply -f config.yaml.
 4. **Open your interface of choice** — Open the web dashboard at http://localhost:9095 to manage the fleet.
 5. **Verify and monitor** — Run ./zyvor-fabricd-ctl verify and ./zyvor-fabricd-ctl health, then scrape /metrics into Prometheus and import the bundled Grafana dashboard.
 

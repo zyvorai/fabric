@@ -72,7 +72,7 @@ The entire codebase has undergone a **31-round security audit**: 194 issues iden
 
 The exhaustive, line-by-line checklist lives in **[FEATURES.md](../FEATURES.md)**. This section is the skim version — one paragraph per area.
 
-**VM lifecycle** — create, start, stop, restart, pause, resume, delete, hibernate (suspend-to-disk), full/linked cloning with CoW, templates, declarative config (`zyvorctl apply -f config.yaml`), VM import from VMDK/VDI/VHD, online disk resize.
+**VM lifecycle** — create, start, stop, restart, pause, resume, delete, hibernate (suspend-to-disk), full/linked cloning with CoW, templates, declarative config (`fabricctl apply -f config.yaml`), VM import from VMDK/VDI/VHD, online disk resize.
 
 **Storage** — 6 backends (Local, NFS, LVM, LVM-thin, ZFS, Ceph/RBD), volume CRUD, snapshots with retention, ZFS incremental replication, Ceph cluster health/RBD management, live storage migration between pools, built-in cloud image catalog (Ubuntu/Fedora/Debian/Alma).
 
@@ -92,22 +92,22 @@ The exhaustive, line-by-line checklist lives in **[FEATURES.md](../FEATURES.md)*
 
 ## Management Interfaces
 
-### CLI (`zyvorctl`)
+### CLI (`fabricctl`)
 
 Scriptable command-line tool with JSON/YAML/table output:
 
 ```bash
-zyvorctl list -o json
-zyvorctl create myvm --image=ubuntu.qcow2 --cpus=4 --memory=4G
-zyvorctl start myvm
-zyvorctl apply -f infrastructure.yaml
-zyvorctl policy list
-zyvorctl ceph health my-pool
+fabricctl list -o json
+fabricctl create myvm --image=ubuntu.qcow2 --cpus=4 --memory=4G
+fabricctl start myvm
+fabricctl apply -f infrastructure.yaml
+fabricctl policy list
+fabricctl ceph health my-pool
 ```
 
 ### Web Dashboard
 
-Hybrid UI: public marketing pages (`/`, `/product`, `/platform`, `/security`) and a light Apple-style console under `/app` (React 19, SF Pro / system UI fonts, command palette Ctrl+K, WebSocket updates, bulk operations). Sign in at `/sign-in`. The former `zyvorctl-tui` terminal dashboard has been removed — use the web console or `zyvorctl`.
+Hybrid UI: public marketing pages (`/`, `/product`, `/platform`, `/security`) and a light Apple-style console under `/app` (React 19, SF Pro / system UI fonts, command palette Ctrl+K, WebSocket updates, bulk operations). Sign in at `/sign-in`. The former `zyvorctl-tui` terminal dashboard has been removed — use the web console or `fabricctl`.
 
 ### Kubernetes Operator
 
@@ -143,7 +143,7 @@ resource "zyvor_fabric_vm" "web" {
 
 ```
                     +-----------+    +----------+    +-----------+    +------------+
-                    |  zyvorctl |    |  Web UI  |    |    K8s    |    | Terraform  |
+                    |  fabricctl |    |  Web UI  |    |    K8s    |    | Terraform  |
                     |   (CLI)   |    | (React)  |    | Operator  |    | Provider   |
                     +-----+-----+    +----+-----+    +-----+-----+    +------+-----+
                           |               |                |                  |

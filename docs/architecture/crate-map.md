@@ -124,7 +124,7 @@ Enterprise management features for large-scale VM deployments.
 
 | Crate       | Path                  | Description                                              |
 |-------------|-----------------------|----------------------------------------------------------|
-| `zyvorctl`     | `backend/zyvorctl`       | Command-line client. Talks to Zyvor Fabric REST API. VM lifecycle commands, image management, status queries. |
+| `fabricctl`     | `backend/fabricctl`       | Command-line client. Talks to Zyvor Fabric REST API. VM lifecycle commands, image management, status queries. |
 | `zyvor-fabric-sdk`| `backend/zyvor-fabric-sdk` | Typed Rust SDK for the Zyvor Fabric API. Async client with builder pattern, authentication helpers, VM lifecycle, storage, networking, and streaming support. |
 
 ### Web UI (not a Rust crate)
@@ -155,7 +155,7 @@ Enterprise management features for large-scale VM deployments.
 | `prometheus`           | -       | prometheus-exporter | Metrics registry               |
 | `uuid`                 | 1.16    | All crates        | UUID v4/v5 generation            |
 | `chrono`               | 0.4     | All crates        | Date/time handling               |
-| `clap`                 | 4.5     | zyvorctl          | CLI argument parsing             |
+| `clap`                 | 4.5     | fabricctl          | CLI argument parsing             |
 | `futures`              | 0.3     | Async crates      | Stream/sink utilities            |
 | `rand`                 | 0.9     | security, core    | Random number generation         |
 | `tar` / `flate2`       | 0.4/1.1 | content-library   | Archive handling                 |

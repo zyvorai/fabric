@@ -70,4 +70,4 @@ Canonical route: **`/app/create`**.
 
 ## Interfaces
 
-Human UI is **web only**. CLI (`zyvorctl`), Kubernetes operator, and Terraform remain. The former terminal UI (`zyvorctl-tui`) has been removed.
+Human UI is **web only**. CLI (`fabricctl`), Kubernetes operator, and Terraform remain. The former terminal UI (`zyvorctl-tui`) has been removed.

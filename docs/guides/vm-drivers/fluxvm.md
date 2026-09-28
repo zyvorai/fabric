@@ -37,7 +37,7 @@ Operator UX: [fluxvm-dataplane.md](fluxvm-dataplane.md) · tutorials
 [09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).
 
 Production alignment with FluxVM: Fabric `GET /readyz`, create `tenant` /
-`labels.tenant`, `GET /api/vms?tenant=`, `zyvorctl create --tenant`, and JWT
+`labels.tenant`, `GET /api/vms?tenant=`, `fabricctl create --tenant`, and JWT
 `tenant` claim enforcement (create mismatch → 403; get/mutate other tenant → 404).
 When FluxVM enables `[[auth.tokens]]`, set `driver.fluxvm_token`. Optional
 `network.hubble_ui_url` is an external Hubble link only — see
@@ -80,7 +80,7 @@ Bridged VMs are created with `NetworkSpec::Tap { netns: true }` (per-VM network 
 {"network":{"mode":"tap","mac":"02:00:00:00:0a:0a","direct":{"outer":"enp1s0","mode":"l2-uplink","guest_ips":["192.168.1.50"]}}}
 ```
 
-On Fabric that is `direct_uplink` plus optional `direct_guest_ips` on create (`zyvorctl create --direct-uplink enp1s0 --direct-guest-ip 192.168.1.50`). The spec is stored on the VM and sent on first start. A later change is `PUT /api/vms/{name}/direct-uplink` (`zyvorctl direct-uplink`), which drops the FluxVM record so the next start creates the new tap. NIC hotplug of a direct uplink is `POST /v1/vms/{id}/hotplug/nic`; a bridged hotplug stays on QMP. A hotplug onto a VM that is not already bridged or NAT is stored on the VM so a restart keeps it.
+On Fabric that is `direct_uplink` plus optional `direct_guest_ips` on create (`fabricctl create --direct-uplink enp1s0 --direct-guest-ip 192.168.1.50`). The spec is stored on the VM and sent on first start. A later change is `PUT /api/vms/{name}/direct-uplink` (`fabricctl direct-uplink`), which drops the FluxVM record so the next start creates the new tap. NIC hotplug of a direct uplink is `POST /v1/vms/{id}/hotplug/nic`; a bridged hotplug stays on QMP. A hotplug onto a VM that is not already bridged or NAT is stored on the VM so a restart keeps it.
 
 | Capability | `driver-core` trait | FluxVM endpoint(s) |
 | --- | --- | --- |
@@ -130,19 +130,19 @@ On Fabric that is `direct_uplink` plus optional `direct_guest_ips` on create (`z
 export ZYVOR_FABRIC_URL=https://127.0.0.1:9095
 export ZYVOR_FABRIC_TOKEN=…   # from POST /api/auth/login
 
-zyvorctl dataplane status <name>
-zyvorctl dataplane policy get <name>
-zyvorctl dataplane policy set <name> --file policy.json
-zyvorctl dataplane effective <name>
-zyvorctl dataplane stats <name>
-zyvorctl dataplane flows <name> --limit 100
-zyvorctl dataplane health
-zyvorctl dataplane service list
-zyvorctl dataplane service status
-zyvorctl dataplane service health
-zyvorctl dataplane group list
-zyvorctl dataplane cnp list
-zyvorctl dataplane observe
+fabricctl dataplane status <name>
+fabricctl dataplane policy get <name>
+fabricctl dataplane policy set <name> --file policy.json
+fabricctl dataplane effective <name>
+fabricctl dataplane stats <name>
+fabricctl dataplane flows <name> --limit 100
+fabricctl dataplane health
+fabricctl dataplane service list
+fabricctl dataplane service status
+fabricctl dataplane service health
+fabricctl dataplane group list
+fabricctl dataplane cnp list
+fabricctl dataplane observe
 ```
 
 **Do not confuse** this with Fabric's `/api/network-policies` (label→nftables SDN on the host). The VM-detail tab is labeled **Dataplane**; cluster UI is **Edge Dataplane** (`/app/edge-dataplane`).

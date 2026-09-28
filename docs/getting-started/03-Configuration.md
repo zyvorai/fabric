@@ -220,7 +220,7 @@ Read the current admin password:
 
 ```bash
 sudo cat /var/lib/zyvor-fabricd/.admin_password
-# Or using zyvorctl
+# Or using fabricctl
 ./zyvor-fabricd-ctl password
 ```
 

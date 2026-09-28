@@ -39,7 +39,7 @@ Expect something like:
 
 ```bash
 curl -sk "$FABRIC_HOST/api/dataplane/health" "${AUTH[@]}" | jq .
-# or: zyvorctl dataplane health -o json
+# or: fabricctl dataplane health -o json
 ```
 
 Important fields:

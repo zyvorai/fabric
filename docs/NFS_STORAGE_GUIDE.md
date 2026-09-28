@@ -217,7 +217,7 @@ curl -X POST http://localhost:9095/api/storage/pools/nfs-pool-1/refresh
 ### Create VM with NFS Storage
 
 ```bash
-zyvorctl create my-vm \
+fabricctl create my-vm \
   --image=/mnt/nfs-pool/images/ubuntu-22.04.qcow2 \
   --cpus=4 \
   --memory=4096
@@ -230,7 +230,7 @@ zyvorctl create my-vm \
 qemu-img create -f qcow2 /mnt/nfs-pool/vms/my-vm.qcow2 20G
 
 # Use for VM
-zyvorctl create my-vm --disk=/mnt/nfs-pool/vms/my-vm.qcow2
+fabricctl create my-vm --disk=/mnt/nfs-pool/vms/my-vm.qcow2
 ```
 
 ---

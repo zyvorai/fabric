@@ -16,13 +16,35 @@ use crate::style::{self, ColorMode};
 
 static API_BASE: Mutex<String> = Mutex::new(String::new());
 
+const DEFAULT_ROOT: &str = "http://localhost:9095";
+
+/// True when neither `--server` nor `ZYVOR_FABRIC_URL` / `FABRIC_URL` picked the server.
+fn server_is_default(server: Option<&str>) -> bool {
+    server.is_none()
+        && std::env::var("ZYVOR_FABRIC_URL").is_err()
+        && std::env::var("FABRIC_URL").is_err()
+}
+
+/// A default install serves TLS on 9095 (`[tls] enabled`, self-signed), while the
+/// Docker config serves plain HTTP. With no server given, use https if it answers.
+async fn probe_default_https() -> Option<String> {
+    let client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .timeout(std::time::Duration::from_secs(1))
+        .build()
+        .ok()?;
+    let url = DEFAULT_ROOT.replacen("http://", "https://", 1);
+    client.get(format!("{url}/health")).send().await.ok()?;
+    Some(format!("{url}/api"))
+}
+
 /// Fabric API root including `/api` (override with `--server` / `ZYVOR_FABRIC_URL` / `FABRIC_URL`).
 fn resolve_api_base(server: Option<&str>) -> String {
     let root = server
         .map(|s| s.to_string())
         .or_else(|| std::env::var("ZYVOR_FABRIC_URL").ok())
         .or_else(|| std::env::var("FABRIC_URL").ok())
-        .unwrap_or_else(|| "http://localhost:9095".to_string());
+        .unwrap_or_else(|| DEFAULT_ROOT.to_string());
     let root = root.trim_end_matches('/').to_string();
     if root.ends_with("/api") {
         root
@@ -64,7 +86,7 @@ pub enum OutputFormat {
 // ─── Main CLI ────────────────────────────────────────────────────────────────
 
 #[derive(Parser)]
-#[command(name = "zyvorctl")]
+#[command(name = "fabricctl")]
 #[command(about = "Zyvor Fabric CLI", long_about = None)]
 // clap's --version auto-wiring needs the "cargo" feature (this workspace
 // doesn't enable it, backend/Cargo.toml:75) -- pass the version explicitly
@@ -84,7 +106,7 @@ pub struct Cli {
     #[arg(long, default_value = "auto", global = true, value_enum)]
     color: ColorMode,
 
-    /// Fabric API URL (overrides ZYVOR_FABRIC_URL / FABRIC_URL)
+    /// Fabric API URL (overrides ZYVOR_FABRIC_URL / FABRIC_URL; default http://localhost:9095, or https when that answers)
     #[arg(long, global = true)]
     server: Option<String>,
 
@@ -341,7 +363,7 @@ enum DataplaneCmd {
     Observe,
     /// Hubble-style packet flows (JSON from Fabric; color/plain via --style)
     ///
-    /// Uses `--style` (not global `-o/--output`) because `zyvorctl` already
+    /// Uses `--style` (not global `-o/--output`) because `fabricctl` already
     /// reserves `-o` for table|json|yaml. Default: color on TTY, else plain.
     Hubble {
         #[arg(long = "style", default_value = "auto")]
@@ -1551,7 +1573,7 @@ fn print_config(
     });
     match fmt {
         OutputFormat::Table => {
-            println!("{}", style::heading("⚙️  zyvorctl config"));
+            println!("{}", style::heading("⚙️  fabricctl config"));
             println!("  server:    {}", base);
             println!(
                 "  token:     {}",
@@ -1633,7 +1655,7 @@ async fn run_status(client: &Client, fmt: OutputFormat, token_set: bool) -> Resu
                 });
                 print_value(&report, fmt);
                 if !ok {
-                    anyhow::bail!("zyvorctl status: unhealthy");
+                    anyhow::bail!("fabricctl status: unhealthy");
                 }
                 return Ok(());
             }
@@ -1646,7 +1668,7 @@ async fn run_status(client: &Client, fmt: OutputFormat, token_set: bool) -> Resu
 
     match fmt {
         OutputFormat::Table => {
-            println!("{}", style::heading("❤️  zyvorctl status"));
+            println!("{}", style::heading("❤️  fabricctl status"));
             for (name, detail) in &lines {
                 let lower = detail.to_ascii_lowercase();
                 let line = if lower.contains("ok")
@@ -1677,7 +1699,7 @@ async fn run_status(client: &Client, fmt: OutputFormat, token_set: bool) -> Resu
     }
 
     if !ok {
-        anyhow::bail!("zyvorctl status: unhealthy");
+        anyhow::bail!("fabricctl status: unhealthy");
     }
     Ok(())
 }
@@ -1697,7 +1719,7 @@ impl Cli {
         // Meta commands that do not need an HTTP client
         if let Commands::Completion { shell } = &command {
             let mut cmd = Self::command_with_grouped_help();
-            generate(*shell, &mut cmd, "zyvorctl", &mut io::stdout());
+            generate(*shell, &mut cmd, "fabricctl", &mut io::stdout());
             return Ok(());
         }
         if matches!(command, Commands::Config) {
@@ -1709,6 +1731,11 @@ impl Cli {
             );
         }
 
+        if server_is_default(self.server.as_deref()) {
+            if let Some(https) = probe_default_https().await {
+                set_api_base(https);
+            }
+        }
         let base = api_base();
         let mut headers = reqwest::header::HeaderMap::new();
         if let Some(token) = auth_token(self.token.as_deref()) {
@@ -3366,7 +3393,7 @@ mod container_group_cli_tests {
 
     #[test]
     fn container_group_list_parses() {
-        let cli = Cli::try_parse_from(["zyvorctl", "container-group", "list"]).unwrap();
+        let cli = Cli::try_parse_from(["fabricctl", "container-group", "list"]).unwrap();
         assert!(matches!(
             cli.command,
             Some(Commands::ContainerGroup(ContainerGroupCmd::List))
@@ -3375,9 +3402,9 @@ mod container_group_cli_tests {
 
     #[test]
     fn container_group_apply_requires_a_file() {
-        assert!(Cli::try_parse_from(["zyvorctl", "container-group", "apply"]).is_err());
-        let cli =
-            Cli::try_parse_from(["zyvorctl", "container-group", "apply", "-f", "cg.yaml"]).unwrap();
+        assert!(Cli::try_parse_from(["fabricctl", "container-group", "apply"]).is_err());
+        let cli = Cli::try_parse_from(["fabricctl", "container-group", "apply", "-f", "cg.yaml"])
+            .unwrap();
         match cli.command {
             Some(Commands::ContainerGroup(ContainerGroupCmd::Apply { file })) => {
                 assert_eq!(file, "cg.yaml");
@@ -3388,8 +3415,8 @@ mod container_group_cli_tests {
 
     #[test]
     fn container_group_delete_requires_a_name() {
-        assert!(Cli::try_parse_from(["zyvorctl", "container-group", "delete"]).is_err());
-        let cli = Cli::try_parse_from(["zyvorctl", "container-group", "delete", "web"]).unwrap();
+        assert!(Cli::try_parse_from(["fabricctl", "container-group", "delete"]).is_err());
+        let cli = Cli::try_parse_from(["fabricctl", "container-group", "delete", "web"]).unwrap();
         match cli.command {
             Some(Commands::ContainerGroup(ContainerGroupCmd::Delete { name })) => {
                 assert_eq!(name, "web");
@@ -3400,7 +3427,7 @@ mod container_group_cli_tests {
 
     #[test]
     fn container_group_backup_create_defaults_retention_days_to_30() {
-        let cli = Cli::try_parse_from(["zyvorctl", "container-group", "backup", "create", "web"])
+        let cli = Cli::try_parse_from(["fabricctl", "container-group", "backup", "create", "web"])
             .unwrap();
         match cli.command {
             Some(Commands::ContainerGroup(ContainerGroupCmd::Backup(
@@ -3418,9 +3445,11 @@ mod container_group_cli_tests {
 
     #[test]
     fn container_group_backup_restore_requires_an_id() {
-        assert!(Cli::try_parse_from(["zyvorctl", "container-group", "backup", "restore"]).is_err());
+        assert!(
+            Cli::try_parse_from(["fabricctl", "container-group", "backup", "restore"]).is_err()
+        );
         let cli = Cli::try_parse_from([
-            "zyvorctl",
+            "fabricctl",
             "container-group",
             "backup",
             "restore",
@@ -3440,14 +3469,18 @@ mod container_group_cli_tests {
     #[test]
     fn meta_commands_parse() {
         assert!(matches!(
-            Cli::try_parse_from(["zyvorctl", "status"]).unwrap().command,
+            Cli::try_parse_from(["fabricctl", "status"])
+                .unwrap()
+                .command,
             Some(Commands::Status)
         ));
         assert!(matches!(
-            Cli::try_parse_from(["zyvorctl", "config"]).unwrap().command,
+            Cli::try_parse_from(["fabricctl", "config"])
+                .unwrap()
+                .command,
             Some(Commands::Config)
         ));
-        let cli = Cli::try_parse_from(["zyvorctl", "completion", "zsh"]).unwrap();
+        let cli = Cli::try_parse_from(["fabricctl", "completion", "zsh"]).unwrap();
         assert!(matches!(
             cli.command,
             Some(Commands::Completion { shell: Shell::Zsh })
@@ -3455,8 +3488,8 @@ mod container_group_cli_tests {
     }
 
     #[test]
-    fn bare_zyvorctl_has_no_command() {
-        let cli = Cli::try_parse_from(["zyvorctl"]).unwrap();
+    fn bare_fabricctl_has_no_command() {
+        let cli = Cli::try_parse_from(["fabricctl"]).unwrap();
         assert!(cli.command.is_none());
     }
 }

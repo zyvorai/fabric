@@ -38,7 +38,7 @@ curl -sk -X POST "$FABRIC_HOST/api/dataplane/groups" "${AUTH[@]}" -d '{
 ```bash
 curl -sk "$FABRIC_HOST/api/dataplane/groups" "${AUTH[@]}" | jq '.items[] | {name, identity, labels}'
 curl -sk "$FABRIC_HOST/api/dataplane/groups/web" "${AUTH[@]}" | jq .
-# zyvorctl dataplane group list -o json
+# fabricctl dataplane group list -o json
 ```
 
 ## 3. Attach the VM via labels (or group name)
@@ -90,7 +90,7 @@ cat >/tmp/group-web.json <<'EOF'
   }
 }
 EOF
-zyvorctl dataplane group create --file /tmp/group-web.json -o json
+fabricctl dataplane group create --file /tmp/group-web.json -o json
 ```
 
 ## Next

@@ -56,8 +56,8 @@ sudo zyvor-fabricd
 # or: sudo systemctl enable --now zyvor-fabricd
 
 # CLI
-zyvorctl list
-zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
+fabricctl list
+fabricctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 
 # Web UI → https://localhost:9095  (console at /app; Create VM has optional Tenant)
 ```
@@ -70,7 +70,7 @@ zyvorctl create web-01 --image fedora-41 --cpus 2 --memory 4096 --tenant acme
 | **Kubernetes (k3s lab / Helm)** | [`./scripts/deploy k8s USER@HOST`](#run-on-kubernetes) → [docs/KUBERNETES.md](docs/KUBERNETES.md) |
 | **AI inference (Beta)** | [Tutorial 15](docs/tutorials/15-ai-workloads.md) · [docs/ai-workloads.md](docs/ai-workloads.md) · console `/app/ai` |
 | **Keep** (open agent workstation) | [Tutorial 16](docs/tutorials/16-keep-workstation.md) · [Tutorial 17](docs/tutorials/17-keep-pdf-brief.md) · [docs/keep/KEEP.md](docs/keep/KEEP.md) · `./scripts/keep-live-lab.sh` · console `/keep` · [Pages](https://zyvorai.github.io/fabric/keep) · `./scripts/keepctl` |
-| Declarative VMs | `zyvorctl apply -f config.yaml` |
+| Declarative VMs | `fabricctl apply -f config.yaml` |
 | Terraform | [terraform-provider/](terraform-provider/) |
 | K8s operator (CRDs → API) | [operator/](operator/) |
 | Ansible | [ansible/](ansible/) |
@@ -84,7 +84,7 @@ Verify after start:
 curl -sf http://127.0.0.1:9095/health
 curl -sf http://127.0.0.1:9095/readyz | jq '{ok, store, fluxvm_ok: .fluxvm.ok}'
 curl -sf http://127.0.0.1:7788/readyz | jq .
-# Multi-tenant: zyvorctl create … --tenant acme; JWT tenant claim scopes list/get/mutate
+# Multi-tenant: fabricctl create … --tenant acme; JWT tenant claim scopes list/get/mutate
 # When FluxVM auth is on: set driver.fluxvm_token in zyvor-fabricd.toml
 ```
 
@@ -96,7 +96,7 @@ curl -sf http://127.0.0.1:7788/readyz | jq .
 |---------|---------------------|
 | Private cloud usually means a heavy hypervisor stack | A lightweight, disposable VM engine underneath ([FluxVM](https://github.com/zyvorai/fluxvm)) — no systemd dependency, no vCenter |
 | No unified API across interfaces | 780+ REST endpoints and 3 WebSocket channels, one daemon, four front doors |
-| Scripting vs. GUI is usually either/or | CLI (`zyvorctl`) + web console + Terraform + Kubernetes operator, all first-class |
+| Scripting vs. GUI is usually either/or | CLI (`fabricctl`) + web console + Terraform + Kubernetes operator, all first-class |
 | Enterprise needs RBAC, audit, and encryption | JWT auth, 3-tier RBAC, audit export, encryption at rest |
 | GPU passthrough is bolted on elsewhere | Generic PCI/VFIO passthrough REST API on Linux KVM |
 | Inference needs a second control plane | **AI Workloads (Beta)** — models, Maglev backends, OpenAI gateway, Janus lab GPU or real NVIDIA VMs |
@@ -273,7 +273,7 @@ Zyvor Fabric is a thin, opinionated layer. It doesn't own a hypervisor or a gues
 ```mermaid
 flowchart TB
   subgraph Interfaces
-    CLI[zyvorctl CLI]
+    CLI[fabricctl CLI]
     Web[Web console]
     TF[Terraform provider]
     Op[Kubernetes operator]
@@ -305,7 +305,7 @@ OpenAI-compatible inference on the same daemon — no separate AI control plane.
 |---|---|
 | **Maturity** | Single-cluster **Beta** · multi-site HA store stays Preview · **not GA** |
 | **Console** | `/app/ai` — Models, Deployments, Endpoints, API keys, Nodes |
-| **CLI** | `zyvorctl ai model \| profile \| deploy \| endpoint \| key \| gpus \| node \| capacity` |
+| **CLI** | `fabricctl ai model \| profile \| deploy \| endpoint \| key \| gpus \| node \| capacity` |
 | **Gateway** | `/api/ai/openai/{endpoint}/v1/chat/completions` |
 | **Lab without NVIDIA** | Set `FLUXVM_AI_JANUS_URL` — [Zyvor Janus](https://github.com/zyvorai/janus) is the virtual upstream |
 | **Real GPUs** | FluxVM inventory + VFIO VM + runtime image (`FLUXVM_AI_IMAGE`) |
@@ -313,11 +313,11 @@ OpenAI-compatible inference on the same daemon — no separate AI control plane.
 | **MIG** | Janus records always · PCI via `FLUXVM_AI_PCI_MIG=1` |
 
 ```bash
-zyvorctl ai model add demo-qwen --source hf://Qwen/Qwen3-8B
-zyvorctl ai profile add demo-24g --runtime vllm --gpu 1 --vram 24 --cpu 8 --memory 32
-zyvorctl ai deploy demo-qwen --profile demo-24g --replicas 1
-zyvorctl ai endpoint expose demo-qwen --openai-compatible
-zyvorctl ai key create demo-key --endpoint demo-qwen-openai
+fabricctl ai model add demo-qwen --source hf://Qwen/Qwen3-8B
+fabricctl ai profile add demo-24g --runtime vllm --gpu 1 --vram 24 --cpu 8 --memory 32
+fabricctl ai deploy demo-qwen --profile demo-24g --replicas 1
+fabricctl ai endpoint expose demo-qwen --openai-compatible
+fabricctl ai key create demo-key --endpoint demo-qwen-openai
 # → POST $FABRIC_URL/api/ai/openai/demo-qwen-openai/v1/chat/completions
 ```
 

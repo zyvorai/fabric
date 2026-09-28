@@ -273,7 +273,7 @@ See [crate-map.md](crate-map.md) for the complete listing.
 
 **Utilities** (5 crates): `cloud-init`, `prometheus-exporter`, `vnc-proxy`, `ova-tools`, `api-error`
 
-**CLI and UI** (2 crates + web): `zyvorctl`, `zyvor-fabric-sdk`, plus the React web console (`web/`, not a Rust crate)
+**CLI and UI** (2 crates + web): `fabricctl`, `zyvor-fabric-sdk`, plus the React web console (`web/`, not a Rust crate)
 
 ---
 

@@ -6,8 +6,8 @@ Ops scripts and helpers on top of the observe/control pack in
 
 | Feature | How |
 |---------|-----|
-| Explain dest:port | `zyvorctl dataplane explain VM 1.1.1.1 --port 443` |
-| Dry-run Guard | `zyvorctl dataplane dry-run VM` |
+| Explain dest:port | `fabricctl dataplane explain VM 1.1.1.1 --port 443` |
+| Dry-run Guard | `fabricctl dataplane dry-run VM` |
 | Templates list | `GET /api/dataplane/templates` |
 | Follow | `scripts/dataplane-follow.sh 5` |
 | Time-boxed Guard | `scripts/dataplane-timers.py set --vm web-1 --ttl 600` |

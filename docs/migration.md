@@ -12,7 +12,7 @@ Zyvor Fabric supports two migration paths:
 - **Offline** — stop the VM, `rsync` its data to the target, done.
 - **Live** — `rsync` in the background while the VM runs, then pause briefly for a final sync and cutover. Downtime is the last sync, not the whole transfer.
 
-For native transport (receivers, prepare/start/status/cancel), use the APIs below and `zyvorctl runtime migrate …`. Do **not** market native live migration as GA without the KVM e2e gate.
+For native transport (receivers, prepare/start/status/cancel), use the APIs below and `fabricctl runtime migrate …`. Do **not** market native live migration as GA without the KVM e2e gate.
 
 ---
 
@@ -83,7 +83,7 @@ Fabric proxies FluxVM receivers and source-side transport:
 | `POST /api/migration/receivers/{id}/activate` | Promote receiver after cutover |
 | `DELETE /api/migration/receivers/{id}` | Abort unused receiver |
 
-CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`. Full sequence and ownership: [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md).
+CLI: `fabricctl runtime capabilities` and `fabricctl runtime migrate …`. Full sequence and ownership: [FLUXVM-FABRIC-BOUNDARY.md](FLUXVM-FABRIC-BOUNDARY.md).
 
 ---
 
@@ -91,7 +91,7 @@ CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`. Full se
 
 Pausing the source VM for the final sync goes through the FluxVM `VmDriver` on
 this host. Starting the VM on the *target* node after cutover shells
-`ssh <target> zyvorctl start <vm>` (machinectl was removed). Ensure `zyvorctl`
+`ssh <target> fabricctl start <vm>` (machinectl was removed). Ensure `fabricctl`
 is installed on the target and can reach local Fabric/FluxVM; otherwise start
 the VM via `POST /api/vms/{name}/start` on the target Fabric API.
 

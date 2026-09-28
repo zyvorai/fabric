@@ -2,6 +2,19 @@
 
 ## 0.3.0
 
+### Changed
+- **`zyvorctl` is now `fabricctl`.** The Fabric CLI binary, its Rust crate (`backend/fabricctl`), the bash completion
+  (`/etc/bash_completion.d/fabricctl`), the CI workflow and the docs use the new name, matching the product and `keepctl`.
+  There is no `zyvorctl` alias. `make install`, `scripts/install.sh`, `setup.sh`, `scripts/dist-install.sh`,
+  `scripts/deploy-remote.sh` and the uninstallers remove a leftover `zyvorctl` and its completion. The Python SDK
+  package and its console script are renamed too (`import fabricctl`, command `fabricctl`), which breaks existing
+  imports. Environment variables (`ZYVOR_FABRIC_URL`, `ZYVOR_FABRIC_TOKEN`, and the `FABRIC_*` fallbacks) are unchanged.
+  If branch protection requires the old `zyvorctl` CI check, repoint it to `fabricctl`.
+- **`fabricctl` finds a TLS daemon without `--server`.** With no `--server`, `ZYVOR_FABRIC_URL` or `FABRIC_URL`, it tries
+  `https://localhost:9095` first (a default install serves self-signed TLS there) and otherwise uses
+  `http://localhost:9095` (the Docker config). Before, the plain-`http` default failed against a TLS daemon with
+  `invalid HTTP version parsed`. An explicit server is used as given.
+
 ### Fixed
 - **Use-case cells were not confined on the host.** The runtime looked for the guest's default gateway right after
   creating the cell, before the guest had booted, and skipped the network policy without saying so when it found none,

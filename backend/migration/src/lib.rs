@@ -176,7 +176,7 @@ impl MigrationManager {
     ///
     /// The source (local) VM's pause-for-final-sync goes through the
     /// active FluxVM `VmDriver`. Starting the VM on the *target* node shells
-    /// `ssh <target> zyvorctl start <vm>` — a local `Arc<dyn VmDriver>` only
+    /// `ssh <target> fabricctl start <vm>` — a local `Arc<dyn VmDriver>` only
     /// talks to this host's FluxVM, not a remote one.
     async fn live_sync(&self, _config: &MigrationConfig) -> Result<()> {
         anyhow::bail!(

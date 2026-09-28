@@ -35,7 +35,9 @@ install: install-bin install-conf install-systemd install-web install-modules in
 install-bin:
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 0755 backend/target/release/zyvor-fabricd  $(DESTDIR)$(BINDIR)/zyvor-fabricd
-	install -m 0755 backend/target/release/zyvorctl      $(DESTDIR)$(BINDIR)/zyvorctl
+	install -m 0755 backend/target/release/fabricctl      $(DESTDIR)$(BINDIR)/fabricctl
+	# fabricctl was named zyvorctl before the rename; drop a stale copy
+	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl
 
 # Directories are also created defensively by the daemon itself at startup
 # (see daemon.rs::ensure_runtime_dirs) — installed here too so they exist
@@ -73,16 +75,16 @@ install-modules:
 	install -d $(DESTDIR)/etc/logrotate.d
 	install -m 0644 configs/logrotate.d/zyvor-fabricd $(DESTDIR)/etc/logrotate.d/zyvor-fabricd
 	install -d $(DESTDIR)/etc/bash_completion.d
-	install -m 0644 completions/zyvorctl.bash $(DESTDIR)/etc/bash_completion.d/zyvorctl
-	install -m 0644 completions/zyvorctl.bash $(DESTDIR)/etc/bash_completion.d/zyvorctl
+	install -m 0644 completions/fabricctl.bash $(DESTDIR)/etc/bash_completion.d/fabricctl
+	rm -f  $(DESTDIR)/etc/bash_completion.d/zyvorctl
 
 uninstall:
 	rm -f  $(DESTDIR)$(BINDIR)/zyvor-fabricd
-	rm -f  $(DESTDIR)$(BINDIR)/zyvorctl
+	rm -f  $(DESTDIR)$(BINDIR)/fabricctl $(DESTDIR)$(BINDIR)/zyvorctl
 	rm -f  $(DESTDIR)$(UNITDIR)/zyvor-fabricd.service
 	rm -f  $(DESTDIR)$(UNITDIR)/vm@.service
 	rm -f  $(DESTDIR)/etc/logrotate.d/zyvor-fabricd
-	rm -f  $(DESTDIR)/etc/bash_completion.d/zyvorctl
+	rm -f  $(DESTDIR)/etc/bash_completion.d/fabricctl $(DESTDIR)/etc/bash_completion.d/zyvorctl
 	rm -rf $(DESTDIR)$(LIBEXECDIR)
 	rm -rf $(DESTDIR)$(DATADIR)/zyvor-fabricd
 	rm -rf $(DESTDIR)$(SYSCONFDIR)/zyvor-fabricd
@@ -99,7 +101,7 @@ dev:
 	@cd web && npm run dev
 
 cli:
-	cd backend && cargo run --bin zyvorctl
+	cd backend && cargo run --bin fabricctl
 
 test:
 	cd backend && cargo test

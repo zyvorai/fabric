@@ -234,11 +234,11 @@ pub fn render_root_help(color: bool) -> String {
     let mut out = String::new();
     out.push_str(&format!(
         "✨ {} {}\n\n",
-        paint(color, style::BOLD, "zyvorctl"),
+        paint(color, style::BOLD, "fabricctl"),
         paint(color, style::DIM, "— Zyvor Fabric CLI")
     ));
     out.push_str(&format!(
-        "📘 {}\n  zyvorctl [flags] [command]\n\n",
+        "📘 {}\n  fabricctl [flags] [command]\n\n",
         paint(color, style::BOLD, "Usage:")
     ));
 
@@ -275,10 +275,10 @@ pub fn render_root_help(color: bool) -> String {
         "    --token",
         "Bearer token (overrides ZYVOR_FABRIC_TOKEN)",
     ));
-    out.push_str(&flag_line(color, "-h, --help", "Help for zyvorctl"));
+    out.push_str(&flag_line(color, "-h, --help", "Help for fabricctl"));
     out.push_str(&flag_line(color, "-V, --version", "Print version"));
     out.push('\n');
-    out.push_str("💡 Use \"zyvorctl [command] --help\" for more information about a command.\n");
+    out.push_str("💡 Use \"fabricctl [command] --help\" for more information about a command.\n");
     out
 }
 

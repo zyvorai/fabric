@@ -19,9 +19,9 @@ For VM-edge observe (FluxVM-native), use Edge Dataplane → **Packet flow**
 (Colorful / Normal) or `GET /api/dataplane/hubble/flows`.
 
 ```bash
-zyvorctl dataplane hubble --style color
-zyvorctl dataplane hubble --style plain
-zyvorctl dataplane hubble --style json   # or: -o json
+fabricctl dataplane hubble --style color
+fabricctl dataplane hubble --style plain
+fabricctl dataplane hubble --style json   # or: -o json
 ```
 
 This is Hubble-*lite* from FluxVM (guest → tap → tc/eBPF → uplink → peer), not

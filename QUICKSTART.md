@@ -54,30 +54,30 @@ cd web && npm run dev -- --host 127.0.0.1 --port 3000
 
 ```bash
 # List VMs
-./backend/target/debug/zyvorctl list
-./backend/target/debug/zyvorctl list -o json      # JSON output
-./backend/target/debug/zyvorctl list -o yaml      # YAML output
+./backend/target/debug/fabricctl list
+./backend/target/debug/fabricctl list -o json      # JSON output
+./backend/target/debug/fabricctl list -o yaml      # YAML output
 
 # Create a VM
-./backend/target/debug/zyvorctl create myvm \
+./backend/target/debug/fabricctl create myvm \
   --image=/path/to/image.qcow2 \
   --cpus=2 \
   --memory=2048
 
 # Start a VM
-./backend/target/debug/zyvorctl start myvm
+./backend/target/debug/fabricctl start myvm
 
 # Apply config from YAML file
-./backend/target/debug/zyvorctl apply -f vm.yaml
+./backend/target/debug/fabricctl apply -f vm.yaml
 
 # Network security
-./backend/target/debug/zyvorctl policy list
-./backend/target/debug/zyvorctl firewall list
-./backend/target/debug/zyvorctl vpn tunnels
+./backend/target/debug/fabricctl policy list
+./backend/target/debug/fabricctl firewall list
+./backend/target/debug/fabricctl vpn tunnels
 
 # Ceph storage
-./backend/target/debug/zyvorctl ceph create my-pool --monitors=10.0.0.1 --pool=rbd
-./backend/target/debug/zyvorctl ceph health my-pool
+./backend/target/debug/fabricctl ceph create my-pool --monitors=10.0.0.1 --pool=rbd
+./backend/target/debug/fabricctl ceph health my-pool
 
 # Open web UI at http://localhost:9095 (console: /app)
 ```
@@ -92,7 +92,7 @@ cd web && npm run dev -- --host 127.0.0.1 --port 3000
 sudo systemctl enable --now zyvor-fabricd
 
 # Use CLI
-zyvorctl list
+fabricctl list
 ```
 
 ## Remote bare-metal deploy

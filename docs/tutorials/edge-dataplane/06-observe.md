@@ -6,7 +6,7 @@
 
 ```bash
 curl -sk "$FABRIC_HOST/api/dataplane/identities" "${AUTH[@]}" | jq '.items[:8]'
-# zyvorctl dataplane identities -o json
+# fabricctl dataplane identities -o json
 ```
 
 Includes reserved entities (`host=1`, `world=2`, …) and security-group identities
@@ -21,7 +21,7 @@ curl -sk "$FABRIC_HOST/api/dataplane/observe" "${AUTH[@]}" | jq '{
   policies: [.policies[].metadata.name // .policies[].name],
   endpoints: [.endpoints[]? | {name, labels, groups, identity}]
 }'
-# zyvorctl dataplane observe -o json
+# fabricctl dataplane observe -o json
 ```
 
 Use this after applying groups/CNP to confirm endpoints picked up labels.

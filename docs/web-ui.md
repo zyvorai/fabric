@@ -35,7 +35,7 @@ Apple-hybrid React UI for Zyvor Fabric: public marketing pages plus a light auth
 - High-contrast tokens aligned with apple.com (`#1d1d1f` / `#333336` / `#6e6e73` on `#f5f5f7`)
 - Responsive console with collapsible mobile nav
 
-Human UI is **web only**. CLI (`zyvorctl`), Kubernetes operator, and Terraform remain. Terminal UI (`zyvorctl-tui`) removed.
+Human UI is **web only**. CLI (`fabricctl`), Kubernetes operator, and Terraform remain. Terminal UI (`zyvorctl-tui`) removed.
 
 ### Dataplane console (detail)
 

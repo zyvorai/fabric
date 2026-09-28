@@ -39,7 +39,7 @@ Expected VM list (may require auth depending on config):
 Zyvor Fabric uses JWT authentication. First, retrieve the admin password:
 
 ```bash
-# Using zyvorctl
+# Using fabricctl
 ./zyvor-fabricd-ctl password
 
 # Or read the file directly
@@ -118,10 +118,10 @@ Expected response:
 
 ### Using the CLI
 
-If `zyvorctl` is installed:
+If `fabricctl` is installed:
 
 ```bash
-zyvorctl create my-first-vm \
+fabricctl create my-first-vm \
   --image=your-image.qcow2 \
   --cpus=2 \
   --memory=2048 \

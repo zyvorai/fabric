@@ -48,9 +48,9 @@ Step-by-step walkthroughs for common workflows.
 
 | Document | Description |
 |----------|-------------|
-| zyvorctl Reference | Full CLI command reference with examples |
+| fabricctl Reference | Full CLI command reference with examples |
 | zyvor-fabricd-ctl Operations | Deployment, management, and maintenance commands |
-| Declarative Configuration | Define VM infrastructure as YAML with `zyvorctl apply` |
+| Declarative Configuration | Define VM infrastructure as YAML with `fabricctl apply` |
 | Shell Completions | Enable tab completion for bash |
 
 ### Operations Guides
@@ -93,7 +93,7 @@ Detailed documentation for each major feature area.
 | VM Profiles | Instance types and resource presets |
 | VM Import | Import from VMDK, VDI, VHD formats |
 | OVA/OVF Export | Export VMs to OVA/OVF format for portability |
-| Declarative Specs | YAML-based VM definitions with `zyvorctl apply` |
+| Declarative Specs | YAML-based VM definitions with `fabricctl apply` |
 | VM Checkpoints | Create and restore in-memory checkpoints |
 | VM Forking | Fork a running VM for testing |
 
@@ -264,25 +264,25 @@ Detailed documentation for each major feature area.
 
 | Command | Description |
 |---------|-------------|
-| `zyvorctl` / `zyvorctl --help` | Cilium-style grouped help with emoji section markers (Basic, Dataplane, Networking, Meta, …) |
-| `zyvorctl list` | List VMs (paginated `{items, total, …}` from `GET /api/vms`); set `FABRIC_URL` + `FABRIC_TOKEN` or `ZYVOR_FABRIC_*` for HTTPS labs |
-| `zyvorctl create` | Create a new VM |
-| `zyvorctl start` | Start a stopped VM |
-| `zyvorctl stop` | Stop a running VM |
-| `zyvorctl restart` | Restart a VM |
-| `zyvorctl delete` | Delete a VM |
-| `zyvorctl apply` | Apply declarative YAML specification |
-| `zyvorctl policy` | Manage network policies |
-| `zyvorctl dataplane` | VM edge dataplane (policy, flows, hubble, CNP, …) |
-| `zyvorctl status` | Fabric API + dataplane health checklist |
-| `zyvorctl config` | Show effective server/token/color settings |
-| `zyvorctl completion` | Generate bash/zsh/fish completion scripts |
-| `zyvorctl ceph` | Ceph storage management |
-| `zyvorctl metrics` | Get VM metrics |
+| `fabricctl` / `fabricctl --help` | Cilium-style grouped help with emoji section markers (Basic, Dataplane, Networking, Meta, …) |
+| `fabricctl list` | List VMs (paginated `{items, total, …}` from `GET /api/vms`); set `FABRIC_URL` + `FABRIC_TOKEN` or `ZYVOR_FABRIC_*` for HTTPS labs |
+| `fabricctl create` | Create a new VM |
+| `fabricctl start` | Start a stopped VM |
+| `fabricctl stop` | Stop a running VM |
+| `fabricctl restart` | Restart a VM |
+| `fabricctl delete` | Delete a VM |
+| `fabricctl apply` | Apply declarative YAML specification |
+| `fabricctl policy` | Manage network policies |
+| `fabricctl dataplane` | VM edge dataplane (policy, flows, hubble, CNP, …) |
+| `fabricctl status` | Fabric API + dataplane health checklist |
+| `fabricctl config` | Show effective server/token/color settings |
+| `fabricctl completion` | Generate bash/zsh/fish completion scripts |
+| `fabricctl ceph` | Ceph storage management |
+| `fabricctl metrics` | Get VM metrics |
 
 Global flags: `-o table|json|yaml`, `--color auto|always|never`, `--server`, `--token`.
 
-VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`) — there is no `zyvorctl console` command.
+VM console/VNC access is Web/REST-only (`GET /ws/console/:name`, `/ws/vnc/:name`) — there is no `fabricctl console` command.
 
 ### zyvor-fabricd-ctl Reference
 

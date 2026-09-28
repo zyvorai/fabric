@@ -127,7 +127,7 @@ export default function AiWorkloads() {
 
       {tab === 'models' && (
         models.length === 0 ? (
-          <EmptyState icon={<Layers className="w-8 h-8" />} title="No model artifacts" description="zyvorctl ai model add NAME --source hf://org/model" />
+          <EmptyState icon={<Layers className="w-8 h-8" />} title="No model artifacts" description="fabricctl ai model add NAME --source hf://org/model" />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -158,7 +158,7 @@ export default function AiWorkloads() {
 
       {tab === 'deployments' && (
         deployments.length === 0 ? (
-          <EmptyState icon={<Bot className="w-8 h-8" />} title="No inference deployments" description="zyvorctl ai deploy MODEL --runtime vllm --gpu 1 --replicas 1" />
+          <EmptyState icon={<Bot className="w-8 h-8" />} title="No inference deployments" description="fabricctl ai deploy MODEL --runtime vllm --gpu 1 --replicas 1" />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -199,7 +199,7 @@ export default function AiWorkloads() {
 
       {tab === 'endpoints' && (
         endpoints.length === 0 ? (
-          <EmptyState icon={<Radio className="w-8 h-8" />} title="No endpoints" description="zyvorctl ai endpoint expose DEPLOYMENT --openai-compatible" />
+          <EmptyState icon={<Radio className="w-8 h-8" />} title="No endpoints" description="fabricctl ai endpoint expose DEPLOYMENT --openai-compatible" />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -230,7 +230,7 @@ export default function AiWorkloads() {
 
       {tab === 'keys' && (
         keys.length === 0 ? (
-          <EmptyState icon={<KeyRound className="w-8 h-8" />} title="No API keys" description="zyvorctl ai key create NAME --endpoint ENDPOINT" />
+          <EmptyState icon={<KeyRound className="w-8 h-8" />} title="No API keys" description="fabricctl ai key create NAME --endpoint ENDPOINT" />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">

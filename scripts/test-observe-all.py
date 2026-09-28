@@ -48,7 +48,7 @@ class ObserveAll(unittest.TestCase):
         srv = (ROOT / "backend/zyvor-fabricd/src/server.rs").read_text()
         for p in ("dataplane/explain", "dataplane/dry-run", "dataplane/templates"):
             self.assertIn(p, srv)
-        cli = (ROOT / "backend/zyvorctl/src/cli.rs").read_text()
+        cli = (ROOT / "backend/fabricctl/src/cli.rs").read_text()
         self.assertIn("DataplaneCmd::Explain", cli)
         self.assertIn("DataplaneCmd::DryRun", cli)
 

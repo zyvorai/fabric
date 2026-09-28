@@ -8,7 +8,7 @@ Zyvor Fabric is a virtual machine management platform built in Rust. It provides
 
 ```
  +----------+   +----------+   +-----------+   +------------+
- | zyvorctl |   |  Web UI  |   |    K8s    |   | Terraform  |
+ | fabricctl |   |  Web UI  |   |    K8s    |   | Terraform  |
  |  (CLI)   |   | (React)  |   | Operator  |   | Provider   |
  +----+-----+   +----+-----+   +-----+-----+   +------+-----+
       |              |               |                 |
@@ -50,7 +50,7 @@ The backend is a Cargo workspace with 53 crates organized into functional areas.
 | `zyvor-fabric-vm-driver` | Builds VM images via `mkosi` -- unrelated to VM lifecycle, which is entirely FluxVM's job |
 | `vm-model` | Core data structures: VM definitions, state enums, request/response types |
 | `state-store` | Persistent VM state with JSON storage, in-memory caching, file persistence |
-| `zyvorctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
+| `fabricctl` | CLI -- scriptable command-line tool with JSON/YAML/table output |
 | `encryption` | Encryption at rest |
 | `certificate-manager` | TLS certificate management |
 

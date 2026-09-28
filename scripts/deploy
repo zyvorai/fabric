@@ -33,7 +33,7 @@ Usage:
 Bare-metal (systemd) flags — passed to deploy-remote.sh:
   --quick           skip system deps (rsync + build + install)
   --sync-only       rsync only (no install)
-  --remote-build    compile on server (cargo build -p zyvor-fabricd -p zyvorctl)
+  --remote-build    compile on server (cargo build -p zyvor-fabricd -p fabricctl)
   --remote-check    compile check on server (cargo check)
   --bind ADDR       API listen address (default 0.0.0.0 for remote IPv4)
   --open-firewall   open firewalld port 9095

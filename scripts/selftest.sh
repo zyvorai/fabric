@@ -34,7 +34,7 @@ echo ""
 
 # ── Binaries ──
 section "Binaries"
-for bin in zyvor-fabricd zyvorctl; do
+for bin in zyvor-fabricd fabricctl; do
     if command -v "$bin" &>/dev/null; then
         ver=$("$bin" --version 2>/dev/null || echo "installed")
         pass "$bin: $ver"
