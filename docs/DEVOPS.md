@@ -40,6 +40,12 @@ Lab `zyvor-fabricd` usually serves **HTTPS with a self-signed cert**.
 `scripts/devops-gate.sh` uses `curl -k` and, when `FABRIC_URL` is unset, probes
 `https://127.0.0.1:9095` then `http://127.0.0.1:9095`.
 
+`fabricctl` does the same for its default server: with no `--server`,
+`ZYVOR_FABRIC_URL` or `FABRIC_URL` it uses `https://localhost:9095` when that
+port answers a plain-HTTP request the way a TLS listener does, and
+`http://localhost:9095` otherwise (the Docker config serves plain HTTP). An
+explicit server is used as given.
+
 ```bash
 # Super-easy stack ship (FluxVM + Fabric + readiness)
 ./scripts/ship sus@HOST
@@ -57,6 +63,19 @@ FLUXVM_URL=http://127.0.0.1:7788 ./scripts/devops-gate.sh
 # or:
 ZYVOR_DEVOPS_LIVE=1 ./scripts/test-devops-gate.sh
 ```
+
+## Security and format scans in CI
+
+- **Trivy** (`.github/workflows/security.yml`) scans the tree for vulnerabilities and secrets at
+  HIGH and CRITICAL. [`trivy-secret.yaml`](../trivy-secret.yaml) at the repo root is Trivy's secret
+  config; it allows only the fake `ghp_…` tokens in `agent-runtime/src/memory.rs` (the memory
+  redaction tests need a token-shaped value). Every other path is still scanned. Add a new allow
+  rule there only for a test fixture, with a `path` limited to that file.
+- **CodeQL** reports to the repository's code-scanning page. A false positive is dismissed there
+  with a written reason (for example the operator-set path in `agent-runtime/src/audit.rs`); a real
+  one gets a code fix and a test.
+- **Fabric Doctor** (`.github/workflows/fabric-doctor.yml`) runs `gofmt -l ./cmd ./internal` in
+  `tools/fabric-doctor`; run `gofmt -w` on the listed files before pushing.
 
 ## Source of truth (pick one)
 
