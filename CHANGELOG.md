@@ -11,8 +11,9 @@
   imports. Environment variables (`ZYVOR_FABRIC_URL`, `ZYVOR_FABRIC_TOKEN`, and the `FABRIC_*` fallbacks) are unchanged.
   If branch protection requires the old `zyvorctl` CI check, repoint it to `fabricctl`.
 - **`fabricctl` finds a TLS daemon without `--server`.** With no `--server`, `ZYVOR_FABRIC_URL` or `FABRIC_URL`, it tries
-  `https://localhost:9095` first (a default install serves self-signed TLS there) and otherwise uses
-  `http://localhost:9095` (the Docker config). Before, the plain-`http` default failed against a TLS daemon with
+  `https://localhost:9095` when that port answers a plain-HTTP request like a TLS listener does (a default install serves
+  self-signed TLS there), and otherwise uses `http://localhost:9095` (the Docker config). The detection sends no
+  credentials and does not touch certificate validation. Before, the plain-`http` default failed against a TLS daemon with
   `invalid HTTP version parsed`. An explicit server is used as given.
 
 ### Fixed

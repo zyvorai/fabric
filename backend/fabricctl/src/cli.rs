@@ -17,6 +17,7 @@ use crate::style::{self, ColorMode};
 static API_BASE: Mutex<String> = Mutex::new(String::new());
 
 const DEFAULT_ROOT: &str = "http://localhost:9095";
+const DEFAULT_ADDR: &str = "localhost:9095";
 
 /// True when neither `--server` nor `ZYVOR_FABRIC_URL` / `FABRIC_URL` picked the server.
 fn server_is_default(server: Option<&str>) -> bool {
@@ -26,16 +27,28 @@ fn server_is_default(server: Option<&str>) -> bool {
 }
 
 /// A default install serves TLS on 9095 (`[tls] enabled`, self-signed), while the
-/// Docker config serves plain HTTP. With no server given, use https if it answers.
-async fn probe_default_https() -> Option<String> {
-    let client = Client::builder()
-        .danger_accept_invalid_certs(true)
-        .timeout(std::time::Duration::from_secs(1))
-        .build()
-        .ok()?;
-    let url = DEFAULT_ROOT.replacen("http://", "https://", 1);
-    client.get(format!("{url}/health")).send().await.ok()?;
-    Some(format!("{url}/api"))
+/// Docker config serves plain HTTP. With no server given, decide which one this is.
+///
+/// Sends one plain-HTTP request and looks at the reply: an HTTP server answers
+/// `HTTP/…`; a TLS listener answers a plaintext request with a TLS alert or just
+/// closes. No certificate is involved, so nothing is trusted or skipped here.
+async fn port_speaks_tls(addr: &str) -> bool {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let probe = async {
+        let mut stream = tokio::net::TcpStream::connect(addr).await.ok()?;
+        stream
+            .write_all(b"GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n")
+            .await
+            .ok()?;
+        let mut buf = [0u8; 5];
+        // A reset or an empty read is what a TLS listener does with plaintext.
+        let n = stream.read(&mut buf).await.unwrap_or(0);
+        Some(!buf[..n].starts_with(b"HTTP/"))
+    };
+    matches!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), probe).await,
+        Ok(Some(true))
+    )
 }
 
 /// Fabric API root including `/api` (override with `--server` / `ZYVOR_FABRIC_URL` / `FABRIC_URL`).
@@ -1731,10 +1744,8 @@ impl Cli {
             );
         }
 
-        if server_is_default(self.server.as_deref()) {
-            if let Some(https) = probe_default_https().await {
-                set_api_base(https);
-            }
+        if server_is_default(self.server.as_deref()) && port_speaks_tls(DEFAULT_ADDR).await {
+            set_api_base(DEFAULT_ROOT.replacen("http://", "https://", 1) + "/api");
         }
         let base = api_base();
         let mut headers = reqwest::header::HeaderMap::new();
@@ -3491,5 +3502,52 @@ mod container_group_cli_tests {
     fn bare_fabricctl_has_no_command() {
         let cli = Cli::try_parse_from(["fabricctl"]).unwrap();
         assert!(cli.command.is_none());
+    }
+}
+
+#[cfg(test)]
+mod default_server_probe_tests {
+    use super::port_speaks_tls;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// One-shot listener: reads the request, writes `reply`, closes.
+    async fn serve_once(reply: &'static [u8]) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 256];
+            let _ = sock.read(&mut buf).await;
+            let _ = sock.write_all(reply).await;
+        });
+        addr
+    }
+
+    #[tokio::test]
+    async fn plain_http_server_is_not_tls() {
+        let addr = serve_once(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n").await;
+        assert!(!port_speaks_tls(&addr).await);
+    }
+
+    #[tokio::test]
+    async fn tls_alert_reply_is_tls() {
+        // What a TLS listener sends back to plaintext: a fatal alert record.
+        let addr = serve_once(&[0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a]).await;
+        assert!(port_speaks_tls(&addr).await);
+    }
+
+    #[tokio::test]
+    async fn silent_close_is_tls() {
+        let addr = serve_once(b"").await;
+        assert!(port_speaks_tls(&addr).await);
+    }
+
+    #[tokio::test]
+    async fn nothing_listening_is_not_tls() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        drop(listener);
+        assert!(!port_speaks_tls(&addr).await);
     }
 }
