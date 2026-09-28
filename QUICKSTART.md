@@ -153,6 +153,24 @@ To set a custom admin password, use the `ZYVOR_FABRICD_ADMIN_PASSWORD` environme
 
 When auth is disabled (`enabled = false` in config), API calls work without a token.
 
+## Use the CLI
+
+`fabricctl` picks its server in this order: `--server`, `ZYVOR_FABRIC_URL`, `FABRIC_URL`, then a
+default of `https://localhost:9095` (if that port speaks TLS) or `http://localhost:9095`. It sends
+the token from `--token`, `ZYVOR_FABRIC_TOKEN` or `FABRIC_TOKEN`, and accepts a self-signed
+certificate for an `https://` server.
+
+```bash
+export FABRIC_TOKEN="$TOKEN"     # from the login step above
+fabricctl status                 # API, auth token and dataplane
+fabricctl list                   # VMs
+fabricctl -o json list           # json | yaml | table
+fabricctl --server https://fabric.example:9095 list
+```
+
+A default install serves **HTTPS with a self-signed certificate**, so the `curl` examples below
+need `https://localhost:9095` and `-k` unless you use the Docker config, which serves plain HTTP.
+
 ## Test the API
 
 ```bash
