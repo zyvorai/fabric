@@ -371,7 +371,7 @@ func httpProbe(ctx context.Context, cfg Config, endpoint, label, remediation str
 	client := &http.Client{Timeout: cfg.HTTPTimeout}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return StatusFail, "invalid "+label+" URL: "+err.Error(), "Set a valid http(s) "+label+" endpoint."
+		return StatusFail, "invalid " + label + " URL: " + err.Error(), "Set a valid http(s) " + label + " endpoint."
 	}
 	resp, err := client.Do(req)
 	if err != nil {
