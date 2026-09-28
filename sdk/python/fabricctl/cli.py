@@ -1,6 +1,6 @@
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 # SPDX-License-Identifier: Apache-2.0
-"""zyvorctl CLI - command-line interface for zyvor-fabricd."""
+"""fabricctl CLI - command-line interface for zyvor-fabricd."""
 
 import argparse
 import json
@@ -47,7 +47,7 @@ def _print_result(result, output_format="json"):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="zyvorctl - CLI for zyvor-fabricd"
+        description="fabricctl - CLI for zyvor-fabricd"
     )
     parser.add_argument(
         "--url",

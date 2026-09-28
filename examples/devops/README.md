@@ -4,7 +4,7 @@ Copy these into your platform repo or call them from CI. They assume:
 
 - Fabric API on `:9095`
 - FluxVM on `:7788` (sibling [zyvorai/fluxvm](https://github.com/zyvorai/fluxvm))
-- One writer (GitOps **or** Terraform **or** `zyvorctl apply`)
+- One writer (GitOps **or** Terraform **or** `fabricctl apply`)
 
 ## Local / pipeline gates
 
@@ -21,7 +21,7 @@ bash scripts/devops-gate.sh
 #   ./scripts/test-lab-verify.sh
 # production readiness (read-only; requires FABRIC_TOKEN):
 #   FABRIC_TOKEN=… ./scripts/test-production-readiness.sh
-zyvorctl apply -f examples/devops/apply-vm.yaml
+fabricctl apply -f examples/devops/apply-vm.yaml
 ```
 
 ## GitHub Actions

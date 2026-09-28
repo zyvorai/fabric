@@ -28,9 +28,11 @@ echo ""
 
 echo "[1/7] Installing zyvor-fabric binaries..."
 install -d /usr/bin
-for bin in zyvor-fabricd zyvorctl; do
+for bin in zyvor-fabricd fabricctl; do
     [[ -f "$PKG_DIR/bin/$bin" ]] && install -m 0755 "$PKG_DIR/bin/$bin" "/usr/bin/$bin" && echo "  + /usr/bin/$bin"
 done
+# fabricctl was named zyvorctl before the rename; drop a stale copy
+rm -f /usr/bin/zyvorctl /usr/local/bin/zyvorctl
 
 echo "[2/7] Installing FluxVM binary..."
 install -d /usr/local/bin

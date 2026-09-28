@@ -58,8 +58,8 @@ Pass bar: schema **4**. Generation **6** on a v6 FluxVM build.
 curl -sk -X POST "$FABRIC_HOST/api/dataplane/services" "${AUTH[@]}" \
   --data @docs/examples/service-fabric-v3/ha-draining-service.json | jq .
 
-zyvorctl dataplane service list
-zyvorctl dataplane service status
+fabricctl dataplane service list
+fabricctl dataplane service status
 ```
 
 Backend fields use `"address"` (not `"ip"`). States: `ready` / `draining` /
@@ -117,7 +117,7 @@ Policy JSON uses `service` / `default_action` / `allow_identities` (not
 ```bash
 curl -sk -X DELETE "$FABRIC_HOST/api/dataplane/services/payments/policy" "${AUTH[@]}"
 curl -sk -X DELETE "$FABRIC_HOST/api/dataplane/services/payments" "${AUTH[@]}"
-# or: zyvorctl dataplane service delete payments
+# or: fabricctl dataplane service delete payments
 ```
 
 ---

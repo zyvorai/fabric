@@ -69,14 +69,14 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      - name: Build zyvor-fabricd + zyvorctl
-        run: cd backend && ~/.cargo/bin/cargo build --release --bin zyvor-fabricd --bin zyvorctl
+      - name: Build zyvor-fabricd + fabricctl
+        run: cd backend && ~/.cargo/bin/cargo build --release --bin zyvor-fabricd --bin fabricctl
 
       - name: Binary smoke check (real dynamic linking, not just a successful compile)
         run: |
           set -e
-          echo "== zyvorctl --version =="
-          backend/target/release/zyvorctl --version
+          echo "== fabricctl --version =="
+          backend/target/release/fabricctl --version
 
           echo "== zyvor-fabricd: confirm it starts and logs before failing on missing config =="
           # zyvor-fabricd has no --version (it's a plain daemon, no clap).

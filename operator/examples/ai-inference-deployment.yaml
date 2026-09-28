@@ -1,6 +1,6 @@
 # Fabric AI Workloads — InferenceDeployment (preview)
 # Apply after ModelArtifact exists and an InferenceProfile is registered
-# (zyvorctl ai profile add … or a companion ConfigMap/Job). Profiles are
+# (fabricctl ai profile add … or a companion ConfigMap/Job). Profiles are
 # not a CRD yet; create them via CLI/Terraform first.
 apiVersion: zyvor-fabricd.io/v1alpha1
 kind: ModelArtifact

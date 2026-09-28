@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-//! Color / plain Hubble-style text for `zyvorctl dataplane hubble`.
+//! Color / plain Hubble-style text for `fabricctl dataplane hubble`.
 
 use crate::style::{self, paint};
 

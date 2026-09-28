@@ -72,12 +72,12 @@ Policy JSON uses `service`, `default_action`, `allow_identities` /
 ## CLI
 
 ```bash
-zyvorctl dataplane service list
-zyvorctl dataplane service apply --file docs/examples/service-fabric-v3/ha-draining-service.json
-zyvorctl dataplane service status
-zyvorctl dataplane service flows
-zyvorctl dataplane service delta payments --after-seq 0
-zyvorctl dataplane service delete payments
+fabricctl dataplane service list
+fabricctl dataplane service apply --file docs/examples/service-fabric-v3/ha-draining-service.json
+fabricctl dataplane service status
+fabricctl dataplane service flows
+fabricctl dataplane service delta payments --after-seq 0
+fabricctl dataplane service delete payments
 ```
 
 ## Maglev DNAT and VM edge policy

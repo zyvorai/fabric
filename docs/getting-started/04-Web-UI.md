@@ -82,7 +82,7 @@ Light Apple-style console using **SF Pro / system UI** fonts and high-contrast t
 
 Human UI is **web only**. Automation remains via:
 
-- CLI — `zyvorctl`
+- CLI — `fabricctl`
 - Kubernetes operator
 - Terraform provider
 

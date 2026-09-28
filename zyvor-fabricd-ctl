@@ -302,7 +302,7 @@ cmd_deps() {
     echo ""
     ok "All dependencies installed"
     echo ""
-    info "Next: run ${BOLD}./zyvorctl build${NC} to build the project"
+    info "Next: run ${BOLD}./fabricctl build${NC} to build the project"
     info "  Or: run ${BOLD}./zyvor-fabricd-ctl doctor${NC} to verify readiness"
 }
 
@@ -318,7 +318,7 @@ cmd_build() {
     info "Building backend (Rust)..."
     cd "$SCRIPT_DIR/backend"
     cargo build --release 2>&1
-    ok "Backend built: target/release/zyvor-fabricd, zyvorctl,"
+    ok "Backend built: target/release/zyvor-fabricd, fabricctl,"
 
     if [[ $build_web -eq 1 ]] && [[ -d "$SCRIPT_DIR/web" ]]; then
         if command -v node &>/dev/null; then
@@ -334,7 +334,7 @@ cmd_build() {
 
     echo ""
     ok "Build complete"
-    info "Next: run ${BOLD}sudo ./zyvorctl install${NC} to install"
+    info "Next: run ${BOLD}sudo ./fabricctl install${NC} to install"
 }
 
 # ── install: Install to the system ──────────────────────────────────────
@@ -344,7 +344,7 @@ cmd_install() {
 
     # Check if built
     if [[ ! -f "$SCRIPT_DIR/backend/target/release/zyvor-fabricd" ]]; then
-        err "Not built yet. Run: ./zyvorctl build"
+        err "Not built yet. Run: ./fabricctl build"
         exit 1
     fi
 
@@ -354,7 +354,7 @@ cmd_install() {
 
     ok "zyvor-fabricd installed"
     echo ""
-    info "Start with: ${BOLD}sudo ./zyvorctl start${NC}"
+    info "Start with: ${BOLD}sudo ./fabricctl start${NC}"
     info "Or enable on boot: ${BOLD}sudo systemctl enable --now zyvor-fabricd${NC}"
 }
 
@@ -534,7 +534,7 @@ cmd_deploy() {
     # Build as the original user if running via sudo
     if [[ -n "${SUDO_USER:-}" ]]; then
         info "Building as $SUDO_USER..."
-        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./zyvorctl build --no-web"
+        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./fabricctl build --no-web"
     else
         cmd_build --no-web
     fi
@@ -573,7 +573,7 @@ cmd_reinstall() {
     # Rebuild
     if [[ -n "${SUDO_USER:-}" ]]; then
         info "Rebuilding as $SUDO_USER..."
-        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./zyvorctl build --no-web"
+        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./fabricctl build --no-web"
     else
         cmd_build --no-web
     fi
@@ -611,7 +611,7 @@ cmd_backup() {
             elif [[ -x "$SCRIPT_DIR/scripts/backup-vms" ]]; then
                 "$SCRIPT_DIR/scripts/backup-vms"
             else
-                err "Backup script not found. Run: ./zyvorctl install"
+                err "Backup script not found. Run: ./fabricctl install"
                 exit 1
             fi
             ;;
@@ -655,7 +655,7 @@ cmd_health() {
     elif [[ -x "$SCRIPT_DIR/scripts/health-check" ]]; then
         "$SCRIPT_DIR/scripts/health-check"
     else
-        err "Health check script not found. Run: ./zyvorctl install"
+        err "Health check script not found. Run: ./fabricctl install"
         exit 1
     fi
 }
@@ -731,7 +731,7 @@ cmd_tls() {
     echo "  tls_cert = \"$cert_file\""
     echo "  tls_key = \"$key_file\""
     echo ""
-    info "Then restart: ${BOLD}./zyvorctl restart${NC}"
+    info "Then restart: ${BOLD}./fabricctl restart${NC}"
 }
 
 # ── start/stop/restart/status/logs ──────────────────────────────────────
@@ -740,7 +740,7 @@ cmd_start() {
     step "Starting zyvor-fabricd"
 
     if ! command -v zyvor-fabricd &>/dev/null && [[ ! -f /usr/bin/zyvor-fabricd ]]; then
-        err "zyvor-fabricd not installed. Run: sudo ./zyvorctl install"
+        err "zyvor-fabricd not installed. Run: sudo ./fabricctl install"
         exit 1
     fi
 
@@ -971,7 +971,7 @@ cmd_demo() {
     # Check zyvor-fabricd is running
     if ! curl -skf "$API_URL/health" &>/dev/null; then
         err "zyvor-fabricd is not running at $API_URL"
-        info "Start it with: ${BOLD}sudo ./zyvorctl start${NC}"
+        info "Start it with: ${BOLD}sudo ./fabricctl start${NC}"
         exit 1
     fi
     ok "zyvor-fabricd is running at $API_URL"
@@ -1084,7 +1084,7 @@ cmd_demo() {
     echo -e "${BOLD}Quick reference:${NC}"
     echo -e "  API:       ${CYAN}$API_URL${NC}"
     echo -e "  Web UI:    ${CYAN}$API_URL${NC}"
-    echo -e "  CLI:       ${CYAN}zyvorctl list${NC}"
+    echo -e "  CLI:       ${CYAN}fabricctl list${NC}"
     echo -e "  Docs:      ${CYAN}$API_URL/api${NC}"
     echo -e "  Metrics:   ${CYAN}$API_URL/metrics${NC}"
     echo ""
@@ -1093,9 +1093,9 @@ cmd_demo() {
 # ── help ────────────────────────────────────────────────────────────────
 cmd_help() {
     echo ""
-    echo -e "${BOLD}zyvorctl${NC} — zyvor-fabricd management tool"
+    echo -e "${BOLD}fabricctl${NC} — zyvor-fabricd management tool"
     echo ""
-    echo -e "${BOLD}Usage:${NC} ./zyvorctl <command> [options]"
+    echo -e "${BOLD}Usage:${NC} ./fabricctl <command> [options]"
     echo ""
     echo -e "${BOLD}Setup:${NC}"
     echo "  deps              Install all system dependencies (auto-sudo)"
@@ -1135,10 +1135,10 @@ cmd_help() {
     echo ""
     echo -e "${BOLD}Quick start (manual):${NC}"
     echo "  ./zyvor-fabricd-ctl deps            # Install dependencies (auto-sudo)"
-    echo "  ./zyvorctl build           # Build everything"
-    echo "  ./zyvorctl test            # Run tests"
-    echo "  ./zyvorctl install         # Install to system (auto-sudo)"
-    echo "  ./zyvorctl start           # Start the service (auto-sudo)"
+    echo "  ./fabricctl build           # Build everything"
+    echo "  ./fabricctl test            # Run tests"
+    echo "  ./fabricctl install         # Install to system (auto-sudo)"
+    echo "  ./fabricctl start           # Start the service (auto-sudo)"
     echo "  ./zyvor-fabricd-ctl demo            # Run the demo"
     echo ""
     echo -e "${BOLD}Quick start (automated):${NC}"

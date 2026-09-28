@@ -82,7 +82,7 @@ Fabric exposes the control-plane contract:
 | `POST /api/migration/receivers/{id}/activate` | Promote receiver after cutover |
 | `DELETE /api/migration/receivers/{id}` | Abort unused receiver |
 
-CLI: `zyvorctl runtime capabilities` and `zyvorctl runtime migrate …`
+CLI: `fabricctl runtime capabilities` and `fabricctl runtime migrate …`
 (`prepare-receiver`, `activate-receiver`, `abort-receiver`, `start`, `status`, `cancel`).
 
 ## Service Fabric fan-out (v6)

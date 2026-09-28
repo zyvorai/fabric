@@ -7,7 +7,7 @@ Zyvor Fabric is the product name. Technical identifiers use `zyvor-fabricd`.
 | Product | **Zyvor Fabric** |
 | GitHub | [zyvorai/fabric](https://github.com/zyvorai/fabric) |
 | systemd unit | `zyvor-fabricd.service` |
-| Binary | `zyvor-fabricd`, `zyvorctl`, `zyvor-fabricd-ctl` |
+| Binary | `zyvor-fabricd`, `fabricctl` (was `zyvorctl` before 0.3.0), `zyvor-fabricd-ctl` |
 | Config | `/etc/zyvor-fabricd/zyvor-fabricd.toml` |
 | State | `/var/lib/zyvor-fabricd/` |
 | Env vars | `ZYVOR_FABRICD_*` |

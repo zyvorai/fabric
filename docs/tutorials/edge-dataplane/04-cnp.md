@@ -56,8 +56,8 @@ cat >/tmp/web-egress.cnp.json <<'EOF'
   }
 }
 EOF
-zyvorctl dataplane cnp apply --file /tmp/web-egress.cnp.json -o json
-zyvorctl dataplane cnp list -o json
+fabricctl dataplane cnp apply --file /tmp/web-egress.cnp.json -o json
+fabricctl dataplane cnp list -o json
 ```
 
 ## Next

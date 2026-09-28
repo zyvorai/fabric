@@ -2,6 +2,15 @@
 
 ## 0.3.0
 
+### Changed
+- **`zyvorctl` is now `fabricctl`.** The Fabric CLI binary, its Rust crate (`backend/fabricctl`), the bash completion
+  (`/etc/bash_completion.d/fabricctl`), the CI workflow and the docs use the new name, matching the product and `keepctl`.
+  There is no `zyvorctl` alias. `make install`, `scripts/install.sh`, `setup.sh`, `scripts/dist-install.sh`,
+  `scripts/deploy-remote.sh` and the uninstallers remove a leftover `zyvorctl` and its completion. The Python SDK
+  package and its console script are renamed too (`import fabricctl`, command `fabricctl`), which breaks existing
+  imports. Environment variables (`ZYVOR_FABRIC_URL`, `ZYVOR_FABRIC_TOKEN`, and the `FABRIC_*` fallbacks) are unchanged.
+  If branch protection requires the old `zyvorctl` CI check, repoint it to `fabricctl`.
+
 ### Fixed
 - **Use-case cells were not confined on the host.** The runtime looked for the guest's default gateway right after
   creating the cell, before the guest had booted, and skipped the network policy without saying so when it found none,

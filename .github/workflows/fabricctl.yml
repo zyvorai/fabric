@@ -1,4 +1,4 @@
-name: zyvorctl
+name: fabricctl
 
 # Fast gate for the Fabric CLI: fmt, clippy, unit tests, and a smoke of the
 # Cilium-style grouped help / color / completion surface. The full workspace
@@ -8,22 +8,22 @@ on:
   push:
     branches: [main]
     paths:
-      - "backend/zyvorctl/**"
+      - "backend/fabricctl/**"
       - "backend/vm-model/**"
       - "backend/Cargo.toml"
       - "backend/Cargo.lock"
-      - ".github/workflows/zyvorctl.yml"
+      - ".github/workflows/fabricctl.yml"
   pull_request:
     branches: [main]
     paths:
-      - "backend/zyvorctl/**"
+      - "backend/fabricctl/**"
       - "backend/vm-model/**"
       - "backend/Cargo.toml"
       - "backend/Cargo.lock"
-      - ".github/workflows/zyvorctl.yml"
+      - ".github/workflows/fabricctl.yml"
 
 jobs:
-  zyvorctl:
+  fabricctl:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -36,21 +36,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
 
       - name: Check formatting
-        run: cd backend && cargo fmt -p zyvorctl -- --check
+        run: cd backend && cargo fmt -p fabricctl -- --check
 
       - name: Lint
-        run: cd backend && cargo clippy -p zyvorctl --all-targets -- -D warnings
+        run: cd backend && cargo clippy -p fabricctl --all-targets -- -D warnings
 
       - name: Test
-        run: cd backend && cargo test -p zyvorctl
+        run: cd backend && cargo test -p fabricctl
 
       - name: Build
-        run: cd backend && cargo build -p zyvorctl
+        run: cd backend && cargo build -p fabricctl
 
       - name: CLI smoke (grouped help, color, completion)
         run: |
           set -euo pipefail
-          BIN=backend/target/debug/zyvorctl
+          BIN=backend/target/debug/fabricctl
           "$BIN" --version
           help="$("$BIN" --color never --help)"
           [[ "$help" == *"Basic Commands:"* ]]
@@ -71,7 +71,7 @@ jobs:
           cfg="$("$BIN" config --color never)"
           [[ "$cfg" == *"server:"* ]]
           bash_comp="$("$BIN" completion bash)"
-          [[ "$bash_comp" == *"_zyvorctl"* ]]
+          [[ "$bash_comp" == *"_fabricctl"* ]]
           zsh_comp="$("$BIN" completion zsh)"
           [[ "$zsh_comp" == *"compdef"* ]]
           fish_comp="$("$BIN" completion fish)"

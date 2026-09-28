@@ -28,7 +28,7 @@ When Fabric runs as a privileged host-network DaemonSet, execute Doctor with the
 
 The JSON schema is intentionally stable so the same engine can later back:
 
-- `zyvorctl doctor`
+- `fabricctl doctor`
 - a Fabric `/api/system/readiness` endpoint
 - the web console's **Host Readiness** page
 - a Kubernetes admission/preflight Job

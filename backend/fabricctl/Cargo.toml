@@ -1,11 +1,11 @@
 [package]
-name = "zyvorctl"
+name = "fabricctl"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "zyvorctl"
+name = "fabricctl"
 path = "src/main.rs"
 
 [dependencies]

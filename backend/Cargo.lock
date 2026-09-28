@@ -1181,6 +1181,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "fabricctl"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "base64 0.23.1",
+ "clap",
+ "clap_complete",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tabled",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "vm-model",
+]
+
+[[package]]
 name = "fallible-iterator"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5586,23 +5605,4 @@ dependencies = [
  "zyvor-fabric-storage",
  "zyvor-fabric-system",
  "zyvor-fabric-vm",
-]
-
-[[package]]
-name = "zyvorctl"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "base64 0.23.1",
- "clap",
- "clap_complete",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "tabled",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "vm-model",
 ]

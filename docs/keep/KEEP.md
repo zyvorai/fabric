@@ -158,7 +158,7 @@ fabric/agent-runtime/   # policy, model_socket, cockpit API, export-token, demos
 ## Related code
 
 - FluxVM: https://github.com/zyvorai/fluxvm — Phase 6 `security_profile` (hypervisor only)
-- Fabric: agent-runtime + **`zyvorctl keep` / `keepctl`** + `docs/keep/` (this product surface)
+- Fabric: agent-runtime + **`fabricctl keep` / `keepctl`** + `docs/keep/` (this product surface)
 - Design precursor: `fabric/docs/design/confidential-agent-vms.md`
 
 There is no separate Keep git repository.

@@ -67,7 +67,7 @@ Full install: system deps + cargo build + systemd + dashboard.
 Quick: skip system deps (rsync + build + install + web).
 Open the UI at https://HOST:9095 (self-signed cert by default; config listens on 0.0.0.0 for remote IPv4 deploys).
 
---remote-build   After rsync+chown, run `cargo build --release -p zyvor-fabricd -p zyvorctl` only.
+--remote-build   After rsync+chown, run `cargo build --release -p zyvor-fabricd -p fabricctl` only.
 --remote-check   Same but `cargo check` (faster compile smoke).
 --uninstall      Stop service, remove binaries/units; keeps /var/lib/zyvor-fabricd data.
 
@@ -302,7 +302,7 @@ done
 for unit in zyvor-fabricd.service vm@.service zyvor-fabricd-backup.service zyvor-fabricd-backup.timer zyvor-fabricd-cleanup.service zyvor-fabricd-cleanup.timer; do
   \$SUDO rm -f /usr/lib/systemd/system/\$unit 2>/dev/null || true
 done
-for bin in zyvor-fabricd zyvorctl zyvorctl; do
+for bin in zyvor-fabricd fabricctl zyvorctl; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 \$SUDO rm -rf /usr/share/zyvor-fabricd 2>/dev/null || true
@@ -402,8 +402,8 @@ fi
 
 if $REMOTE_BUILD || $REMOTE_CHECK; then
     mk_target=build
-    cargo_cmd="cargo build --release -p zyvor-fabricd -p zyvorctl"
-    $REMOTE_CHECK && { mk_target=check; cargo_cmd="cargo check -p zyvor-fabricd -p zyvorctl"; }
+    cargo_cmd="cargo build --release -p zyvor-fabricd -p fabricctl"
+    $REMOTE_CHECK && { mk_target=check; cargo_cmd="cargo check -p zyvor-fabricd -p fabricctl"; }
     phase 3 "$TOTAL_STEPS" "Compile on remote ($mk_target)" "no install — run full deploy to install binaries"
     ssh_r_bash "$REMOTE" "
 set -euo pipefail
@@ -439,7 +439,7 @@ if ! $QUICK && ! $DEPS_ONLY; then
 set -euo pipefail
 SUDO='${SUDO}'
 \$SUDO systemctl stop zyvor-fabricd.service 2>/dev/null || true
-for bin in zyvor-fabricd zyvorctl; do
+for bin in zyvor-fabricd fabricctl zyvorctl; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 " || warn "could not remove old binaries"
@@ -495,7 +495,7 @@ elif ! $DEPS_ONLY; then
 set -euo pipefail
 SUDO='${SUDO}'
 \$SUDO systemctl stop zyvor-fabricd.service 2>/dev/null || true
-for bin in zyvor-fabricd zyvorctl; do
+for bin in zyvor-fabricd fabricctl zyvorctl; do
   \$SUDO rm -f /usr/bin/\$bin 2>/dev/null || true
 done
 " || warn "could not remove old binaries"
@@ -503,17 +503,17 @@ done
     install_step=$((install_step + 1))
 fi
 
-phase "$install_step" "$TOTAL_STEPS" "Build Rust binaries on remote" "cargo build --release -p zyvor-fabricd -p zyvorctl"
+phase "$install_step" "$TOTAL_STEPS" "Build Rust binaries on remote" "cargo build --release -p zyvor-fabricd -p fabricctl"
 ssh_r_bash "$REMOTE" "
 set -euo pipefail
 cd $REMOTE_DIR/backend
 $remote_cargo_env
-cargo build --release -p zyvor-fabricd -p zyvorctl
+cargo build --release -p zyvor-fabricd -p fabricctl
 " || die "Rust build failed"
 ok "Rust binaries built"
 install_step=$((install_step + 1))
 
-phase "$install_step" "$TOTAL_STEPS" "Install binaries and systemd units" "config · directories · zyvorctl · restart service"
+phase "$install_step" "$TOTAL_STEPS" "Install binaries and systemd units" "config · directories · fabricctl · restart service"
 
 # The daemon only seeds the admin account's password when auth.db has no
 # users yet (backend/security/src/db.rs seed_admin) -- on every normal
@@ -559,7 +559,7 @@ API_PORT='${API_PORT}'
 ADMIN_APPLIES='${ADMIN_APPLIES}'
 cd \"\$REMOTE_DIR\"
 
-for bin in zyvor-fabricd zyvorctl; do
+for bin in zyvor-fabricd fabricctl; do
     if [ -f \"backend/target/release/\$bin\" ]; then
         \$SUDO install -m 755 \"backend/target/release/\$bin\" \"/usr/bin/\$bin\"
         echo \"  ✅ \$bin -> /usr/bin/\$bin\"
@@ -570,10 +570,12 @@ for bin in zyvor-fabricd zyvorctl; do
         fi
     fi
 done
-[ -f zyvorctl ] && \$SUDO install -m 755 zyvorctl /usr/bin/zyvorctl && echo '  ✅ zyvorctl -> /usr/bin/zyvorctl'
-if [ -f zyvorctl ] && [ -d /usr/local/bin ]; then
-  \$SUDO install -m 755 zyvorctl /usr/local/bin/zyvorctl && echo '  ✅ zyvorctl -> /usr/local/bin/zyvorctl'
+[ -f fabricctl ] && \$SUDO install -m 755 fabricctl /usr/bin/fabricctl && echo '  ✅ fabricctl -> /usr/bin/fabricctl'
+if [ -f fabricctl ] && [ -d /usr/local/bin ]; then
+  \$SUDO install -m 755 fabricctl /usr/local/bin/fabricctl && echo '  ✅ fabricctl -> /usr/local/bin/fabricctl'
 fi
+# fabricctl was named zyvorctl before the rename; drop stale copies
+\$SUDO rm -f /usr/bin/zyvorctl /usr/local/bin/zyvorctl
 
 \$SUDO install -d /etc/zyvor-fabricd /var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/state /var/log/zyvor-fabricd /run/zyvor-fabricd
 

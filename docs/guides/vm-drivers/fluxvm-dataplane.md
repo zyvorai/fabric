@@ -10,7 +10,7 @@ Service Fabric is not attached to bridge-less direct taps.
 | Layer | Owns | Surface |
 | --- | --- | --- |
 | **Fabric SDN** | Host isolation (label → nftables) | `/api/network-policies` · **Net Security → Policies** |
-| **VM edge (Network Fabric)** | Per-VM L3/L4 allowlists, Mbps/PPS, stats, LRU flows on TAP/netns. Current attach schema is 11 | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** · `zyvorctl dataplane` |
+| **VM edge (Network Fabric)** | Per-VM L3/L4 allowlists, Mbps/PPS, stats, LRU flows on TAP/netns. Current attach schema is 11 | `/api/vms/{name}/dataplane/*` · VM → **Dataplane** · `fabricctl dataplane` |
 
 Kernel program and safety properties live in FluxVM:
 [Network Fabric architecture](https://github.com/zyvorai/fluxvm#network-fabric-architecture-how-it-works) ·
@@ -125,7 +125,7 @@ endpoints below; FluxVM must have north-south TC pinned for them to return data.
 | `GET/DELETE …/{name}/policy` | `/v1/network/services/{name}/policy` | Get / delete policy |
 | `GET …/{name}/l7/envoy` | `/v1/network/services/{name}/l7/envoy` | Envoy redirect contract |
 
-CLI: `zyvorctl dataplane service …` (incl. `flows` / `export-telemetry` / `delta`). Console: **Edge Dataplane → Services**.
+CLI: `fabricctl dataplane service …` (incl. `flows` / `export-telemetry` / `delta`). Console: **Edge Dataplane → Services**.
 
 Observe pack (explain, dry-run Guard, templates): [dataplane-observe-pack.md](../../dataplane-observe-pack.md).
 
@@ -206,11 +206,11 @@ Hands-on: [Tutorial 09](../../tutorials/09-edge-dataplane.md) ·
 
 ---
 
-## CLI (`zyvorctl`)
+## CLI (`fabricctl`)
 
-`zyvorctl list` decodes the paginated `GET /api/vms` envelope (`{items, total, …}`),
+`fabricctl list` decodes the paginated `GET /api/vms` envelope (`{items, total, …}`),
 not a bare JSON array. Root help is Cilium-style grouped with emoji markers
-(`zyvorctl --help`); `--color auto|always|never` colorizes tables/status
+(`fabricctl --help`); `--color auto|always|never` colorizes tables/status
 (honors `NO_COLOR`).
 
 ```bash
@@ -221,22 +221,22 @@ export ZYVOR_FABRIC_TOKEN="$(curl -sk -X POST "$ZYVOR_FABRIC_URL/api/auth/login"
   -d '{"username":"admin","password":"YOUR_PASSWORD"}' \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')"
 
-zyvorctl status                # Fabric API + dataplane checklist
-zyvorctl config                # effective --server / token / color
-zyvorctl list -o json          # items[] from paginated /api/vms
-zyvorctl dataplane status <name> -o json
-zyvorctl dataplane policy get <name> -o json
-zyvorctl dataplane policy set <name> --file /tmp/dp-policy.json
-zyvorctl dataplane effective <name> -o json
-zyvorctl dataplane stats <name> -o json
-zyvorctl dataplane flows <name> --limit 20 -o json
-zyvorctl dataplane health -o json
-zyvorctl dataplane group list -o json
-zyvorctl dataplane cnp list -o json
-zyvorctl dataplane observe -o json
-zyvorctl dataplane refresh-dns -o json
-zyvorctl dataplane hubble --style color   # default: color on TTY, plain when piped
-zyvorctl completion zsh > ~/.zfunc/_zyvorctl
+fabricctl status                # Fabric API + dataplane checklist
+fabricctl config                # effective --server / token / color
+fabricctl list -o json          # items[] from paginated /api/vms
+fabricctl dataplane status <name> -o json
+fabricctl dataplane policy get <name> -o json
+fabricctl dataplane policy set <name> --file /tmp/dp-policy.json
+fabricctl dataplane effective <name> -o json
+fabricctl dataplane stats <name> -o json
+fabricctl dataplane flows <name> --limit 20 -o json
+fabricctl dataplane health -o json
+fabricctl dataplane group list -o json
+fabricctl dataplane cnp list -o json
+fabricctl dataplane observe -o json
+fabricctl dataplane refresh-dns -o json
+fabricctl dataplane hubble --style color   # default: color on TTY, plain when piped
+fabricctl completion zsh > ~/.zfunc/_fabricctl
 ```
 
 Aliases: `FABRIC_URL`, `FABRIC_TOKEN` (same as `ZYVOR_FABRIC_*`). Default URL remains `http://localhost:9095`
@@ -267,7 +267,7 @@ curl -sk -X POST "$ZYVOR_FABRIC_URL/api/vms/lab-dp/start" \
   -H "Authorization: Bearer $ZYVOR_FABRIC_TOKEN"
 
 # Wait until state=running, then:
-zyvorctl dataplane status lab-dp -o json
+fabricctl dataplane status lab-dp -o json
 # expect: mode=ebpf, attached=true, schema_version=11
 ```
 
@@ -308,8 +308,8 @@ iface). That is expected.
 | Direct tap has no Service Fabric | Expected. FluxVM does not attach Service Fabric to bridge-less direct taps |
 | `mode=legacy` | `[sandbox.dataplane] mode` in `/etc/fluxvm.toml` |
 | Policy POST 4xx on ports | Use `tcp/443`, not `443` |
-| `zyvorctl` 401 | Set `ZYVOR_FABRIC_TOKEN` from `/api/auth/login` |
-| `zyvorctl` TLS errors | Use `https://` URL (client accepts self-signed) |
+| `fabricctl` 401 | Set `ZYVOR_FABRIC_TOKEN` from `/api/auth/login` |
+| `fabricctl` TLS errors | Use `https://` URL (client accepts self-signed) |
 | Metrics all zero on stopped VM | Expected when VM is in Fabric store but not registered in FluxVM (`200`, not `404`) |
 | Auth file ≠ auth.db after deploy | `FORCE_ADMIN_RESET=1 FABRIC_LAB_DEFAULTS=1 ./scripts/deploy remote …` |
 | Dashboard card stuck “Checking…” | First `/api/capabilities` before login is 401; refresh after sign-in |

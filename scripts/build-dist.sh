@@ -55,13 +55,13 @@ rsync -az --delete "${RSYNC_EXCLUDES[@]}" -e ssh "$FLUXVM_LOCAL/" "$REMOTE:FluxV
 rsync -az --delete "${RSYNC_EXCLUDES[@]}" -e ssh "$GUESTKIT_LOCAL/" "$REMOTE:guestkit/"
 ok "Sources synced"
 
-phase 2 6 "Build zyvor-fabric (release)" "zyvor-fabricd · zyvorctl"
+phase 2 6 "Build zyvor-fabric (release)" "zyvor-fabricd · fabricctl"
 ssh "$REMOTE" bash -s <<'EOS'
 set -euo pipefail
 export PATH="${HOME}/.cargo/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:${PATH}"
 cd ~/zyvor-fabric/backend
-cargo build --release -p zyvor-fabricd -p zyvorctl
-echo "  built zyvor-fabricd, zyvorctl"
+cargo build --release -p zyvor-fabricd -p fabricctl
+echo "  built zyvor-fabricd, fabricctl"
 EOS
 ok "zyvor-fabric built"
 
@@ -111,7 +111,7 @@ rm -rf "\$STAGE"
 mkdir -p "\$STAGE"/{bin,vendor,web,configs/pam.d,configs/modules-load.d,configs/logrotate.d,systemd}
 
 cp ~/zyvor-fabric/backend/target/release/zyvor-fabricd "\$STAGE/bin/"
-cp ~/zyvor-fabric/backend/target/release/zyvorctl "\$STAGE/bin/"
+cp ~/zyvor-fabric/backend/target/release/fabricctl "\$STAGE/bin/"
 cp ~/FluxVM/target/release/fluxvm "\$STAGE/bin/"
 
 cp ~/guestkit/target/release/guestkit "\$STAGE/vendor/guestkit-agent-cli"

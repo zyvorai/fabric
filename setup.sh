@@ -157,7 +157,7 @@ install_rust() {
 # 3. Build zyvor-fabricd
 # ---------------------------------------------------------------------------
 build_zyvor_fabricd() {
-    step "Building Zyvor Fabric binaries (zyvor-fabricd, zyvorctl)"
+    step "Building Zyvor Fabric binaries (zyvor-fabricd, fabricctl)"
 
     local src_dir="${SCRIPT_DIR}"
     [[ -f "${src_dir}/backend/Cargo.toml" ]] || die "Cargo.toml not found in ${src_dir}/backend/. Run from zyvor-fabric source directory."
@@ -167,7 +167,7 @@ build_zyvor_fabricd() {
     info "Building release binaries (this may take a few minutes)"
     cargo build --release 2>&1 | tail -10
 
-    for bin in zyvor-fabricd zyvorctl; do
+    for bin in zyvor-fabricd fabricctl; do
         if [[ -f "target/release/${bin}" ]]; then
             success "  target/release/${bin} ($(du -h "target/release/${bin}" | cut -f1))"
         fi
@@ -215,12 +215,14 @@ install_binaries() {
     step "Installing binaries to ${INSTALL_PREFIX}/bin"
     install -d "${INSTALL_PREFIX}/bin"
 
-    for bin in zyvor-fabricd zyvorctl; do
+    for bin in zyvor-fabricd fabricctl; do
         if [[ -f "backend/target/release/${bin}" ]]; then
             install -m 0755 "backend/target/release/${bin}" "${INSTALL_PREFIX}/bin/${bin}"
             info "  Installed ${bin}"
         fi
     done
+    # fabricctl was named zyvorctl before the rename; drop a stale copy
+    rm -f "${INSTALL_PREFIX}/bin/zyvorctl"
 
     export PATH="${INSTALL_PREFIX}/bin:${PATH}"
 
@@ -351,7 +353,7 @@ print_summary() {
     echo "✅  zyvor-fabricd ${ZYVOR_FABRICD_VERSION} — Setup Complete"
     echo "✅ ================================================================"
     echo ""
-    echo "  Binaries:        ${INSTALL_PREFIX}/bin/zyvor-fabricd, zyvorctl,"
+    echo "  Binaries:        ${INSTALL_PREFIX}/bin/zyvor-fabricd, fabricctl,"
     echo "  Config:          /etc/zyvor-fabricd/zyvor-fabricd.toml"
     echo "  Data:            /var/lib/zyvor-fabricd/"
     echo "  Logs:            /var/log/zyvor-fabricd/"
@@ -376,8 +378,8 @@ print_summary() {
     echo "  sudo systemctl stop zyvor-fabricd        # Stop daemon"
     echo "  sudo systemctl status zyvor-fabricd      # Check status"
     echo "  journalctl -u zyvor-fabricd -f           # Follow logs"
-    echo "  zyvorctl list                          # List VMs"
-    echo "  zyvorctl create --name my-vm ...       # Create VM"
+    echo "  fabricctl list                         # List VMs"
+    echo "  fabricctl create --name my-vm ...      # Create VM"
     echo ""
 }
 

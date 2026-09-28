@@ -29,7 +29,7 @@ PROTECTED = [
     "systemd-vmspawn",
     "zyvor-fabric-vm-driver",
     "zyvor-fabric-sdk",
-    "zyvorctl",
+    "fabricctl",
     "zyvor-fabricd-operator",
     "zyvor-fabricd-cleanup",
     "zyvor-fabricd-backup",

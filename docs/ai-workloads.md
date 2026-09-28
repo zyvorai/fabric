@@ -25,14 +25,14 @@ Step-by-step operator walkthrough (Janus lab GPU **or** real NVIDIA):
 export FABRIC_URL=https://127.0.0.1:9095 ZYVOR_FABRIC_URL=$FABRIC_URL
 # Obtain ZYVOR_FABRIC_TOKEN via POST /api/auth/login (admin password file)
 
-zyvorctl ai gpus
-zyvorctl ai node list
-zyvorctl ai model add demo-qwen --source hf://Qwen/Qwen3-8B
-zyvorctl ai profile add demo-24g --runtime vllm --gpu 1 --vram 24 --cpu 8 --memory 32
-zyvorctl ai deploy demo-qwen --profile demo-24g --replicas 1
+fabricctl ai gpus
+fabricctl ai node list
+fabricctl ai model add demo-qwen --source hf://Qwen/Qwen3-8B
+fabricctl ai profile add demo-24g --runtime vllm --gpu 1 --vram 24 --cpu 8 --memory 32
+fabricctl ai deploy demo-qwen --profile demo-24g --replicas 1
 # Leave preferred_site unset when only Janus GPUs exist (site=janus)
-zyvorctl ai endpoint expose demo-qwen --openai-compatible
-zyvorctl ai key create demo-key --endpoint demo-qwen-openai
+fabricctl ai endpoint expose demo-qwen --openai-compatible
+fabricctl ai key create demo-key --endpoint demo-qwen-openai
 # Then: POST $FABRIC_URL/api/ai/openai/demo-qwen-openai/v1/chat/completions
 ```
 
@@ -45,7 +45,7 @@ Open `/app/ai` after sign-in: **Models**, **Deployments**, **Endpoints**, **API 
 | Topic | Behavior |
 |---|---|
 | Runtimes | `vllm`, `tensorrt-llm`, `triton`, `llama.cpp`, `tei` launch by default; `FLUXVM_AI_DENY_RUNTIMES` blocks; `FLUXVM_AI_ALLOW_RUNTIMES` is a strict allowlist when set |
-| Janus MIG | Record-only slices via `zyvorctl ai node mig-create` (no `nvidia-smi`) |
+| Janus MIG | Record-only slices via `fabricctl ai node mig-create` (no `nvidia-smi`) |
 | PCI MIG | Requires `FLUXVM_AI_PCI_MIG=1`; optional `FLUXVM_AI_PCI_MIG_RECORD_ONLY=1` without driver |
 | Raft | `FLUXVM_AI_RAFT_ID` / `PEERS` / `TOKEN` — three processes; rate counters and audit tip on the leader |
 
@@ -143,20 +143,20 @@ ANY        /api/ai/openai/{endpoint}[/{path}]   # API-key or fabric-inference JW
 ## CLI
 
 ```bash
-zyvorctl ai model add qwen3-8b --source hf://Qwen/Qwen3-8B
-zyvorctl ai profile add edge-24g --gpu 1 --vram 24 --cpu 8 --memory 32
-zyvorctl ai deploy qwen3-8b --profile edge-24g --replicas 2
-zyvorctl ai endpoint expose qwen3-8b --openai-compatible --routing least_queue
-zyvorctl ai deployment scale qwen3-8b --replicas 4
-zyvorctl ai deployment autoscale qwen3-8b --enable --min 1 --max 4
-zyvorctl ai deployment drain qwen3-8b
-zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
-zyvorctl ai key create edge-key --endpoint qwen3-8b-openai
-zyvorctl ai capacity
-zyvorctl ai gpus
-zyvorctl ai node list
-zyvorctl ai node mig-create node-0 --parent-bdf janus:node-0:gpu-0 --profile 1g.10gb
-zyvorctl ai node mig-delete node-0 janus:node-0:gpu-0--1g.10gb--0
+fabricctl ai model add qwen3-8b --source hf://Qwen/Qwen3-8B
+fabricctl ai profile add edge-24g --gpu 1 --vram 24 --cpu 8 --memory 32
+fabricctl ai deploy qwen3-8b --profile edge-24g --replicas 2
+fabricctl ai endpoint expose qwen3-8b --openai-compatible --routing least_queue
+fabricctl ai deployment scale qwen3-8b --replicas 4
+fabricctl ai deployment autoscale qwen3-8b --enable --min 1 --max 4
+fabricctl ai deployment drain qwen3-8b
+fabricctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
+fabricctl ai key create edge-key --endpoint qwen3-8b-openai
+fabricctl ai capacity
+fabricctl ai gpus
+fabricctl ai node list
+fabricctl ai node mig-create node-0 --parent-bdf janus:node-0:gpu-0 --profile 1g.10gb
+fabricctl ai node mig-delete node-0 janus:node-0:gpu-0--1g.10gb--0
 ```
 
 ## OpenAI gateway
@@ -166,7 +166,7 @@ auth, an inference OIDC token, and request quotas:
 
 ```bash
 export OPENAI_BASE_URL=https://fabric.example:9095/api/ai/openai/qwen3-8b-openai
-export OPENAI_API_KEY=fvai_…   # from zyvorctl ai key create
+export OPENAI_API_KEY=fvai_…   # from fabricctl ai key create
 # or: Authorization: Bearer <OIDC JWT with aud=fabric-inference>
 curl -sk "$OPENAI_BASE_URL/v1/chat/completions" \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
@@ -386,10 +386,10 @@ if scale-in is skipped because metrics are missing or stale, the decision is
 recorded on `deployment.status.message` and the replica count is left unchanged.
 
 ```bash
-zyvorctl ai deployment autoscale qwen3-8b --enable --min 1 --max 4 \
+fabricctl ai deployment autoscale qwen3-8b --enable --min 1 --max 4 \
   --scale-out-queue 20 --scale-out-seconds 30
-zyvorctl ai deployment drain qwen3-8b --grace-seconds 30
-zyvorctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
+fabricctl ai deployment drain qwen3-8b --grace-seconds 30
+fabricctl ai deployment rollout qwen3-8b --strategy canary --canary-percent 10
 ```
 
 ## Reconciliation
@@ -464,7 +464,7 @@ Agents can call Fabric-managed inference without an external provider key:
 Set `ZYVOR_FABRIC_INFERENCE_BASE=http://10.96.0.50:8000` in the guest harness
 so OpenAI-compatible CLIs hit the Maglev VIP through the egress broker.
 Optional `FABRIC_AI_API_KEY` injects an endpoint key created via
-`zyvorctl ai key create`.
+`fabricctl ai key create`.
 
 ## Golden image runbook
 

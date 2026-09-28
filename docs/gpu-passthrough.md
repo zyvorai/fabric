@@ -5,7 +5,7 @@ Pass a physical PCI device — including a GPU — through to a VM using VFIO an
 Zyvor Fabric's passthrough support is **generic PCI hotplug**: it can attach any host PCI
 device (a GPU, a NIC, an NVMe controller, ...) to an already-running VM once that device is
 bound to the `vfio-pci` driver. There is no GPU-specific API, no vGPU/mediated-device support,
-and no `zyvorctl gpu` command — driver binding, ROM handling beyond a simple on/off flag, and
+and no `fabricctl gpu` command — driver binding, ROM handling beyond a simple on/off flag, and
 guest driver setup are all done by hand, outside the platform.
 
 ---
@@ -71,7 +71,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:9095/api/system/pci-devi
 ```
 
 This lists **every** PCI device on the host, not just GPUs — filter on `class_name` (e.g. `VGA
-compatible controller`, `3D controller`) to find candidates. There is no `zyvorctl` command for
+compatible controller`, `3D controller`) to find candidates. There is no `fabricctl` command for
 this or any other step below; it's REST-only.
 
 ---

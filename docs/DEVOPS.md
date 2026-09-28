@@ -62,7 +62,7 @@ ZYVOR_DEVOPS_LIVE=1 ./scripts/test-devops-gate.sh
 
 - GitOps: `examples/devops/gitops` + operator
 - Terraform: `examples/devops/terraform`
-- CLI: `zyvorctl apply -f examples/devops/apply-vm.yaml`
+- CLI: `fabricctl apply -f examples/devops/apply-vm.yaml`
 
 Do not mix writers on the same VM name.
 

@@ -20,7 +20,7 @@
 - VM templates
 - VM state persistence
 - VM driver: [FluxVM](https://github.com/zyvorai/fluxvm), a disposable-VM engine with no systemd dependency (QEMU / Cloud Hypervisor / Firecracker / FluxVM hypervisor)
-- **VM edge dataplane (FluxVM Network Fabric schema v4)** — proxied at `/api/vms/{name}/dataplane/*` and `/api/dataplane/{groups,cnp,health,ipcache,…}`; VM **Dataplane** tab (Status / Policy / Effective / Stats / Flows); console **Edge Dataplane**; Dashboard **VM dataplane** capability; `zyvorctl dataplane` with groups/CNP/health. Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) and [user dataplane](docs/user/pages/infrastructure/dataplane.md).
+- **VM edge dataplane (FluxVM Network Fabric schema v4)** — proxied at `/api/vms/{name}/dataplane/*` and `/api/dataplane/{groups,cnp,health,ipcache,…}`; VM **Dataplane** tab (Status / Policy / Effective / Stats / Flows); console **Edge Dataplane**; Dashboard **VM dataplane** capability; `fabricctl dataplane` with groups/CNP/health. Orthogonal to Fabric SDN `/network-policies`. See [fluxvm-dataplane.md](docs/guides/vm-drivers/fluxvm-dataplane.md) and [user dataplane](docs/user/pages/infrastructure/dataplane.md).
 - CPU and memory configuration (`--cpus`, `--ram`)
 - Direct kernel boot (`--linux`, `--initrd`)
 - TAP and user mode networking (`--network-tap`, `--network-user-mode`)
@@ -35,14 +35,14 @@
 
 ## User Interfaces
 
-### CLI (zyvorctl)
+### CLI (fabricctl)
 
-- Cilium-style grouped help with emoji section markers (`zyvorctl --help`) plus 15+ subcommand groups (policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net, dataplane, …)
-- `zyvorctl dataplane status|policy|stats|flows|effective|health|group|cnp|observe|hubble|…` — FluxVM Network Fabric edge (not SDN network-policies)
+- Cilium-style grouped help with emoji section markers (`fabricctl --help`) plus 15+ subcommand groups (policy, firewall, service, qos, dns, vpn, mirror, nat, monitor, ceph, net, dataplane, …)
+- `fabricctl dataplane status|policy|stats|flows|effective|health|group|cnp|observe|hubble|…` — FluxVM Network Fabric edge (not SDN network-policies)
 - Meta: `status` (API/dataplane checklist), `config`, `completion` (bash/zsh/fish)
 - Output formats: table, JSON, YAML (`-o json|yaml|table`); `--color auto|always|never` (TTY-aware, honors `NO_COLOR`)
-- Declarative config import: `zyvorctl apply -f config.yaml`
-- Config export: `zyvorctl export <resource> -o yaml`
+- Declarative config import: `fabricctl apply -f config.yaml`
+- Config export: `fabricctl export <resource> -o yaml`
 - Ceph management: pool create, health, stats, RBD image CRUD
 - Colorized tables/status and Hubble flow output
 

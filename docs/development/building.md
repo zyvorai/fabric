@@ -123,7 +123,7 @@ cargo build --release
 
 The debug build produces binaries in `target/debug/`:
 - `Zyvor Fabric` -- the main daemon
-- `zyvorctl` -- the CLI client
+- `fabricctl` -- the CLI client
 
 The release build produces optimized binaries in `target/release/`.
 

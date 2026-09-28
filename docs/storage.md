@@ -105,27 +105,27 @@ curl -X POST http://localhost:9095/api/volumes/data-volume/restore \
 
 ## Ceph/RBD
 
-### CLI (`zyvorctl`)
+### CLI (`fabricctl`)
 
 ```bash
 # Create a Ceph storage pool
-zyvorctl ceph create my-pool \
+fabricctl ceph create my-pool \
   --monitors=10.0.0.1,10.0.0.2,10.0.0.3 \
   --pool=rbd \
   --user=admin \
   --keyring=/etc/ceph/ceph.client.admin.keyring
 
 # Health and stats
-zyvorctl ceph health my-pool
-zyvorctl ceph stats my-pool
+fabricctl ceph health my-pool
+fabricctl ceph stats my-pool
 
 # RBD image management
-zyvorctl ceph images my-pool
-zyvorctl ceph create-image my-pool vm-disk-01 --size=10240
-zyvorctl ceph delete-image my-pool vm-disk-01
+fabricctl ceph images my-pool
+fabricctl ceph create-image my-pool vm-disk-01 --size=10240
+fabricctl ceph delete-image my-pool vm-disk-01
 
 # Export as YAML
-zyvorctl ceph pools -o yaml
+fabricctl ceph pools -o yaml
 ```
 
 ### API

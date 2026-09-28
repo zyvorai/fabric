@@ -124,7 +124,7 @@ curl -s -X POST "$FABRIC_URL/api/container-groups/apply" \
   }'
 ```
 
-Or via `zyvorctl` from a spec file:
+Or via `fabricctl` from a spec file:
 
 ```yaml
 # web.yaml
@@ -139,7 +139,7 @@ containers:
 ```
 
 ```bash
-zyvorctl container-group apply -f web.yaml
+fabricctl container-group apply -f web.yaml
 ```
 
 A tenant-scoped, private-registry, health-checked, network-isolated group
@@ -173,9 +173,9 @@ any Pod gets created; see [quotas below](#quotas-and-billing).
 ## 5. Verify it landed
 
 ```bash
-zyvorctl container-group list
-zyvorctl container-group info web
-zyvorctl container-group events   # audit trail: created/applied/deleted/quota_exceeded/placement_failed
+fabricctl container-group list
+fabricctl container-group info web
+fabricctl container-group events   # audit trail: created/applied/deleted/quota_exceeded/placement_failed
 ```
 
 Or directly against Kubernetes, in whichever namespace step 2 resolved to
@@ -232,9 +232,9 @@ backup/restore works on the mounted directories directly rather than
 `qemu-img`:
 
 ```bash
-zyvorctl container-group backup create web --retention-days 30
-zyvorctl container-group backup list
-zyvorctl container-group backup restore <backup-id>
+fabricctl container-group backup create web --retention-days 30
+fabricctl container-group backup list
+fabricctl container-group backup restore <backup-id>
 ```
 
 Restore extracts the archive back onto the exact host paths it was taken

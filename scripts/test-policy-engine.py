@@ -107,7 +107,7 @@ class Engine(unittest.TestCase):
         ui = (ROOT / "web/src/components/CiliumFlowControls.tsx").read_text()
         self.assertIn("Dry-run Guard", ui)
         self.assertIn("Explain", ui)
-        cli = (ROOT / "backend/zyvorctl/src/cli.rs").read_text()
+        cli = (ROOT / "backend/fabricctl/src/cli.rs").read_text()
         self.assertIn("DataplaneCmd::Explain", cli)
         self.assertIn("DataplaneCmd::DryRun", cli)
 

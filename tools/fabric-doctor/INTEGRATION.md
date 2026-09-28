@@ -14,7 +14,7 @@ Recommended follow-up edits to the main repository (kept out of the overlay to a
 
 1. Add `Fabric Doctor` to the README's interfaces/tools section.
 2. Add a top-level Makefile target that runs `$(MAKE) -C tools/fabric-doctor check`.
-3. Package `fabric-doctor` next to `zyvorctl` in release artifacts.
-4. Later expose the report via `zyvorctl doctor` and `/api/system/readiness` by reusing the stable JSON schema.
+3. Package `fabric-doctor` next to `fabricctl` in release artifacts.
+4. Later expose the report via `fabricctl doctor` and `/api/system/readiness` by reusing the stable JSON schema.
 
 The implementation is intentionally standalone and standard-library-only, so it can land without adding dependencies to the Rust workspace or changing Fabric's runtime behavior.

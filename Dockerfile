@@ -1,6 +1,6 @@
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 # SPDX-License-Identifier: Apache-2.0
-# Builds zyvor-fabricd + zyvorctl (Rust) and the web console (Node), then
+# Builds zyvor-fabricd + fabricctl (Rust) and the web console (Node), then
 # assembles a single runtime image. See docs/DOCKER.md for how to run it
 # with Docker or Podman, and why it needs network_mode: host + the specific
 # capability list in docker-compose.yml (this Dockerfile only builds the
@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY backend/ ./
 
-RUN cargo build --locked --release --bin zyvor-fabricd --bin zyvorctl
+RUN cargo build --locked --release --bin zyvor-fabricd --bin fabricctl
 
 FROM debian:bookworm-slim
 
@@ -54,7 +54,7 @@ RUN mkdir -p /var/lib/zyvor-fabricd/images /var/lib/zyvor-fabricd/storage /etc/z
     /usr/share/zyvor-fabricd/web
 
 COPY --from=rust-builder /build/target/release/zyvor-fabricd /usr/local/bin/
-COPY --from=rust-builder /build/target/release/zyvorctl /usr/local/bin/
+COPY --from=rust-builder /build/target/release/fabricctl /usr/local/bin/
 COPY --from=web-builder /build/web/dist/ /usr/share/zyvor-fabricd/web/
 COPY configs/zyvor-fabricd-docker.toml /etc/zyvor-fabricd/zyvor-fabricd.toml
 

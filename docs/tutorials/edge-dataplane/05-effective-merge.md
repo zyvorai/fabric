@@ -26,7 +26,7 @@ curl -sk "$FABRIC_HOST/api/vms/$VM/dataplane/effective" "${AUTH[@]}" | jq '{
   effective_default_allow: .effective.default_allow,
   effective_mbps: .effective.max_egress_mbps
 }'
-# zyvorctl dataplane effective "$VM" -o json
+# fabricctl dataplane effective "$VM" -o json
 ```
 
 ## 2. Multi-group experiment

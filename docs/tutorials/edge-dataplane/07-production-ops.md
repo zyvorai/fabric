@@ -31,7 +31,7 @@ Guest IP → FluxVM identity map (control-plane JSON under FluxVM state_dir):
 
 ```bash
 curl -sk "$FABRIC_HOST/api/dataplane/ipcache" "${AUTH[@]}" | jq '.items'
-# zyvorctl dataplane ipcache -o json
+# fabricctl dataplane ipcache -o json
 ```
 
 ## FQDN refresh
@@ -40,7 +40,7 @@ If policy / CNP used `allow_fqdns` / `toFQDNs`, re-resolve into CIDRs:
 
 ```bash
 curl -sk -X POST "$FABRIC_HOST/api/dataplane/refresh-dns" "${AUTH[@]}" | jq .
-# zyvorctl dataplane refresh-dns -o json
+# fabricctl dataplane refresh-dns -o json
 ```
 
 Expect `{"refreshed": N}`. If refresh fails with “Filter already exists” after a

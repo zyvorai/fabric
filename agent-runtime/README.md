@@ -139,7 +139,7 @@ Every approval and every brokered egress call is written to `audit.jsonl` in the
 
 Each entry commits to the previous entry's SHA-256, so editing or deleting a line breaks the chain. `GET /v1/audit` returns entries (newest last, `limit` defaults to 200, maximum 5000, optional `session_id`) plus `chain: {entries, chain_ok, broken_at?}`. Egress entries record the method, host, and path only, never the query string, headers, or credentials. Calls that fail the session capability check (401) are not journaled, because their claimed session id is unproven. A failed journal write is logged and does not fail the request.
 
-Through the Fabric daemon these are `GET/POST /api/approvals`, `POST /api/approvals/{id}`, and `GET /api/audit/agent-actions`; from the CLI, `zyvorctl approval list|approve|deny` and `zyvorctl agent-audit`.
+Through the Fabric daemon these are `GET/POST /api/approvals`, `POST /api/approvals/{id}`, and `GET /api/audit/agent-actions`; from the CLI, `fabricctl approval list|approve|deny` and `fabricctl agent-audit`.
 
 ### Asking a human before egress
 
@@ -237,7 +237,7 @@ Volumes are per FluxVM tenant and live under FluxVM's `sandbox.volumes_dir` (def
 
 ## Skills
 
-A skill is a small bundle of instructions and helper files, with a top-level `SKILL.md`, that an agent can read at run time. Publish one with `POST /v1/skills` (`{"name", "description"?, "scope"?, "files": [{"path", "content_base64", "executable"?}]}`) or `zyvorctl skill publish <dir>`. Limits: 32 files, 512 KiB per file, 2 MiB in total, relative paths of `[A-Za-z0-9._/-]` only. A skill version is the SHA-256 of its content, so publishing identical content again changes nothing and `GET /v1/skills/{name}` lists every version.
+A skill is a small bundle of instructions and helper files, with a top-level `SKILL.md`, that an agent can read at run time. Publish one with `POST /v1/skills` (`{"name", "description"?, "scope"?, "files": [{"path", "content_base64", "executable"?}]}`) or `fabricctl skill publish <dir>`. Limits: 32 files, 512 KiB per file, 2 MiB in total, relative paths of `[A-Za-z0-9._/-]` only. A skill version is the SHA-256 of its content, so publishing identical content again changes nothing and `GET /v1/skills/{name}` lists every version.
 
 An agent lists skills in its manifest as `name` or `name@version`. Deploy rewrites each to an exact `name@version` pin, so republishing a skill never changes what an already deployed agent version mounts. Every session writes the pinned skills into its sandbox:
 

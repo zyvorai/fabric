@@ -67,7 +67,7 @@ check _ssh "
 # ── Binary check ──
 echo ""
 echo "  ── Binaries ──"
-for bin in zyvor-fabricd zyvorctl; do
+for bin in zyvor-fabricd fabricctl; do
     check _ssh "
         if command -v $bin &>/dev/null; then
             echo \"  ✅ $bin: \$(command -v $bin)\"

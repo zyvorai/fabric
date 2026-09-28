@@ -127,7 +127,7 @@ cargo build --release
 
 # Install binaries
 sudo install -m 755 target/release/zyvor-fabricd /usr/local/bin/
-sudo install -m 755 target/release/zyvorctl /usr/local/bin/
+sudo install -m 755 target/release/fabricctl /usr/local/bin/
 ```
 
 ### Directory Setup

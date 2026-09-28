@@ -93,7 +93,7 @@ manage `…/dataplane/pod-policy` (see operator guide).
 | Status / policy / stats / flows / effective / drop-reasons / pod-policy | `/api/vms/{name}/dataplane/…` |
 | Groups / CNP / health / observe / ipcache / refresh-dns | `/api/dataplane/…` |
 | QGA (Windows Kryton) | `/api/vms/{name}/qga/{ping,exec,firewall/…}` |
-| CLI | `zyvorctl dataplane policy guard\|audit\|open\|invert\|block\|allow` |
+| CLI | `fabricctl dataplane policy guard\|audit\|open\|invert\|block\|allow` |
 
 Tutorials: [Tutorial 09](../../../tutorials/09-edge-dataplane.md) ·
 [edge-dataplane series](../../../tutorials/edge-dataplane/README.md).

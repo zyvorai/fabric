@@ -12,7 +12,7 @@ or the Janus lab stand-in when the host has no GPU.
 
 - `zyvor-fabricd` reachable at `https://127.0.0.1:9095` (or your host URL)
 - Admin credentials (`/var/lib/zyvor-fabricd/.admin_password`)
-- `zyvorctl`, `curl`, `jq`
+- `fabricctl`, `curl`, `jq`
 - One of:
   - **Path A — Janus lab:** `FLUXVM_AI_JANUS_URL` set (for example
     `http://127.0.0.1:30818`) and FluxVM reporting no NVIDIA GPU
@@ -55,9 +55,9 @@ curl -sk -H "authorization: Bearer $ZYVOR_FABRIC_TOKEN" \
 ## Step 1: See what Fabric thinks the GPU plane is
 
 ```bash
-zyvorctl ai gpus -o json | jq .
-zyvorctl ai node list -o json | jq .
-zyvorctl ai capacity -o json | jq .
+fabricctl ai gpus -o json | jq .
+fabricctl ai node list -o json | jq .
+fabricctl ai capacity -o json | jq .
 ```
 
 **Janus path.** When `FLUXVM_AI_JANUS_URL` is set and FluxVM has no NVIDIA
@@ -80,18 +80,18 @@ FABRIC_URL="$FABRIC_URL" ./scripts/smoke-ai-janus-lab.sh
 
 ```bash
 # Model artifact (Hugging Face id or a pre-staged host path)
-zyvorctl ai model add demo-qwen \
+fabricctl ai model add demo-qwen \
   --source hf://Qwen/Qwen3-8B
 
-zyvorctl ai model list -o json | jq '.[].name'
+fabricctl ai model list -o json | jq '.[].name'
 
 # Profile: runtime + shape. Known runtimes launch by default:
 # vllm, tensorrt-llm, triton, llama.cpp, tei
-zyvorctl ai profile add demo-24g \
+fabricctl ai profile add demo-24g \
   --runtime vllm \
   --gpu 1 --vram 24 --cpu 8 --memory 32
 
-zyvorctl ai profile list -o json | jq .
+fabricctl ai profile list -o json | jq .
 ```
 
 On Janus, the profile still describes the *logical* shape; Fabric does not
@@ -106,17 +106,17 @@ For a strict allowlist: `FLUXVM_AI_ALLOW_RUNTIMES=vllm,tei`.
 
 ```bash
 # Do not set preferred_site=lab when only Janus GPUs exist
-zyvorctl ai deploy demo-qwen \
+fabricctl ai deploy demo-qwen \
   --profile demo-24g \
   --replicas 1
 
-zyvorctl ai deployment list -o json | jq .
+fabricctl ai deployment list -o json | jq .
 
-zyvorctl ai endpoint expose demo-qwen \
+fabricctl ai endpoint expose demo-qwen \
   --openai-compatible \
   --routing least_queue
 
-zyvorctl ai endpoint list -o json | jq .
+fabricctl ai endpoint list -o json | jq .
 ```
 
 Wait until the deployment shows a ready replica. On Janus you should see a
@@ -131,12 +131,12 @@ Console: open `/app/ai` → **Deployments** / **Endpoints** / **Nodes**.
 
 ```bash
 # Capture the secret once — it is not shown again
-zyvorctl ai key create demo-key --endpoint demo-qwen-openai -o json \
+fabricctl ai key create demo-key --endpoint demo-qwen-openai -o json \
   | tee /tmp/ai-key.json
 
 KEY="$(jq -r '.secret // .key // .token // empty' /tmp/ai-key.json)"
 # If the CLI prints the secret outside JSON, copy it from the create output.
-ENDPOINT="$(zyvorctl ai endpoint list -o json | jq -r '.[0].name // "demo-qwen-openai"')"
+ENDPOINT="$(fabricctl ai endpoint list -o json | jq -r '.[0].name // "demo-qwen-openai"')"
 
 export OPENAI_BASE_URL="$FABRIC_URL/api/ai/openai/$ENDPOINT"
 curl -sk "$OPENAI_BASE_URL/v1/chat/completions" \
@@ -161,17 +161,17 @@ audience are rejected unless `FLUXVM_AI_GATEWAY_ACCEPT_JWT=1`.
 ## Step 5: Scale, drain, and capacity
 
 ```bash
-zyvorctl ai deployment scale demo-qwen --replicas 2
-zyvorctl ai capacity -o json | jq .
-zyvorctl ai deployment drain demo-qwen
+fabricctl ai deployment scale demo-qwen --replicas 2
+fabricctl ai capacity -o json | jq .
+fabricctl ai deployment drain demo-qwen
 # scale back when done draining
-zyvorctl ai deployment scale demo-qwen --replicas 1
+fabricctl ai deployment scale demo-qwen --replicas 1
 ```
 
 Revisioned rolling / canary / blue-green:
 
 ```bash
-zyvorctl ai deployment rollout demo-qwen --strategy canary --canary-percent 10
+fabricctl ai deployment rollout demo-qwen --strategy canary --canary-percent 10
 ```
 
 ---
@@ -182,13 +182,13 @@ zyvorctl ai deployment rollout demo-qwen --strategy canary --canary-percent 10
 
 ```bash
 # Free the parent if a deployment still holds it
-zyvorctl ai deployment delete demo-qwen || true
+fabricctl ai deployment delete demo-qwen || true
 
-zyvorctl ai node mig-create node-0 \
+fabricctl ai node mig-create node-0 \
   --parent-bdf janus:node-0:gpu-0 \
   --profile 1g.10gb -o json | jq '.gpus[].bdf'
 
-zyvorctl ai node mig-delete node-0 'janus:node-0:gpu-0--1g.10gb--0'
+fabricctl ai node mig-delete node-0 'janus:node-0:gpu-0--1g.10gb--0'
 ```
 
 **PCI (driver):**
@@ -198,7 +198,7 @@ zyvorctl ai node mig-delete node-0 'janus:node-0:gpu-0--1g.10gb--0'
 # Environment=FLUXVM_AI_PCI_MIG=1
 # Optional lab without nvidia-smi: FLUXVM_AI_PCI_MIG_RECORD_ONLY=1
 
-zyvorctl ai node mig-create <node-id> \
+fabricctl ai node mig-create <node-id> \
   --parent-bdf 0000:01:00.0 \
   --profile 1g.10gb
 ```
@@ -231,11 +231,11 @@ Unreachable fabricd fails closed when the webhook is enabled.
 ## Step 8: Clean up
 
 ```bash
-zyvorctl ai key delete "$(jq -r .id /tmp/ai-key.json)" 2>/dev/null || true
-zyvorctl ai endpoint delete demo-qwen-openai 2>/dev/null || true
-zyvorctl ai deployment delete demo-qwen 2>/dev/null || true
-zyvorctl ai profile delete demo-24g 2>/dev/null || true
-zyvorctl ai model delete demo-qwen 2>/dev/null || true
+fabricctl ai key delete "$(jq -r .id /tmp/ai-key.json)" 2>/dev/null || true
+fabricctl ai endpoint delete demo-qwen-openai 2>/dev/null || true
+fabricctl ai deployment delete demo-qwen 2>/dev/null || true
+fabricctl ai profile delete demo-24g 2>/dev/null || true
+fabricctl ai model delete demo-qwen 2>/dev/null || true
 ```
 
 ---

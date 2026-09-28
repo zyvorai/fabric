@@ -52,15 +52,15 @@ jobs:
       - name: Build binaries
         run: |
           cd backend
-          cargo build --release --locked --bin zyvor-fabricd --bin zyvorctl
-          cp target/release/zyvor-fabricd target/release/zyvorctl "$GITHUB_WORKSPACE/"
+          cargo build --release --locked --bin zyvor-fabricd --bin fabricctl
+          cp target/release/zyvor-fabricd target/release/fabricctl "$GITHUB_WORKSPACE/"
 
       - name: Package artifacts
         run: |
           TAG="${GITHUB_REF_NAME}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then TAG="${{ inputs.tag }}"; fi
           mkdir -p dist
-          tar -czf "dist/zyvor-fabricd-${TAG}-linux-${{ matrix.arch }}.tar.gz" zyvor-fabricd zyvorctl fabric-doctor
+          tar -czf "dist/zyvor-fabricd-${TAG}-linux-${{ matrix.arch }}.tar.gz" zyvor-fabricd fabricctl fabric-doctor
           (cd dist && sha256sum *.tar.gz > "SHA256SUMS-${{ matrix.arch }}.txt")
 
       - uses: actions/upload-artifact@v7

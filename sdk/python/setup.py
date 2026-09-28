@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="zyvorctl",
+    name="fabricctl",
     version="0.1.0",
     packages=find_packages(),
     install_requires=["requests>=2.28"],
@@ -13,7 +13,7 @@ setup(
     license="MIT",
     entry_points={
         "console_scripts": [
-            "zyvorctl=zyvorctl.cli:main",
+            "fabricctl=fabricctl.cli:main",
         ],
     },
 )

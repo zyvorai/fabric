@@ -93,7 +93,7 @@ function ApplySpecDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
       <div className="p-6">
         <h2 className="text-xl font-semibold text-[var(--zf-ink)] mb-1">Apply ContainerGroup Spec</h2>
         <p className="text-sm text-[var(--zf-muted)] mb-4">
-          Paste or edit a JSON spec, the same shape <code>zyvorctl container-group apply -f</code> accepts.
+          Paste or edit a JSON spec, the same shape <code>fabricctl container-group apply -f</code> accepts.
         </p>
         <textarea
           value={text}

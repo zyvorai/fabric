@@ -143,7 +143,7 @@ List all VMs with pagination.
 }
 ```
 
-`zyvorctl list` decodes this paginated envelope (`items`, not a bare array).
+`fabricctl list` decodes this paginated envelope (`items`, not a bare array).
 
 ```bash
 curl -s "http://localhost:9095/api/vms?tenant=acme" \
@@ -1148,10 +1148,10 @@ curl -sk https://127.0.0.1:9095/api/vms/NAME/dataplane/status \
   -H "Authorization: Bearer $TOKEN" | jq
 curl -sk https://127.0.0.1:9095/api/dataplane/services/status \
   -H "Authorization: Bearer $TOKEN" | jq
-zyvorctl dataplane service list
-zyvorctl dataplane service apply --file docs/examples/service-fabric-v3/ha-draining-service.json
-zyvorctl dataplane service delta payments --after-seq 0
-zyvorctl dataplane service flows
+fabricctl dataplane service list
+fabricctl dataplane service apply --file docs/examples/service-fabric-v3/ha-draining-service.json
+fabricctl dataplane service delta payments --after-seq 0
+fabricctl dataplane service flows
 ```
 
 Tutorials: [09-edge-dataplane.md](../../tutorials/09-edge-dataplane.md).

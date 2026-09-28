@@ -87,7 +87,7 @@ cd zyvor-fabric
 This command will:
 - Install any missing system dependencies
 - Build the Rust workspace (53 crates)
-- Install binaries (`Zyvor Fabric`, `zyvorctl`) to `/usr/local/bin/`
+- Install binaries (`Zyvor Fabric`, `fabricctl`) to `/usr/local/bin/`
 - Install the systemd service unit
 - Create configuration directories
 - Start the zyvor-fabricd service
@@ -198,7 +198,7 @@ All tests must pass with zero warnings before deployment.
 sudo cp backend/target/release/zyvor-fabricd /usr/local/bin/
 
 # Install the CLI
-sudo cp backend/target/release/zyvorctl /usr/local/bin/
+sudo cp backend/target/release/fabricctl /usr/local/bin/
 
 # Create config directory
 sudo mkdir -p /etc/zyvor-fabricd
