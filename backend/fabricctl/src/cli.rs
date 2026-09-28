@@ -16,13 +16,35 @@ use crate::style::{self, ColorMode};
 
 static API_BASE: Mutex<String> = Mutex::new(String::new());
 
+const DEFAULT_ROOT: &str = "http://localhost:9095";
+
+/// True when neither `--server` nor `ZYVOR_FABRIC_URL` / `FABRIC_URL` picked the server.
+fn server_is_default(server: Option<&str>) -> bool {
+    server.is_none()
+        && std::env::var("ZYVOR_FABRIC_URL").is_err()
+        && std::env::var("FABRIC_URL").is_err()
+}
+
+/// A default install serves TLS on 9095 (`[tls] enabled`, self-signed), while the
+/// Docker config serves plain HTTP. With no server given, use https if it answers.
+async fn probe_default_https() -> Option<String> {
+    let client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .timeout(std::time::Duration::from_secs(1))
+        .build()
+        .ok()?;
+    let url = DEFAULT_ROOT.replacen("http://", "https://", 1);
+    client.get(format!("{url}/health")).send().await.ok()?;
+    Some(format!("{url}/api"))
+}
+
 /// Fabric API root including `/api` (override with `--server` / `ZYVOR_FABRIC_URL` / `FABRIC_URL`).
 fn resolve_api_base(server: Option<&str>) -> String {
     let root = server
         .map(|s| s.to_string())
         .or_else(|| std::env::var("ZYVOR_FABRIC_URL").ok())
         .or_else(|| std::env::var("FABRIC_URL").ok())
-        .unwrap_or_else(|| "http://localhost:9095".to_string());
+        .unwrap_or_else(|| DEFAULT_ROOT.to_string());
     let root = root.trim_end_matches('/').to_string();
     if root.ends_with("/api") {
         root
@@ -84,7 +106,7 @@ pub struct Cli {
     #[arg(long, default_value = "auto", global = true, value_enum)]
     color: ColorMode,
 
-    /// Fabric API URL (overrides ZYVOR_FABRIC_URL / FABRIC_URL)
+    /// Fabric API URL (overrides ZYVOR_FABRIC_URL / FABRIC_URL; default http://localhost:9095, or https when that answers)
     #[arg(long, global = true)]
     server: Option<String>,
 
@@ -1709,6 +1731,11 @@ impl Cli {
             );
         }
 
+        if server_is_default(self.server.as_deref()) {
+            if let Some(https) = probe_default_https().await {
+                set_api_base(https);
+            }
+        }
         let base = api_base();
         let mut headers = reqwest::header::HeaderMap::new();
         if let Some(token) = auth_token(self.token.as_deref()) {
@@ -3376,8 +3403,8 @@ mod container_group_cli_tests {
     #[test]
     fn container_group_apply_requires_a_file() {
         assert!(Cli::try_parse_from(["fabricctl", "container-group", "apply"]).is_err());
-        let cli =
-            Cli::try_parse_from(["fabricctl", "container-group", "apply", "-f", "cg.yaml"]).unwrap();
+        let cli = Cli::try_parse_from(["fabricctl", "container-group", "apply", "-f", "cg.yaml"])
+            .unwrap();
         match cli.command {
             Some(Commands::ContainerGroup(ContainerGroupCmd::Apply { file })) => {
                 assert_eq!(file, "cg.yaml");
@@ -3418,7 +3445,9 @@ mod container_group_cli_tests {
 
     #[test]
     fn container_group_backup_restore_requires_an_id() {
-        assert!(Cli::try_parse_from(["fabricctl", "container-group", "backup", "restore"]).is_err());
+        assert!(
+            Cli::try_parse_from(["fabricctl", "container-group", "backup", "restore"]).is_err()
+        );
         let cli = Cli::try_parse_from([
             "fabricctl",
             "container-group",
@@ -3440,11 +3469,15 @@ mod container_group_cli_tests {
     #[test]
     fn meta_commands_parse() {
         assert!(matches!(
-            Cli::try_parse_from(["fabricctl", "status"]).unwrap().command,
+            Cli::try_parse_from(["fabricctl", "status"])
+                .unwrap()
+                .command,
             Some(Commands::Status)
         ));
         assert!(matches!(
-            Cli::try_parse_from(["fabricctl", "config"]).unwrap().command,
+            Cli::try_parse_from(["fabricctl", "config"])
+                .unwrap()
+                .command,
             Some(Commands::Config)
         ));
         let cli = Cli::try_parse_from(["fabricctl", "completion", "zsh"]).unwrap();

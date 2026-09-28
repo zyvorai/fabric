@@ -10,6 +10,10 @@
   package and its console script are renamed too (`import fabricctl`, command `fabricctl`), which breaks existing
   imports. Environment variables (`ZYVOR_FABRIC_URL`, `ZYVOR_FABRIC_TOKEN`, and the `FABRIC_*` fallbacks) are unchanged.
   If branch protection requires the old `zyvorctl` CI check, repoint it to `fabricctl`.
+- **`fabricctl` finds a TLS daemon without `--server`.** With no `--server`, `ZYVOR_FABRIC_URL` or `FABRIC_URL`, it tries
+  `https://localhost:9095` first (a default install serves self-signed TLS there) and otherwise uses
+  `http://localhost:9095` (the Docker config). Before, the plain-`http` default failed against a TLS daemon with
+  `invalid HTTP version parsed`. An explicit server is used as given.
 
 ### Fixed
 - **Use-case cells were not confined on the host.** The runtime looked for the guest's default gateway right after
