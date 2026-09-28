@@ -2,7 +2,8 @@
 # Render docs/social HTML cards with headless Chrome + macOS sips.
 #   ./docs/social/build-social-card.sh
 # Writes:
-#   docs/social/fabric-share-card.png     (1200x630 — README + site OG)
+#   docs/social/fabric-share-card.png     (1200x630 — README + site OG, light)
+#   docs/social/fabric-share-card-dark.png (1200x630 — README dark theme; NOT copied to the site)
 #   docs/social/fabric-social-card.jpg    (1600x900 — LinkedIn / X)
 #   website/static/img/social-card.png   (byte copy of the share PNG)
 set -euo pipefail
@@ -27,6 +28,7 @@ shot() {
 }
 
 shot "$HERE/fabric-share-card.html" 1200 630 "$HERE/fabric-share-card.png" png
+shot "$HERE/fabric-share-card-dark.html" 1200 630 "$HERE/fabric-share-card-dark.png" png
 shot "$HERE/fabric-social-card.html" 1600 900 "$HERE/fabric-social-card.jpg" jpeg
 
 SITE_OG="$ROOT/website/static/img/social-card.png"
