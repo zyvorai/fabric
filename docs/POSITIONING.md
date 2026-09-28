@@ -71,7 +71,7 @@ Zyvor Fabric includes:
 
 ### When to look elsewhere
 
-Fabric isn't the right fit for every case. See **[Is this for you?](../README.md#is-this-for-you)** in the README and the full **[Comparison Matrix](guides/decision-support/comparison-matrix.md)** for where Proxmox VE, oVirt, or a full libvirt stack currently outmatch it — chiefly: mature multi-host live migration at scale, existing deep libvirt/XML tooling investments, and first-class Windows guest support.
+Fabric isn't the right fit for every case. See **[Is this for you?](why-fabric.md#is-this-for-you)** and the full **[Comparison Matrix](guides/decision-support/comparison-matrix.md)** for where Proxmox VE, oVirt, or a full libvirt stack currently outmatch it — chiefly: mature multi-host live migration at scale, existing deep libvirt/XML tooling investments, and first-class Windows guest support.
 
 ---
 
@@ -79,7 +79,7 @@ Fabric isn't the right fit for every case. See **[Is this for you?](../README.md
 
 **Machina** is a separate, **not-yet-shipped** product: an **AI-native Infrastructure Workbench for macOS**. Everything in this section is roadmap/vision, not a current capability of Zyvor Fabric.
 
-> **Naming note:** the Zyvor ecosystem table (see the [main README](../README.md#zyvor-platform-stack)) also lists a currently-shipping, lowercase **"machina"** described there as a physical bare-metal hypervisor OS (libvirt/KVM) — a different product from the macOS workbench described below. This naming collision predates this rewrite; flagging it here rather than guessing which name is authoritative, since that's a product-naming decision for whoever owns the Zyvor catalog, not something to resolve unilaterally in a docs pass.
+> **Naming note:** the Zyvor ecosystem table (see the [Zyvor platform stack](platform-stack.md)) also lists a currently-shipping, lowercase **"machina"** described there as a physical bare-metal hypervisor OS (libvirt/KVM) — a different product from the macOS workbench described below. This naming collision predates this rewrite; flagging it here rather than guessing which name is authoritative, since that's a product-naming decision for whoever owns the Zyvor catalog, not something to resolve unilaterally in a docs pass.
 
 | | Zyvor Fabric | Machina (roadmap) |
 |---|-------------|---------|

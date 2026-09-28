@@ -33,8 +33,8 @@ Private cloud control plane driving VM lifecycle over FluxVM's REST API — no l
 
 | Mode | Command | Docs |
 |------|---------|------|
-| **Ship stack (easiest)** | `./scripts/ship USER@HOST` | [README](../README.md#bare-metal-systemd--easiest-path) · [DEVOPS.md](DEVOPS.md) |
-| Bare metal remote | `./scripts/deploy remote USER@HOST` | [README](../README.md#deploy) |
+| **Ship stack (easiest)** | `./scripts/ship USER@HOST` | [Deploy guide](deploy.md#bare-metal-systemd--easiest-path) · [DEVOPS.md](DEVOPS.md) |
+| Bare metal remote | `./scripts/deploy remote USER@HOST` | [Deploy guide](deploy.md) |
 | **Prod readiness** | `FABRIC_TOKEN=… ./scripts/test-production-readiness.sh` | [production.md](deployment/production.md) · [DEVOPS.md](DEVOPS.md) |
 | Lab verify | `./scripts/test-lab-verify.sh` | [DEVOPS.md](DEVOPS.md) |
 | Lab deploy from GitHub | push to `main`, or run the Lab deploy workflow | [DEVOPS.md](DEVOPS.md) · [`.github/workflows/lab-deploy.yml`](../.github/workflows/lab-deploy.yml) |
