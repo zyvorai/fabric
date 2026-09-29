@@ -82,6 +82,11 @@ You (phone or laptop)
 
 Keep is a product layer of [Fabric](../../README.md) on the [agent runtime](../../agent-runtime/) and [FluxVM](https://github.com/zyvorai/fluxvm). It is not a second hypervisor and not a separate repository.
 
+For incident handoff, the [agent SDK evidence CLI](../../sdk/agent-runtime/README.md#session-evidence-bundles)
+collects a bounded session cockpit, audit export and action receipts into a private JSON snapshot.
+Its offline checksum detects file changes; it is not a signature or proof that the bounded
+receipt and audit windows contain every historical action.
+
 ### The cell
 
 The untrusted agent runtime runs in a **microVM on FluxVM**, not only in a container on the host kernel. If something inside goes wrong, an escape has to get through a hypervisor before it reaches the vault.

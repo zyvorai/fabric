@@ -67,6 +67,43 @@ a user. Approval decisions by user tokens need `approve` in their scopes, and
 the runtime may additionally require a signed phone decision. The SDK does not
 bypass that check; the runtime's 403 response is returned as an error.
 
+## Session evidence bundles
+
+`keep-evidence` collects the existing cockpit, a session-scoped audit export and
+approved-action receipts into **one private JSON file**. An operator token and a
+separately minted audit export token are required:
+
+```bash
+export KEEP_API_TOKEN='operator-token' KEEP_EXPORT_TOKEN='audit-scoped-export-token'
+keep-evidence collect --url https://keep.example \
+  --session d564e4fe-3658-4b13-9336-45cbbe1a89d1 --out ./incident-1042.json
+keep-evidence verify ./incident-1042.json
+```
+
+The output is created with mode `0600` and an existing path is never replaced.
+Keep the file in an approved private location: cockpit and audit rows can contain
+sensitive metadata. The CLI never puts either token in the URL or the bundle.
+`verify` requires no network access or token. It checks the local SHA-256 checksum,
+format and session references. Someone who changes the file can recompute that
+checksum, so it **does not establish authenticity**. The bundle records the
+runtime's global audit-chain verdict but cannot independently verify the global
+chain from a session-scoped slice. It also is not hardware attestation.
+
+Exports are bounded to the newest 5,000 audit rows for a session and the newest
+500 receipts across the runtime. The bundle flags saturated windows and always
+labels receipts as potentially incomplete (retention and purges also apply).
+Capture runs over several HTTP calls rather than one atomic snapshot; its
+`captured_from` and `captured_until` fields show that interval. For long-lived
+retention, schedule periodic exports before the windows fill.
+
+The Node API is available from `@zyvor/fabric-agent/evidence`:
+
+```ts
+import { collectEvidence, verifyEvidence } from "@zyvor/fabric-agent/evidence";
+const bundle = await collectEvidence(keep, { sessionId, exportToken });
+const result = verifyEvidence(bundle); // local checksum and shape only
+```
+
 ## Idempotent fan-out
 
 ```ts
