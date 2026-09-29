@@ -82,6 +82,11 @@ You (phone or laptop)
 
 Keep is a product layer of [Fabric](../../README.md) on the [agent runtime](../../agent-runtime/) and [FluxVM](https://github.com/zyvorai/fluxvm). It is not a second hypervisor and not a separate repository.
 
+The [agent SDK](../../sdk/agent-runtime/README.md#keep-approvals-and-evidence) also exposes Keep's operator
+APIs (`keep.approvals.list()` / `decide()` and evidence queries) to your own code. It needs a runtime API token; a
+user token sees only its own sessions and needs the `approve` scope to decide, and an agent's sandbox token cannot
+call these routes. Keep never approves an action on the agent's behalf.
+
 For incident handoff, the [agent SDK evidence CLI](../../sdk/agent-runtime/README.md#session-evidence-bundles)
 collects a bounded session cockpit, audit export and action receipts into a private JSON snapshot.
 Its offline checksum detects file changes; it is not a signature or proof that the bounded
