@@ -8,8 +8,11 @@ import { createGateway } from "./gateway.js";
 
 const path = process.argv[2] ?? process.env.GATEWAY_CONFIG ?? "gateway.json";
 const config = JSON.parse(readFileSync(path, "utf8"));
-for (const key of ["jwtSecret", "relaySecret", "stateFile", "shards", "defaultRegion"]) {
+for (const key of ["relaySecret", "stateFile", "shards", "defaultRegion"]) {
   if (!config[key]) throw new Error(`${path}: "${key}" is required`);
+}
+if (Boolean(config.oidc) === Boolean(config.jwtSecret)) {
+  throw new Error(`${path}: configure exactly one of "oidc" or "jwtSecret"`);
 }
 const { server } = createGateway(config, { log: (...a) => console.error(...a) });
 const port = Number(config.port ?? process.env.PORT ?? 8443);
