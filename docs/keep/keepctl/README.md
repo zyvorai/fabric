@@ -39,6 +39,21 @@ keepctl trigger list
 
 The console shows the same three views at `/app/keep/history` (Runs, Audit, Approvals).
 
+Send the audit journal to a SIEM. `GET /v1/export/audit?format=ocsf` returns newline-delimited events shaped like
+OCSF *API Activity* (class 6003), one per journal row. It needs an export token with the `audit` scope, the same as the
+JSON export:
+
+```bash
+TOK=$(keepctl export-token audit:read:1h 600 | jq -r .token)
+curl -sD- -H "Authorization: Bearer $KEEP_TOKEN" -H "X-Keep-Export-Token: $TOK" \
+  "$KEEP_API/v1/export/audit?format=ocsf&limit=500" -o audit.ndjson
+```
+
+Each event carries its row's `hash` (as `metadata.uid`) and `prev_hash` (under `unmapped`), so the receiver can
+re-check the order. The chain verdict is in the `X-Keep-Audit-Chain` response header (`ok` or `broken`). The mapping is
+shape-only and has not been run through the OCSF schema validator; `audit.jsonl` and `keepctl audit` stay the
+source of truth.
+
 Lab live gate (stub + FluxVM proof):
 
 ```bash
