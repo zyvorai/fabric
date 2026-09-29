@@ -33,6 +33,54 @@ export class Fabric {
       warmPool: async (name) => this.request("GET", `/v1/agents/${encodeURIComponent(name)}/warm-pool`),
       reconcileWarmPool: async (name) => this.request("POST", `/v1/agents/${encodeURIComponent(name)}/warm-pool`, {}),
     };
+    this.approvals = {
+      list: async () => (await this.request("GET", "/v1/approvals")).items,
+      decide: async (id, decision, { comment, scope } = {}) => {
+        if (decision !== "approved" && decision !== "denied") {
+          throw new TypeError("decision must be approved or denied");
+        }
+        if (scope !== undefined && (decision !== "approved" || !["once", "session"].includes(scope))) {
+          throw new TypeError("scope must be once or session on an approved decision");
+        }
+        return this.request("POST", `/v1/approvals/${encodeURIComponent(id)}`, {
+          decision, ...(comment === undefined ? {} : { comment }), ...(scope === undefined ? {} : { scope }),
+        });
+      },
+    };
+    this.evidence = {
+      cockpit: (sessionId) => this.request("GET", `/v1/sessions/${encodeURIComponent(sessionId)}/cockpit`),
+      audit: ({ sessionId, limit } = {}) => this.request("GET", `/v1/audit${query({ session_id: sessionId, limit })}`),
+      receipts: async ({ userId, limit } = {}) =>
+        (await this.request("GET", `/v1/receipts${query({ user_id: userId, limit })}`)).items,
+      // Full export is a distinct, scoped capability. Never place the export token in a URL.
+      exportAudit: ({ exportToken, sessionId, limit } = {}) => {
+        if (!exportToken) throw new TypeError("exportToken is required");
+        return this.request("GET", `/v1/export/audit${query({ session_id: sessionId, limit })}`, undefined,
+          { "x-keep-export-token": exportToken });
+      },
+    };
+    this.usage = ({ userId, since } = {}) =>
+      this.request("GET", `/v1/usage${query({ user_id: userId, since })}`);
+    this.identity = {
+      whoami: () => this.request("GET", "/v1/whoami"),
+      // Operator only. The caller must keep the returned token out of logs and URLs.
+      mintUserToken: (userId, { scopes, ttlSeconds } = {}) => {
+        if (!userId) throw new TypeError("userId is required");
+        if (scopes !== undefined && (!Array.isArray(scopes) || scopes.length === 0 ||
+          scopes.some((s) => !["read", "run", "approve"].includes(s)))) {
+          throw new TypeError("scopes must be a nonempty list of read, run or approve");
+        }
+        return this.request("POST", "/v1/user-tokens", {
+          user_id: userId,
+          ...(scopes === undefined ? {} : { scopes }),
+          ...(ttlSeconds === undefined ? {} : { ttl_seconds: ttlSeconds }),
+        });
+      },
+      revokeUserTokens: (userId) => {
+        if (!userId) throw new TypeError("userId is required");
+        return this.request("POST", `/v1/users/${encodeURIComponent(userId)}/revoke-tokens`, {});
+      },
+    };
   }
 
   agent(name) {
@@ -41,8 +89,8 @@ export class Fabric {
     };
   }
 
-  async request(method, path, body) {
-    const headers = { accept: "application/json" };
+  async request(method, path, body, extraHeaders = {}) {
+    const headers = { accept: "application/json", ...extraHeaders };
     if (body !== undefined) headers["content-type"] = "application/json";
     if (this.token) headers.authorization = `Bearer ${this.token}`;
     const response = await this.fetch(`${this.baseUrl}${path}`, {
@@ -57,6 +105,14 @@ export class Fabric {
     if (response.status === 204) return undefined;
     return response.json();
   }
+}
+
+function query(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) search.set(key, String(value));
+  }
+  return search.size ? `?${search}` : "";
 }
 
 export class Session {
