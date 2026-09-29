@@ -143,3 +143,76 @@ test("start_policy is forwarded for warm scheduling control", async () => {
   assert.equal(body.start_policy, "require-warm");
   assert.equal(session.start_policy, "require-warm");
 });
+
+test("Keep evidence requests encode filters and keep export capability in a header", async () => {
+  const calls = [];
+  const client = new Fabric({
+    baseUrl: "https://keep.example/",
+    token: "operator-token",
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ items: [], chain: { chain_ok: true }, export: true }),
+        { status: 200, headers: { "content-type": "application/json" } });
+    },
+  });
+  await client.evidence.cockpit("session/one");
+  await client.evidence.audit({ sessionId: "session/one", limit: 12 });
+  await client.evidence.receipts({ userId: "alice+bob", limit: 5 });
+  await client.evidence.exportAudit({ exportToken: "secret-capability", sessionId: "session/one" });
+  await client.usage({ userId: "alice+bob", since: "2026-09-29T00:00:00Z" });
+
+  assert.equal(calls[0].url, "https://keep.example/v1/sessions/session%2Fone/cockpit");
+  assert.equal(new URL(calls[1].url).searchParams.get("session_id"), "session/one");
+  assert.equal(new URL(calls[2].url).searchParams.get("user_id"), "alice+bob");
+  assert.equal(calls[3].init.headers["x-keep-export-token"], "secret-capability");
+  assert.ok(!calls[3].url.includes("secret-capability"));
+  assert.equal(calls[3].init.headers.authorization, "Bearer operator-token");
+  assert.equal(new URL(calls[4].url).searchParams.get("since"), "2026-09-29T00:00:00Z");
+});
+
+test("Keep approval decisions validate scope before sending and surface runtime conflicts", async () => {
+  const calls = [];
+  const client = new Fabric({
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+      if (init.method === "POST") return new Response(JSON.stringify({ error: "approval is already decided" }),
+        { status: 409, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ items: [{ id: "a1", status: "pending" }] }),
+        { status: 200, headers: { "content-type": "application/json" } });
+    },
+  });
+  assert.equal((await client.approvals.list())[0].id, "a1");
+  await assert.rejects(client.approvals.decide("a1", "maybe"), /decision must/);
+  await assert.rejects(client.approvals.decide("a1", "denied", { scope: "session" }), /scope must/);
+  assert.equal(calls.length, 1);
+  await assert.rejects(client.approvals.decide("a/1", "approved", { scope: "once" }),
+    /approval is already decided/);
+  assert.match(calls[1].url, /\/v1\/approvals\/a%2F1$/);
+  assert.deepEqual(JSON.parse(calls[1].init.body), { decision: "approved", scope: "once" });
+});
+
+test("full audit export requires an explicit scoped capability", async () => {
+  const client = new Fabric({ fetch: async () => { throw new Error("must not call runtime"); } });
+  assert.throws(() => client.evidence.exportAudit({}), /exportToken is required/);
+});
+
+test("identity API mints scoped user tokens and revokes without exposing tokens in URLs", async () => {
+  const calls = [];
+  const client = new Fabric({
+    token: "operator-token",
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ token: "user-secret", user_id: "alice", scopes: ["read"],
+        expires_at: "2026-09-29T01:00:00Z" }), { status: 200, headers: { "content-type": "application/json" } });
+    },
+  });
+  assert.equal((await client.identity.whoami()).user_id, "alice");
+  const minted = await client.identity.mintUserToken("alice", { scopes: ["read"], ttlSeconds: 600 });
+  assert.equal(minted.token, "user-secret");
+  assert.deepEqual(JSON.parse(calls[1].init.body), { user_id: "alice", scopes: ["read"], ttl_seconds: 600 });
+  await client.identity.revokeUserTokens("alice/ops");
+  assert.match(calls[2].url, /\/v1\/users\/alice%2Fops\/revoke-tokens$/);
+  assert.ok(calls.every(({ url }) => !url.includes("user-secret") && !url.includes("operator-token")));
+  assert.throws(() => client.identity.mintUserToken("alice", { scopes: ["write"] }), /scopes must/);
+  assert.equal(calls.length, 3);
+});

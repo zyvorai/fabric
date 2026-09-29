@@ -18,6 +18,55 @@ export default defineAgent(async (ctx) => {
 
 See `../../agent-runtime/README.md` for runtime deployment, credentials, session APIs, hibernation and security details.
 
+## Keep approvals and evidence
+
+The SDK exposes Keep's existing operator APIs. Supply a runtime API token; a user token is
+restricted to its own sessions and needs the `approve` scope to decide an approval.
+An agent's sandbox token cannot call these operator routes.
+
+```ts
+import { Fabric } from "@zyvor/fabric-agent";
+
+const keep = new Fabric({ baseUrl: "https://keep.example", token: process.env.KEEP_API_TOKEN });
+const session = await keep.agent("research").run({ question: "Investigate this issue" },
+  { user_id: "alice", request_id: "ticket-1042" });
+
+const pending = (await keep.approvals.list()).filter(
+  (a) => a.session_id === session.id && a.status === "pending",
+);
+// Show prompt, subject and planned_action to an authorized human before deciding.
+// Keep itself never approves an action on the agent's behalf.
+if (pending.length) await keep.approvals.decide(pending[0].id, "denied", { comment: "Review first" });
+
+const cockpit = await keep.evidence.cockpit(session.id);
+const audit = await keep.evidence.audit({ sessionId: session.id, limit: 100 });
+const receipts = await keep.evidence.receipts({ userId: "alice" });
+const metering = await keep.usage({ userId: "alice" });
+console.log(cockpit, audit.chain.chain_ok, receipts.length, metering.usage.runs);
+```
+
+`audit()` reads a bounded recent view, including the chain verification result.
+For a full audit export, an operator must separately mint an export token scoped to
+`audit`; call `keep.evidence.exportAudit({ exportToken, sessionId })`. The SDK sends
+that capability in `X-Keep-Export-Token`, never in a URL. Receipts record brokered
+approved actions, not every agent action; see `agent-runtime/src/receipts.rs`.
+
+An operator can create a restricted client token and later revoke its user's
+previous tokens:
+
+```ts
+const { token } = await keep.identity.mintUserToken("alice", {
+  scopes: ["read", "run"], ttlSeconds: 3600,
+});
+// Deliver token to Alice through your application's secret channel; never log it.
+await keep.identity.revokeUserTokens("alice");
+```
+
+`identity.whoami()` reports whether the current token belongs to an operator or
+a user. Approval decisions by user tokens need `approve` in their scopes, and
+the runtime may additionally require a signed phone decision. The SDK does not
+bypass that check; the runtime's 403 response is returned as an error.
+
 ## Idempotent fan-out
 
 ```ts

@@ -72,6 +72,37 @@ export interface SessionEvent {
   timestamp: string;
 }
 
+export interface KeepApproval {
+  id: string;
+  session_id: string;
+  kind: string;
+  subject?: string | null;
+  prompt: string;
+  status: "pending" | "approved" | "denied" | "expired";
+  planned_action?: unknown;
+  created_at: string;
+  decided_at?: string | null;
+}
+
+export interface KeepReceipt {
+  id: string;
+  at: string;
+  session_id: string;
+  user_id?: string | null;
+  agent: string;
+  method: string;
+  url: string;
+  approval_id?: string | null;
+  status: number;
+  body_sha256: string;
+}
+
+export interface AuditView {
+  items: unknown[];
+  chain: { chain_ok: boolean; [key: string]: unknown };
+  export: boolean;
+}
+
 export declare class Session {
   id: string;
   agent: string;
@@ -123,5 +154,37 @@ export declare class Fabric {
       repaired: number;
       ready: number;
     }>;
+  };
+  /** Decisions require an operator token or a user token with the approve scope. */
+  approvals: {
+    list(): Promise<KeepApproval[]>;
+    decide(id: string, decision: "approved" | "denied", options?: {
+      comment?: string;
+      /** Egress approvals only; session persists for the session lifetime. */
+      scope?: "once" | "session";
+    }): Promise<KeepApproval>;
+  };
+  evidence: {
+    cockpit(sessionId: string): Promise<unknown>;
+    /** Recent audit only; user tokens see only their own session rows. */
+    audit(options?: { sessionId?: string; limit?: number }): Promise<AuditView>;
+    receipts(options?: { userId?: string; limit?: number }): Promise<KeepReceipt[]>;
+    /** Requires a separate scoped export token; never put that token in a URL. */
+    exportAudit(options: { exportToken: string; sessionId?: string; limit?: number }): Promise<AuditView>;
+  };
+  /** Operator calls require userId; user tokens always see their own usage. */
+  usage(options?: { userId?: string; since?: string }): Promise<{
+    usage: { user_id: string; runs: number; artifacts: number; artifact_bytes: number; model_calls: number; session_seconds: number };
+    limits: { max_runs_per_day: number | null; max_artifacts: number | null; max_model_calls_per_day: number | null };
+  }>;
+  identity: {
+    whoami(): Promise<{ role: "operator" } | { role: "user"; user_id: string; scopes: Array<"read" | "run" | "approve"> }>;
+    /** Operator only. Store the returned bearer token securely. */
+    mintUserToken(userId: string, options?: {
+      scopes?: Array<"read" | "run" | "approve">;
+      ttlSeconds?: number;
+    }): Promise<{ token: string; user_id: string; scopes: string[]; expires_at: string }>;
+    /** Operator only. Invalidates prior tokens for this user. */
+    revokeUserTokens(userId: string): Promise<{ user_id: string; not_before: string }>;
   };
 }
