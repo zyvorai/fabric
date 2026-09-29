@@ -33,6 +33,7 @@ pub mod model;
 pub mod model_call;
 pub mod notify;
 pub mod policy;
+pub mod policy_lint;
 pub mod pool;
 pub mod preview;
 pub mod proxy;
