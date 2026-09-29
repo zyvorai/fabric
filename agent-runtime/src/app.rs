@@ -2392,6 +2392,18 @@ async fn put_agent_policy(
         .await
         .ok_or_else(|| ApiError::not_found("agent not found"))?;
     let policy = crate::policy::KeepPolicy::from_yaml(&body).map_err(ApiError::bad_request)?;
+    let current = crate::policy::KeepPolicy::from_manifest(&agent.manifest);
+    let risks = crate::policy_lint::review_change(Some(&current), &policy);
+    let acked = headers
+        .get("x-keep-policy-ack-risk")
+        .and_then(|v| v.to_str().ok())
+        == Some("1");
+    if crate::policy_lint::needs_ack(&risks) && !acked {
+        return Err(ApiError::conflict(format!(
+            "policy change widens access ({}); review it and resend with X-Keep-Policy-Ack-Risk: 1",
+            crate::policy_lint::summarize_high(&risks)
+        )));
+    }
     let mut manifest = agent.manifest.clone();
     policy.apply_to_manifest(&mut manifest);
     let bundle_path = state
@@ -2424,13 +2436,18 @@ async fn put_agent_policy(
             AuditPhase::Performed,
             "keep.policy.set",
             Some(name),
-            json!({"version": record.version}),
+            json!({
+                "version": record.version,
+                "risk_codes": risks.iter().map(|r| r.code).collect::<Vec<_>>(),
+                "risk_acknowledged": acked,
+            }),
         )
         .await;
     Ok(Json(json!({
         "name": record.name,
         "version": record.version,
         "policy": crate::policy::KeepPolicy::from_manifest(&record.manifest),
+        "risks": risks,
     })))
 }
 
