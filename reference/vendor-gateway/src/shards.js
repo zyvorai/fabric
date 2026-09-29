@@ -63,6 +63,7 @@ export class TokenBroker {
     if (hit && hit.expires > Date.now() + 60_000) return hit.token;
     const res = await this.fetch(`${shard.url}/v1/user-tokens`, {
       method: "POST",
+      redirect: "manual",
       headers: { "content-type": "application/json", authorization: `Bearer ${shard.token}` },
       body: JSON.stringify({ user_id: userId, scopes: this.scopes, ttl_seconds: this.ttl }),
     });

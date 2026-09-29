@@ -5,6 +5,7 @@
 // Keep embeds no vendor push SDK. Each `push.kind` is an adapter: implement `send(device, message)`.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { sendWebhook } from "./webhook.js";
 
 export function verifyRelaySignature(secret, rawBody, header) {
   const want = createHmac("sha256", secret).update(rawBody).digest();
@@ -22,21 +23,18 @@ export function notification(message) {
   };
 }
 
-/** Adapters by `push.kind`. `webhook` and `log` work as they are; the rest are the vendor's to write. */
-export function defaultAdapters({ fetchImpl = fetch, log = console.log } = {}) {
+/** Adapters by `push.kind`. Webhook delivery requires an explicit host allowlist. */
+export function defaultAdapters({ log = console.log, webhookAllowedHosts = [], dnsLookup, httpsRequest } = {}) {
   const needsVendor = (name) => async () => {
     throw new Error(`the ${name} adapter is not implemented: it needs the vendor's push credentials (see README)`);
   };
   return {
-    // POST the notification to the URL the device enrolled as its push token (your own delivery service).
+    // POST only to your approved push delivery service, never to an arbitrary enrolled URL.
     webhook: {
       async send(device, message) {
-        const res = await fetchImpl(device.push.token, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(notification(message)),
+        await sendWebhook(device.push.token, notification(message), {
+          allowedHosts: webhookAllowedHosts, dnsLookup, httpsRequest,
         });
-        if (!res.ok) throw new Error(`webhook answered HTTP ${res.status}`);
       },
     },
     log: { async send(device, message) { log("push", device.id, JSON.stringify(notification(message))); } },
