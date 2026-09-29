@@ -40,6 +40,7 @@ widen what a user can reach beyond what the shard allows that token. Keep the op
   "relaySecret": "…", "adminKey": "…",
   "defaultRegion": "eu", "port": 8443, "stateFile": "/var/lib/gateway/users.json",
   "ratePerMinute": 120,
+  "pushWebhookAllowedHosts": ["push.vendor.example"],
   "shards": [
     { "id": "eu-1", "region": "eu", "url": "http://10.0.1.5:9096", "token": "<that shard's operator token>" },
     { "id": "eu-2", "region": "eu", "url": "http://10.0.1.6:9096", "token": "…" },
@@ -77,7 +78,11 @@ On each shard set `ZYVOR_AGENT_PUSH_RELAYS='{"webhook":"https://gateway.example/
 
 ## Push adapters
 
-`webhook` (POSTs the notification to the URL the device enrolled as its push token) and `log` work as they are.
+`webhook` POSTs to the device's enrolled URL only when its HTTPS hostname exactly matches
+`pushWebhookAllowedHosts`. Set this to the hostnames of **your own push delivery service**; with an empty or
+missing list, webhook delivery is disabled. Every DNS answer must be a public address, the chosen address is
+pinned to the TLS request, certificate verification uses the original hostname, and redirects are refused. The
+adapter limits notifications to 64 KiB and waits at most five seconds. `log` writes the notification to stdout.
 `fcm`, `mipush`, `hms`, `oppo` and `vivo` are **placeholders that throw**: each needs the vendor's own push
 credentials and SDK, which do not belong in this repository. Implement `send(device, message)` for the ones you
 use. A 5xx from the relay makes the shard retry twice and then journal the failure.
@@ -91,3 +96,5 @@ use. A 5xx from the relay makes the shard retry twice and then journal the failu
   policy, key provisioning and user deprovisioning remain the vendor's job.
 - Placement is sticky and never rebalances. Adding a shard only takes **new** users.
 - Uploads are buffered in memory (up to 70 MiB), fine for documents, not for large media.
+- Oversized requests return 413. The gateway refuses shard redirects so scoped user and operator tokens cannot
+  be forwarded to a redirect target; configure each shard with its final URL.

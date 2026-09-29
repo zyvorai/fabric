@@ -29,6 +29,10 @@ async function fakeShard(operatorToken) {
       mints += 1;
       return json(201, { token: `kut1.${JSON.parse(body).user_id}.${mints}` });
     }
+    if (req.url === "/v1/sessions/redirect") {
+      res.writeHead(302, { location: "http://127.0.0.1:1/steal" });
+      return res.end();
+    }
     if (req.url.startsWith("/v1/users/") && auth !== operatorToken && req.method !== "GET") return json(403, { error: "operator only" });
     if (req.url.startsWith("/v1/sessions") && auth.startsWith("kut1.stale")) return json(401, { error: "expired" });
     if (req.url.startsWith("/v1/usage")) return json(200, { usage: { runs: 3 } });
@@ -137,6 +141,33 @@ test("a POST body (an approval decision) is forwarded intact", async (t) => {
   assert.equal(r.status, 200);
   const call = eu.seen.find((c) => c.method === "POST" && c.url.startsWith("/v1/approvals/"));
   assert.equal(call.body, body);
+});
+
+test("upstream redirects are refused instead of forwarding user credentials", async (t) => {
+  const { base, login, eu } = await setup(t);
+  const r = await fetch(`${base}/api/sessions/redirect`, { headers: { authorization: login() } });
+  assert.equal(r.status, 502);
+  assert.equal(eu.seen.filter((call) => call.url === "/v1/sessions/redirect").length, 1);
+});
+
+test("an oversized relay body receives 413", async (t) => {
+  const { base } = await setup(t);
+  const r = await fetch(`${base}/relay/push`, { method: "POST", body: "x".repeat((1 << 20) + 1) });
+  assert.equal(r.status, 413);
+  assert.deepEqual(await r.json(), { error: "body too large" });
+});
+
+test("an oversized streamed body also receives 413", async (t) => {
+  const { base } = await setup(t);
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(Buffer.alloc(700_000));
+      controller.enqueue(Buffer.alloc(400_000));
+      controller.close();
+    },
+  });
+  const r = await fetch(`${base}/relay/push`, { method: "POST", body, duplex: "half" });
+  assert.equal(r.status, 413);
 });
 
 test("a stale user token is replaced once", async (t) => {

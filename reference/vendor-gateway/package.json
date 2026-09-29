@@ -9,6 +9,6 @@
   "scripts": {
     "start": "node src/main.js",
     "test": "node --test",
-    "lint": "node --check src/main.js && node --check src/gateway.js && node --check src/jwt.js && node --check src/oidc.js && node --check src/shards.js && node --check src/relay.js"
+    "lint": "node --check src/main.js && node --check src/gateway.js && node --check src/jwt.js && node --check src/oidc.js && node --check src/shards.js && node --check src/relay.js && node --check src/webhook.js"
   }
 }

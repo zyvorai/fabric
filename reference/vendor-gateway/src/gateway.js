@@ -27,12 +27,20 @@ const send = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
+class BodyTooLargeError extends Error {}
+
+function refuseRedirect(response) {
+  if (response.status >= 300 && response.status < 400) throw new Error("shard redirect refused");
+  return response;
+}
+
 async function readBody(req, limit = 1 << 20) {
+  if (Number(req.headers["content-length"]) > limit) throw new BodyTooLargeError("body too large");
   const chunks = [];
   let size = 0;
   for await (const c of req) {
     size += c.length;
-    if (size > limit) throw new Error("body too large");
+    if (size > limit) throw new BodyTooLargeError("body too large");
     chunks.push(c);
   }
   return Buffer.concat(chunks);
@@ -54,9 +62,9 @@ class RateLimiter {
 
 /**
  * @param config { jwtSecret, adminKey, relaySecret, defaultRegion, shards, stateFile, ratePerMinute }
- * @param deps   { fetchImpl?, adapters?, log? }
+ * @param deps   { fetchImpl?, adapters?, log?, dnsLookup?, httpsRequest? }
  */
-export function createGateway(config, { fetchImpl = fetch, adapters, log = () => {} } = {}) {
+export function createGateway(config, { fetchImpl = fetch, adapters, log = () => {}, dnsLookup, httpsRequest } = {}) {
   if (Boolean(config.oidc) === Boolean(config.jwtSecret)) {
     throw new Error("configure exactly one login verifier: oidc or jwtSecret");
   }
@@ -64,13 +72,14 @@ export function createGateway(config, { fetchImpl = fetch, adapters, log = () =>
   const placement = new Placement(config.shards, config.stateFile);
   const tokens = new TokenBroker({ fetchImpl });
   const limiter = new RateLimiter(config.ratePerMinute ?? 120);
-  const relayAdapters = adapters ?? defaultAdapters({ fetchImpl, log });
+  const relayAdapters = adapters ?? defaultAdapters({ log, webhookAllowedHosts: config.pushWebhookAllowedHosts, dnsLookup, httpsRequest });
 
-  const operator = (shard, path, init = {}) =>
-    fetchImpl(`${shard.url}${path}`, {
+  const operator = async (shard, path, init = {}) =>
+    refuseRedirect(await fetchImpl(`${shard.url}${path}`, {
       ...init,
+      redirect: "manual",
       headers: { "content-type": "application/json", ...(init.headers ?? {}), authorization: `Bearer ${shard.token}` },
-    });
+    }));
 
   /** Who is calling and where their data lives, or a response has been sent. */
   async function identify(req, res) {
@@ -106,10 +115,11 @@ export function createGateway(config, { fetchImpl = fetch, adapters, log = () =>
       const token = await tokens.tokenFor(who.shard, who.userId);
       const headers = { authorization: `Bearer ${token}` };
       for (const h of ["content-type", "accept"]) if (req.headers[h]) headers[h] = req.headers[h];
-      return fetchImpl(target, { method: req.method, headers, body: bodyBytes });
+      return fetchImpl(target, { method: req.method, headers, body: bodyBytes, redirect: "manual" });
     };
     let upstream = await attempt();
     if (upstream.status === 401) { tokens.forget(who.shard.id, who.userId); upstream = await attempt(); }
+    refuseRedirect(upstream);
     res.writeHead(upstream.status, { "content-type": upstream.headers.get("content-type") ?? "application/json" });
     if (upstream.body) Readable.fromWeb(upstream.body).pipe(res); else res.end();
   }
@@ -119,7 +129,7 @@ export function createGateway(config, { fetchImpl = fetch, adapters, log = () =>
     const parts = url.pathname.split("/").filter(Boolean); // api, devices, [id]
     if (req.method === "GET" && parts.length === 2) {
       const token = await tokens.tokenFor(who.shard, who.userId);
-      const r = await fetchImpl(`${who.shard.url}/v1/users/${who.userId}/devices`, { headers: { authorization: `Bearer ${token}` } });
+      const r = refuseRedirect(await fetchImpl(`${who.shard.url}/v1/users/${who.userId}/devices`, { redirect: "manual", headers: { authorization: `Bearer ${token}` } }));
       res.writeHead(r.status, { "content-type": "application/json" });
       return res.end(await r.text());
     }
@@ -175,6 +185,7 @@ export function createGateway(config, { fetchImpl = fetch, adapters, log = () =>
       return send(res, 404, { error: "not found" });
     } catch (e) {
       log("gateway error", e);
+      if (e instanceof BodyTooLargeError) return send(res, 413, { error: "body too large" });
       return send(res, 502, { error: "upstream failure" });
     }
   });
