@@ -8,6 +8,7 @@
 import http from "node:http";
 import { Readable } from "node:stream";
 import { toUserId, verifyJwt } from "./jwt.js";
+import { OidcVerifier } from "./oidc.js";
 import { defaultAdapters, handleRelay } from "./relay.js";
 import { Placement, TokenBroker } from "./shards.js";
 
@@ -56,6 +57,10 @@ class RateLimiter {
  * @param deps   { fetchImpl?, adapters?, log? }
  */
 export function createGateway(config, { fetchImpl = fetch, adapters, log = () => {} } = {}) {
+  if (Boolean(config.oidc) === Boolean(config.jwtSecret)) {
+    throw new Error("configure exactly one login verifier: oidc or jwtSecret");
+  }
+  const oidc = config.oidc ? new OidcVerifier(config.oidc, { fetchImpl }) : null;
   const placement = new Placement(config.shards, config.stateFile);
   const tokens = new TokenBroker({ fetchImpl });
   const limiter = new RateLimiter(config.ratePerMinute ?? 120);
@@ -71,7 +76,8 @@ export function createGateway(config, { fetchImpl = fetch, adapters, log = () =>
   async function identify(req, res) {
     let claims;
     try {
-      claims = verifyJwt((req.headers.authorization ?? "").replace(/^Bearer /, ""), config.jwtSecret);
+      const token = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+      claims = oidc ? await oidc.verify(token) : verifyJwt(token, config.jwtSecret);
     } catch {
       send(res, 401, { error: "invalid or missing login" });
       return null;

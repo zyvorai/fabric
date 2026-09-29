@@ -65,7 +65,7 @@ Wire format and the signed text are in [mobile/README.md](mobile/README.md).
 | Phone-signed approvals, device enrolment, push relay interface | Built. Unit and CI end-to-end tests pass; **not yet run with a waiting agent on a real cell** (the lab host's template gives the guest no network route). Node reference client | [mobile/README.md](mobile/README.md) |
 | The vendor's choice of model (Qwen, DeepSeek, GLM, local, its own) | Built and tested | [MODELS.md](MODELS.md), [MODEL.md](MODEL.md) |
 | Document use cases, triggers, batch, ready-made scenarios | Built | [PACKS.md](PACKS.md), [TRIGGERS.md](TRIGGERS.md), [SCENARIOS.md](SCENARIOS.md) |
-| Gateway: login, placement by region, token minting, push relay | **Reference code**, tested | [`reference/vendor-gateway`](https://github.com/zyvorai/fabric/tree/main/reference/vendor-gateway) |
+| Gateway: pinned OIDC/JWKS login (RS256/ES256), placement by region, token minting, push relay | **Reference code**, tested against local HTTP fixtures | [`reference/vendor-gateway`](https://github.com/zyvorai/fabric/tree/main/reference/vendor-gateway) |
 | Benchmark for cold-start and concurrency | Script | `scripts/keep-bench.sh` |
 | An Android app | **Not built.** A sketch of the signing code is in the mobile guide | [mobile/README.md](mobile/README.md) |
 | Vendor push adapters (FCM, Mi Push, HMS, OPPO, vivo) | **Placeholders**: each needs the vendor's own credentials | gateway README |

@@ -18,7 +18,7 @@ widen what a user can reach beyond what the shard allows that token. Keep the op
 
 | Job | How |
 |---|---|
-| **Identity** | Verifies the vendor's login token (`src/jwt.js`, HS256 here; swap in your OIDC or session check). Needs `sub`; optional `region`, `exp`, `acr` |
+| **Identity** | Verifies a pinned OIDC issuer, audience and JWKS (RS256/ES256), or a local HS256 reference token. Needs `sub`; optional `region`, `acr` |
 | **User ids** | Maps an account id to the runtime's `[a-z0-9._-]{1,32}`: kept if it fits, otherwise a stable hash. Two accounts never share one |
 | **Placement** | On first sight, puts the user on **one shard in their region** (rendezvous hashing) and remembers it in `stateFile`. A user never moves: Keep does not migrate cells between hosts |
 | **Tokens** | Mints a user token per (shard, user) with the shard's operator token, caches it for 15 minutes, re-mints once on a 401 |
@@ -32,7 +32,12 @@ widen what a user can reach beyond what the shard allows that token. Keep the op
 
 ```json
 {
-  "jwtSecret": "…", "relaySecret": "…", "adminKey": "…",
+  "oidc": {
+    "issuer": "https://login.example/realms/zyvor",
+    "audience": "keep-phone",
+    "jwksUrl": "https://login.example/realms/zyvor/protocol/openid-connect/certs"
+  },
+  "relaySecret": "…", "adminKey": "…",
   "defaultRegion": "eu", "port": 8443, "stateFile": "/var/lib/gateway/users.json",
   "ratePerMinute": 120,
   "shards": [
@@ -45,8 +50,26 @@ widen what a user can reach beyond what the shard allows that token. Keep the op
 
 ```bash
 node src/main.js gateway.json
-npm test          # 12 tests, no network
+npm test          # local HTTP fixtures; no external network
 ```
+
+Configure exactly one of `oidc` or `jwtSecret`. Use an access token issued for
+the gateway's dedicated audience, with `iss`, `aud`, `sub` and `exp` claims. A
+multi-audience token also needs `azp` equal to the configured audience. OIDC
+mode accepts RS256 and ES256 only. It loads public keys from the configured
+`jwksUrl`, caches them for five minutes, and refreshes when an unknown key id
+arrives (unknown-key refreshes are limited to one every five seconds). Token
+headers cannot redirect key retrieval; JWKS redirects are refused.
+The JWKS URL must use HTTPS. For local tests only, set `allowLoopbackHttp: true`
+under `oidc` and use a loopback HTTP URL. Never use that setting with a remote
+HTTP identity provider. Rotate keys with a new `kid` and keep old keys published
+until their issued tokens expire. If the provider is unreachable after the cache
+expires, login fails closed.
+
+The existing `jwtSecret` HS256 mode remains for the local reference setup. It
+does not pin an issuer or audience, so use `oidc` for deployments connected to
+an identity provider. The gateway still trusts the token's `acr: "strong"` for
+phone enrolment: configure and verify that claim's meaning in your provider.
 
 On each shard set `ZYVOR_AGENT_PUSH_RELAYS='{"webhook":"https://gateway.example/relay/push"}'` and
 `ZYVOR_AGENT_PUSH_RELAY_SECRET` to the gateway's `relaySecret`, and give every shard the same
@@ -64,6 +87,7 @@ use. A 5xx from the relay makes the shard retry twice and then journal the failu
 - One process, state in a JSON file. Run several behind a load balancer only after moving `stateFile` and the rate
   limiter to a shared store.
 - No TLS termination, no request logging, no abuse controls beyond the per-user rate limit.
-- The login verifier is HS256 with a shared secret. Use your account system's real verifier.
+- OIDC verification is pinned to one issuer/audience; account lifecycle, MFA
+  policy, key provisioning and user deprovisioning remain the vendor's job.
 - Placement is sticky and never rebalances. Adding a shard only takes **new** users.
 - Uploads are buffered in memory (up to 70 MiB), fine for documents, not for large media.
