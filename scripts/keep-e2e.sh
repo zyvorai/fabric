@@ -233,7 +233,15 @@ check "unsigned policy refused" 403 "$CODE"
 check "  …names signature" "signature" "$(body)"
 
 "$SIGN_BIN" sign "$SEED" "$W/keep.policy.yaml" >"$W/keep.policy.yaml.sig"
-"$KEEPCTL" policy set keep-desk "$W/keep.policy.yaml" "$W/keep.policy.yaml.sig" >/dev/null
+# This policy weakens api.github.com from ask=always to ask=first, so the risk check refuses it
+# until the change is acknowledged.
+CODE=$(http_code -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/x-yaml' \
+  -H "X-Keep-Policy-Signature: $(tr -d ' \n' <"$W/keep.policy.yaml.sig")" \
+  --data-binary @"$W/keep.policy.yaml" "$API/v1/agents/keep-desk/policy")
+check "risky policy refused without acknowledgement" 409 "$CODE"
+check "  …names the finding" "approval_weakened" "$(body)"
+check "  …says how to acknowledge" "X-Keep-Policy-Ack-Risk" "$(body)"
+KEEP_POLICY_ACK_RISK=1 "$KEEPCTL" policy set keep-desk "$W/keep.policy.yaml" "$W/keep.policy.yaml.sig" >/dev/null
 SHOW="$("$KEEPCTL" policy show keep-desk)"
 check "policy show has stripe allow" "api.stripe.com" "$SHOW"
 check "policy show has github" "api.github.com" "$SHOW"
@@ -351,6 +359,27 @@ CODE=$(http_code -H "Authorization: Bearer $TOKEN" -H "X-Keep-Export-Token: $AUD
   "$API/v1/export/audit?limit=20")
 check "export/audit with audit token → 200" 200 "$CODE"
 check "  …export:true" '"export":true' "$(body | tr -d ' \n')"
+
+echo "==> OCSF audit export"
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" -H "X-Keep-Export-Token: $AUDIT_TOK" \
+  "$API/v1/export/audit?format=ocsf&limit=20")
+check "export/audit?format=ocsf → 200" 200 "$CODE"
+check "  …API Activity class" '"class_uid":6003' "$(body | head -1 | tr -d ' ')"
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" "$API/v1/export/audit?format=ocsf")
+check "export/audit?format=ocsf without token → 403" 403 "$CODE"
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" -H "X-Keep-Export-Token: $AUDIT_TOK" \
+  "$API/v1/export/audit?format=xml")
+check "export/audit with an unknown format → 400" 400 "$CODE"
+
+echo "==> policy suggestions and binary pins (operator only)"
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" "$API/v1/agents/keep-desk/policy-suggestions")
+check "policy-suggestions → 200" 200 "$CODE"
+check "  …is a draft, not applied" "suggestions" "$(body)"
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" "$API/v1/agents/nobody/policy-suggestions")
+check "policy-suggestions for an unknown agent → 404" 404 "$CODE"
+CODE=$(http_code -H "Authorization: Bearer $TOKEN" "$API/v1/agents/keep-desk/binary-pins")
+check "binary-pins → 200" 200 "$CODE"
+check "  …lists pins" "pins" "$(body)"
 
 echo "==> pack / unpack (no secrets)"
 CODE=$(http_code -H "Authorization: Bearer $TOKEN" "$API/v1/agents/keep-desk/pack")
