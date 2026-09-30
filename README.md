@@ -45,6 +45,14 @@ Fabric does not implement VM execution itself. That is a deliberate design choic
 
 </div>
 
+<div align="center">
+
+[![Keep: your agent, your hardware, your keys](docs/assets/keep-hero.jpg)](docs/keep/README.md)
+
+*[Keep](docs/keep/README.md), the sealed agent runtime. Muse column sourced from Meta's announcement; evidence class today is `software-test`.*
+
+</div>
+
 <a id="ai-workloads-beta"></a>
 
 <table>
