@@ -56,7 +56,16 @@ It sends `GET {addr}/v1/{mount}/data/{path}` with `X-Vault-Token` (and `X-Vault-
 reaches Vault, the value is cached and read once per burst, and a failure fails closed with no stale value.
 
 - **Auth: a token you provide.** `token_file` (what a Vault Agent file sink writes; it is **re-read on every fetch**, so a renewed token is picked
-  up, and it must be private like any secret file) or `token_env`. Set exactly one. AppRole and Kubernetes login are not built yet.
+  up, and it must be private like any secret file) or `token_env`. Set exactly one.
+- **Auth: AppRole.** `{"method": "approle", "role_id": "…", "secret_id_file": "/run/…"}` (or `secret_id_env`; `mount` defaults to `approle`). The
+  runtime logs in with `POST /v1/auth/{mount}/login`, keeps the returned token until shortly before its lease ends (30 s early, at most an hour),
+  and reads with it. The secret id goes only in the login request body.
+- **Auth: Kubernetes.** `{"method": "kubernetes", "role": "keep"}` (`mount` defaults to `kubernetes`, `jwt_file` to
+  `/var/run/secrets/kubernetes.io/serviceaccount/token`). The pod's service account token is sent to Vault, which checks it against its role. It is
+  read at each login, so a rotated projected token is used, and its file permissions are not checked because Kubernetes makes it world-readable.
+- **When Vault refuses a token.** If a token that was **cached** is refused (revoked, expired early), the runtime gets a new one (a new login, or the
+  token file read again) and tries once more. A token that was **just issued** and is refused means the policy says no, so it is not retried, and
+  nothing loops.
 - **Transport.** `addr` must be `https` (plain `http` only to a loopback address). Redirects are never followed. Each request has a timeout
   (`timeout_seconds`, default 10, at most 30) and the answer is capped at 256 KiB. For a private CA, `ca_file` names a PEM certificate to trust.
 - **Cache.** `ttl_seconds` defaults to **300** (at most 3600). It is also how long a revoked secret keeps working.
@@ -69,6 +78,21 @@ reaches Vault, the value is cached and read once per burst, and a failure fails 
   answer, which can echo paths or policy.
 - **Not yet verified against a real Vault.** The behaviour is tested against a mock; a real server, a real Vault Agent and a Vault Enterprise
   namespace have not been tried.
+
+#### Seeing where a source stands
+
+`GET /v1/vault/status` (operator token only; `keepctl vault-status`) lists each credential that has a `source`: its name, its kind (`file` or
+`vault`), whether a value is cached, how many seconds ago the last read worked, whether a read is in flight, and the **class** of the last failure:
+`unreachable`, `refused`, `not_found`, `malformed`, `config` or `file`. It never shows a value, a path or an answer. Failures also log a warning
+with the same class. `config` usually means a token, secret id or CA file that is missing or unreadable; `refused` means Vault answered 400, 401 or
+403.
+
+#### On Kubernetes
+
+The `zyvor-keep` chart (`charts/zyvor-keep`) takes `credentials.descriptors` (rendered to a ConfigMap and mounted read-only, and never holding a
+secret), `runtime.extraVolumes` and `runtime.extraVolumeMounts` (to mount the Secret, CSI or Vault Agent files that `file` sources read), and
+`serviceAccount.name` (the account whose token Vault's Kubernetes login sends). A changed descriptor restarts the runtime, which reads them once at
+startup.
 
 The design is in [design/credential-sources.md](../design/credential-sources.md).
 

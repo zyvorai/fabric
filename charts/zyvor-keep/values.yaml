@@ -27,6 +27,11 @@ runtime:
   snapshotHostPath: /var/lib/fluxvm/agent-snapshots
   ## Any further ZYVOR_AGENT_* settings, as a list of {name, value}.
   extraEnv: []
+  ## Extra volumes and mounts, as ordinary Kubernetes volume and volumeMount entries. Use them to mount
+  ## the files a credential `source` reads: a Kubernetes Secret (set `defaultMode: 0400`, or the source
+  ## sets `allow_loose_permissions`), a CSI Secrets Store volume, or a Vault Agent sink.
+  extraVolumes: []
+  extraVolumeMounts: []
   resources:
     requests:
       cpu: 100m
@@ -41,6 +46,31 @@ keep:
   ## Hex Ed25519 public keys (64 characters each) that may sign policy. Required when keep.mode is true.
   ## Create one with `scripts/deploy-keep.sh`, or see docs/keep/sentinel/README.md. Never put a seed here.
   trustedSigners: []
+
+## Credential descriptors, for ZYVOR_AGENT_CREDENTIALS_FILE: a map of credential name to descriptor. A
+## descriptor names where a secret comes from and never holds one: an `env` variable, or a `source`
+## (a mounted `file`, or `vault`). Rendered to a ConfigMap and mounted read-only. See docs/keep/vault/README.md.
+## Example:
+##   credentials:
+##     descriptors:
+##       github:
+##         host: api.github.com
+##         header: authorization
+##         prefix: "Bearer "
+##         source:
+##           kind: vault
+##           addr: https://vault.internal:8200
+##           path: keep/github
+##           field: token
+##           auth: {method: kubernetes, role: keep}
+credentials:
+  descriptors: {}
+
+## The pod's service account. Vault's Kubernetes login sends this account's token, so name one that is
+## bound to a Vault role. The token is mounted at the standard path unless automountToken is false.
+serviceAccount:
+  name: ""
+  automountToken: true
 
 security:
   ## An existing Secret with the key `api-token` (and optionally `fluxvm-token`).
