@@ -1277,6 +1277,16 @@ async fn provision_guest(
             ),
         )
         .await?;
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                crate::contain::SECCOMP_GUEST_PATH,
+                &crate::contain::seccomp_filter(),
+                0o644,
+            ),
+        )
+        .await?;
     }
     mount_skills(state, session, agent).await?;
 
