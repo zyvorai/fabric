@@ -33,13 +33,34 @@ pub fn broker_router(state: Arc<AppState>) -> axum::Router {
         .with_state(state)
 }
 
+/// The address a request came from, when the server was built with connection info. Router-level
+/// tests are not, so this is `None` there rather than a failure.
+pub struct MaybePeer(pub Option<std::net::SocketAddr>);
+
+impl<S: Send + Sync> axum::extract::FromRequestParts<S> for MaybePeer {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(Self(
+            parts
+                .extensions
+                .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+                .map(|c| c.0),
+        ))
+    }
+}
+
 pub async fn proxy(
     State(state): State<Arc<AppState>>,
+    MaybePeer(peer): MaybePeer,
     headers: HeaderMap,
     Json(request): Json<EgressRequest>,
 ) -> Response {
     let target = AuditTarget::from_request(&headers, &request);
-    match proxy_inner(&state, &headers, request).await {
+    match proxy_inner(&state, &headers, request, peer).await {
         Ok(value) => {
             target
                 .record(
@@ -112,10 +133,13 @@ impl AuditTarget {
     }
 }
 
+/// `peer` is the address the request arrived from, when known. It is only used to find the calling
+/// program for rules that list `binaries`; without it such a rule refuses.
 pub(crate) async fn proxy_inner(
     state: &AppState,
     headers: &HeaderMap,
     request: EgressRequest,
+    peer: Option<std::net::SocketAddr>,
 ) -> Result<Value, (StatusCode, String)> {
     let session_id = header(headers, "x-zyvor-session-id")?;
     let capability = header(headers, "x-zyvor-egress-capability")?;
@@ -188,6 +212,32 @@ pub(crate) async fn proxy_inner(
         }
         None => None,
     };
+    // Which program is calling? Only asked when a rule for this host names binaries, because it
+    // costs a round trip into the guest. Any failure leaves `caller` empty, and such a rule then
+    // refuses.
+    let mut caller = None;
+    let binary_rules = crate::l7::host_binary_rules(&agent.manifest.egress_rules, host);
+    if !binary_rules.is_empty() {
+        match crate::binary_id::attribute(state, &session, peer, state.config.egress_listen.port())
+            .await
+        {
+            Ok(identity) => {
+                // A rule that pins no hash gets trust on first use for the program it names.
+                let unpinned = binary_rules
+                    .iter()
+                    .any(|b| b.sha256.is_none() && b.path == identity.path);
+                if unpinned {
+                    crate::binary_id::check_or_pin(&state.config.state_dir, &agent.name, &identity)
+                        .await
+                        .map_err(|message| (StatusCode::FORBIDDEN, message))?;
+                }
+                caller = Some(identity);
+            }
+            Err(reason) => {
+                tracing::warn!(session = %session.id, %reason, "could not identify the calling program");
+            }
+        }
+    }
     // Layer 7 policy runs first, so a request the agent may never send is refused
     // before an operator is asked about it.
     crate::l7::check_rules(
@@ -196,6 +246,7 @@ pub(crate) async fn proxy_inner(
         &request.method,
         url.path(),
         body.as_deref().unwrap_or(&[]),
+        caller.as_ref(),
     )
     .map_err(|message| (StatusCode::FORBIDDEN, message))?;
     let dlp_hits = if agent.manifest.dlp {
@@ -1610,6 +1661,7 @@ pub(crate) mod ask_tests {
                 body_base64: body.map(|b| base64::engine::general_purpose::STANDARD.encode(b)),
                 credential: Some("mail".into()),
             },
+            None,
         )
         .await
     }
@@ -1638,6 +1690,7 @@ pub(crate) mod ask_tests {
                 body_base64: body.map(|b| base64::engine::general_purpose::STANDARD.encode(b)),
                 credential: Some("mail".into()),
             },
+            None,
         )
         .await
     }
@@ -2150,6 +2203,7 @@ pub(crate) mod ask_tests {
                         body_base64: None,
                         credential: Some("gmail".into()),
                     },
+                    None,
                 )
                 .await
             }
@@ -2433,6 +2487,7 @@ pub(crate) mod ask_tests {
                 body_base64: body.map(|b| base64::engine::general_purpose::STANDARD.encode(b)),
                 credential: None,
             },
+            None,
         )
         .await
     }
@@ -2558,6 +2613,209 @@ pub(crate) mod ask_tests {
             "a refused call must never reach the host"
         );
         assert!(state.store.list_approvals().await.is_empty());
+    }
+
+    /// A stand-in FluxVM whose guest `process` answers with whatever `answer` holds, counting calls.
+    async fn fake_fluxvm(
+        answer: Arc<std::sync::Mutex<Value>>,
+    ) -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let app = axum::Router::new()
+            .route(
+                "/v1/sandboxes/{id}/process",
+                axum::routing::post(
+                    |axum::extract::State((answer, calls)): axum::extract::State<(
+                        Arc<std::sync::Mutex<Value>>,
+                        Arc<std::sync::atomic::AtomicUsize>,
+                    )>,
+                     axum::Json(body): axum::Json<Value>| async move {
+                        calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        assert!(
+                            body["command"]
+                                .as_str()
+                                .unwrap()
+                                .starts_with(crate::binary_id::GUEST_PATH),
+                            "unexpected guest command {body}"
+                        );
+                        axum::Json(answer.lock().unwrap().clone())
+                    },
+                ),
+            )
+            .with_state((answer, calls.clone()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (url, calls)
+    }
+
+    fn guest_says(path: &str, sha: &str) -> Value {
+        json!({"result": "exec", "exit_code": 0, "stdout": format!("77 {path} {sha}\n"), "stderr": ""})
+    }
+
+    async fn call_from(
+        state: &AppState,
+        session: &SessionRecord,
+        port: u16,
+        peer: Option<std::net::SocketAddr>,
+    ) -> Result<Value, (StatusCode, String)> {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-zyvor-session-id",
+            session.id.to_string().parse().unwrap(),
+        );
+        headers.insert("x-zyvor-egress-capability", "cap".parse().unwrap());
+        proxy_inner(
+            state,
+            &headers,
+            EgressRequest {
+                url: format!("http://127.0.0.1:{port}/send"),
+                method: "POST".into(),
+                headers: Default::default(),
+                body_base64: None,
+                credential: None,
+            },
+            peer,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn a_rule_with_binaries_admits_only_the_program_the_guest_names() {
+        let (port, counter) = upstream_counter().await;
+        let answer = Arc::new(std::sync::Mutex::new(guest_says(
+            "/usr/bin/node",
+            &"a".repeat(64),
+        )));
+        let (fluxvm_url, lookups) = fake_fluxvm(answer.clone()).await;
+        let (state, session) = state_and_session_cfg(|c| c.fluxvm_url = fluxvm_url).await;
+        let session = deploy_local_agent(&state, &session, |m| {
+            m.egress_rules = vec![crate::model::EgressRule {
+                host: "127.0.0.1".into(),
+                methods: vec!["POST".into()],
+                binaries: vec![crate::model::BinaryRule {
+                    path: "/usr/bin/node".into(),
+                    sha256: None,
+                }],
+                ..Default::default()
+            }];
+        })
+        .await;
+        let peer = |port: u16| Some(std::net::SocketAddr::from(([127, 0, 0, 1], port)));
+
+        // The named program gets through, and its hash is remembered.
+        assert!(call_from(&state, &session, port, peer(40001)).await.is_ok());
+        assert_eq!(hits(&counter), 1);
+        let pins = crate::binary_id::list_pins(&state.config.state_dir, &session.agent)
+            .await
+            .unwrap();
+        assert_eq!(pins, vec![("/usr/bin/node".to_string(), "a".repeat(64))]);
+        assert_eq!(lookups.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        // The same connection again within the cache window does not ask the guest again.
+        assert!(call_from(&state, &session, port, peer(40001)).await.is_ok());
+        assert_eq!(lookups.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(hits(&counter), 2);
+
+        // Same path, different hash: not the program first seen.
+        *answer.lock().unwrap() = guest_says("/usr/bin/node", &"b".repeat(64));
+        let err = call_from(&state, &session, port, peer(40002))
+            .await
+            .unwrap_err();
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+        assert!(err.1.contains("clear the pin"), "{}", err.1);
+
+        // A program the rule does not name.
+        *answer.lock().unwrap() = guest_says("/tmp/dropper", &"c".repeat(64));
+        let err = call_from(&state, &session, port, peer(40003))
+            .await
+            .unwrap_err();
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+        assert!(err.1.contains("program"), "{}", err.1);
+
+        // The guest cannot find the owner, or answers with junk.
+        *answer.lock().unwrap() =
+            json!({"result": "exec", "exit_code": 1, "stdout": "", "stderr": ""});
+        assert!(call_from(&state, &session, port, peer(40004))
+            .await
+            .unwrap_err()
+            .1
+            .contains("could not be identified"));
+        *answer.lock().unwrap() =
+            json!({"result": "exec", "exit_code": 0, "stdout": "not an identity", "stderr": ""});
+        assert!(call_from(&state, &session, port, peer(40005))
+            .await
+            .is_err());
+
+        // No peer address (a path the runtime cannot attribute) refuses too.
+        *answer.lock().unwrap() = guest_says("/usr/bin/node", &"a".repeat(64));
+        assert!(call_from(&state, &session, port, None)
+            .await
+            .unwrap_err()
+            .1
+            .contains("could not be identified"));
+        assert_eq!(hits(&counter), 2, "nothing refused may reach the host");
+
+        // An operator clears the pin; the rebuilt program is trusted afresh.
+        *answer.lock().unwrap() = guest_says("/usr/bin/node", &"b".repeat(64));
+        assert_eq!(
+            crate::binary_id::clear_pins(&state.config.state_dir, &session.agent, None)
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(call_from(&state, &session, port, peer(40006)).await.is_ok());
+        assert_eq!(hits(&counter), 3);
+        assert!(state.store.list_approvals().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_pinned_hash_in_the_rule_needs_no_first_use_and_a_host_without_binaries_never_asks() {
+        let (port, counter) = upstream_counter().await;
+        let answer = Arc::new(std::sync::Mutex::new(guest_says(
+            "/usr/bin/node",
+            &"a".repeat(64),
+        )));
+        let (fluxvm_url, lookups) = fake_fluxvm(answer.clone()).await;
+        let (state, session) = state_and_session_cfg(|c| c.fluxvm_url = fluxvm_url).await;
+        let pinned = "a".repeat(64);
+        let session = deploy_local_agent(&state, &session, |m| {
+            m.egress_rules = vec![crate::model::EgressRule {
+                host: "127.0.0.1".into(),
+                binaries: vec![crate::model::BinaryRule {
+                    path: "/usr/bin/node".into(),
+                    sha256: Some(pinned.clone()),
+                }],
+                ..Default::default()
+            }];
+        })
+        .await;
+        let peer = |port: u16| Some(std::net::SocketAddr::from(([127, 0, 0, 1], port)));
+        assert!(call_from(&state, &session, port, peer(41001)).await.is_ok());
+        // The policy pinned it, so nothing is remembered on the side.
+        assert!(
+            crate::binary_id::list_pins(&state.config.state_dir, &session.agent)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        *answer.lock().unwrap() = guest_says("/usr/bin/node", &"b".repeat(64));
+        assert!(call_from(&state, &session, port, peer(41002))
+            .await
+            .is_err());
+        assert_eq!(hits(&counter), 1);
+
+        // With no rule that names binaries, the guest is never asked.
+        let before = lookups.load(std::sync::atomic::Ordering::SeqCst);
+        let session = deploy_local_agent(&state, &session, |m| {
+            m.egress_rules = vec![crate::model::EgressRule {
+                host: "127.0.0.1".into(),
+                methods: vec!["POST".into()],
+                ..Default::default()
+            }];
+        })
+        .await;
+        assert!(call_from(&state, &session, port, peer(41003)).await.is_ok());
+        assert_eq!(lookups.load(std::sync::atomic::Ordering::SeqCst), before);
     }
 
     #[tokio::test]

@@ -56,6 +56,9 @@ pub struct KeepAllow {
     /// GraphQL operation types the body may run.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub graphql_operations: Vec<String>,
+    /// Programs in the cell that may reach this host (see [`crate::binary_id`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub binaries: Vec<crate::model::BinaryRule>,
 }
 
 impl KeepAllow {
@@ -64,6 +67,11 @@ impl KeepAllow {
         !self.rpc_methods.is_empty()
             || !self.mcp_tools.is_empty()
             || !self.graphql_operations.is_empty()
+    }
+
+    /// True when the entry restricts something beyond the host itself, so it needs an egress rule.
+    pub fn restricts_request(&self) -> bool {
+        !self.methods.is_empty() || self.reads_body() || !self.binaries.is_empty()
     }
 }
 
@@ -260,6 +268,7 @@ impl KeepPolicy {
                 existing.rpc_methods = rule.rpc_methods.clone();
                 existing.mcp_tools = rule.mcp_tools.clone();
                 existing.graphql_operations = rule.graphql_operations.clone();
+                existing.binaries = rule.binaries.clone();
             } else {
                 allow.push(KeepAllow {
                     host: rule.host.clone(),
@@ -268,6 +277,7 @@ impl KeepPolicy {
                     rpc_methods: rule.rpc_methods.clone(),
                     mcp_tools: rule.mcp_tools.clone(),
                     graphql_operations: rule.graphql_operations.clone(),
+                    binaries: rule.binaries.clone(),
                     ..Default::default()
                 });
             }
@@ -309,7 +319,7 @@ impl KeepPolicy {
         m.egress_rules = self
             .allow
             .iter()
-            .filter(|a| !a.methods.is_empty() || a.reads_body())
+            .filter(|a| a.restricts_request())
             .map(|a| EgressRule {
                 host: a.host.clone(),
                 methods: a.methods.clone(),
@@ -318,6 +328,7 @@ impl KeepPolicy {
                 rpc_methods: a.rpc_methods.clone(),
                 mcp_tools: a.mcp_tools.clone(),
                 graphql_operations: a.graphql_operations.clone(),
+                binaries: a.binaries.clone(),
             })
             .collect();
         if self.allow.iter().any(|a| {

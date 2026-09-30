@@ -8,6 +8,7 @@ pub mod artifact_diff;
 pub mod attestation;
 pub mod audit;
 pub mod authz;
+pub mod binary_id;
 pub mod browse_ifc;
 pub mod browser;
 pub mod card;

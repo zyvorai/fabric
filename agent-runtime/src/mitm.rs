@@ -396,6 +396,9 @@ async fn handle(context: &Context_, request: Request<Incoming>) -> Response<Full
                 .then(|| base64::engine::general_purpose::STANDARD.encode(&body)),
             credential,
         },
+        // A decrypted tunnel has no guest connection the runtime can attribute, so a host whose
+        // rules name binaries refuses here (the CONNECT proxy already refuses such hosts).
+        None,
     )
     .await;
     match reply {
