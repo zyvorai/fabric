@@ -34,6 +34,14 @@ Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) refuses unsigned policy. The signature is 
 keepctl policy show <agent>
 ```
 
+## MCP, JSON-RPC and GraphQL hosts
+
+For these endpoints the verb is always `POST`, so limit the body instead: `rpc_methods` (JSON-RPC method names), `mcp_tools` (tool names allowed for `tools/call`) and `graphql_operations` (`query`, `mutation`, `subscription`) on the `allow` entry. Start with the narrowest list the agent needs: for a search-only agent, `rpc_methods: [tools/list, tools/call]`, `mcp_tools: [search]`, and `graphql_operations: [query]`. A body that cannot be read as the expected JSON is refused. Details in `docs/keep/sentinel/README.md`.
+
+## Risk check
+
+The runtime compares every new policy with the current one. A change with a High finding (default egress `allow`, a metadata or private host, a `*` host, a write method added, weaker `ask`, a removed taint guard, a dropped or widened body rule) is refused with `409` and the reasons. Show those reasons to the user. Resend with `KEEP_POLICY_ACK_RISK=1 keepctl policy set ...` only after the user says the change is intended. Codes are listed in `docs/keep/sentinel/README.md`.
+
 ## Drafting from denials
 
 If an agent was blocked from hosts it needs, `keepctl policy suggest <agent> draft.yaml` lists the denied hosts and writes a draft policy with a narrow `allow` entry (`ask: always`) for each. Read the draft with the user, remove anything not wanted, then sign and load it as above. Suggestions marked `NEEDS ACK` are not in the draft; do not add them without the user asking.

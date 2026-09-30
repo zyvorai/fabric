@@ -686,6 +686,7 @@ mod tests {
                     methods: vec!["GET".into()],
                     path_prefixes: vec![],
                     max_body_bytes: None,
+                    ..Default::default()
                 }];
             })
             .await;

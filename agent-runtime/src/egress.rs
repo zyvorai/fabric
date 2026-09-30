@@ -195,7 +195,7 @@ pub(crate) async fn proxy_inner(
         host,
         &request.method,
         url.path(),
-        body.as_ref().map_or(0, Vec::len),
+        body.as_deref().unwrap_or(&[]),
     )
     .map_err(|message| (StatusCode::FORBIDDEN, message))?;
     let dlp_hits = if agent.manifest.dlp {
@@ -2450,6 +2450,7 @@ pub(crate) mod ask_tests {
                 methods: vec!["GET".into()],
                 path_prefixes: vec![],
                 max_body_bytes: None,
+                ..Default::default()
             }];
         })
         .await;
@@ -2515,6 +2516,47 @@ pub(crate) mod ask_tests {
         assert_eq!(error.0, StatusCode::FORBIDDEN);
         assert!(error.1.contains("egress guard"), "{}", error.1);
         assert_eq!(hits(&counter), 1);
+    }
+
+    #[tokio::test]
+    async fn body_rules_refuse_a_disallowed_mcp_call_before_it_is_sent() {
+        let (port, counter) = upstream_counter().await;
+        let (state, session) = state_and_session().await;
+        let session = deploy_local_agent(&state, &session, |m| {
+            m.egress_rules = vec![crate::model::EgressRule {
+                host: "127.0.0.1".into(),
+                methods: vec!["POST".into()],
+                rpc_methods: vec!["tools/call".into(), "tools/list".into()],
+                mcp_tools: vec!["search".into()],
+                ..Default::default()
+            }];
+        })
+        .await;
+        let allowed =
+            r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search"}}"#;
+        assert!(plain_call(&state, &session, port, "POST", Some(allowed))
+            .await
+            .is_ok());
+        assert_eq!(hits(&counter), 1);
+
+        for refused in [
+            r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"delete_all"}}"#,
+            r#"{"jsonrpc":"2.0","id":3,"method":"resources/read"}"#,
+            r#"[{"method":"tools/list","id":4},{"method":"tools/call","id":5,"params":{"name":"delete_all"}}]"#,
+            "not json",
+        ] {
+            let error = plain_call(&state, &session, port, "POST", Some(refused))
+                .await
+                .unwrap_err();
+            assert_eq!(error.0, StatusCode::FORBIDDEN, "{refused}");
+            assert!(error.1.contains("request body"), "{}", error.1);
+        }
+        assert_eq!(
+            hits(&counter),
+            1,
+            "a refused call must never reach the host"
+        );
+        assert!(state.store.list_approvals().await.is_empty());
     }
 
     #[tokio::test]

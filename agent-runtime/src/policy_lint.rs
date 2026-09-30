@@ -218,6 +218,26 @@ pub fn review_change(old: Option<&KeepPolicy>, new: &KeepPolicy) -> Vec<Finding>
                     format!("`{}` gains methods: {}", a.host, added.join(", ")),
                 ));
             }
+            for (what, was, now) in [
+                ("JSON-RPC methods", &p.rpc_methods, &a.rpc_methods),
+                ("MCP tools", &p.mcp_tools, &a.mcp_tools),
+                (
+                    "GraphQL operations",
+                    &p.graphql_operations,
+                    &a.graphql_operations,
+                ),
+            ] {
+                // An empty list means unrestricted, so dropping the list widens access.
+                let widened =
+                    !was.is_empty() && (now.is_empty() || !now.iter().all(|n| was.contains(n)));
+                if widened {
+                    out.push(Finding::new(
+                        Severity::High,
+                        "body_rules_widened",
+                        format!("`{}` is no longer limited to the same {what}", a.host),
+                    ));
+                }
+            }
             if rank_ask(a.ask.as_deref()) < rank_ask(p.ask.as_deref()) {
                 out.push(Finding::new(
                     Severity::High,
@@ -495,5 +515,31 @@ mod tests {
         let (st, body) = put(wide, true).await;
         assert_eq!(st, 200, "{body}");
         assert!(body.contains("default_egress_allow"), "{body}");
+    }
+
+    #[test]
+    fn dropping_or_widening_a_body_restriction_is_high() {
+        let old = pol("version: 1\nallow:\n  - { host: mcp.example.com, methods: [POST], mcp_tools: [search], rpc_methods: [tools/call], ask: first }\n");
+        let dropped =
+            pol("version: 1\nallow:\n  - { host: mcp.example.com, methods: [POST], ask: first }\n");
+        let f = review_change(Some(&old), &dropped);
+        assert_eq!(
+            f.iter().filter(|x| x.code == "body_rules_widened").count(),
+            2
+        );
+        assert!(needs_ack(&f));
+
+        let wider = pol("version: 1\nallow:\n  - { host: mcp.example.com, methods: [POST], mcp_tools: [search, delete], rpc_methods: [tools/call], ask: first }\n");
+        assert_eq!(
+            codes(&review_change(Some(&old), &wider)),
+            vec!["body_rules_widened"]
+        );
+
+        let narrower = pol("version: 1\nallow:\n  - { host: mcp.example.com, methods: [POST], mcp_tools: [search], rpc_methods: [tools/call], ask: first }\n");
+        assert!(review_change(Some(&old), &narrower).is_empty());
+        // Adding a restriction where there was none is not a widening.
+        let base = pol(BASE);
+        let restricted = pol("version: 1\nallow:\n  - { host: api.github.com, methods: [GET], graphql_operations: [query], ask: first }\n");
+        assert!(review_change(Some(&base), &restricted).is_empty());
     }
 }
