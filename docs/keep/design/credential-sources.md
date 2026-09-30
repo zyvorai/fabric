@@ -1,5 +1,8 @@
 # Credential sources (Vault, files)
 
+> **Status.** The `file` source (step 1 of "Size") is built: see [vault/README.md](../vault/README.md#credentials-from-a-file-source). It follows
+> the recommendations below. The `vault` source (steps 2 and 3) is not started.
+
 ## Why
 
 Every credential secret lives in the runtime's process environment. A descriptor names a variable (`"env": "STRIPE_KEY"`) and the runtime reads it

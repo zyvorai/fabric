@@ -5,10 +5,14 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    path::Path,
-    sync::{Arc, RwLock},
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, RwLock,
+    },
     time::{Duration, Instant},
 };
+use tokio::sync::Mutex as AsyncMutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CredentialDescriptor {
@@ -67,6 +71,82 @@ pub struct CredentialDescriptor {
     /// client id and client secret stay in host env and never reach a cell.
     #[serde(default)]
     pub oauth: Option<OAuthRefresh>,
+    /// Where the secret comes from instead of `env`: see [`SecretSource`]. Set at most one of `env` and
+    /// `source`. Read from the operator's credentials file at startup, like everything else here; no
+    /// API route writes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<SecretSource>,
+}
+
+/// Longest a fetched secret is kept before it is fetched again.
+pub const MAX_SOURCE_TTL_SECS: u64 = 3600;
+/// Default cache time of a secret read from a file.
+pub const DEFAULT_FILE_TTL_SECS: u64 = 60;
+/// A secret file larger than this is refused.
+const MAX_SECRET_FILE_BYTES: u64 = 64 * 1024;
+
+/// Where a credential's secret is kept. The authorisation checks (host, method, path, port, user,
+/// approval) are the same whatever the source; a source only changes where the value is read from.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum SecretSource {
+    /// Read the secret from a file, trimmed, and cache it for `ttl_seconds`. This covers Vault Agent
+    /// sinks, Kubernetes Secrets mounted as volumes, the CSI Secrets Store driver and systemd
+    /// `LoadCredential=`. Rotation is replacing the file; the change is seen after the cache time.
+    File {
+        /// Absolute path, followed through symlinks (Kubernetes mounts secrets through them).
+        path: PathBuf,
+        /// Cache time in seconds, 1 to 3600. Default 60. This is also how long a revoked or rotated
+        /// secret keeps working.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ttl_seconds: Option<u64>,
+        /// Accept a file readable by group or others. Off by default because a secret file should be
+        /// 0400 or 0600; a Kubernetes Secret volume is 0644 unless its `defaultMode` says otherwise.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        allow_loose_permissions: bool,
+    },
+}
+
+impl SecretSource {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::File { .. } => "file",
+        }
+    }
+
+    fn ttl(&self) -> Duration {
+        match self {
+            Self::File { ttl_seconds, .. } => {
+                Duration::from_secs(ttl_seconds.unwrap_or(DEFAULT_FILE_TTL_SECS))
+            }
+        }
+    }
+
+    fn validate(&self, name: &str) -> Result<()> {
+        match self {
+            Self::File {
+                path, ttl_seconds, ..
+            } => {
+                if !path.is_absolute() {
+                    bail!("credential '{name}' source path must be absolute");
+                }
+                if path
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir))
+                {
+                    bail!("credential '{name}' source path may not contain `..`");
+                }
+                if let Some(ttl) = ttl_seconds {
+                    if !(1..=MAX_SOURCE_TTL_SECS).contains(ttl) {
+                        bail!(
+                            "credential '{name}' source ttl_seconds must be between 1 and {MAX_SOURCE_TTL_SECS}"
+                        );
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 /// Token-endpoint settings for `kind=oauth-refresh` (RFC 6749 section 6, refresh-token grant).
@@ -201,11 +281,25 @@ async fn mint_access_token(
     })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct CachedToken {
     value: String,
     valid_until: Instant,
 }
+
+// A token is a secret: never print it, even from a `{:?}` of the whole vault.
+impl std::fmt::Debug for CachedToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CachedToken")
+            .field("value", &"<redacted>")
+            .field("valid_until", &self.valid_until)
+            .finish()
+    }
+}
+
+/// One sourced credential's cache. The lock is held across a fetch, so a burst of requests after
+/// the value expires makes one read, not many.
+type SourceSlot = Arc<AsyncMutex<Option<CachedToken>>>;
 
 /// The stand-in for credential `name` that a session's agent holds. It is derived
 /// from the session's capability, so it is stable for the session, different for
@@ -244,6 +338,10 @@ pub struct CredentialVault {
     tokens: Arc<RwLock<HashMap<String, CachedToken>>>,
     /// Access tokens minted for one person's connection, by (credential, person).
     user_tokens: Arc<RwLock<HashMap<(String, String), CachedToken>>>,
+    /// A cache per credential that has a `source`, built once because descriptors never change after load.
+    sourced: Arc<HashMap<String, SourceSlot>>,
+    /// How many times a secret has been read from its source, for tests and diagnosis. Never a value.
+    source_fetches: Arc<AtomicUsize>,
 }
 
 impl CredentialVault {
@@ -258,17 +356,30 @@ impl CredentialVault {
             .context("decoding credentials descriptor JSON")?;
         for (name, d) in &descriptors {
             validate_descriptor(name, d)?;
+            startup_check_source(name, d).await?;
         }
         Ok(Self::from_descriptors(descriptors))
     }
 
     /// A vault of the given descriptors (used by tests and embedders).
     pub fn from_descriptors(descriptors: HashMap<String, CredentialDescriptor>) -> Self {
+        let sourced = descriptors
+            .iter()
+            .filter(|(_, d)| d.source.is_some())
+            .map(|(name, _)| (name.clone(), SourceSlot::default()))
+            .collect();
         Self {
             descriptors,
             tokens: Arc::default(),
             user_tokens: Arc::default(),
+            sourced: Arc::new(sourced),
+            source_fetches: Arc::default(),
         }
+    }
+
+    /// How many times a secret has been read from a source since startup.
+    pub fn source_fetches(&self) -> usize {
+        self.source_fetches.load(Ordering::SeqCst)
     }
 
     pub fn descriptor(&self, name: &str) -> Option<&CredentialDescriptor> {
@@ -314,6 +425,9 @@ impl CredentialVault {
         let descriptor = self.descriptor(name).with_context(|| {
             format!("credential '{name}' is not configured on this Fabric host")
         })?;
+        if descriptor.source.is_some() {
+            bail!("credential '{name}' has a source and can only be resolved asynchronously");
+        }
         if descriptor.kind.eq_ignore_ascii_case("fabric") {
             // Optional endpoint API key; empty means no Authorization header.
             let value = std::env::var("FABRIC_AI_API_KEY").unwrap_or_default();
@@ -557,7 +671,7 @@ impl CredentialVault {
     /// Credential authority (Keep 0.1): resolve a secret only when the request
     /// matches the descriptor allowlist for host / method / path / port / user.
     /// Secrets still come from host env — user-held unwrap is Keep 0.2.
-    pub fn authorize_resolve(
+    pub async fn authorize_resolve(
         &self,
         name: &str,
         ctx: &ResolveContext<'_>,
@@ -588,7 +702,165 @@ impl CredentialVault {
                 bail!("credential '{name}' is not allowed for user '{uid}'");
             }
         }
+        // Every check above ran before any secret was read, whatever the source.
+        if descriptor.source.is_some() {
+            let value = self.resolve_sourced(name, descriptor).await?;
+            return Ok((descriptor, format!("{}{}", descriptor.prefix, value)));
+        }
         self.resolve_for(name, ctx.user_id)
+    }
+
+    /// The secret of a credential with a `source`, from its cache or freshly read. A read that fails
+    /// clears the cache and fails the request: a value is never used past its own cache time.
+    async fn resolve_sourced(
+        &self,
+        name: &str,
+        descriptor: &CredentialDescriptor,
+    ) -> Result<String> {
+        let source = descriptor
+            .source
+            .as_ref()
+            .with_context(|| format!("credential '{name}' has no source"))?;
+        let slot = self
+            .sourced
+            .get(name)
+            .with_context(|| format!("credential '{name}' has no source cache"))?;
+        let mut cached = slot.lock().await;
+        if let Some(c) = cached.as_ref().filter(|c| c.valid_until > Instant::now()) {
+            return Ok(c.value.clone());
+        }
+        self.source_fetches.fetch_add(1, Ordering::SeqCst);
+        let fetched = match source {
+            SecretSource::File {
+                path,
+                allow_loose_permissions,
+                ..
+            } => read_secret_file(name, path, *allow_loose_permissions).await,
+        };
+        let value = match fetched {
+            Ok(value) => value,
+            Err(error) => {
+                *cached = None;
+                tracing::warn!(credential = %name, source = source.kind(), "could not read the credential's secret");
+                return Err(error);
+            }
+        };
+        // The value must be usable as the tail of a header, and must not smuggle in a second header.
+        if reqwest::header::HeaderValue::from_str(&format!("{}{}", descriptor.prefix, value))
+            .is_err()
+        {
+            *cached = None;
+            bail!("credential '{name}': the secret from its source is not a valid header value");
+        }
+        *cached = Some(CachedToken {
+            value: value.clone(),
+            valid_until: Instant::now() + source.ttl(),
+        });
+        Ok(value)
+    }
+}
+
+/// Read a secret file: a regular file (symlinks are followed, as Kubernetes needs), not readable by
+/// group or others unless allowed, at most 64 KiB, UTF-8, trimmed, non-empty and free of control
+/// characters. Errors name the credential and the file, never its contents.
+async fn read_secret_file(name: &str, path: &Path, allow_loose: bool) -> Result<String> {
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::open(path).await.with_context(|| {
+        format!(
+            "credential '{name}': the secret file {} cannot be opened",
+            path.display()
+        )
+    })?;
+    // Check the file we opened, not the path, so it cannot be swapped between check and read.
+    let meta = file.metadata().await.with_context(|| {
+        format!(
+            "credential '{name}': the secret file {} cannot be inspected",
+            path.display()
+        )
+    })?;
+    if !meta.is_file() {
+        bail!(
+            "credential '{name}': {} is not a regular file",
+            path.display()
+        );
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = meta.permissions().mode() & 0o777;
+        if !allow_loose && mode & 0o077 != 0 {
+            bail!(
+                "credential '{name}': the secret file {} is readable by group or others (mode {mode:04o}); make it 0400 or 0600, or set allow_loose_permissions",
+                path.display()
+            );
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = allow_loose;
+    let mut bytes = Vec::new();
+    file.take(MAX_SECRET_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .await
+        .with_context(|| {
+            format!(
+                "credential '{name}': the secret file {} cannot be read",
+                path.display()
+            )
+        })?;
+    if bytes.len() as u64 > MAX_SECRET_FILE_BYTES {
+        bail!(
+            "credential '{name}': the secret file {} is larger than {MAX_SECRET_FILE_BYTES} bytes",
+            path.display()
+        );
+    }
+    let text = String::from_utf8(bytes).map_err(|_| {
+        anyhow::anyhow!(
+            "credential '{name}': the secret file {} is not valid UTF-8",
+            path.display()
+        )
+    })?;
+    let value = text.trim();
+    if value.is_empty() {
+        bail!(
+            "credential '{name}': the secret file {} is empty",
+            path.display()
+        );
+    }
+    if value.chars().any(char::is_control) {
+        bail!("credential '{name}': the secret file {} contains a control character (a newline inside the value?)", path.display());
+    }
+    Ok(value.to_string())
+}
+
+/// Startup check of a file source. A file that is readable by others is a configuration error and
+/// stops startup. A file that is not there yet only warns, because whatever renders it (Vault
+/// Agent, a CSI driver) may start after this does.
+async fn startup_check_source(name: &str, d: &CredentialDescriptor) -> Result<()> {
+    let Some(SecretSource::File {
+        path,
+        allow_loose_permissions,
+        ..
+    }) = &d.source
+    else {
+        return Ok(());
+    };
+    match tokio::fs::metadata(path).await {
+        Ok(_) => {
+            // Reuses the read path's checks and discards the value.
+            read_secret_file(name, path, *allow_loose_permissions)
+                .await
+                .map(|_| ())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            tracing::warn!(credential = %name, path = %path.display(), "the credential's secret file does not exist yet");
+            Ok(())
+        }
+        Err(e) => Err(e).with_context(|| {
+            format!(
+                "credential '{name}': the secret file {} cannot be inspected",
+                path.display()
+            )
+        }),
     }
 }
 
@@ -621,7 +893,19 @@ fn validate_descriptor(name: &str, d: &CredentialDescriptor) -> Result<()> {
     if name.is_empty() || d.host.trim().is_empty() || d.header.trim().is_empty() {
         bail!("credential descriptors require non-empty name, host and header");
     }
-    if d.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH) {
+    if let Some(source) = &d.source {
+        if !d.env.trim().is_empty() {
+            bail!("credential '{name}' sets both env and source; choose one");
+        }
+        if d.kind.eq_ignore_ascii_case("fabric") || d.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH)
+        {
+            bail!(
+                "credential '{name}' has kind {} and cannot use a source",
+                d.kind
+            );
+        }
+        source.validate(name)?;
+    } else if d.kind.eq_ignore_ascii_case(KIND_OAUTH_REFRESH) {
         let Some(o) = &d.oauth else {
             bail!("credential '{name}' has kind oauth-refresh and needs an oauth block");
         };
@@ -787,6 +1071,7 @@ mod tests {
             require_device_signature: false,
             preview: None,
             oauth: None,
+            source: None,
         };
         assert!(credential_allows_request(
             &d,
@@ -859,8 +1144,8 @@ mod tests {
         assert!(validate_descriptor("c", &gated(&["POST"], Some("wire"))).is_err());
     }
 
-    #[test]
-    fn authorize_resolve_checks_user_allowlist() {
+    #[tokio::test]
+    async fn authorize_resolve_checks_user_allowlist() {
         std::env::set_var("AUTH_TEST_KEY", "secret-value");
         let mut map = HashMap::new();
         map.insert(
@@ -875,16 +1160,18 @@ mod tests {
         );
         let vault = CredentialVault::from_descriptors(map);
         let method = reqwest::Method::GET;
-        let denied = vault.authorize_resolve(
-            "mail",
-            &ResolveContext {
-                host: "mail.example",
-                method: &method,
-                path: "/",
-                port: 443,
-                user_id: Some("bob"),
-            },
-        );
+        let denied = vault
+            .authorize_resolve(
+                "mail",
+                &ResolveContext {
+                    host: "mail.example",
+                    method: &method,
+                    path: "/",
+                    port: 443,
+                    user_id: Some("bob"),
+                },
+            )
+            .await;
         assert!(denied.is_err());
         let ok = vault
             .authorize_resolve(
@@ -897,6 +1184,7 @@ mod tests {
                     user_id: Some("alice"),
                 },
             )
+            .await
             .unwrap();
         assert!(ok.1.contains("secret-value"));
         std::env::remove_var("AUTH_TEST_KEY");
@@ -1010,8 +1298,11 @@ mod tests {
             port: 443,
             user_id: None,
         };
-        assert!(vault.authorize_resolve("google", &ctx(&get)).is_ok());
-        assert!(vault.authorize_resolve("google", &ctx(&post)).is_err());
+        assert!(vault.authorize_resolve("google", &ctx(&get)).await.is_ok());
+        assert!(vault
+            .authorize_resolve("google", &ctx(&post))
+            .await
+            .is_err());
     }
 
     #[tokio::test]
@@ -1184,11 +1475,16 @@ mod tests {
         };
         assert!(vault
             .authorize_resolve("gmail", &ctx(&get, Some("ana")))
+            .await
             .is_ok());
         assert!(vault
             .authorize_resolve("gmail", &ctx(&post, Some("ana")))
+            .await
             .is_err());
-        assert!(vault.authorize_resolve("gmail", &ctx(&get, None)).is_err());
+        assert!(vault
+            .authorize_resolve("gmail", &ctx(&get, None))
+            .await
+            .is_err());
     }
 
     #[tokio::test]
@@ -1515,5 +1811,348 @@ mod tests {
             None,
             "the same refresh token echoed back is not a change"
         );
+    }
+
+    // ---- sources -------------------------------------------------------------------------
+
+    fn scratch_dir() -> PathBuf {
+        let d = std::env::temp_dir().join(format!("zyvor-src-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn write_secret(dir: &Path, name: &str, content: &str, mode: u32) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let path = dir.join(name);
+        std::fs::write(&path, content).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+        path
+    }
+
+    fn file_vault(path: &Path, extra: serde_json::Value) -> CredentialVault {
+        let mut d = serde_json::json!({
+            "host": "api.example.com", "header": "authorization", "prefix": "Bearer ",
+            "source": {"kind": "file", "path": path},
+        });
+        for (k, v) in extra.as_object().cloned().unwrap_or_default() {
+            d["source"][k] = v;
+        }
+        let mut map = HashMap::new();
+        map.insert("svc".to_string(), serde_json::from_value(d).unwrap());
+        CredentialVault::from_descriptors(map)
+    }
+
+    fn ctx_for<'a>(method: &'a reqwest::Method) -> ResolveContext<'a> {
+        ResolveContext {
+            host: "api.example.com",
+            method,
+            path: "/v1/x",
+            port: 443,
+            user_id: None,
+        }
+    }
+
+    async fn resolve(v: &CredentialVault) -> Result<String> {
+        let get = reqwest::Method::GET;
+        v.authorize_resolve("svc", &ctx_for(&get))
+            .await
+            .map(|(_, s)| s)
+    }
+
+    #[tokio::test]
+    async fn a_file_source_is_read_trimmed_and_prefixed() {
+        let dir = scratch_dir();
+        let path = write_secret(&dir, "k", "  s3cr3t-value \n", 0o600);
+        let v = file_vault(&path, serde_json::json!({}));
+        assert_eq!(resolve(&v).await.unwrap(), "Bearer s3cr3t-value");
+        assert_eq!(v.source_fetches(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn the_value_is_cached_until_its_ttl_and_then_read_again() {
+        let dir = scratch_dir();
+        let path = write_secret(&dir, "k", "one", 0o600);
+        let v = file_vault(&path, serde_json::json!({"ttl_seconds": 1}));
+        assert_eq!(resolve(&v).await.unwrap(), "Bearer one");
+        write_secret(&dir, "k", "two", 0o600);
+        assert_eq!(resolve(&v).await.unwrap(), "Bearer one", "still cached");
+        assert_eq!(v.source_fetches(), 1);
+        tokio::time::sleep(Duration::from_millis(1150)).await;
+        assert_eq!(
+            resolve(&v).await.unwrap(),
+            "Bearer two",
+            "rotated after the ttl"
+        );
+        assert_eq!(v.source_fetches(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_burst_after_expiry_reads_the_file_once() {
+        let dir = scratch_dir();
+        let path = write_secret(&dir, "k", "burst", 0o600);
+        let v = Arc::new(file_vault(&path, serde_json::json!({})));
+        let mut tasks = Vec::new();
+        for _ in 0..32 {
+            let v = v.clone();
+            tasks.push(tokio::spawn(async move { resolve(&v).await.unwrap() }));
+        }
+        for t in tasks {
+            assert_eq!(t.await.unwrap(), "Bearer burst");
+        }
+        assert_eq!(v.source_fetches(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_failed_read_fails_closed_and_never_serves_the_old_value() {
+        let dir = scratch_dir();
+        let path = write_secret(&dir, "k", "old-secret", 0o600);
+        let v = file_vault(&path, serde_json::json!({"ttl_seconds": 1}));
+        assert_eq!(resolve(&v).await.unwrap(), "Bearer old-secret");
+        std::fs::remove_file(&path).unwrap();
+        // Inside the ttl the cached value is still good; that is the revocation latency.
+        assert!(resolve(&v).await.is_ok());
+        tokio::time::sleep(Duration::from_millis(1150)).await;
+        let err = resolve(&v).await.unwrap_err().to_string();
+        assert!(err.contains("cannot be opened"), "{err}");
+        assert!(
+            !err.contains("old-secret"),
+            "the error leaked the secret: {err}"
+        );
+        // A failed read clears the cache; when the file returns, the new value is read.
+        write_secret(&dir, "k", "new-secret", 0o600);
+        assert_eq!(resolve(&v).await.unwrap(), "Bearer new-secret");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_secret_file_must_be_private_unless_the_operator_says_otherwise() {
+        let dir = scratch_dir();
+        let loose = write_secret(&dir, "loose", "s", 0o644);
+        let err = resolve(&file_vault(&loose, serde_json::json!({})))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("readable by group or others"), "{err}");
+        assert!(err.contains("0644"), "{err}");
+        assert!(!err.contains("Bearer s"), "{err}");
+        let ok = file_vault(&loose, serde_json::json!({"allow_loose_permissions": true}));
+        assert_eq!(resolve(&ok).await.unwrap(), "Bearer s");
+        let group = write_secret(&dir, "group", "s", 0o640);
+        assert!(resolve(&file_vault(&group, serde_json::json!({})))
+            .await
+            .is_err());
+        let owner_only = write_secret(&dir, "ro", "s", 0o400);
+        assert!(resolve(&file_vault(&owner_only, serde_json::json!({})))
+            .await
+            .is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn symlinks_are_followed_but_only_to_a_regular_file() {
+        let dir = scratch_dir();
+        let real = write_secret(&dir, "real", "through-a-link", 0o600);
+        // Kubernetes mounts a secret file as a symlink into a timestamped directory.
+        let link = dir.join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        assert_eq!(
+            resolve(&file_vault(&link, serde_json::json!({})))
+                .await
+                .unwrap(),
+            "Bearer through-a-link"
+        );
+        let err = resolve(&file_vault(&dir, serde_json::json!({})))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("not a regular file") || err.contains("cannot be"),
+            "{err}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn an_empty_oversized_binary_or_multiline_secret_is_refused_without_echoing_it() {
+        let dir = scratch_dir();
+        for (name, content, want) in [
+            ("empty", "  \n".to_string(), "is empty"),
+            ("big", "x".repeat(70_000), "larger than"),
+            (
+                "multi",
+                "line-one\nline-two".to_string(),
+                "control character",
+            ),
+            ("nul", "abc\u{0}def".to_string(), "control character"),
+        ] {
+            let path = write_secret(&dir, name, &content, 0o600);
+            let err = resolve(&file_vault(&path, serde_json::json!({})))
+                .await
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(want), "{name}: {err}");
+            assert!(
+                !err.contains("line-one") && !err.contains("abc"),
+                "{name} leaked: {err}"
+            );
+        }
+        let bin = dir.join("bin");
+        std::fs::write(&bin, [0xff, 0xfe, 0xfd]).unwrap();
+        std::fs::set_permissions(&bin, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+            .unwrap();
+        let err = resolve(&file_vault(&bin, serde_json::json!({})))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("UTF-8"), "{err}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_request_that_fails_the_descriptors_checks_never_reads_the_file() {
+        let dir = scratch_dir();
+        let path = write_secret(&dir, "k", "guarded", 0o600);
+        let v = file_vault(&path, serde_json::json!({}));
+        let mut map = HashMap::new();
+        let mut d = v.descriptor("svc").unwrap().clone();
+        d.allowed_methods = vec!["GET".into()];
+        d.allowed_users = vec!["alice".into()];
+        map.insert("svc".to_string(), d);
+        let v = CredentialVault::from_descriptors(map);
+        let get = reqwest::Method::GET;
+        let post = reqwest::Method::POST;
+        let deny = |m: &reqwest::Method, host: &'static str, user: Option<&'static str>| {
+            let v = v.clone();
+            let m = m.clone();
+            async move {
+                v.authorize_resolve(
+                    "svc",
+                    &ResolveContext {
+                        host,
+                        method: &m,
+                        path: "/v1/x",
+                        port: 443,
+                        user_id: user,
+                    },
+                )
+                .await
+                .is_err()
+            }
+        };
+        assert!(deny(&post, "api.example.com", Some("alice")).await); // method
+        assert!(deny(&get, "evil.example", Some("alice")).await); // host
+        assert!(deny(&get, "api.example.com", Some("bob")).await); // user
+        assert!(deny(&get, "api.example.com", None).await); // no user
+        assert_eq!(
+            v.source_fetches(),
+            0,
+            "a refused request must not touch the secret"
+        );
+        let ok = v
+            .authorize_resolve(
+                "svc",
+                &ResolveContext {
+                    host: "api.example.com",
+                    method: &get,
+                    path: "/v1/x",
+                    port: 443,
+                    user_id: Some("alice"),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.1, "Bearer guarded");
+        assert_eq!(v.source_fetches(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_sync_path_refuses_a_sourced_credential_and_the_debug_output_hides_secrets() {
+        let dir = scratch_dir();
+        let path = write_secret(&dir, "k", "never-printed", 0o600);
+        let v = file_vault(&path, serde_json::json!({}));
+        assert!(v
+            .resolve("svc")
+            .unwrap_err()
+            .to_string()
+            .contains("asynchronously"));
+        let token = CachedToken {
+            value: "tok-secret".into(),
+            valid_until: Instant::now(),
+        };
+        let printed = format!("{token:?}");
+        assert!(
+            printed.contains("<redacted>") && !printed.contains("tok-secret"),
+            "{printed}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn descriptor_validation_covers_sources() {
+        let dir = scratch_dir();
+        let path = write_secret(&dir, "k", "v", 0o600);
+        let file = dir.join("creds.json");
+        let load = |d: serde_json::Value| {
+            std::fs::write(&file, serde_json::json!({"svc": d}).to_string()).unwrap();
+            let file = file.clone();
+            async move { CredentialVault::load(Some(&file)).await }
+        };
+        let base = |source: serde_json::Value| serde_json::json!({"host": "h.example", "header": "authorization", "source": source});
+        let src = serde_json::json!({"kind": "file", "path": path});
+        assert!(load(base(src.clone())).await.is_ok());
+        // both env and source
+        let mut both = base(src.clone());
+        both["env"] = "X".into();
+        assert!(load(both)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("both env and source"));
+        // not for fabric or oauth
+        let mut fabric = base(src.clone());
+        fabric["kind"] = "fabric".into();
+        assert!(load(fabric)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("cannot use a source"));
+        // path and ttl rules, unknown kind and unknown field
+        for bad in [
+            serde_json::json!({"kind": "file", "path": "relative/secret"}),
+            serde_json::json!({"kind": "file", "path": "/etc/../etc/secret"}),
+            serde_json::json!({"kind": "file", "path": path, "ttl_seconds": 0}),
+            serde_json::json!({"kind": "file", "path": path, "ttl_seconds": 3601}),
+            serde_json::json!({"kind": "tape", "path": path}),
+            serde_json::json!({"kind": "file", "path": path, "extra": 1}),
+        ] {
+            assert!(
+                load(base(bad.clone())).await.is_err(),
+                "{bad} should be refused"
+            );
+        }
+        // A loose file stops startup; a missing one only warns.
+        let loose = write_secret(&dir, "loose", "v", 0o644);
+        let err = load(base(serde_json::json!({"kind": "file", "path": loose})))
+            .await
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("readable by group or others"), "{err}");
+        assert!(load(base(
+            serde_json::json!({"kind": "file", "path": dir.join("not-yet")})
+        ))
+        .await
+        .is_ok());
+        // A descriptor with env and no source still loads, as before.
+        assert!(load(
+            serde_json::json!({"host": "h.example", "header": "authorization", "env": "X"})
+        )
+        .await
+        .is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
