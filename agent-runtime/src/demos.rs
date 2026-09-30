@@ -860,7 +860,7 @@ async fn run_demo_inner(
 
     // A model step the vault would refuse fails now, before a cell is created.
     if let Some(ms) = &spec.model {
-        crate::model_call::preflight(&state, ms)?;
+        crate::model_call::preflight(&state, ms).await?;
     }
 
     // Validate the input before touching FluxVM: bad uploads fail fast and cheap.

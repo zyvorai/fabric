@@ -894,6 +894,7 @@ pub(crate) async fn browser_fill_secret(
                 user_id: session.user_id.as_deref(),
             },
         )
+        .await
         .map_err(ApiError::forbidden)?;
     // Split-sight: pause the agent while vault fills.
     let _ = state

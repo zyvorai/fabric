@@ -442,6 +442,7 @@ pub(crate) async fn proxy_inner(
                         user_id: session.user_id.as_deref(),
                     },
                 )
+                .await
                 .map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?
         };
         if let Some(kind) = descriptor.approval_kind_for(&method) {
@@ -2816,6 +2817,112 @@ pub(crate) mod ask_tests {
         .await;
         assert!(call_from(&state, &session, port, peer(41003)).await.is_ok());
         assert_eq!(lookups.load(std::sync::atomic::Ordering::SeqCst), before);
+    }
+
+    #[tokio::test]
+    async fn a_credential_with_a_file_source_is_injected_only_after_the_checks_pass() {
+        use std::os::unix::fs::PermissionsExt;
+        let (api_port, _token_port, ca_pem, seen) = fake_google().await;
+        let dir = std::env::temp_dir().join(format!("zyvor-src-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let ca_file = dir.join("ca.pem");
+        std::fs::write(&ca_file, ca_pem).unwrap();
+        let secret = dir.join("key");
+        let write = |value: &str| {
+            std::fs::write(&secret, value).unwrap();
+            std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o600)).unwrap();
+        };
+        write("file-secret-1\n");
+        let creds = dir.join("creds.json");
+        std::fs::write(
+            &creds,
+            json!({"svc": {
+                "host": "127.0.0.1", "header": "authorization", "prefix": "Bearer ",
+                "allowed_ports": [api_port], "allowed_methods": ["GET"],
+                "source": {"kind": "file", "path": secret, "ttl_seconds": 1}
+            }})
+            .to_string(),
+        )
+        .unwrap();
+        let (state, base) = state_and_session_cfg(|config| {
+            config.credentials_file = Some(creds);
+            config.extra_ca_files = vec![ca_file];
+        })
+        .await;
+        let mut m = manifest(EgressMode::Deny, Some(30));
+        m.credentials = vec!["svc".into()];
+        m.egress_allow_hosts = vec!["127.0.0.1".into()];
+        m.allow_private_networks = true;
+        let deployed = state
+            .store
+            .deploy_agent(crate::model::DeployAgentRequest {
+                name: base.agent.clone(),
+                bundle_base64: base64::engine::general_purpose::STANDARD.encode("export default 1"),
+                manifest: m,
+            })
+            .await
+            .unwrap();
+        let session = state
+            .store
+            .update_session(base.id, |s| s.agent_version = deployed.version.clone())
+            .await
+            .unwrap();
+        let send = |method: &'static str| {
+            let (state, session) = (state.clone(), session.clone());
+            async move {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    "x-zyvor-session-id",
+                    session.id.to_string().parse().unwrap(),
+                );
+                headers.insert("x-zyvor-egress-capability", "cap".parse().unwrap());
+                proxy_inner(
+                    &state,
+                    &headers,
+                    EgressRequest {
+                        url: format!("https://127.0.0.1:{api_port}/v1/x"),
+                        method: method.into(),
+                        headers: Default::default(),
+                        body_base64: (method == "POST")
+                            .then(|| base64::engine::general_purpose::STANDARD.encode("x")),
+                        credential: Some("svc".into()),
+                    },
+                    None,
+                )
+                .await
+            }
+        };
+
+        // An allowed request gets the secret in the header, read from the file.
+        let first = send("GET").await;
+        assert!(first.is_ok(), "{first:?}");
+        assert_eq!(seen.lock().unwrap().as_slice(), ["Bearer file-secret-1"]);
+        assert_eq!(state.credentials.source_fetches(), 1);
+
+        // A method the descriptor does not allow is refused, and the file is not read for it.
+        let refused = send("POST").await.unwrap_err();
+        assert_eq!(refused.0, StatusCode::FORBIDDEN);
+        assert!(!refused.1.contains("file-secret"), "{}", refused.1);
+        assert_eq!(seen.lock().unwrap().len(), 1);
+        assert_eq!(state.credentials.source_fetches(), 1);
+
+        // Rotation is seen after the cache time, not before.
+        write("file-secret-2");
+        assert!(send("GET").await.is_ok());
+        assert_eq!(seen.lock().unwrap()[1], "Bearer file-secret-1");
+        tokio::time::sleep(std::time::Duration::from_millis(1150)).await;
+        assert!(send("GET").await.is_ok());
+        assert_eq!(seen.lock().unwrap()[2], "Bearer file-secret-2");
+
+        // Once the file is gone and the cache has expired the request fails closed: nothing is sent,
+        // and the error does not carry the old secret.
+        std::fs::remove_file(&secret).unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(1150)).await;
+        let gone = send("GET").await.unwrap_err();
+        assert_eq!(gone.0, StatusCode::FORBIDDEN);
+        assert!(!gone.1.contains("file-secret"), "{}", gone.1);
+        assert_eq!(seen.lock().unwrap().len(), 3);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]

@@ -173,7 +173,7 @@ struct Authorized {
 }
 
 /// Ask the vault whether this endpoint may be used. It decides host, method, path and port.
-fn authorize(state: &AppState, spec: &ModelSpec) -> Result<Authorized, ApiError> {
+async fn authorize(state: &AppState, spec: &ModelSpec) -> Result<Authorized, ApiError> {
     let url = spec.endpoint().map_err(ApiError::bad_request)?;
     let host = spec.host();
     let port = url.port_or_known_default().unwrap_or(443);
@@ -194,6 +194,7 @@ fn authorize(state: &AppState, spec: &ModelSpec) -> Result<Authorized, ApiError>
                 user_id: None,
             },
         )
+        .await
         .map_err(|e| ApiError::forbidden(format!("model step refused by the vault: {e}")))?;
     let header = descriptor.header.clone();
     Ok(Authorized {
@@ -206,8 +207,8 @@ fn authorize(state: &AppState, spec: &ModelSpec) -> Result<Authorized, ApiError>
 
 /// Fail fast: check the vault before a cell is created, so a misconfigured endpoint does not
 /// cost a sandbox boot. It does not open an approval and sends nothing.
-pub(crate) fn preflight(state: &AppState, spec: &ModelSpec) -> Result<(), ApiError> {
-    authorize(state, spec).map(|_| ())
+pub(crate) async fn preflight(state: &AppState, spec: &ModelSpec) -> Result<(), ApiError> {
+    authorize(state, spec).await.map(|_| ())
 }
 
 /// Send `text` to the declared endpoint and return the reply. Fails closed: any refusal or error
@@ -229,7 +230,7 @@ pub(crate) async fn call(
         host,
         header,
         secret,
-    } = authorize(state, spec)?;
+    } = authorize(state, spec).await?;
 
     let body = request_body(spec, text);
     let body_sha256 = hex::encode(Sha256::digest(&body));
@@ -762,12 +763,12 @@ mod tests {
     async fn preflight_checks_the_vault_without_approving_or_sending() {
         let (port, seen) = stub(200, "x").await;
         let (state, _session) = state_for(port).await;
-        assert!(preflight(&state, &spec(port)).is_ok());
+        assert!(preflight(&state, &spec(port)).await.is_ok());
         let bad = ModelSpec {
             credential: "nope".into(),
             ..spec(port)
         };
-        let err = preflight(&state, &bad).unwrap_err();
+        let err = preflight(&state, &bad).await.unwrap_err();
         assert_eq!(err.status(), StatusCode::FORBIDDEN);
         assert!(
             err.message().contains("refused by the vault"),
