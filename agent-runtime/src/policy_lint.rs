@@ -238,6 +238,24 @@ pub fn review_change(old: Option<&KeepPolicy>, new: &KeepPolicy) -> Vec<Finding>
                     ));
                 }
             }
+            // A program is covered if the old entry named the same path with no hash pinned, or
+            // with the same hash. Dropping the list, or adding a program, widens who may call.
+            let covered = |b: &crate::model::BinaryRule| {
+                p.binaries
+                    .iter()
+                    .any(|o| o.path == b.path && (o.sha256.is_none() || o.sha256 == b.sha256))
+            };
+            if !p.binaries.is_empty() && (a.binaries.is_empty() || !a.binaries.iter().all(covered))
+            {
+                out.push(Finding::new(
+                    Severity::High,
+                    "binaries_widened",
+                    format!(
+                        "`{}` may now be reached by programs it was not open to before",
+                        a.host
+                    ),
+                ));
+            }
             if rank_ask(a.ask.as_deref()) < rank_ask(p.ask.as_deref()) {
                 out.push(Finding::new(
                     Severity::High,
@@ -541,5 +559,43 @@ mod tests {
         let base = pol(BASE);
         let restricted = pol("version: 1\nallow:\n  - { host: api.github.com, methods: [GET], graphql_operations: [query], ask: first }\n");
         assert!(review_change(Some(&base), &restricted).is_empty());
+    }
+
+    #[test]
+    fn widening_who_may_call_is_high_and_narrowing_is_not() {
+        let h = "a".repeat(64);
+        let base = |b: &str| {
+            pol(&format!("version: 1\nallow:\n  - {{ host: api.example.com, methods: [GET], ask: first, binaries: [{b}] }}\n"))
+        };
+        let old = base(
+            "{ path: /usr/bin/curl, sha256: HASH }"
+                .replace("HASH", &h)
+                .as_str(),
+        );
+        // Dropped entirely: anyone may call.
+        let dropped =
+            pol("version: 1\nallow:\n  - { host: api.example.com, methods: [GET], ask: first }\n");
+        assert!(codes(&review_change(Some(&old), &dropped)).contains(&"binaries_widened"));
+        // A second program.
+        let more = base(&format!(
+            "{{ path: /usr/bin/curl, sha256: {h} }}, {{ path: /usr/bin/node }}"
+        ));
+        assert!(needs_ack(&review_change(Some(&old), &more)));
+        // The pin is loosened to trust-on-first-use.
+        let unpinned = base("{ path: /usr/bin/curl }");
+        assert!(codes(&review_change(Some(&old), &unpinned)).contains(&"binaries_widened"));
+        // A different pinned hash is a replacement, not the same program.
+        let swapped = base(&format!(
+            "{{ path: /usr/bin/curl, sha256: {} }}",
+            "b".repeat(64)
+        ));
+        assert!(codes(&review_change(Some(&old), &swapped)).contains(&"binaries_widened"));
+        // Same list: quiet. Pinning a hash where there was none: narrower, quiet.
+        assert!(review_change(Some(&old), &old).is_empty());
+        let was_open = base("{ path: /usr/bin/curl }");
+        let pinned = base(&format!("{{ path: /usr/bin/curl, sha256: {h} }}"));
+        assert!(review_change(Some(&was_open), &pinned).is_empty());
+        // Adding a restriction where there was none is not a widening.
+        assert!(review_change(Some(&dropped), &old).is_empty());
     }
 }

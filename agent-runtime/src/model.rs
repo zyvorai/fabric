@@ -282,6 +282,26 @@ impl AgentManifest {
                     ));
                 }
             }
+            for b in &rule.binaries {
+                if !b.path.starts_with('/')
+                    || b.path.len() > 4096
+                    || b.path.chars().any(char::is_control)
+                    || b.path.split('/').any(|s| s == "..")
+                    || b.path.ends_with(" (deleted)")
+                {
+                    return Err(format!(
+                        "egress_rules binaries path must be an absolute path with no `..`, not {:?}",
+                        b.path
+                    ));
+                }
+                if let Some(h) = &b.sha256 {
+                    if h.len() != 64 || !h.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f')) {
+                        return Err(format!(
+                            "egress_rules binaries sha256 must be 64 lower-case hex characters, not {h:?}"
+                        ));
+                    }
+                }
+            }
             for op in &rule.graphql_operations {
                 if !matches!(op.as_str(), "query" | "mutation" | "subscription") {
                     return Err(format!(
@@ -410,6 +430,16 @@ pub const MIN_EGRESS_APPROVAL_SECONDS: u64 = 5;
 /// clean refusal from the broker rather than a client-side timeout.
 pub const MAX_EGRESS_APPROVAL_SECONDS: u64 = 240;
 
+/// A program in the cell allowed to reach a host. See [`crate::binary_id`].
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BinaryRule {
+    /// Absolute path of the executable as the guest reports it, e.g. `/usr/bin/node`.
+    pub path: String,
+    /// Pin the executable's SHA-256 (64 lower-case hex). Empty means trust on first use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+}
+
 /// A limit on what the agent may send to a host. See [`crate::l7::check_rules`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EgressRule {
@@ -434,6 +464,10 @@ pub struct EgressRule {
     /// GraphQL operation types the body may run: `query`, `mutation`, `subscription`. Empty means any.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub graphql_operations: Vec<String>,
+    /// Programs in the cell that may make this request. Empty means any. The runtime asks the guest
+    /// which program owns the connection and refuses when it cannot tell. See [`crate::binary_id`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub binaries: Vec<BinaryRule>,
 }
 
 /// Which hosts do not taint a session that reads from them.

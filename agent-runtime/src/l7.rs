@@ -7,7 +7,11 @@
 //!
 //! The CONNECT proxy cannot apply either: a TLS tunnel exposes only `host:port`.
 
-use crate::{credentials::host_matches, model::EgressRule};
+use crate::{
+    binary_id::BinaryIdentity,
+    credentials::host_matches,
+    model::{BinaryRule, EgressRule},
+};
 
 /// Bodies larger than this are not parsed for `rpc_methods`, `mcp_tools` or `graphql_operations`;
 /// a rule that needs to read the body refuses them instead.
@@ -20,16 +24,21 @@ pub const MAX_PARSED_BODY: usize = 1024 * 1024;
 /// the body size and, when the rule names JSON-RPC methods, MCP tools or GraphQL
 /// operations, what the body actually asks for. A body that cannot be read as the
 /// expected JSON never satisfies such a rule.
+///
+/// A rule that lists `binaries` also needs `caller`, the program that made the request.
+/// `None` means the caller could not be identified, and such a rule then refuses.
 pub fn check_rules(
     rules: &[EgressRule],
     host: &str,
     method: &str,
     path: &str,
     body: &[u8],
+    caller: Option<&BinaryIdentity>,
 ) -> Result<(), String> {
     let body_len = body.len();
     let mut any = false;
     let mut body_refused = false;
+    let mut binary_refused = false;
     for rule in rules.iter().filter(|r| host_matches(&r.host, host)) {
         any = true;
         let method_ok =
@@ -40,13 +49,22 @@ pub fn check_rules(
         if !(method_ok && path_ok && size_ok) {
             continue;
         }
-        if body_allowed(rule, body) {
-            return Ok(());
+        if !body_allowed(rule, body) {
+            body_refused = true;
+            continue;
         }
-        body_refused = true;
+        if !binary_allowed(rule, caller) {
+            binary_refused = true;
+            continue;
+        }
+        return Ok(());
     }
     if !any {
         Ok(())
+    } else if binary_refused && !body_refused {
+        Err(format!(
+            "{method} {path} is not permitted by this agent's egress rules for {host}: the program making the request is not one of the allowed programs, or could not be identified"
+        ))
     } else if body_refused {
         Err(format!(
             "{method} {path} is not permitted by this agent's egress rules for {host}: the request body is not an allowed JSON-RPC, MCP or GraphQL call"
@@ -56,6 +74,31 @@ pub fn check_rules(
             "{method} {path} ({body_len} body bytes) is not permitted by this agent's egress rules for {host}"
         ))
     }
+}
+
+/// Does the caller satisfy the rule's `binaries`? Always true for a rule that lists none.
+fn binary_allowed(rule: &EgressRule, caller: Option<&BinaryIdentity>) -> bool {
+    if rule.binaries.is_empty() {
+        return true;
+    }
+    let Some(caller) = caller else {
+        return false;
+    };
+    rule.binaries.iter().any(|b| {
+        b.path == caller.path
+            && b.sha256
+                .as_deref()
+                .is_none_or(|pinned| pinned.eq_ignore_ascii_case(&caller.sha256))
+    })
+}
+
+/// The `binaries` entries of every rule for `host`. Non-empty means the caller must be identified.
+pub fn host_binary_rules<'a>(rules: &'a [EgressRule], host: &str) -> Vec<&'a BinaryRule> {
+    rules
+        .iter()
+        .filter(|r| host_matches(&r.host, host))
+        .flat_map(|r| r.binaries.iter())
+        .collect()
 }
 
 fn reads_body(rule: &EgressRule) -> bool {
@@ -307,6 +350,17 @@ mod tests {
         vec![b'x'; len]
     }
 
+    /// Most tests are about the request, not the caller.
+    fn check_rules(
+        rules: &[EgressRule],
+        host: &str,
+        method: &str,
+        path: &str,
+        body: &[u8],
+    ) -> Result<(), String> {
+        super::check_rules(rules, host, method, path, body, None)
+    }
+
     #[test]
     fn hosts_without_rules_are_unrestricted() {
         let rules = [rule("api.example.com", &["GET"], &[], None)];
@@ -545,5 +599,109 @@ mod tests {
             r#"{"method":"tools/call","id":1,"params":{"name":"other"}}"#
         )
         .is_err());
+    }
+
+    fn who(path: &str, sha: &str) -> BinaryIdentity {
+        BinaryIdentity {
+            pid: 1,
+            path: path.into(),
+            sha256: sha.into(),
+        }
+    }
+
+    fn bin_rule(methods: &[&str], binaries: &[(&str, Option<&str>)]) -> EgressRule {
+        EgressRule {
+            host: "api.example.com".into(),
+            methods: methods.iter().map(|s| s.to_string()).collect(),
+            binaries: binaries
+                .iter()
+                .map(|(p, h)| BinaryRule {
+                    path: (*p).into(),
+                    sha256: h.map(str::to_string),
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn as_caller(
+        rules: &[EgressRule],
+        method: &str,
+        caller: Option<&BinaryIdentity>,
+    ) -> Result<(), String> {
+        super::check_rules(rules, "api.example.com", method, "/x", b"", caller)
+    }
+
+    #[test]
+    fn a_rule_with_binaries_needs_the_right_program() {
+        let rules = [bin_rule(
+            &["GET"],
+            &[("/usr/bin/curl", None), ("/usr/bin/node", None)],
+        )];
+        assert!(as_caller(&rules, "GET", Some(&who("/usr/bin/curl", &"a".repeat(64)))).is_ok());
+        assert!(as_caller(&rules, "GET", Some(&who("/usr/bin/node", &"a".repeat(64)))).is_ok());
+        let err =
+            as_caller(&rules, "GET", Some(&who("/tmp/dropper", &"a".repeat(64)))).unwrap_err();
+        assert!(err.contains("program"), "{err}");
+        // A path that only looks similar is a different program.
+        assert!(as_caller(&rules, "GET", Some(&who("/usr/bin/curl2", &"a".repeat(64)))).is_err());
+        assert!(as_caller(&rules, "GET", Some(&who("/usr/bin/", &"a".repeat(64)))).is_err());
+    }
+
+    #[test]
+    fn an_unidentified_caller_never_satisfies_a_binaries_rule() {
+        let rules = [bin_rule(&["GET"], &[("/usr/bin/curl", None)])];
+        assert!(as_caller(&rules, "GET", None)
+            .unwrap_err()
+            .contains("could not be identified"));
+        // A rule with no binaries does not need a caller at all.
+        let open = [bin_rule(&["GET"], &[])];
+        assert!(as_caller(&open, "GET", None).is_ok());
+    }
+
+    #[test]
+    fn a_pinned_hash_must_match_and_an_unpinned_one_is_left_to_first_use() {
+        let good = "a".repeat(64);
+        let rules = [bin_rule(&["GET"], &[("/usr/bin/curl", Some(&good))])];
+        assert!(as_caller(&rules, "GET", Some(&who("/usr/bin/curl", &good))).is_ok());
+        assert!(as_caller(&rules, "GET", Some(&who("/usr/bin/curl", &"b".repeat(64)))).is_err());
+        let unpinned = [bin_rule(&["GET"], &[("/usr/bin/curl", None)])];
+        assert!(as_caller(
+            &unpinned,
+            "GET",
+            Some(&who("/usr/bin/curl", &"b".repeat(64)))
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn a_looser_rule_does_not_let_another_program_through_a_stricter_one() {
+        // GET is for curl only; POST is for anyone. A GET from node must not ride the POST rule.
+        let rules = [
+            bin_rule(&["GET"], &[("/usr/bin/curl", None)]),
+            bin_rule(&["POST"], &[]),
+        ];
+        let node = who("/usr/bin/node", &"a".repeat(64));
+        assert!(as_caller(&rules, "GET", Some(&node)).is_err());
+        assert!(as_caller(&rules, "POST", Some(&node)).is_ok());
+        assert!(as_caller(&rules, "GET", Some(&who("/usr/bin/curl", &"a".repeat(64)))).is_ok());
+    }
+
+    #[test]
+    fn host_binary_rules_collects_across_rules_and_subdomains() {
+        let rules = [
+            bin_rule(&["GET"], &[("/usr/bin/curl", None)]),
+            bin_rule(&["POST"], &[("/usr/bin/node", None)]),
+            EgressRule {
+                host: "other.example".into(),
+                binaries: vec![BinaryRule {
+                    path: "/x".into(),
+                    sha256: None,
+                }],
+                ..Default::default()
+            },
+        ];
+        assert_eq!(host_binary_rules(&rules, "api.example.com").len(), 2);
+        assert!(host_binary_rules(&rules, "unrelated.test").is_empty());
     }
 }

@@ -38,9 +38,13 @@ keepctl policy show <agent>
 
 For these endpoints the verb is always `POST`, so limit the body instead: `rpc_methods` (JSON-RPC method names), `mcp_tools` (tool names allowed for `tools/call`) and `graphql_operations` (`query`, `mutation`, `subscription`) on the `allow` entry. Start with the narrowest list the agent needs: for a search-only agent, `rpc_methods: [tools/list, tools/call]`, `mcp_tools: [search]`, and `graphql_operations: [query]`. A body that cannot be read as the expected JSON is refused. Details in `docs/keep/sentinel/README.md`.
 
+## Limiting which program may call
+
+`binaries: [{path: /usr/bin/node}]` on an `allow` entry limits the host to that program in the cell; add `sha256` to pin its hash, or leave it out for trust on first use. If a rebuilt program is refused as "not the program first seen", an operator clears the pin with `DELETE /v1/agents/{name}/binary-pins`; do that only when the user confirms the change is expected. It does not work for confidential cells and covers the JSON broker only. Details in `docs/keep/sentinel/README.md`.
+
 ## Risk check
 
-The runtime compares every new policy with the current one. A change with a High finding (default egress `allow`, a metadata or private host, a `*` host, a write method added, weaker `ask`, a removed taint guard, a dropped or widened body rule) is refused with `409` and the reasons. Show those reasons to the user. Resend with `KEEP_POLICY_ACK_RISK=1 keepctl policy set ...` only after the user says the change is intended. Codes are listed in `docs/keep/sentinel/README.md`.
+The runtime compares every new policy with the current one. A change with a High finding (default egress `allow`, a metadata or private host, a `*` host, a write method added, weaker `ask`, a removed taint guard, a dropped or widened body rule, a widened program list) is refused with `409` and the reasons. Show those reasons to the user. Resend with `KEEP_POLICY_ACK_RISK=1 keepctl policy set ...` only after the user says the change is intended. Codes are listed in `docs/keep/sentinel/README.md`.
 
 ## Drafting from denials
 

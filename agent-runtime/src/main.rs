@@ -55,7 +55,10 @@ async fn main() -> Result<()> {
 
     tokio::try_join!(
         axum::serve(public_listener, public),
-        axum::serve(egress_listener, broker),
+        axum::serve(
+            egress_listener,
+            broker.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        ),
     )?;
     Ok(())
 }

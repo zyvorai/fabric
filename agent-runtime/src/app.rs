@@ -477,6 +477,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/agents/{name}/policy-suggestions",
             get(get_policy_suggestions),
         )
+        .route(
+            "/v1/agents/{name}/binary-pins",
+            get(list_binary_pins).delete(clear_binary_pins),
+        )
         .route("/v1/sessions/{id}/cockpit", get(session_cockpit))
         .route("/v1/export-tokens", post(mint_export_token))
         .route("/v1/vault/status", get(vault_status))
@@ -1288,6 +1292,24 @@ async fn provision_guest(
                 crate::contain::SECCOMP_GUEST_PATH,
                 &crate::contain::seccomp_filter(),
                 0o644,
+            ),
+        )
+        .await?;
+    }
+    // Rules that name binaries need the guest to say which program owns a connection.
+    if agent
+        .manifest
+        .egress_rules
+        .iter()
+        .any(|r| !r.binaries.is_empty())
+    {
+        with_timeout(
+            HEALTH_CHECK_ATTEMPT_TIMEOUT,
+            state.fluxvm.fs_write(
+                session.sandbox_id,
+                crate::binary_id::GUEST_PATH,
+                crate::binary_id::SCRIPT.as_bytes(),
+                0o755,
             ),
         )
         .await?;
@@ -2389,6 +2411,57 @@ async fn export_audit(
             .into_response());
     }
     Ok(Json(json!({"items": items, "chain": chain, "export": true})).into_response())
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct PinQuery {
+    /// Clear only this program path; absent clears every pin of the agent.
+    #[serde(default)]
+    path: Option<String>,
+}
+
+/// Programs whose hash the runtime remembered for an agent (trust on first use). Operator only.
+async fn list_binary_pins(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> ApiResult<Json<Value>> {
+    if state.store.get_agent(&name).await.is_none() {
+        return Err(ApiError::not_found("agent not found"));
+    }
+    let pins = crate::binary_id::list_pins(&state.config.state_dir, &name)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(json!({
+        "agent": name,
+        "pins": pins.into_iter().map(|(path, sha256)| json!({"path": path, "sha256": sha256})).collect::<Vec<_>>(),
+    })))
+}
+
+/// Forget remembered hashes so a rebuilt program is trusted afresh. Operator only, and journaled.
+async fn clear_binary_pins(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Query(query): Query<PinQuery>,
+) -> ApiResult<Json<Value>> {
+    if state.store.get_agent(&name).await.is_none() {
+        return Err(ApiError::not_found("agent not found"));
+    }
+    let removed =
+        crate::binary_id::clear_pins(&state.config.state_dir, &name, query.path.as_deref())
+            .await
+            .map_err(ApiError::internal)?;
+    let _ = state
+        .store
+        .audit
+        .append(
+            None,
+            AuditPhase::Performed,
+            "keep.binary_pins.cleared",
+            Some(name.clone()),
+            json!({"removed": removed, "path": query.path}),
+        )
+        .await;
+    Ok(Json(json!({"agent": name, "removed": removed})))
 }
 
 /// Journal rows scanned for `policy-suggestions` unless `?limit=` says otherwise.
