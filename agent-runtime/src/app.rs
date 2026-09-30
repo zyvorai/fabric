@@ -3036,6 +3036,7 @@ async fn unlock_vault(
 
 async fn vault_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
     let names: Vec<String> = state.credentials.names();
+    let sources = state.credentials.source_status();
     let backend = crate::unwrap_tokens::SecretBackendKind::from_env();
     let (snp, tdx) = state.launch_verified_flags().await;
     Ok(Json(json!({
@@ -3043,6 +3044,10 @@ async fn vault_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<Valu
         "unwrap_required": state.vault_unwrap_required,
         "unlocked": state.vault_is_unlocked(),
         "credential_names": names,
+        "sources": sources,
+        "sources_honesty": (!sources.is_empty()).then_some(
+            "Credentials with a source are read from it (a file or Vault), not from the environment. The value is still in this process's memory while it is used, so the host operator can read it."
+        ),
         "user_held": {
             "challenge": "/v1/vault/user-held/challenge",
             "complete": "/v1/vault/user-held/complete",

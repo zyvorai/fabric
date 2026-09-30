@@ -37,6 +37,8 @@ helm install keep charts/zyvor-keep -n keep --create-namespace \
   `api-token`). The pod reads it from the Secret; it is not in the manifest.
 - The API listens on the node's loopback. Reach it with `kubectl port-forward pod/<name> 9096:9096`. The egress
   broker and CONNECT proxy are bound on the node so cells can reach them; restrict them with the node firewall.
+- Credentials: `credentials.descriptors` (no secrets in it), `runtime.extraVolumes` and `runtime.extraVolumeMounts` for files a credential `source`
+  reads, and `serviceAccount.name` for Vault's Kubernetes login. See [vault/README.md](vault/README.md#on-kubernetes).
 - State lives on the node under `runtime.stateHostPath`. Deleting the release does not delete it.
 - The chart and the image have been rendered and schema-checked (`helm lint`, `kubeconform`); they have not been run
   in a cluster, and the image has not been built.

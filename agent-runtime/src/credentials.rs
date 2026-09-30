@@ -109,10 +109,90 @@ pub enum VaultAuth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         token_env: Option<String>,
     },
+    /// AppRole login: `POST /v1/auth/{mount}/login` with the role id and a secret id, for a token
+    /// the runtime then keeps until shortly before it expires. The secret id comes from a file or a
+    /// variable (set exactly one). If Vault refuses a cached token the runtime logs in once more
+    /// and retries; a token that was just issued and is refused is not retried.
+    #[serde(rename = "approle")]
+    AppRole {
+        role_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        secret_id_file: Option<PathBuf>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        secret_id_env: Option<String>,
+        /// The auth mount. Default `approle`.
+        #[serde(default = "default_approle_mount")]
+        mount: String,
+    },
+    /// Kubernetes login: `POST /v1/auth/{mount}/login` with a role and the pod's service account
+    /// JWT, read from `jwt_file` on every login so a rotated projected token is used.
+    Kubernetes {
+        role: String,
+        /// Default `/var/run/secrets/kubernetes.io/serviceaccount/token`. The file is a projected
+        /// token that Kubernetes makes world-readable, so its permissions are not checked.
+        #[serde(default = "default_k8s_jwt_file")]
+        jwt_file: PathBuf,
+        /// The auth mount. Default `kubernetes`.
+        #[serde(default = "default_k8s_mount")]
+        mount: String,
+    },
+}
+
+fn default_approle_mount() -> String {
+    "approle".into()
+}
+
+fn default_k8s_mount() -> String {
+    "kubernetes".into()
+}
+
+fn default_k8s_jwt_file() -> PathBuf {
+    PathBuf::from("/var/run/secrets/kubernetes.io/serviceaccount/token")
+}
+
+/// Why reading a secret from its source failed, as a class that is safe to show an operator: it says
+/// what kind of thing went wrong and never carries an answer, a path's contents or a secret.
+#[derive(Debug)]
+struct SourceError {
+    class: &'static str,
+    message: String,
+}
+
+impl std::fmt::Display for SourceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for SourceError {}
+
+fn fail(class: &'static str, message: String) -> anyhow::Error {
+    anyhow::Error::new(SourceError { class, message })
+}
+
+/// Give an untyped error a class, keeping its message.
+fn tag(class: &'static str, error: anyhow::Error) -> anyhow::Error {
+    if error.downcast_ref::<SourceError>().is_some() {
+        error
+    } else {
+        fail(class, format!("{error:#}"))
+    }
+}
+
+/// The class of a failed read: `unreachable`, `refused`, `not_found`, `malformed`, `config`, `file`
+/// or `error`.
+fn failure_class(error: &anyhow::Error) -> &'static str {
+    error
+        .downcast_ref::<SourceError>()
+        .map(|e| e.class)
+        .unwrap_or("error")
 }
 
 /// Where a credential's secret is kept. The authorisation checks (host, method, path, port, user,
 /// approval) are the same whatever the source; a source only changes where the value is read from.
+// A handful of these are loaded once at startup, so the size difference between the variants costs
+// nothing, and boxing the Vault fields would only make every match on them longer.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum SecretSource {
@@ -161,6 +241,90 @@ pub enum SecretSource {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         allow_loose_permissions: bool,
     },
+}
+
+fn valid_env_name(var: &str) -> bool {
+    let mut chars = var.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn absolute_no_parent(p: &Path) -> bool {
+    p.is_absolute()
+        && !p
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+}
+
+/// Exactly one of a file and a variable, each valid.
+fn validate_file_or_env(
+    name: &str,
+    what: &str,
+    file: &Option<PathBuf>,
+    env: &Option<String>,
+) -> Result<()> {
+    match (file, env) {
+        (Some(f), None) => {
+            if !absolute_no_parent(f) {
+                bail!(
+                    "credential '{name}' vault {what}_file must be an absolute path without `..`"
+                );
+            }
+        }
+        (None, Some(var)) => {
+            if !valid_env_name(var) {
+                bail!("credential '{name}' vault {what}_env is not a valid variable name");
+            }
+        }
+        _ => bail!(
+            "credential '{name}' vault {what} needs exactly one of {what}_file and {what}_env"
+        ),
+    }
+    Ok(())
+}
+
+fn validate_vault_auth(name: &str, auth: &VaultAuth) -> Result<()> {
+    match auth {
+        VaultAuth::Token {
+            token_file,
+            token_env,
+        } => validate_file_or_env(name, "token", token_file, token_env),
+        VaultAuth::AppRole {
+            role_id,
+            secret_id_file,
+            secret_id_env,
+            mount,
+        } => {
+            if role_id.is_empty() || role_id.len() > 128 || role_id.chars().any(char::is_control) {
+                bail!("credential '{name}' vault approle role_id must be 1 to 128 characters without control characters");
+            }
+            if !plain_segments(mount) {
+                bail!("credential '{name}' vault approle mount must be plain path segments");
+            }
+            validate_file_or_env(name, "secret_id", secret_id_file, secret_id_env)
+        }
+        VaultAuth::Kubernetes {
+            role,
+            jwt_file,
+            mount,
+        } => {
+            if role.is_empty()
+                || role.len() > 128
+                || !role
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
+            {
+                bail!("credential '{name}' vault kubernetes role must be 1 to 128 letters, digits, _ - .");
+            }
+            if !absolute_no_parent(jwt_file) {
+                bail!("credential '{name}' vault kubernetes jwt_file must be an absolute path without `..`");
+            }
+            if !plain_segments(mount) {
+                bail!("credential '{name}' vault kubernetes mount must be plain path segments");
+            }
+            Ok(())
+        }
+    }
 }
 
 /// A path-like value made of plain segments: letters, digits, `_`, `-`, `.`; no empty segment, no
@@ -294,28 +458,7 @@ impl SecretSource {
                         bail!("credential '{name}' vault namespace must be plain path segments");
                     }
                 }
-                let VaultAuth::Token {
-                    token_file,
-                    token_env,
-                } = auth;
-                match (token_file, token_env) {
-                    (Some(f), None) => {
-                        if !f.is_absolute()
-                            || f.components().any(|c| matches!(c, std::path::Component::ParentDir))
-                        {
-                            bail!("credential '{name}' vault token_file must be an absolute path without `..`");
-                        }
-                    }
-                    (None, Some(var)) => {
-                        let mut chars = var.chars();
-                        let ok = matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
-                            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_');
-                        if !ok {
-                            bail!("credential '{name}' vault token_env is not a valid variable name");
-                        }
-                    }
-                    _ => bail!("credential '{name}' vault token auth needs exactly one of token_file and token_env"),
-                }
+                validate_vault_auth(name, auth)?;
                 if let Some(f) = ca_file {
                     if !f.is_absolute()
                         || f.components()
@@ -495,6 +638,10 @@ impl std::fmt::Debug for CachedToken {
 struct SourceState {
     cached: Option<CachedToken>,
     client: Option<reqwest::Client>,
+    /// The token a Vault login (AppRole, Kubernetes) returned, and when to stop using it.
+    login: Option<(String, Instant)>,
+    last_ok: Option<Instant>,
+    last_failure: Option<&'static str>,
 }
 
 // Never prints the value, only whether there is one.
@@ -503,11 +650,27 @@ impl std::fmt::Debug for SourceState {
         f.debug_struct("SourceState")
             .field("cached", &self.cached.is_some())
             .field("client", &self.client.is_some())
+            .field("login", &self.login.is_some())
+            .field("last_failure", &self.last_failure)
             .finish()
     }
 }
 
 type SourceSlot = Arc<AsyncMutex<SourceState>>;
+
+/// One sourced credential's state, as shown by `GET /v1/vault/status`.
+#[derive(Debug, Clone, Serialize)]
+pub struct SourceStatus {
+    pub name: String,
+    pub kind: &'static str,
+    /// A value is cached and still within its TTL.
+    pub cached: bool,
+    /// A read is in flight right now.
+    pub fetching: bool,
+    pub last_success_seconds_ago: Option<u64>,
+    /// `unreachable`, `refused`, `not_found`, `malformed`, `config`, `file` or `error`; none if the last read worked.
+    pub last_failure: Option<&'static str>,
+}
 
 /// The stand-in for credential `name` that a session's agent holds. It is derived
 /// from the session's capability, so it is stable for the session, different for
@@ -604,6 +767,41 @@ impl CredentialVault {
             sourced: Arc::new(sourced),
             source_fetches: Arc::default(),
         }
+    }
+
+    /// Where each sourced credential stands, for `GET /v1/vault/status`. Names, kinds, timing and the
+    /// class of the last failure only; never a value, a path, or an answer.
+    pub fn source_status(&self) -> Vec<SourceStatus> {
+        let mut out: Vec<SourceStatus> = self
+            .descriptors
+            .iter()
+            .filter_map(|(name, d)| {
+                let source = d.source.as_ref()?;
+                let mut status = SourceStatus {
+                    name: name.clone(),
+                    kind: source.kind(),
+                    cached: false,
+                    fetching: false,
+                    last_success_seconds_ago: None,
+                    last_failure: None,
+                };
+                match self.sourced.get(name).map(|slot| slot.try_lock()) {
+                    Some(Ok(state)) => {
+                        status.cached = state
+                            .cached
+                            .as_ref()
+                            .is_some_and(|c| c.valid_until > Instant::now());
+                        status.last_success_seconds_ago =
+                            state.last_ok.map(|t| t.elapsed().as_secs());
+                        status.last_failure = state.last_failure;
+                    }
+                    _ => status.fetching = true,
+                }
+                Some(status)
+            })
+            .collect();
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+        out
     }
 
     /// How many times a secret has been read from a source since startup.
@@ -968,31 +1166,17 @@ impl CredentialVault {
                 path,
                 allow_loose_permissions,
                 ..
-            } => read_secret_file(name, path, *allow_loose_permissions).await,
-            SecretSource::Vault { .. } => {
-                if state.client.is_none() {
-                    match vault_client(name, source).await {
-                        Ok(client) => state.client = Some(client),
-                        Err(error) => {
-                            state.cached = None;
-                            tracing::warn!(credential = %name, source = "vault", "could not set up the connection to the secret store");
-                            return Err(error);
-                        }
-                    }
-                }
-                match state.client.as_ref() {
-                    Some(client) => read_vault_secret(name, source, client).await,
-                    None => Err(anyhow::anyhow!(
-                        "credential '{name}': no client for the secret store"
-                    )),
-                }
-            }
+            } => read_secret_file(name, path, *allow_loose_permissions)
+                .await
+                .map_err(|e| tag("file", e)),
+            SecretSource::Vault { .. } => fetch_vault(name, source, &mut state).await,
         };
         let value = match fetched {
             Ok(value) => value,
             Err(error) => {
                 state.cached = None;
-                tracing::warn!(credential = %name, source = source.kind(), "could not read the credential's secret");
+                state.last_failure = Some(failure_class(&error));
+                tracing::warn!(credential = %name, source = source.kind(), class = failure_class(&error), "could not read the credential's secret");
                 return Err(error);
             }
         };
@@ -1001,8 +1185,16 @@ impl CredentialVault {
             .is_err()
         {
             state.cached = None;
-            bail!("credential '{name}': the secret from its source is not a valid header value");
+            state.last_failure = Some("malformed");
+            return Err(fail(
+                "malformed",
+                format!(
+                    "credential '{name}': the secret from its source is not a valid header value"
+                ),
+            ));
         }
+        state.last_ok = Some(Instant::now());
+        state.last_failure = None;
         state.cached = Some(CachedToken {
             value: value.clone(),
             valid_until: Instant::now() + source.ttl(),
@@ -1129,40 +1321,125 @@ async fn vault_client(name: &str, source: &SecretSource) -> Result<reqwest::Clie
         .with_context(|| format!("credential '{name}': the Vault client could not be built"))
 }
 
-/// The Vault token: from the file (read afresh every time, so a renewed token is used) or the variable.
-async fn vault_token(name: &str, auth: &VaultAuth, allow_loose: bool) -> Result<String> {
-    let VaultAuth::Token {
-        token_file,
-        token_env,
-    } = auth;
-    if let Some(path) = token_file {
-        return read_secret_file(name, path, allow_loose).await;
+/// A secret the operator configured as a file or a variable: read afresh every time, so a renewed
+/// token or a rotated secret id is used.
+async fn read_configured_secret(
+    name: &str,
+    what: &str,
+    file: &Option<PathBuf>,
+    env: &Option<String>,
+    allow_loose: bool,
+) -> Result<String> {
+    if let Some(path) = file {
+        return read_secret_file(name, path, allow_loose)
+            .await
+            .map_err(|e| tag("config", e));
     }
-    let var = token_env
-        .as_deref()
-        .with_context(|| format!("credential '{name}': no Vault token is configured"))?;
+    let var = env.as_deref().ok_or_else(|| {
+        fail(
+            "config",
+            format!("credential '{name}': no Vault {what} is configured"),
+        )
+    })?;
     let value = std::env::var(var).map_err(|_| {
-        anyhow::anyhow!("credential '{name}': the Vault token variable {var} is not set")
+        fail(
+            "config",
+            format!("credential '{name}': the Vault {what} variable {var} is not set"),
+        )
     })?;
     let value = value.trim();
     if value.is_empty() || value.chars().any(char::is_control) {
-        bail!("credential '{name}': the Vault token variable {var} is empty or contains a control character");
+        return Err(fail(
+            "config",
+            format!("credential '{name}': the Vault {what} variable {var} is empty or contains a control character"),
+        ));
     }
     Ok(value.to_string())
 }
 
-/// Read one field of a KV v2 secret. Errors say what class of thing went wrong (unreachable, refused,
-/// not found, malformed) and never include the answer, which can echo paths or policy.
-async fn read_vault_secret(
+/// What a failed request to Vault was, without the details of the transport.
+fn send_error(name: &str, e: &reqwest::Error) -> anyhow::Error {
+    let why = if e.is_timeout() {
+        "timed out"
+    } else if e.is_connect() {
+        "connection failed"
+    } else {
+        "the request failed"
+    };
+    fail(
+        "unreachable",
+        format!("credential '{name}': the secret store could not be reached ({why})"),
+    )
+}
+
+/// The status of a Vault answer as an error class, or `Ok` for a 200.
+fn check_status(name: &str, what: &str, status: reqwest::StatusCode) -> Result<()> {
+    match status.as_u16() {
+        200 => Ok(()),
+        400 | 401 | 403 => Err(fail(
+            "refused",
+            format!("credential '{name}': the secret store refused the {what} ({})", status.as_u16()),
+        )),
+        404 => Err(fail(
+            "not_found",
+            format!("credential '{name}': the {what} target or its mount was not found (404)"),
+        )),
+        300..=399 => Err(fail(
+            "unreachable",
+            format!("credential '{name}': the secret store answered a redirect ({status}), which is not followed"),
+        )),
+        _ => Err(fail(
+            "unreachable",
+            format!("credential '{name}': the secret store answered {status}"),
+        )),
+    }
+}
+
+/// The body of an answer, refused past 256 KiB.
+async fn read_capped(name: &str, mut response: reqwest::Response) -> Result<Vec<u8>> {
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| {
+        fail(
+            "unreachable",
+            format!("credential '{name}': the secret store's answer could not be read"),
+        )
+    })? {
+        body.extend_from_slice(&chunk);
+        if body.len() > MAX_VAULT_ANSWER_BYTES {
+            return Err(fail(
+                "malformed",
+                format!("credential '{name}': the secret store's answer is larger than {MAX_VAULT_ANSWER_BYTES} bytes"),
+            ));
+        }
+    }
+    Ok(body)
+}
+
+/// `{addr}/v1/auth/{mount}/login`, built from segments like the read URL.
+fn vault_login_url(addr: &str, mount: &str) -> Result<url::Url> {
+    let mut url = url::Url::parse(addr).context("the Vault address is not a URL")?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("the Vault address cannot carry a path"))?;
+        segments.pop_if_empty().push("v1").push("auth");
+        for seg in mount.split('/') {
+            segments.push(seg);
+        }
+        segments.push("login");
+    }
+    Ok(url)
+}
+
+/// Log in with AppRole or Kubernetes and return the token and how long to keep using it. The secret
+/// id and the JWT go only in the request body; a refusal says so without echoing the answer.
+async fn vault_login(
     name: &str,
     source: &SecretSource,
     client: &reqwest::Client,
-) -> Result<String> {
+) -> Result<(String, Duration)> {
     let SecretSource::Vault {
         addr,
-        mount,
-        path,
-        field,
         namespace,
         auth,
         allow_loose_permissions,
@@ -1171,9 +1448,177 @@ async fn read_vault_secret(
     else {
         bail!("credential '{name}' is not a Vault source");
     };
-    let token = vault_token(name, auth, *allow_loose_permissions).await?;
-    let mut token = reqwest::header::HeaderValue::from_str(&token).map_err(|_| {
-        anyhow::anyhow!("credential '{name}': the Vault token is not a valid header value")
+    let (mount, body) = match auth {
+        VaultAuth::AppRole {
+            role_id,
+            secret_id_file,
+            secret_id_env,
+            mount,
+        } => {
+            let secret_id = read_configured_secret(
+                name,
+                "secret_id",
+                secret_id_file,
+                secret_id_env,
+                *allow_loose_permissions,
+            )
+            .await?;
+            (
+                mount,
+                serde_json::json!({"role_id": role_id, "secret_id": secret_id}),
+            )
+        }
+        VaultAuth::Kubernetes {
+            role,
+            jwt_file,
+            mount,
+        } => {
+            // A projected service account token is world-readable by design, so it is read as is.
+            let jwt = read_secret_file(name, jwt_file, true)
+                .await
+                .map_err(|e| tag("config", e))?;
+            (mount, serde_json::json!({"role": role, "jwt": jwt}))
+        }
+        VaultAuth::Token { .. } => bail!("credential '{name}' uses a token and does not log in"),
+    };
+    let mut request = client
+        .post(vault_login_url(addr, mount)?)
+        .header(reqwest::header::ACCEPT, "application/json")
+        .json(&body);
+    if let Some(ns) = namespace {
+        request = request.header("X-Vault-Namespace", ns.as_str());
+    }
+    let response = request.send().await.map_err(|e| send_error(name, &e))?;
+    check_status(name, "login", response.status())?;
+    let bytes = read_capped(name, response).await?;
+    let doc: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| {
+        fail(
+            "malformed",
+            format!("credential '{name}': the secret store's login answer is not JSON"),
+        )
+    })?;
+    let token = doc
+        .pointer("/auth/client_token")
+        .and_then(|t| t.as_str())
+        .map(str::trim)
+        .filter(|t| !t.is_empty() && !t.chars().any(char::is_control))
+        .ok_or_else(|| {
+            fail(
+                "malformed",
+                format!("credential '{name}': the login answer has no usable client_token"),
+            )
+        })?
+        .to_string();
+    let lease = doc
+        .pointer("/auth/lease_duration")
+        .and_then(|l| l.as_u64())
+        .unwrap_or(0);
+    // Stop using it a little early. A token that never expires is refreshed on the cache schedule.
+    let keep = if lease == 0 {
+        DEFAULT_VAULT_TTL_SECS
+    } else {
+        lease.saturating_sub(30).max(1)
+    }
+    .min(MAX_SOURCE_TTL_SECS);
+    Ok((token, Duration::from_secs(keep)))
+}
+
+/// The token to read with, and whether it was just issued by a login. A `token` auth is read from its
+/// file or variable each time; a login auth is cached until shortly before it expires.
+async fn vault_token_for(
+    name: &str,
+    source: &SecretSource,
+    client: &reqwest::Client,
+    state: &mut SourceState,
+) -> Result<(String, bool)> {
+    let SecretSource::Vault {
+        auth,
+        allow_loose_permissions,
+        ..
+    } = source
+    else {
+        bail!("credential '{name}' is not a Vault source");
+    };
+    if let VaultAuth::Token {
+        token_file,
+        token_env,
+    } = auth
+    {
+        let token = read_configured_secret(
+            name,
+            "token",
+            token_file,
+            token_env,
+            *allow_loose_permissions,
+        )
+        .await?;
+        return Ok((token, false));
+    }
+    if let Some((token, until)) = &state.login {
+        if *until > Instant::now() {
+            return Ok((token.clone(), false));
+        }
+    }
+    let (token, keep) = vault_login(name, source, client).await?;
+    state.login = Some((token.clone(), Instant::now() + keep));
+    Ok((token, true))
+}
+
+/// Read a Vault secret: get a token, read, and if a token that was not just issued is refused, get a
+/// fresh one (a new login, or the token file read again) and try once more. A token issued a moment
+/// ago that is refused means the policy says no, so it is not retried; nothing here loops.
+async fn fetch_vault(name: &str, source: &SecretSource, state: &mut SourceState) -> Result<String> {
+    if state.client.is_none() {
+        let client = vault_client(name, source)
+            .await
+            .map_err(|e| tag("config", e))?;
+        state.client = Some(client);
+    }
+    let client = state.client.clone().ok_or_else(|| {
+        fail(
+            "config",
+            format!("credential '{name}': no client for the secret store"),
+        )
+    })?;
+    let (token, fresh) = vault_token_for(name, source, &client, state).await?;
+    match read_vault_secret(name, source, &client, &token).await {
+        Err(e) if failure_class(&e) == "refused" && !fresh => {
+            state.login = None;
+            let (again, _) = vault_token_for(name, source, &client, state).await?;
+            if again == token {
+                return Err(e);
+            }
+            read_vault_secret(name, source, &client, &again).await
+        }
+        other => other,
+    }
+}
+
+/// Read one field of a KV v2 secret with `token`. Errors say what class of thing went wrong
+/// (unreachable, refused, not found, malformed) and never include the answer, which can echo paths
+/// or policy.
+async fn read_vault_secret(
+    name: &str,
+    source: &SecretSource,
+    client: &reqwest::Client,
+    token: &str,
+) -> Result<String> {
+    let SecretSource::Vault {
+        addr,
+        mount,
+        path,
+        field,
+        namespace,
+        ..
+    } = source
+    else {
+        bail!("credential '{name}' is not a Vault source");
+    };
+    let mut token = reqwest::header::HeaderValue::from_str(token).map_err(|_| {
+        fail(
+            "config",
+            format!("credential '{name}': the Vault token is not a valid header value"),
+        )
     })?;
     token.set_sensitive(true);
     let mut request = client
@@ -1183,49 +1628,37 @@ async fn read_vault_secret(
     if let Some(ns) = namespace {
         request = request.header("X-Vault-Namespace", ns.as_str());
     }
-    let mut response = request.send().await.map_err(|e| {
-        let why = if e.is_timeout() {
-            "timed out"
-        } else if e.is_connect() {
-            "connection failed"
-        } else {
-            "the request failed"
-        };
-        anyhow::anyhow!("credential '{name}': the secret store could not be reached ({why})")
-    })?;
-    let status = response.status();
-    match status.as_u16() {
-        200 => {}
-        403 => bail!("credential '{name}': the secret store refused the token (403)"),
-        404 => bail!("credential '{name}': the secret or its mount was not found (404)"),
-        300..=399 => bail!("credential '{name}': the secret store answered a redirect ({status}), which is not followed"),
-        _ => bail!("credential '{name}': the secret store answered {status}"),
-    }
-    let mut body = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| {
-        anyhow::anyhow!("credential '{name}': the secret store's answer could not be read")
-    })? {
-        body.extend_from_slice(&chunk);
-        if body.len() > MAX_VAULT_ANSWER_BYTES {
-            bail!("credential '{name}': the secret store's answer is larger than {MAX_VAULT_ANSWER_BYTES} bytes");
-        }
-    }
+    let response = request.send().await.map_err(|e| send_error(name, &e))?;
+    check_status(name, "token", response.status())?;
+    let body = read_capped(name, response).await?;
     let doc: serde_json::Value = serde_json::from_slice(&body).map_err(|_| {
-        anyhow::anyhow!("credential '{name}': the secret store's answer is not JSON")
+        fail(
+            "malformed",
+            format!("credential '{name}': the secret store's answer is not JSON"),
+        )
     })?;
     let value = doc
         .pointer("/data/data")
         .and_then(|d| d.get(field.as_str()))
         .and_then(|v| v.as_str())
-        .with_context(|| format!("credential '{name}': the secret has no text field '{field}' (is it a KV v2 secret?)"))?
+        .ok_or_else(|| {
+            fail(
+                "malformed",
+                format!("credential '{name}': the secret has no text field '{field}' (is it a KV v2 secret?)"),
+            )
+        })?
         .trim();
     if value.is_empty() {
-        bail!("credential '{name}': the field '{field}' of the secret is empty");
+        return Err(fail(
+            "malformed",
+            format!("credential '{name}': the field '{field}' of the secret is empty"),
+        ));
     }
     if value.chars().any(char::is_control) {
-        bail!(
-            "credential '{name}': the field '{field}' of the secret contains a control character"
-        );
+        return Err(fail(
+            "malformed",
+            format!("credential '{name}': the field '{field}' of the secret contains a control character"),
+        ));
     }
     Ok(value.to_string())
 }
@@ -3126,6 +3559,464 @@ mod tests {
             err.is_ok(),
             "the token file is only checked when it is read, and a failed read only warns"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---- vault login (AppRole, Kubernetes) ------------------------------------------------
+
+    #[derive(Default)]
+    struct LoginMock {
+        /// (path, JSON body) of each login request.
+        logins: std::sync::Mutex<Vec<(String, serde_json::Value)>>,
+        /// The X-Vault-Token of each read.
+        reads: std::sync::Mutex<Vec<Option<String>>>,
+        /// Tokens a read accepts; any other gets 403.
+        valid: std::sync::Mutex<std::collections::HashSet<String>>,
+        next_token: std::sync::Mutex<String>,
+        lease: std::sync::Mutex<u64>,
+        login_status: std::sync::Mutex<u16>,
+        login_body: std::sync::Mutex<Option<String>>,
+    }
+
+    async fn login_mock() -> (String, Arc<LoginMock>) {
+        use axum::{
+            body::Body,
+            extract::State,
+            http::{HeaderMap, Method, Uri},
+            response::Response,
+            Router,
+        };
+        let mock = Arc::new(LoginMock::default());
+        *mock.next_token.lock().unwrap() = "hvs.login-1".into();
+        *mock.lease.lock().unwrap() = 3600;
+        *mock.login_status.lock().unwrap() = 200;
+        mock.valid.lock().unwrap().insert("hvs.login-1".into());
+        async fn handle(
+            State(m): State<Arc<LoginMock>>,
+            method: Method,
+            uri: Uri,
+            headers: HeaderMap,
+            body: axum::body::Bytes,
+        ) -> Response {
+            if method == Method::POST {
+                m.logins.lock().unwrap().push((
+                    uri.path().to_string(),
+                    serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+                ));
+                let status = *m.login_status.lock().unwrap();
+                let text = match m.login_body.lock().unwrap().clone() {
+                    Some(b) => b,
+                    None if status == 200 => serde_json::json!({"auth": {
+                        "client_token": m.next_token.lock().unwrap().clone(),
+                        "lease_duration": *m.lease.lock().unwrap(),
+                    }})
+                    .to_string(),
+                    // A real Vault can echo what it was sent; the runtime must not repeat it.
+                    None => format!("denied: {}", String::from_utf8_lossy(&body)),
+                };
+                return Response::builder()
+                    .status(status)
+                    .body(Body::from(text))
+                    .unwrap();
+            }
+            let token = headers
+                .get("x-vault-token")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string);
+            m.reads.lock().unwrap().push(token.clone());
+            let allowed = token.is_some_and(|t| m.valid.lock().unwrap().contains(&t));
+            Response::builder()
+                .status(if allowed { 200 } else { 403 })
+                .body(Body::from(if allowed {
+                    kv("token", VAULT_SECRET)
+                } else {
+                    "permission denied".into()
+                }))
+                .unwrap()
+        }
+        let app = Router::new().fallback(handle).with_state(mock.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (addr, mock)
+    }
+
+    const SECRET_ID: &str = "the-approle-secret-id";
+
+    fn approle_vault(addr: &str, dir: &Path, extra: serde_json::Value) -> CredentialVault {
+        let sid = write_secret(dir, "secret-id", SECRET_ID, 0o600);
+        let mut source = serde_json::json!({
+            "kind": "vault", "addr": addr, "path": "keep/github", "field": "token",
+            "auth": {"method": "approle", "role_id": "role-1", "secret_id_file": sid},
+        });
+        for (k, v) in extra.as_object().cloned().unwrap_or_default() {
+            source[k] = v;
+        }
+        vault_vault(source)
+    }
+
+    #[tokio::test]
+    async fn approle_logs_in_once_uses_the_token_for_each_read_and_logs_in_again_when_it_expires() {
+        let dir = scratch_dir();
+        let (addr, mock) = login_mock().await;
+        *mock.lease.lock().unwrap() = 3600;
+        let v = approle_vault(&addr, &dir, serde_json::json!({"ttl_seconds": 1}));
+        assert_eq!(resolve(&v).await.unwrap(), format!("Bearer {VAULT_SECRET}"));
+        {
+            let logins = mock.logins.lock().unwrap();
+            assert_eq!(logins.len(), 1);
+            assert_eq!(logins[0].0, "/v1/auth/approle/login");
+            assert_eq!(
+                logins[0].1,
+                serde_json::json!({"role_id": "role-1", "secret_id": SECRET_ID})
+            );
+        }
+        // The KV cache expires, the login token is still good: read again without logging in.
+        tokio::time::sleep(Duration::from_millis(1150)).await;
+        assert!(resolve(&v).await.is_ok());
+        assert_eq!(mock.logins.lock().unwrap().len(), 1, "the token was reused");
+        assert_eq!(mock.reads.lock().unwrap().len(), 2);
+
+        // A token with a short lease is dropped a little early and replaced by a new login.
+        let (addr, mock) = login_mock().await;
+        *mock.lease.lock().unwrap() = 1;
+        let v = approle_vault(&addr, &dir, serde_json::json!({"ttl_seconds": 1}));
+        assert!(resolve(&v).await.is_ok());
+        tokio::time::sleep(Duration::from_millis(1150)).await;
+        assert!(resolve(&v).await.is_ok());
+        assert_eq!(
+            mock.logins.lock().unwrap().len(),
+            2,
+            "an expired token means a new login"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_revoked_login_token_is_replaced_once_and_a_freshly_issued_one_is_not_retried() {
+        let dir = scratch_dir();
+        let (addr, mock) = login_mock().await;
+        let v = approle_vault(&addr, &dir, serde_json::json!({"ttl_seconds": 1}));
+        assert!(resolve(&v).await.is_ok()); // logs in, gets hvs.login-1
+                                            // Vault revokes that token; the next login issues a good one.
+        mock.valid.lock().unwrap().clear();
+        mock.valid.lock().unwrap().insert("hvs.login-2".into());
+        *mock.next_token.lock().unwrap() = "hvs.login-2".into();
+        tokio::time::sleep(Duration::from_millis(1150)).await;
+        assert!(resolve(&v).await.is_ok());
+        assert_eq!(mock.logins.lock().unwrap().len(), 2, "one re-login");
+        assert_eq!(
+            mock.reads.lock().unwrap().clone(),
+            [
+                Some("hvs.login-1".to_string()),
+                Some("hvs.login-1".to_string()),
+                Some("hvs.login-2".to_string())
+            ]
+        );
+
+        // A token that was just issued and is still refused means the policy says no: no more logins.
+        let (addr, mock) = login_mock().await;
+        mock.valid.lock().unwrap().clear(); // nothing is ever accepted
+        let v = approle_vault(&addr, &dir, serde_json::json!({}));
+        let err = resolve(&v).await.unwrap_err();
+        assert_eq!(failure_class(&err), "refused");
+        assert_eq!(mock.logins.lock().unwrap().len(), 1, "no login loop");
+        assert_eq!(mock.reads.lock().unwrap().len(), 1);
+        // And again a cached-then-refused token gets exactly one more login, then stops.
+        let (addr, mock) = login_mock().await;
+        let v = approle_vault(&addr, &dir, serde_json::json!({"ttl_seconds": 1}));
+        assert!(resolve(&v).await.is_ok());
+        mock.valid.lock().unwrap().clear();
+        tokio::time::sleep(Duration::from_millis(1150)).await;
+        assert!(resolve(&v).await.is_err());
+        assert_eq!(
+            mock.logins.lock().unwrap().len(),
+            2,
+            "one re-login, then it stops"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_refused_or_malformed_login_fails_closed_without_echoing_the_secret_id() {
+        let dir = scratch_dir();
+        for (status, body, class) in [
+            (400u16, None, "refused"),
+            (403, None, "refused"),
+            (404, None, "not_found"),
+            (500, None, "unreachable"),
+            (200, Some(r#"{"auth":{}}"#.to_string()), "malformed"),
+            (200, Some("not json".to_string()), "malformed"),
+            (
+                200,
+                Some(r#"{"auth":{"client_token":"a\nb"}}"#.to_string()),
+                "malformed",
+            ),
+        ] {
+            let (addr, mock) = login_mock().await;
+            *mock.login_status.lock().unwrap() = status;
+            *mock.login_body.lock().unwrap() = body;
+            let v = approle_vault(&addr, &dir, serde_json::json!({}));
+            let err = resolve(&v).await.unwrap_err();
+            assert_eq!(failure_class(&err), class, "{status}: {err}");
+            let text = err.to_string();
+            assert!(
+                !text.contains(SECRET_ID) && !text.contains("role-1"),
+                "{status} leaked: {text}"
+            );
+            assert!(
+                mock.reads.lock().unwrap().is_empty(),
+                "no read without a token"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn kubernetes_login_sends_the_role_and_the_current_jwt_from_the_mount() {
+        let dir = scratch_dir();
+        let (addr, mock) = login_mock().await;
+        // A projected service account token is world-readable, and that must not matter.
+        let jwt = write_secret(&dir, "sa-token", "eyJhbGciOi.the-jwt.sig", 0o644);
+        let v = vault_vault(serde_json::json!({
+            "kind": "vault", "addr": addr, "path": "keep/github", "field": "token", "ttl_seconds": 1,
+            "auth": {"method": "kubernetes", "role": "keep", "jwt_file": jwt, "mount": "k8s/prod"},
+        }));
+        assert!(resolve(&v).await.is_ok());
+        let logins = mock.logins.lock().unwrap().clone();
+        assert_eq!(logins[0].0, "/v1/auth/k8s/prod/login");
+        assert_eq!(
+            logins[0].1,
+            serde_json::json!({"role": "keep", "jwt": "eyJhbGciOi.the-jwt.sig"})
+        );
+        // The default jwt_file and mount are the standard ones.
+        let default: VaultAuth =
+            serde_json::from_value(serde_json::json!({"method": "kubernetes", "role": "keep"}))
+                .unwrap();
+        assert_eq!(
+            default,
+            VaultAuth::Kubernetes {
+                role: "keep".into(),
+                jwt_file: PathBuf::from("/var/run/secrets/kubernetes.io/serviceaccount/token"),
+                mount: "kubernetes".into(),
+            }
+        );
+        // A missing JWT file is a setup error that names the file, not the token.
+        let v = vault_vault(serde_json::json!({
+            "kind": "vault", "addr": addr, "path": "keep/github", "field": "token",
+            "auth": {"method": "kubernetes", "role": "keep", "jwt_file": dir.join("absent")},
+        }));
+        let err = resolve(&v).await.unwrap_err();
+        assert_eq!(failure_class(&err), "config");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn the_status_shows_kind_timing_and_failure_class_and_never_a_value() {
+        let dir = scratch_dir();
+        let (addr, mock) = login_mock().await;
+        let v = approle_vault(&addr, &dir, serde_json::json!({"ttl_seconds": 1}));
+        let before = v.source_status();
+        assert_eq!(before.len(), 1);
+        assert_eq!((before[0].name.as_str(), before[0].kind), ("svc", "vault"));
+        assert!(
+            !before[0].cached
+                && before[0].last_success_seconds_ago.is_none()
+                && before[0].last_failure.is_none()
+        );
+        assert!(resolve(&v).await.is_ok());
+        let ok = v.source_status();
+        assert!(ok[0].cached);
+        assert_eq!(ok[0].last_success_seconds_ago, Some(0));
+        assert_eq!(ok[0].last_failure, None);
+        // A revoked secret store answer shows as a failure class after the cache expires.
+        mock.valid.lock().unwrap().clear();
+        *mock.login_status.lock().unwrap() = 403;
+        tokio::time::sleep(Duration::from_millis(1150)).await;
+        assert!(resolve(&v).await.is_err());
+        let failed = v.source_status();
+        assert!(!failed[0].cached);
+        assert_eq!(failed[0].last_failure, Some("refused"));
+        let shown = serde_json::to_string(&failed).unwrap();
+        for secret in [
+            VAULT_SECRET,
+            SECRET_ID,
+            "hvs.login-1",
+            "role-1",
+            "secret-id",
+        ] {
+            assert!(
+                !shown.contains(secret),
+                "the status leaked {secret}: {shown}"
+            );
+        }
+        // A file source reports too, and a credential without a source does not appear.
+        let f = write_secret(&dir, "k", "v", 0o600);
+        let fv = file_vault(&f, serde_json::json!({}));
+        assert!(resolve(&fv).await.is_ok());
+        assert_eq!(fv.source_status()[0].kind, "file");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn login_auth_validation() {
+        let ok = |auth: serde_json::Value| {
+            let source = serde_json::json!({
+                "kind": "vault", "addr": "https://vault.example", "path": "a/b", "field": "f", "auth": auth,
+            });
+            let d = serde_json::json!({"host": "h.example", "header": "authorization", "source": source});
+            serde_json::from_value::<CredentialDescriptor>(d)
+                .map_err(|e| e.to_string())
+                .and_then(|d| validate_descriptor("svc", &d).map_err(|e| e.to_string()))
+        };
+        assert!(ok(
+            serde_json::json!({"method": "approle", "role_id": "r", "secret_id_env": "SID"})
+        )
+        .is_ok());
+        assert!(ok(serde_json::json!({"method": "approle", "role_id": "r", "secret_id_file": "/run/sid", "mount": "corp/approle"})).is_ok());
+        assert!(ok(serde_json::json!({"method": "kubernetes", "role": "keep"})).is_ok());
+        assert!(ok(serde_json::json!({"method": "kubernetes", "role": "keep", "jwt_file": "/x/jwt", "mount": "k8s"})).is_ok());
+        for (label, bad) in [
+            (
+                "no role_id",
+                serde_json::json!({"method": "approle", "secret_id_env": "SID"}),
+            ),
+            (
+                "empty role_id",
+                serde_json::json!({"method": "approle", "role_id": "", "secret_id_env": "SID"}),
+            ),
+            (
+                "no secret id",
+                serde_json::json!({"method": "approle", "role_id": "r"}),
+            ),
+            (
+                "both secret ids",
+                serde_json::json!({"method": "approle", "role_id": "r", "secret_id_env": "SID", "secret_id_file": "/x"}),
+            ),
+            (
+                "relative secret id file",
+                serde_json::json!({"method": "approle", "role_id": "r", "secret_id_file": "sid"}),
+            ),
+            (
+                "bad env name",
+                serde_json::json!({"method": "approle", "role_id": "r", "secret_id_env": "1 X"}),
+            ),
+            (
+                "bad approle mount",
+                serde_json::json!({"method": "approle", "role_id": "r", "secret_id_env": "S", "mount": "../x"}),
+            ),
+            ("no k8s role", serde_json::json!({"method": "kubernetes"})),
+            (
+                "bad k8s role",
+                serde_json::json!({"method": "kubernetes", "role": "a b"}),
+            ),
+            (
+                "relative jwt",
+                serde_json::json!({"method": "kubernetes", "role": "keep", "jwt_file": "jwt"}),
+            ),
+            (
+                "jwt with ..",
+                serde_json::json!({"method": "kubernetes", "role": "keep", "jwt_file": "/a/../b"}),
+            ),
+            (
+                "bad k8s mount",
+                serde_json::json!({"method": "kubernetes", "role": "keep", "mount": "a b"}),
+            ),
+            (
+                "unknown field",
+                serde_json::json!({"method": "kubernetes", "role": "keep", "extra": 1}),
+            ),
+            ("unknown method", serde_json::json!({"method": "ldap"})),
+        ] {
+            assert!(ok(bad.clone()).is_err(), "{label} should be refused: {bad}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_vault_status_route_lists_sources_for_the_operator_only() {
+        use axum::{body::Body, http::Request};
+        use tower::ServiceExt;
+        let dir = scratch_dir();
+        let secret = write_secret(&dir, "key", "route-secret-value", 0o600);
+        let creds = dir.join("creds.json");
+        std::fs::write(
+            &creds,
+            serde_json::json!({
+                "svc": {"host": "h.example", "header": "authorization",
+                        "source": {"kind": "file", "path": secret}},
+                "plain": {"host": "p.example", "header": "authorization", "env": "SOME_ENV"},
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let token = crate::fixture::text("operator-token");
+        let (state, _) = crate::egress::ask_tests::state_and_session_cfg(|c| {
+            c.api_token = Some(token.clone());
+            c.credentials_file = Some(creds.clone());
+        })
+        .await;
+        let app = crate::app::public_router(state.clone());
+        let call = |tok: String| {
+            let app = app.clone();
+            async move {
+                let req = Request::builder()
+                    .uri("/v1/vault/status")
+                    .header("authorization", format!("Bearer {tok}"))
+                    .body(Body::empty())
+                    .unwrap();
+                let resp = app.oneshot(req).await.unwrap();
+                let st = resp.status();
+                let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+                    .await
+                    .unwrap();
+                (st, String::from_utf8_lossy(&bytes).to_string())
+            }
+        };
+        let (st, body) = call(token.clone()).await;
+        assert_eq!(st, 200, "{body}");
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let sources = v["sources"].as_array().unwrap();
+        assert_eq!(
+            sources.len(),
+            1,
+            "only credentials with a source are listed"
+        );
+        assert_eq!(sources[0]["name"], "svc");
+        assert_eq!(sources[0]["kind"], "file");
+        assert!(!body.contains("route-secret-value"), "leaked: {body}");
+        assert!(v["sources_honesty"]
+            .as_str()
+            .unwrap()
+            .contains("host operator can read it"));
+        assert!(
+            !body.contains(dir.to_string_lossy().as_ref()),
+            "the status must not show paths: {body}"
+        );
+
+        // A user token cannot read it.
+        let (st, mint) = {
+            let req = Request::builder()
+                .method("POST")
+                .uri("/v1/user-tokens")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"user_id": "ana", "ttl_seconds": 600}).to_string(),
+                ))
+                .unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            let st = resp.status();
+            let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20)
+                .await
+                .unwrap();
+            (
+                st,
+                serde_json::from_slice::<serde_json::Value>(&bytes).unwrap(),
+            )
+        };
+        assert_eq!(st, 201, "{mint}");
+        let (st, _) = call(mint["token"].as_str().unwrap().to_string()).await;
+        assert_eq!(st, 403);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

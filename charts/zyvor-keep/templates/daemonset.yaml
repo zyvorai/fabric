@@ -18,7 +18,16 @@ spec:
       labels:
         {{- include "zyvor-keep.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: runtime
+      {{- if .Values.credentials.descriptors }}
+      annotations:
+        # A changed descriptor restarts the runtime, which reads them once at startup.
+        checksum/credentials: {{ toJson .Values.credentials.descriptors | sha256sum }}
+      {{- end }}
     spec:
+      {{- with .Values.serviceAccount.name }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- with .Values.global.imagePullSecrets }}
@@ -63,6 +72,10 @@ spec:
         - name: ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS
           value: {{ join "," .Values.keep.trustedSigners | quote }}
         {{- end }}
+        {{- if .Values.credentials.descriptors }}
+        - name: ZYVOR_AGENT_CREDENTIALS_FILE
+          value: /etc/zyvor/credentials/credentials.json
+        {{- end }}
         {{- with .Values.runtime.extraEnv }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -80,6 +93,14 @@ spec:
           mountPath: /var/lib/fluxvm/agent-snapshots
         - name: tmp
           mountPath: /tmp
+        {{- if .Values.credentials.descriptors }}
+        - name: credentials
+          mountPath: /etc/zyvor/credentials
+          readOnly: true
+        {{- end }}
+        {{- with .Values.runtime.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- /* The listen address may be loopback; hostNetwork makes it the node's loopback, which the kubelet probes reach. */}}
         livenessProbe:
           httpGet:
@@ -109,6 +130,14 @@ spec:
           type: DirectoryOrCreate
       - name: tmp
         emptyDir: {}
+      {{- if .Values.credentials.descriptors }}
+      - name: credentials
+        configMap:
+          name: {{ include "zyvor-keep.fullname" . }}-credentials
+      {{- end }}
+      {{- with .Values.runtime.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
