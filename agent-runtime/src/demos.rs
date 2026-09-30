@@ -884,6 +884,7 @@ async fn run_demo_inner(
                 resources: None,
                 confidential: crate::model::Confidential::Off,
                 security_profile: state.config.security_profile.as_deref(),
+                gpus: None,
             },
         )
         .await

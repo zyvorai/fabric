@@ -71,6 +71,11 @@ pub struct AgentManifest {
     /// Size of each sandbox. `None` uses the FluxVM template's own size.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
+    /// GPUs to pass through to each cell (1 to 8). FluxVM picks free ones. Needs
+    /// `cell_backend: qemu`, and cannot be combined with `confidential`, `warm_pool_size` or
+    /// `idle_hibernate_seconds`. See [`AgentManifest::validate_gpus`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gpus: Option<u8>,
     /// How long an `ask` request waits for a decision before it is refused.
     /// `None` uses [`DEFAULT_EGRESS_APPROVAL_SECONDS`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -324,6 +329,32 @@ impl AgentManifest {
             ),
             _ => Ok(()),
         }
+    }
+
+    /// Deploy-time checks for `gpus`. FluxVM re-checks the backend, but the combinations that
+    /// cannot work are refused here so a deploy fails before a session does.
+    pub fn validate_gpus(&self) -> Result<(), String> {
+        let Some(n) = self.gpus else {
+            return Ok(());
+        };
+        if !(1..=8).contains(&n) {
+            return Err("gpus must be between 1 and 8; leave it out for none".into());
+        }
+        if self.cell_backend != Some(CellBackend::Qemu) {
+            return Err(
+                "gpus need cell_backend=qemu: only QEMU cells can be given a device".into(),
+            );
+        }
+        if self.confidential != Confidential::Off {
+            return Err("gpus cannot be combined with confidential: a passed-through device is outside the encrypted guest".into());
+        }
+        if self.warm_pool_size > 0 {
+            return Err("gpus cannot be combined with warm_pool_size: a warm cell is created before a session owns it, so it would hold a GPU idle".into());
+        }
+        if self.idle_hibernate_seconds.is_some() {
+            return Err("gpus cannot be combined with idle_hibernate_seconds: a cell with a passed-through device cannot be snapshotted".into());
+        }
+        Ok(())
     }
 
     /// Deploy-time checks for `resources` against the operator's ceilings.
@@ -1271,6 +1302,7 @@ mod home_volume_tests {
             egress_approval_timeout_seconds: None,
             model_socket: None,
             cell_backend: None,
+            gpus: None,
         }
     }
 
@@ -1579,5 +1611,49 @@ mod home_volume_tests {
             &[]
         )
         .is_err());
+    }
+
+    #[test]
+    fn gpus_are_validated_where_they_cannot_work() {
+        let ok = |f: &dyn Fn(&mut AgentManifest)| {
+            let mut m = manifest(None);
+            m.cell_backend = Some(CellBackend::Qemu);
+            m.gpus = Some(2);
+            f(&mut m);
+            m.validate_gpus()
+        };
+        assert!(ok(&|_| {}).is_ok());
+        assert!(ok(&|m| m.gpus = None).is_ok());
+        assert!(ok(&|m| m.gpus = Some(8)).is_ok());
+        assert!(ok(&|m| m.gpus = Some(0))
+            .unwrap_err()
+            .contains("between 1 and 8"));
+        assert!(ok(&|m| m.gpus = Some(9))
+            .unwrap_err()
+            .contains("between 1 and 8"));
+        assert!(ok(&|m| m.cell_backend = None)
+            .unwrap_err()
+            .contains("cell_backend=qemu"));
+        assert!(ok(&|m| m.cell_backend = Some(CellBackend::Firecracker))
+            .unwrap_err()
+            .contains("cell_backend=qemu"));
+        assert!(ok(&|m| m.confidential = Confidential::Auto)
+            .unwrap_err()
+            .contains("confidential"));
+        assert!(ok(&|m| m.warm_pool_size = 1)
+            .unwrap_err()
+            .contains("warm_pool_size"));
+        assert!(ok(&|m| m.idle_hibernate_seconds = Some(60))
+            .unwrap_err()
+            .contains("idle_hibernate_seconds"));
+    }
+
+    #[test]
+    fn a_manifest_without_gpus_serializes_as_before() {
+        let m = manifest(None);
+        assert!(serde_json::to_value(&m).unwrap().get("gpus").is_none());
+        let mut with = manifest(None);
+        with.gpus = Some(1);
+        assert_eq!(serde_json::to_value(&with).unwrap()["gpus"], 1);
     }
 }
