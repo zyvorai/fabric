@@ -1,7 +1,8 @@
 # Credential sources (Vault, files)
 
-> **Status.** The `file` source (step 1 of "Size") is built: see [vault/README.md](../vault/README.md#credentials-from-a-file-source). It follows
-> the recommendations below. The `vault` source (steps 2 and 3) is not started.
+> **Status.** The `file` source (step 1 of "Size") and the `vault` source with token auth (step 2) are built: see
+> [vault/README.md](../vault/README.md#credentials-from-a-file-source). They follow the recommendations below. AppRole and Kubernetes login, the
+> status output and the chart values (step 3) are not started. Nothing has been run against a real Vault.
 
 ## Why
 

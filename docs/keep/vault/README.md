@@ -40,7 +40,37 @@ This covers Vault Agent (which renders secrets to files), Kubernetes Secrets mou
 - **The limit.** The secret is still in the runtime's memory while it is used, so the host operator can read it. A source changes where it is
   kept and who can rotate it, not that.
 
-The design and the later Vault source are in [design/credential-sources.md](../design/credential-sources.md).
+### Credentials from HashiCorp Vault (`source.kind: "vault"`)
+
+The runtime can read one field of a **KV v2** secret directly:
+
+```json
+{ "github": { "host": "api.github.com", "header": "authorization", "prefix": "Bearer ",
+              "source": { "kind": "vault", "addr": "https://vault.internal:8200", "mount": "secret",
+                          "path": "keep/github", "field": "token", "ttl_seconds": 300,
+                          "auth": { "method": "token", "token_file": "/vault/secrets/token" } } } }
+```
+
+It sends `GET {addr}/v1/{mount}/data/{path}` with `X-Vault-Token` (and `X-Vault-Namespace` if `namespace` is set) and uses the text at
+`data.data.{field}`. Everything under "Credentials from a file" applies here too: the authorisation checks run first and a refused request never
+reaches Vault, the value is cached and read once per burst, and a failure fails closed with no stale value.
+
+- **Auth: a token you provide.** `token_file` (what a Vault Agent file sink writes; it is **re-read on every fetch**, so a renewed token is picked
+  up, and it must be private like any secret file) or `token_env`. Set exactly one. AppRole and Kubernetes login are not built yet.
+- **Transport.** `addr` must be `https` (plain `http` only to a loopback address). Redirects are never followed. Each request has a timeout
+  (`timeout_seconds`, default 10, at most 30) and the answer is capped at 256 KiB. For a private CA, `ca_file` names a PEM certificate to trust.
+- **Cache.** `ttl_seconds` defaults to **300** (at most 3600). It is also how long a revoked secret keeps working.
+- **What it will not build a URL from.** `mount`, `path` and `namespace` are plain segments (letters, digits, `_ - .`), with no `..`, no empty
+  segment and no leading slash, and each is pushed onto the URL as a separate segment, so nothing in the configuration can change the shape of the
+  request.
+- **At startup** every Vault-sourced secret is read once. A failure only **warns**, since Vault may come up after the runtime; the first request
+  tries again and fails closed if it still cannot.
+- **Errors** say which class of thing went wrong (could not be reached, refused the token, not found, not a KV v2 secret) and never include the
+  answer, which can echo paths or policy.
+- **Not yet verified against a real Vault.** The behaviour is tested against a mock; a real server, a real Vault Agent and a Vault Enterprise
+  namespace have not been tried.
+
+The design is in [design/credential-sources.md](../design/credential-sources.md).
 
 ### Refreshing OAuth credentials
 
