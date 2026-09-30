@@ -55,6 +55,16 @@ pub struct SandboxRecord {
     /// ignores the request and omits this.
     #[serde(default)]
     pub confidential: Option<crate::model::ConfidentialStatus>,
+    /// The create request FluxVM ran. Its `vfio_devices` are the GPUs it assigned.
+    #[serde(default)]
+    pub request: Option<SandboxRequest>,
+}
+
+/// The part of FluxVM's stored create request the runtime reads back.
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct SandboxRequest {
+    #[serde(default)]
+    pub vfio_devices: Vec<String>,
 }
 
 /// FluxVM `GET /v1/security/capabilities` (Phase 6 HostCapabilities subset).
@@ -88,6 +98,9 @@ struct SandboxCreate<'a> {
     /// FluxVM Phase 6 profile (`measured`, …). Older FluxVM ignores unknown fields.
     #[serde(skip_serializing_if = "Option::is_none")]
     security_profile: Option<&'a str>,
+    /// Free GPUs to pass through. An older FluxVM ignores it, so the caller checks the record.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    gpus: Option<u8>,
 }
 
 /// A FluxVM sandbox volume (`POST /v1/sandboxes` `volumes`).
@@ -106,6 +119,8 @@ pub struct SandboxOptions<'a> {
     /// Phase 6 security profile name (e.g. `measured`). Evidence class stays
     /// `software-test` until Keep 0.2 + attested hardware.
     pub security_profile: Option<&'a str>,
+    /// How many GPUs FluxVM should pass through. See `AgentManifest::gpus`.
+    pub gpus: Option<u8>,
 }
 
 impl FluxVm {
@@ -198,6 +213,7 @@ impl FluxVm {
                 confidential: (!options.confidential.is_off())
                     .then_some(options.confidential.as_str()),
                 security_profile: options.security_profile,
+                gpus: options.gpus,
             })
             .send()
             .await?;
@@ -609,9 +625,11 @@ mod tests {
             memory_mib: None,
             confidential: None,
             security_profile: None,
+            gpus: None,
         })
         .unwrap();
         assert!(none.get("volumes").is_none());
+        assert!(none.get("gpus").is_none());
         assert!(none.get("vcpus").is_none() && none.get("memory_mib").is_none());
         assert!(none.get("confidential").is_none());
 
@@ -629,8 +647,10 @@ mod tests {
             memory_mib: Some(7900),
             confidential: Some("auto"),
             security_profile: Some("measured"),
+            gpus: Some(2),
         })
         .unwrap();
+        assert_eq!(some["gpus"], 2);
         assert_eq!(some["volumes"][0]["name"], "home");
         assert_eq!(some["volumes"][0]["guest_path"], "/home/agent");
         assert_eq!(
@@ -638,6 +658,25 @@ mod tests {
             (Some(2), Some(7900))
         );
         assert_eq!(some["security_profile"], "measured");
+    }
+
+    #[test]
+    fn a_sandbox_record_reads_back_the_gpus_fluxvm_assigned() {
+        let rec: SandboxRecord = serde_json::from_value(json!({
+            "id": Uuid::nil(),
+            "request": {"name": "n", "vfio_devices": ["0000:41:00.0", "0000:81:00.0"]}
+        }))
+        .unwrap();
+        assert_eq!(
+            rec.request.unwrap().vfio_devices,
+            ["0000:41:00.0", "0000:81:00.0"]
+        );
+        // A record with no request, or none of the field, reads as no devices, not an error.
+        let bare: SandboxRecord = serde_json::from_value(json!({"id": Uuid::nil()})).unwrap();
+        assert!(bare.request.is_none());
+        let empty: SandboxRecord =
+            serde_json::from_value(json!({"id": Uuid::nil(), "request": {}})).unwrap();
+        assert!(empty.request.unwrap().vfio_devices.is_empty());
     }
 
     #[test]

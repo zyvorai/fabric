@@ -105,18 +105,61 @@ async fn create_cold_sandbox(
             resources: agent.manifest.resources,
             confidential: agent.manifest.confidential,
             security_profile: state.config.security_profile.as_deref(),
+            gpus: agent.manifest.gpus,
         },
     ))
     .await
     .map_err(|error| {
         if !volumes.is_empty() && error.to_string().contains("already attached") {
             ApiError::conflict("the agent's home volume is attached to another sandbox")
+        } else if error.to_string().contains("GPU(s) requested") {
+            // FluxVM had fewer free GPUs than the agent needs: try again later.
+            ApiError::unavailable(format!("no GPU is free for this agent: {error}"))
         } else {
             ApiError::bad_gateway(error)
         }
     })?;
     check_confidential(state, agent, &sandbox).await?;
+    check_gpus(state, agent, &sandbox, session_id).await?;
     Ok(sandbox)
+}
+
+/// Enforce `gpus` on a freshly created sandbox. An older FluxVM ignores the request and would
+/// start a CPU-only cell for an agent that needs a GPU, so a record with fewer devices than asked
+/// for is refused and the sandbox deleted. The devices FluxVM assigned are journaled.
+async fn check_gpus(
+    state: &AppState,
+    agent: &crate::model::AgentRecord,
+    sandbox: &crate::fluxvm::SandboxRecord,
+    session_id: Uuid,
+) -> ApiResult<()> {
+    let Some(wanted) = agent.manifest.gpus else {
+        return Ok(());
+    };
+    let devices: Vec<String> = sandbox
+        .request
+        .as_ref()
+        .map(|r| r.vfio_devices.clone())
+        .unwrap_or_default();
+    if devices.len() < usize::from(wanted) {
+        let _ = state.fluxvm.delete(sandbox.id).await;
+        return Err(ApiError::bad_gateway(format!(
+            "this agent needs {wanted} GPU(s) but FluxVM assigned {}; the cell was deleted (does FluxVM support `gpus`?)",
+            devices.len()
+        )));
+    }
+    let _ = state
+        .store
+        .audit
+        .append(
+            Some(session_id),
+            AuditPhase::Performed,
+            "keep.cell.gpus",
+            Some(agent.name.clone()),
+            json!({"devices": devices}),
+        )
+        .await;
+    Ok(())
 }
 
 /// Enforce `confidential: required` on a freshly created sandbox. FluxVM refuses
@@ -630,6 +673,9 @@ async fn deploy_agent(
         }
     }
     if let Err(message) = req.manifest.validate_confidential() {
+        return Err(ApiError::bad_request(message));
+    }
+    if let Err(message) = req.manifest.validate_gpus() {
         return Err(ApiError::bad_request(message));
     }
     if let Err(message) = req.manifest.validate_cell_backend() {
@@ -3783,7 +3829,22 @@ mod tests {
             guest_ip: None,
             status: None,
             confidential: status,
+            request: None,
         }
+    }
+
+    fn sandbox_with_devices(devices: &[&str]) -> crate::fluxvm::SandboxRecord {
+        let mut s = sandbox(None);
+        s.request = Some(crate::fluxvm::SandboxRequest {
+            vfio_devices: devices.iter().map(|d| d.to_string()).collect(),
+        });
+        s
+    }
+
+    fn agent_with_gpus(n: Option<u8>) -> crate::model::AgentRecord {
+        let mut agent = agent_with(crate::model::Confidential::Off);
+        agent.manifest.gpus = n;
+        agent
     }
 
     fn status(active: bool, reason: &str) -> Option<crate::model::ConfidentialStatus> {
@@ -3842,5 +3903,90 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(deleted.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn gpus_that_were_not_assigned_delete_the_cell_and_assigned_ones_are_journaled() {
+        let (url, deleted) = fluxvm_that_counts_deletes().await;
+        let (state, _session) =
+            crate::egress::ask_tests::state_and_session_cfg(|c| c.fluxvm_url = url).await;
+        let agent = agent_with_gpus(Some(2));
+        let session = Uuid::new_v4();
+        let count = || deleted.load(std::sync::atomic::Ordering::SeqCst);
+
+        // An older FluxVM ignores `gpus` and returns a record with no devices.
+        let old = check_gpus(&state, &agent, &sandbox(None), session).await;
+        let message = old.unwrap_err().message().to_string();
+        assert!(
+            message.contains("needs 2 GPU(s) but FluxVM assigned 0"),
+            "{message}"
+        );
+        assert_eq!(count(), 1);
+
+        // Fewer than asked for is refused too.
+        let short = check_gpus(
+            &state,
+            &agent,
+            &sandbox_with_devices(&["0000:41:00.0"]),
+            session,
+        )
+        .await;
+        assert!(short.unwrap_err().message().contains("assigned 1"));
+        assert_eq!(count(), 2);
+
+        // Enough: kept, and the devices are journaled against the session.
+        check_gpus(
+            &state,
+            &agent,
+            &sandbox_with_devices(&["0000:41:00.0", "0000:81:00.0"]),
+            session,
+        )
+        .await
+        .unwrap();
+        assert_eq!(count(), 2);
+        let rows = state.store.audit.list(Some(session), 10).await.unwrap();
+        let row = rows
+            .iter()
+            .find(|r| r.action == "keep.cell.gpus")
+            .expect("a gpu journal row");
+        assert_eq!(
+            row.detail["devices"],
+            json!(["0000:41:00.0", "0000:81:00.0"])
+        );
+
+        // An agent that asked for none is never inspected.
+        check_gpus(&state, &agent_with_gpus(None), &sandbox(None), session)
+            .await
+            .unwrap();
+        assert_eq!(count(), 2);
+    }
+
+    #[tokio::test]
+    async fn no_free_gpu_is_a_503_the_caller_can_retry() {
+        let app = Router::new().route(
+            "/v1/sandboxes",
+            axum::routing::post(|| async {
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    axum::Json(json!({"error": "2 GPU(s) requested but only 0 free (a free GPU is bound to vfio-pci and not in use)"})),
+                )
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let (state, _session) =
+            crate::egress::ask_tests::state_and_session_cfg(|c| c.fluxvm_url = url).await;
+        let agent = agent_with_gpus(Some(2));
+        let err = create_cold_sandbox(&state, &agent, Uuid::new_v4(), None)
+            .await
+            .unwrap_err();
+        assert_eq!(err.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(
+            err.message().contains("no GPU is free"),
+            "{}",
+            err.message()
+        );
+        assert!(err.message().contains("only 0 free"), "{}", err.message());
     }
 }

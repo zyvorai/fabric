@@ -165,6 +165,21 @@ The reviewer's authority is deliberately narrow, because the request it reads is
 
 Changing `egress_mode` or the timeout changes the agent's version, like any manifest change; manifests that leave both at their defaults keep their existing version ids.
 
+### GPUs
+
+`"gpus": N` in the manifest (1 to 8) gives each cell N GPUs, passed through with VFIO. The runtime sends the count to FluxVM, which picks free ones itself, under a lock, so two sessions are never given the same GPU (see FluxVM's `docs/sandbox-gpus.md`).
+
+```json
+{ "template": "cuda-agent", "cell_backend": "qemu", "gpus": 1 }
+```
+
+- Deploy refuses combinations that cannot work: it needs `"cell_backend": "qemu"` (only QEMU cells can be given a device), and it cannot be combined with `confidential`, `warm_pool_size` or `idle_hibernate_seconds`.
+- FluxVM must already have the GPUs bound to `vfio-pci` (`POST /v1/host/gpus/bind`); see `docs/gpu-passthrough.md`. A GPU in use by another VM is not picked.
+- **No free GPU is a 503** on session create, with FluxVM's count of how many are free. There is no queue; the caller retries. The `503` message starts `no GPU is free for this agent`.
+- **A CPU-only cell is never started by mistake.** After the create, the runtime reads the devices FluxVM assigned from the returned record. If there are fewer than the manifest asked for (an older FluxVM ignores `gpus`), the cell is deleted and the session fails with 502. The assigned addresses are journaled as `keep.cell.gpus`.
+- The egress and credential policy are unchanged: a GPU cell still reaches the network only through the broker.
+- Not verified on real GPUs: the runtime's part is tested against a stand-in FluxVM, and FluxVM's picking logic is tested on its own. A passed-through device sits outside what the runtime can attest or snapshot, and the cell's own workload sees the GPU directly.
+
 ### Egress guard
 
 An operator-run HTTP service can refuse any request through the JSON broker, for every agent. It is the hook for a check the runtime does not have: a content filter, a per-tenant rule, a legal hold.

@@ -1206,6 +1206,7 @@ pub(crate) mod ask_tests {
             egress_approval_timeout_seconds: timeout,
             model_socket: None,
             cell_backend: None,
+            gpus: None,
         }
     }
 
