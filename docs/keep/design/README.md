@@ -6,7 +6,8 @@ sidebar_position: 2
 
 [REMAINING.md](../REMAINING.md) lists items that need a design decision before they are code. These notes are **proposals to decide on, not
 built features.** Each one says what exists today (checked against the code), what the risk is, what I would build, what I would refuse to
-build, and the decisions only you can make, with my recommendation for each. Nothing here has been started.
+build, and the decisions only you can make, with my recommendation for each. Nothing here has been started, except
+[Credential sources](credential-sources.md), which was decided and then built (tested against fakes; no real Vault has been tried).
 
 | Note | The question |
 |---|---|

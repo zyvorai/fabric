@@ -122,6 +122,9 @@ taint:
 - **Ask levels** per rule: `always`, `first` or `never`.
 - **Taint.** After the agent reads an untrusted page, egress is blocked until you approve, and the cockpit paints the process red.
 - **Signed.** In Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) the runtime refuses to start without `ZYVOR_AGENT_POLICY_TRUSTED_SIGNERS`, and every policy update must carry an Ed25519 signature over the exact YAML bytes. Unsigned policy does not load.
+- **Changes are checked.** A policy update is compared with the one the agent runs now. One that widens access (default egress `allow`, a metadata or private host, a `*` host, a write method added, weaker approval, a removed taint guard, wider body or program rules) is refused with `409` until you resend it with `X-Keep-Policy-Ack-Risk: 1`. It is a syntactic check on what the change adds, not a proof of what a cell can reach.
+- **Body and program rules.** For MCP, JSON-RPC and GraphQL endpoints, where every call is a `POST` to one URL, an entry can limit the JSON-RPC methods, the MCP tools and the GraphQL operation types the body may use, and `binaries` limits which program in the cell may call. Both fail closed. `binaries` covers the JSON broker only and does not work for confidential cells.
+- **Drafts from denials.** `keepctl policy suggest` turns an agent's denied requests into a draft policy to read, sign and load. Nothing is applied automatically.
 
 More: [sentinel/README.md](sentinel/README.md).
 
@@ -129,9 +132,9 @@ More: [sentinel/README.md](sentinel/README.md).
 
 Real credentials live in the vault on the host. The egress broker injects a secret **after** the allowlist check, so it never appears in a tool result or in the model's context. A secret is released only when the request matches the whole descriptor: credential, host, method, path, port and user. For TLS hosts a surrogate token (`zy_sur_…`) can stand in and is swapped for the real secret only at the approved exit. Password fill in the browser is done by the host and never returned to the model.
 
-> **Honest limit.** Today the secret material lives in the **host process environment**, so the operator of the host can read it. The vault protects secrets from the agent, not from the host's operator. Sealing secrets to a key only you hold is a hardware-gated goal (see [KEEP-0.2.md](KEEP-0.2.md)).
+> **Honest limit.** A credential's secret comes from the **host process environment**, or from a file or HashiCorp Vault that the credential's `source` names. In every case it is in the host process's memory while it is used, so the operator of the host can read it. The vault protects secrets from the agent, not from the host's operator. A source changes where the secret is kept and who can rotate or revoke it, not that. The file and Vault sources have been tested against fakes only: **no real Vault has been tried**. Sealing secrets to a key only you hold is a hardware-gated goal (see [KEEP-0.2.md](KEEP-0.2.md)).
 
-More: [vault/README.md](vault/README.md).
+More: [vault/README.md](vault/README.md) (including [credentials from a file or Vault](vault/README.md#credentials-from-a-file-source)).
 
 ### Host confinement: rules the agent cannot argue with
 
