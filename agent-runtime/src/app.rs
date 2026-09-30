@@ -2254,6 +2254,9 @@ struct AuditQuery {
     session_id: Option<Uuid>,
     #[serde(default)]
     limit: Option<usize>,
+    /// `export/audit` only: `ocsf` returns newline-delimited OCSF events instead of JSON.
+    #[serde(default)]
+    format: Option<String>,
 }
 
 /// Default and maximum page size for `GET /v1/audit`.
@@ -2308,7 +2311,16 @@ async fn export_audit(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<AuditQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Response> {
+    let ocsf = match query.format.as_deref() {
+        None | Some("json") => false,
+        Some("ocsf") => true,
+        Some(other) => {
+            return Err(ApiError::bad_request(format!(
+                "unknown format `{other}`; use json or ocsf"
+            )))
+        }
+    };
     let export = headers
         .get("x-keep-export-token")
         .and_then(|v| v.to_str().ok());
@@ -2344,9 +2356,25 @@ async fn export_audit(
             json!({"limit": limit}),
         )
         .await;
-    Ok(Json(
-        json!({"items": items, "chain": chain, "export": true}),
-    ))
+    if ocsf {
+        // The chain verdict rides in a header so the body stays pure NDJSON.
+        let verdict = if chain.chain_ok { "ok" } else { "broken" };
+        return Ok((
+            [
+                (
+                    axum::http::header::CONTENT_TYPE,
+                    "application/x-ndjson; charset=utf-8",
+                ),
+                (
+                    axum::http::HeaderName::from_static("x-keep-audit-chain"),
+                    verdict,
+                ),
+            ],
+            crate::ocsf::to_ndjson(&items),
+        )
+            .into_response());
+    }
+    Ok(Json(json!({"items": items, "chain": chain, "export": true})).into_response())
 }
 
 /// Keep: readable Sentinel policy as `keep.policy.yaml`.

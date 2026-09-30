@@ -32,6 +32,7 @@ pub mod mitm;
 pub mod model;
 pub mod model_call;
 pub mod notify;
+pub mod ocsf;
 pub mod policy;
 pub mod policy_lint;
 pub mod pool;
