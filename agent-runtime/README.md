@@ -165,6 +165,28 @@ The reviewer's authority is deliberately narrow, because the request it reads is
 
 Changing `egress_mode` or the timeout changes the agent's version, like any manifest change; manifests that leave both at their defaults keep their existing version ids.
 
+### Egress guard
+
+An operator-run HTTP service can refuse any request through the JSON broker, for every agent. It is the hook for a check the runtime does not have: a content filter, a per-tenant rule, a legal hold.
+
+| Variable | Meaning |
+|---|---|
+| `ZYVOR_AGENT_GUARD_URL` | The guard's URL (`http` or `https`). Unset means no guard. |
+| `ZYVOR_AGENT_GUARD_TOKEN` | Optional bearer token. Refused at startup unless the URL is `https` or a loopback host. |
+| `ZYVOR_AGENT_GUARD_TIMEOUT_SECS` | 1 to 60, default 3. |
+
+The guard is called after the agent's own rules (`egress_rules`, including body rules) and the DLP scan, and before an operator is asked or a credential is added, so it never sees a secret the runtime injects. It gets a JSON `POST`:
+
+```json
+{"version":1,"session_id":"…","agent":"desk","method":"POST","url":"https://api.example.com/v1/x",
+ "host":"api.example.com","path":"/v1/x","header_names":["content-type"],"dlp":["aws-access-key"],
+ "body_bytes":5,"body_sha256":"…","body_base64":"aGVsbG8="}
+```
+
+The URL has no query string or credentials, only header *names* are sent, and a body over 256 KiB is described by size and hash (`"body_omitted": true`). It answers `200` with `{"decision":"allow"}` or `{"decision":"deny","reason":"…"}`. The guard can only narrow what policy allows. It **fails closed**: a timeout, a connection error, any status but 200, an answer over 64 KiB, or anything but an exact `allow` or `deny` refuses the request with 403, and the agent sees the guard's reason (control characters removed, 200 characters at most). Refusals are journaled like any other denied egress.
+
+It does not see CONNECT-proxy traffic, which exposes only `host:port`; put `egress_rules` on a host to keep it off the proxy.
+
 ## Containment
 
 These controls are aimed at a compromised or prompt-injected agent. They stack: each one assumes the others may be bypassed.

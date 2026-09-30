@@ -26,6 +26,7 @@ pub mod fluxvm;
 pub mod goal_plan;
 pub mod goal_worker;
 pub mod goals;
+pub mod guard;
 pub mod l7;
 pub mod mcp;
 pub mod memory;
