@@ -11,6 +11,11 @@
 #
 # Fails closed: without bwrap and setpriv the command does not run at all.
 #
+# A seccomp filter (/opt/zyvor/seccomp.bpf, written next to this script) refuses the syscalls
+# an agent has no business making: ptrace, mount, bpf, kexec, module loading, perf, io_uring
+# and similar. It is x86_64 only; on any other CPU, or with the filter missing, the command
+# does not run.
+#
 # What the agent gets: a read-only view of the guest (so it cannot edit its own
 # bundle, the worker, or this script), a private /tmp, its writable home, no
 # capabilities, no new privileges, its own PID/IPC/UTS namespaces.
@@ -22,6 +27,7 @@
 set -eu
 
 user="${ZYVOR_CONTAIN_USER:-agent}"
+seccomp="${ZYVOR_CONTAIN_SECCOMP_FILE:-/opt/zyvor/seccomp.bpf}"
 home="${ZYVOR_CONTAIN_HOME:-/home/$user}"
 
 if [ "$#" -eq 0 ]; then
@@ -35,6 +41,15 @@ for tool in bwrap setpriv; do
   fi
 done
 
+if [ "$(uname -m)" != x86_64 ]; then
+  echo "contain.sh: the syscall filter is x86_64 only; refusing to run without it on $(uname -m)" >&2
+  exit 127
+fi
+if [ ! -r "$seccomp" ]; then
+  echo "contain.sh: $seccomp is missing; refusing to run without the syscall filter" >&2
+  exit 127
+fi
+
 if ! id "$user" >/dev/null 2>&1; then
   useradd --create-home --home-dir "$home" --shell /bin/bash "$user"
 fi
@@ -44,7 +59,7 @@ mkdir -p "$home"
 chown "$uid:$gid" "$home" 2>/dev/null || true
 
 exec bwrap \
-  --die-with-parent --new-session \
+  --die-with-parent --new-session --seccomp 3 \
   --unshare-pid --unshare-ipc --unshare-uts --unshare-cgroup-try \
   --ro-bind / / \
   --dev /dev --proc /proc \
@@ -55,4 +70,4 @@ exec bwrap \
   -- \
   setpriv --reuid="$uid" --regid="$gid" --clear-groups \
     --inh-caps=-all --bounding-set=-all --no-new-privs \
-  "$@"
+  "$@" 3<"$seccomp"
