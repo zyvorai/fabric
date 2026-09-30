@@ -24,6 +24,10 @@ References: `docs/keep/confine.md`, `docs/keep/keepctl/README.md`, `docs/keep/TH
 | Drop reason `udp-deny` | UDP (QUIC, WebRTC, STUN) is blocked by design. |
 | Guest cannot reach the network at all | Expected for use-case cells: they run over vsock with everything denied. Agent sessions need a host with agent networking. |
 
+## The agent needed a host it was denied
+
+Run `keepctl policy suggest <agent>` to see which hosts it asked for and could not reach. Loosening policy is the owner's decision: use the `keep-policy` skill to draft and review the change.
+
 ## Rules
 
 - Do not loosen policy to make an error go away. Report what was blocked and let the owner decide.

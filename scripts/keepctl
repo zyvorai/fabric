@@ -12,7 +12,7 @@
 #   keepctl doctor [--smoke]         # runtime, Keep mode, signers, FluxVM, demos (+ a live CSV cleanup)
 #   keepctl create -f agent.json --signature agent.json.sig
 #                                   # deploy with signed full manifest in Keep mode
-#   keepctl policy show|set|sign …   # signed keep.policy.yaml / agent.json
+#   keepctl policy show|set|sign|suggest …   # signed keep.policy.yaml / agent.json; suggest drafts allow rules from denials
 #   keepctl unwrap-token|unwrap|vault-status  # software vault ceremony (host-env)
 #   keepctl user-held-challenge|user-held-complete  # Keep 0.2 scaffold (refused without SNP/TDX)
 #   keepctl browser tabs|shot|script|doctor|profile|checkout <session-id> …
@@ -222,6 +222,33 @@ PY
         sig=$("$sign_bin" sign "$seed" "$file")
         printf '%s\n' "$sig" | tee "${file}.sig"
         ;;
+      suggest)
+        name="${1:-}"; shift || true
+        [[ -n "$name" ]] || { echo "usage: keepctl policy suggest <agent> [out.yaml]" >&2; exit 1; }
+        out="${1:-}"
+        resp=$(api GET "/v1/agents/${name}/policy-suggestions")
+        printf '%s' "$resp" | KEEPCTL_SUGGEST_OUT="$out" python3 -c '
+import json, os, sys
+d = json.load(sys.stdin)
+sug = d.get("suggestions", [])
+print("agent %s: %d suggestion(s) from %d journal rows" % (d.get("agent"), len(sug), d.get("scanned_rows", 0)))
+for s in sug:
+    flag = "NEEDS ACK" if s.get("needs_ack") else "ok"
+    print("  %-40s %4d denials  %-16s %s" % (s["host"], s["denials"], ",".join(s["methods"]) or "(any)", flag))
+    for f in s.get("findings", []):
+        if f["code"] != "new_host":
+            print("      %s: %s" % (f["severity"], f["message"]))
+out = os.environ.get("KEEPCTL_SUGGEST_OUT")
+yaml = d.get("candidate_yaml")
+if yaml and out:
+    open(out, "w").write(yaml)
+    print("draft written to %s (unsigned; read it, sign it, then: keepctl policy set %s %s SIG)" % (out, d.get("agent"), out))
+elif yaml:
+    print("pass an output file to save the draft policy")
+else:
+    print("nothing to add without acknowledgement")
+'
+        ;;
       show|set)
         name="${1:-}"; shift || true
         [[ -n "$name" ]] || { echo "usage: keepctl policy show|set <agent> [file] [sig]" >&2; exit 1; }
@@ -251,7 +278,7 @@ PY
         esac
         ;;
       *)
-        echo "usage: keepctl policy show|set|sign …" >&2
+        echo "usage: keepctl policy show|set|sign|suggest …" >&2
         exit 1
         ;;
     esac

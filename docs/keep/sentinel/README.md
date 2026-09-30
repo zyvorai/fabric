@@ -48,6 +48,24 @@ A change with a High finding is refused with `409` and the reasons. Review it, t
 `risks`, and the audit row `keep.policy.set` records the codes and whether they were acknowledged. Per-host checks
 run for newly added hosts only, so an unchanged entry does not block later edits.
 
+## Suggested rules from denials
+
+A `deny`-mode agent that asks for a host outside its allowlist leaves a `Denied` journal row. `GET
+/v1/agents/{name}/policy-suggestions` (operator token only) groups those rows by host and returns the narrowest allow
+entry that would have let the calls through, with `ask: always`:
+
+```bash
+keepctl policy suggest my-agent draft.yaml     # summary, and the draft policy in draft.yaml
+$EDITOR draft.yaml                              # read it; drop what you do not want
+keepctl policy sign draft.yaml && keepctl policy set my-agent draft.yaml draft.yaml.sig
+```
+
+It changes nothing itself. The agent chooses which hosts it asks for, so a suggestion is a prompt for a person, not a
+request that can be approved by the agent. Every suggestion is run through the risk check above; one with a High
+finding is listed with `NEEDS ACK` and is left out of the draft. Only denials for a host missing from the allowlist
+count: an operator's refusal or a reviewer's verdict does not produce a suggestion. Hosts are limited to plain host or
+IP characters, so an agent cannot put YAML or terminal escapes into the draft.
+
 ## Signature
 
 Ed25519 over the exact YAML bytes the API receives (`X-Keep-Policy-Signature: <hex>`).

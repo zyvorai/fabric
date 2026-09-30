@@ -34,6 +34,10 @@ Keep mode (`ZYVOR_AGENT_KEEP_MODE=1`) refuses unsigned policy. The signature is 
 keepctl policy show <agent>
 ```
 
+## Drafting from denials
+
+If an agent was blocked from hosts it needs, `keepctl policy suggest <agent> draft.yaml` lists the denied hosts and writes a draft policy with a narrow `allow` entry (`ask: always`) for each. Read the draft with the user, remove anything not wanted, then sign and load it as above. Suggestions marked `NEEDS ACK` are not in the draft; do not add them without the user asking.
+
 ## Before proposing a change
 
 Tell the user, in plain words, what the change adds: new hosts, new methods, wider `ask`, wildcards. Flag any host that is a private address, a cloud metadata address, or a wildcard. Never sign a policy yourself; the signing seed is the owner's.

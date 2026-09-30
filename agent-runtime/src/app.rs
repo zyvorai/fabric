@@ -473,6 +473,10 @@ pub fn public_router(state: Arc<AppState>) -> Router {
             "/v1/agents/{name}/policy",
             get(get_agent_policy).put(put_agent_policy),
         )
+        .route(
+            "/v1/agents/{name}/policy-suggestions",
+            get(get_policy_suggestions),
+        )
         .route("/v1/sessions/{id}/cockpit", get(session_cockpit))
         .route("/v1/export-tokens", post(mint_export_token))
         .route("/v1/vault/status", get(vault_status))
@@ -2385,6 +2389,57 @@ async fn export_audit(
             .into_response());
     }
     Ok(Json(json!({"items": items, "chain": chain, "export": true})).into_response())
+}
+
+/// Journal rows scanned for `policy-suggestions` unless `?limit=` says otherwise.
+const SUGGEST_SCAN_DEFAULT: usize = 5000;
+const SUGGEST_SCAN_MAX: usize = 50_000;
+
+/// Keep: draft allow rules from an agent's denied egress. Operator only (user tokens never
+/// reach this route). Nothing is applied: load a reviewed policy with `PUT …/policy`.
+async fn get_policy_suggestions(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Query(query): Query<AuditQuery>,
+) -> ApiResult<Json<Value>> {
+    let agent = state
+        .store
+        .get_agent(&name)
+        .await
+        .ok_or_else(|| ApiError::not_found("agent not found"))?;
+    let current = crate::policy::KeepPolicy::from_manifest(&agent.manifest);
+    let sessions: std::collections::HashSet<Uuid> = state
+        .store
+        .list_sessions()
+        .await
+        .into_iter()
+        .filter(|s| s.agent == name)
+        .map(|s| s.id)
+        .collect();
+    let scan = query
+        .limit
+        .unwrap_or(SUGGEST_SCAN_DEFAULT)
+        .clamp(1, SUGGEST_SCAN_MAX);
+    let entries = state
+        .store
+        .audit
+        .list(None, scan)
+        .await
+        .map_err(ApiError::internal)?;
+    let suggestions = crate::advisor::suggest(&entries, &sessions, &current);
+    let candidate = crate::advisor::candidate_policy(&current, &suggestions);
+    let candidate_yaml = if suggestions.iter().any(|s| !s.needs_ack) {
+        Some(candidate.to_yaml().map_err(ApiError::internal)?)
+    } else {
+        None
+    };
+    Ok(Json(json!({
+        "agent": name,
+        "scanned_rows": entries.len(),
+        "suggestions": suggestions,
+        "candidate_yaml": candidate_yaml,
+        "note": "a draft, not applied: read it, sign it, then PUT it; suggestions with a High finding are not in candidate_yaml",
+    })))
 }
 
 /// Keep: readable Sentinel policy as `keep.policy.yaml`.

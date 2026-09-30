@@ -777,6 +777,10 @@ async fn sentinel_screen(
 }
 
 /// Poll interval while a request waits for an operator decision.
+/// The reason a deny-mode agent gets for a host outside its allowlist. `advisor` matches on it
+/// to find denials worth suggesting a rule for, so keep the two in step.
+pub(crate) const NOT_ALLOWLISTED: &str = "is not in this agent's egress allowlist";
+
 const APPROVAL_POLL: std::time::Duration = std::time::Duration::from_millis(250);
 
 /// Decide what to do with a request to a host that is not on the allowlist.
@@ -798,9 +802,7 @@ pub(crate) async fn authorize_unlisted_host(
         .unwrap_or_default();
     let refuse = |message: String| Err((StatusCode::FORBIDDEN, message));
     if manifest.egress_mode == EgressMode::Deny {
-        return refuse(format!(
-            "host {host} is not in this agent's egress allowlist"
-        ));
+        return refuse(format!("host {host} {NOT_ALLOWLISTED}"));
     }
     if state
         .store
