@@ -134,8 +134,8 @@ pub fn suggest(
             let allow = KeepAllow {
                 host: host.clone(),
                 methods: acc.methods.iter().cloned().collect(),
-                action: None,
                 ask: Some("always".into()),
+                ..Default::default()
             };
             let mut proposed = current.clone();
             proposed.allow.push(allow.clone());

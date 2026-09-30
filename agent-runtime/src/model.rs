@@ -275,6 +275,20 @@ impl AgentManifest {
             if rule.max_body_bytes == Some(0) {
                 return Err("egress_rules max_body_bytes must be greater than zero".into());
             }
+            for name in rule.rpc_methods.iter().chain(&rule.mcp_tools) {
+                if name.is_empty() || name.len() > 200 || name.chars().any(char::is_control) {
+                    return Err(format!(
+                        "egress_rules has an invalid rpc method or tool name {name:?}"
+                    ));
+                }
+            }
+            for op in &rule.graphql_operations {
+                if !matches!(op.as_str(), "query" | "mutation" | "subscription") {
+                    return Err(format!(
+                        "egress_rules graphql_operations must be query, mutation or subscription, not {op:?}"
+                    ));
+                }
+            }
         }
         if let Some(taint) = &self.taint {
             if taint.trusted_hosts.iter().any(|h| h.trim().is_empty()) {
@@ -397,7 +411,7 @@ pub const MIN_EGRESS_APPROVAL_SECONDS: u64 = 5;
 pub const MAX_EGRESS_APPROVAL_SECONDS: u64 = 240;
 
 /// A limit on what the agent may send to a host. See [`crate::l7::check_rules`].
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EgressRule {
     /// Exact host or parent suffix, as in `egress_allow_hosts`.
     pub host: String,
@@ -409,6 +423,17 @@ pub struct EgressRule {
     pub path_prefixes: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_body_bytes: Option<u64>,
+    /// JSON-RPC 2.0 method names the request body may call (for MCP: `tools/list`, `tools/call`, ...).
+    /// Empty means unrestricted. Any of the three body fields makes the rule read the body, and a
+    /// body that is not the expected JSON is refused. See [`crate::l7::check_rules`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rpc_methods: Vec<String>,
+    /// For an MCP `tools/call`, the tool names (`params.name`) that may be called. Empty means any tool.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_tools: Vec<String>,
+    /// GraphQL operation types the body may run: `query`, `mutation`, `subscription`. Empty means any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub graphql_operations: Vec<String>,
 }
 
 /// Which hosts do not taint a session that reads from them.

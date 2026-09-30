@@ -38,7 +38,7 @@ fn default_deny() -> String {
     "deny".into()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct KeepAllow {
     pub host: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -47,6 +47,24 @@ pub struct KeepAllow {
     pub action: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ask: Option<String>,
+    /// JSON-RPC methods the body may call (see [`crate::model::EgressRule::rpc_methods`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rpc_methods: Vec<String>,
+    /// MCP tool names a `tools/call` may use.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_tools: Vec<String>,
+    /// GraphQL operation types the body may run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub graphql_operations: Vec<String>,
+}
+
+impl KeepAllow {
+    /// True when the entry restricts what the request body may ask for.
+    pub fn reads_body(&self) -> bool {
+        !self.rpc_methods.is_empty()
+            || !self.mcp_tools.is_empty()
+            || !self.graphql_operations.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -232,20 +250,25 @@ impl KeepPolicy {
             .iter()
             .map(|host| KeepAllow {
                 host: host.clone(),
-                methods: vec![],
-                action: None,
                 ask: ask.clone(),
+                ..Default::default()
             })
             .collect();
         for rule in &m.egress_rules {
             if let Some(existing) = allow.iter_mut().find(|a| a.host == rule.host) {
                 existing.methods = rule.methods.clone();
+                existing.rpc_methods = rule.rpc_methods.clone();
+                existing.mcp_tools = rule.mcp_tools.clone();
+                existing.graphql_operations = rule.graphql_operations.clone();
             } else {
                 allow.push(KeepAllow {
                     host: rule.host.clone(),
                     methods: rule.methods.clone(),
-                    action: None,
                     ask: ask.clone(),
+                    rpc_methods: rule.rpc_methods.clone(),
+                    mcp_tools: rule.mcp_tools.clone(),
+                    graphql_operations: rule.graphql_operations.clone(),
+                    ..Default::default()
                 });
             }
         }
@@ -286,12 +309,15 @@ impl KeepPolicy {
         m.egress_rules = self
             .allow
             .iter()
-            .filter(|a| !a.methods.is_empty())
+            .filter(|a| !a.methods.is_empty() || a.reads_body())
             .map(|a| EgressRule {
                 host: a.host.clone(),
                 methods: a.methods.clone(),
                 path_prefixes: vec![],
                 max_body_bytes: None,
+                rpc_methods: a.rpc_methods.clone(),
+                mcp_tools: a.mcp_tools.clone(),
+                graphql_operations: a.graphql_operations.clone(),
             })
             .collect();
         if self.allow.iter().any(|a| {
@@ -540,5 +566,54 @@ browser:
         assert!(trust.validate_configuration().is_err());
         trust.require_signature = true;
         trust.validate_configuration().unwrap();
+    }
+
+    #[test]
+    fn body_rules_survive_the_policy_round_trip() {
+        let yaml = "version: 1\nallow:\n  - { host: mcp.example.com, methods: [POST], rpc_methods: [tools/call, tools/list], mcp_tools: [search], ask: first }\n  - { host: graph.example.com, graphql_operations: [query] }\n";
+        let policy = KeepPolicy::from_yaml(yaml).unwrap();
+        let mut m = bare_manifest();
+        policy.apply_to_manifest(&mut m);
+        let mcp = m
+            .egress_rules
+            .iter()
+            .find(|r| r.host == "mcp.example.com")
+            .unwrap();
+        assert_eq!(mcp.rpc_methods, vec!["tools/call", "tools/list"]);
+        assert_eq!(mcp.mcp_tools, vec!["search"]);
+        // A host with only a body rule (no methods) still gets a rule, so it is enforced.
+        let graph = m
+            .egress_rules
+            .iter()
+            .find(|r| r.host == "graph.example.com")
+            .unwrap();
+        assert_eq!(graph.graphql_operations, vec!["query"]);
+        assert!(m.validate_egress_policy().is_ok());
+        // And back out again unchanged.
+        let back = KeepPolicy::from_manifest(&m);
+        let allow = back
+            .allow
+            .iter()
+            .find(|a| a.host == "mcp.example.com")
+            .unwrap();
+        assert_eq!(allow.mcp_tools, vec!["search"]);
+        assert_eq!(allow.rpc_methods, vec!["tools/call", "tools/list"]);
+    }
+
+    #[test]
+    fn invalid_body_rules_are_refused_at_deploy() {
+        let mut m = bare_manifest();
+        m.egress_rules = vec![EgressRule {
+            host: "x.example.com".into(),
+            graphql_operations: vec!["mutate".into()],
+            ..Default::default()
+        }];
+        assert!(m
+            .validate_egress_policy()
+            .unwrap_err()
+            .contains("graphql_operations"));
+        m.egress_rules[0].graphql_operations.clear();
+        m.egress_rules[0].mcp_tools = vec![String::new()];
+        assert!(m.validate_egress_policy().is_err());
     }
 }
