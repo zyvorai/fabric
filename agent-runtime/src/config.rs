@@ -1,7 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{notify::ApprovalWebhook, sentinel::SentinelConfig};
+use crate::{guard::GuardConfig, notify::ApprovalWebhook, sentinel::SentinelConfig};
 use anyhow::{Context, Result};
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
@@ -29,6 +29,8 @@ pub struct Config {
     /// Reviewer model for `egress_mode: "sentinel"`. Absent means sentinel
     /// agents fall back to asking an operator.
     pub sentinel: Option<SentinelConfig>,
+    /// Operator-run service that may refuse any brokered request. See `guard`.
+    pub guard: Option<GuardConfig>,
     /// Where new approvals are pushed so a person sees them. See `notify`.
     pub approval_webhook: Option<ApprovalWebhook>,
     /// Ceilings for a manifest's `resources`. Absent means FluxVM's own limits decide.
@@ -107,6 +109,7 @@ impl Config {
             credentials_file: env_opt("ZYVOR_AGENT_CREDENTIALS_FILE").map(PathBuf::from),
             skill_scopes_file: env_opt("ZYVOR_AGENT_SKILL_SCOPES_FILE").map(PathBuf::from),
             sentinel: sentinel_from_env()?,
+            guard: guard_from_env()?,
             approval_webhook: approval_webhook_from_env()?,
             confine_all: env_opt("ZYVOR_AGENT_CONFINE").is_some_and(|v| v == "1"),
             security_profile: {
@@ -201,6 +204,21 @@ fn sentinel_from_env() -> Result<Option<SentinelConfig>> {
         timeout: Duration::from_secs(env_parse("ZYVOR_AGENT_SENTINEL_TIMEOUT_SECS", "15")?),
         can_allow: env_opt("ZYVOR_AGENT_SENTINEL_CAN_ALLOW").is_some_and(|v| v == "1"),
     }))
+}
+
+fn guard_from_env() -> Result<Option<GuardConfig>> {
+    let Some(url) = env_opt("ZYVOR_AGENT_GUARD_URL") else {
+        return Ok(None);
+    };
+    let secs: u64 = env_parse("ZYVOR_AGENT_GUARD_TIMEOUT_SECS", "3")?;
+    if !(1..=60).contains(&secs) {
+        anyhow::bail!("ZYVOR_AGENT_GUARD_TIMEOUT_SECS must be between 1 and 60");
+    }
+    Ok(Some(GuardConfig::new(
+        &url,
+        env_opt("ZYVOR_AGENT_GUARD_TOKEN"),
+        Duration::from_secs(secs),
+    )?))
 }
 
 fn env_or(name: &str, default: &str) -> String {

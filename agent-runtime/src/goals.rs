@@ -967,6 +967,7 @@ pub(crate) mod tests {
             credentials_file: None,
             skill_scopes_file: None,
             sentinel: None,
+            guard: None,
             approval_webhook: None,
             proxy_listen: None,
             proxy_connect_ports: vec![443],

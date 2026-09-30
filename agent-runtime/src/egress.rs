@@ -212,6 +212,41 @@ pub(crate) async fn proxy_inner(
     } else {
         Vec::new()
     };
+    // The operator's guard, if any, sees the request after the agent's own rules and before a
+    // person is asked or a credential is added. It can only refuse.
+    if let Some(guard) = &state.config.guard {
+        let mut described = url.clone();
+        described.set_query(None);
+        described.set_fragment(None);
+        let _ = described.set_username("");
+        let _ = described.set_password(None);
+        let decision = crate::guard::check(
+            &state.egress_http,
+            guard,
+            &crate::guard::GuardRequest {
+                session_id: session.id,
+                agent: &agent.name,
+                method: &request.method,
+                url: described.as_str(),
+                host,
+                path: url.path(),
+                header_names: request
+                    .headers
+                    .keys()
+                    .map(|k| k.to_ascii_lowercase())
+                    .collect(),
+                dlp_hits: &dlp_hits,
+                body: body.as_deref().unwrap_or(&[]),
+            },
+        )
+        .await;
+        if let crate::guard::Decision::Deny(reason) = decision {
+            return Err((
+                StatusCode::FORBIDDEN,
+                format!("egress to {host} was refused by the egress guard: {reason}"),
+            ));
+        }
+    }
     if !agent
         .manifest
         .egress_allow_hosts
@@ -1077,6 +1112,7 @@ pub(crate) mod ask_tests {
             credentials_file: None,
             skill_scopes_file: None,
             sentinel: None,
+            guard: None,
             approval_webhook: None,
             proxy_listen: None,
             proxy_connect_ports: vec![443],
@@ -2427,6 +2463,58 @@ pub(crate) mod ask_tests {
         assert!(error.1.contains("egress rules"), "{}", error.1);
         assert_eq!(hits(&counter), 1);
         assert!(state.store.list_approvals().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_guard_refuses_a_request_before_it_is_sent_and_a_dead_guard_refuses_everything() {
+        let (port, counter) = upstream_counter().await;
+        // A guard that refuses any body containing "forbidden".
+        let guard = axum::Router::new().route(
+            "/check",
+            axum::routing::post(|axum::Json(v): axum::Json<Value>| async move {
+                let body = base64::engine::general_purpose::STANDARD
+                    .decode(v["body_base64"].as_str().unwrap_or(""))
+                    .unwrap_or_default();
+                if String::from_utf8_lossy(&body).contains("forbidden") {
+                    axum::Json(json!({"decision": "deny", "reason": "policy says no"}))
+                } else {
+                    axum::Json(json!({"decision": "allow"}))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let guard_url = format!("http://{}/check", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, guard).await.unwrap() });
+
+        let cfg = |url: &str| {
+            crate::guard::GuardConfig::new(url, None, std::time::Duration::from_secs(2)).unwrap()
+        };
+        let (state, session) = state_and_session_cfg(|c| c.guard = Some(cfg(&guard_url))).await;
+        let session = deploy_local_agent(&state, &session, |_| {}).await;
+
+        assert!(plain_call(&state, &session, port, "POST", Some("fine"))
+            .await
+            .is_ok());
+        assert_eq!(hits(&counter), 1);
+        let error = plain_call(&state, &session, port, "POST", Some("forbidden thing"))
+            .await
+            .unwrap_err();
+        assert_eq!(error.0, StatusCode::FORBIDDEN);
+        assert!(error.1.contains("egress guard"), "{}", error.1);
+        assert!(error.1.contains("policy says no"), "{}", error.1);
+        assert_eq!(hits(&counter), 1, "a refused request must never be sent");
+        assert!(state.store.list_approvals().await.is_empty());
+
+        // A guard that is down refuses everything, including what it would have allowed.
+        let (state, session) =
+            state_and_session_cfg(|c| c.guard = Some(cfg("http://127.0.0.1:1/check"))).await;
+        let session = deploy_local_agent(&state, &session, |_| {}).await;
+        let error = plain_call(&state, &session, port, "POST", Some("fine"))
+            .await
+            .unwrap_err();
+        assert_eq!(error.0, StatusCode::FORBIDDEN);
+        assert!(error.1.contains("egress guard"), "{}", error.1);
+        assert_eq!(hits(&counter), 1);
     }
 
     #[tokio::test]
