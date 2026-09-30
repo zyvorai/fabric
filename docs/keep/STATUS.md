@@ -27,6 +27,14 @@ Scoreboard (ahead-of-Muse gate, software-test only): [`AHEAD.md`](AHEAD.md) · `
 | Model choice | `model_socket` wired for agents (`ctx.model.chat()`, CLI harness), any OpenAI-compatible endpoint | [`MODELS.md`](MODELS.md) |
 | Phone vendors | Blueprint, reference gateway, benchmark, partial zh-CN console | [`VENDORS.md`](VENDORS.md) |
 | Install Keep | `./scripts/deploy keep user@host` (needs FluxVM on the host); `keepctl doctor` | [`PRODUCTION.md`](PRODUCTION.md) · `scripts/deploy-keep.sh` |
+| Install on Kubernetes | `charts/zyvor-keep`: a `hostNetwork` DaemonSet beside FluxVM, Keep mode on by default, credential descriptors, secret volumes, a service account. Rendered and schema-checked; **never installed in a cluster** | [`PRODUCTION.md`](PRODUCTION.md#install-keep-on-kubernetes) |
+| Policy changes | A risk check (409 until acknowledged) on every policy update; `keepctl policy suggest` drafts allow rules from an agent's denied requests | [`sentinel/README.md`](sentinel/README.md) |
+| Egress rules by body and program | MCP, JSON-RPC and GraphQL body rules; `binaries` (which program in the cell may call, from the guest's `/proc`). The attribution script was run on real Linux, including across a `bwrap` PID namespace; **not** in a real cell | [`sentinel/README.md`](sentinel/README.md) |
+| Operator egress guard | `ZYVOR_AGENT_GUARD_URL`: an HTTP service that may refuse any brokered request; fails closed | `agent-runtime/README.md` |
+| Cell hardening | A seccomp syscall filter in the inner container (x86_64). The filter was run under a real `bwrap` on Linux; **not** through a real cell or with Chromium | `agent-runtime/README.md` |
+| GPU cells | `gpus` in the agent manifest; FluxVM picks free VFIO-bound GPUs under a lock. Picking logic tested; **no real GPU** | `agent-runtime/README.md` · FluxVM `docs/sandbox-gpus.md` |
+| Audit export | `GET /v1/export/audit?format=ocsf`: OCSF-shaped NDJSON, chain hashes carried; not run through the OCSF schema validator | [`keepctl/README.md`](keepctl/README.md) |
+| Credential sources | A credential's secret from a file, or from HashiCorp Vault (token, AppRole, Kubernetes login); `GET /v1/vault/status` lists each source. Tested against a mock; **no real Vault** | [`vault/README.md`](vault/README.md#credentials-from-a-file-source) |
 | CI | Keep workflow: unit tests, **demos e2e** (7 built-ins, a custom use case, signed pack deploy in Keep mode, against the real runtime and the FluxVM stand-in), stub e2e | [`.github/workflows/keep.yml`](../../.github/workflows/keep.yml) |
 | Tutorial | Hands-on + pack appendix + demos + your own | [Tutorial 16](../tutorials/16-keep-workstation.md) · [Tutorial 17](../tutorials/17-keep-pdf-brief.md) · [Tutorial 18](../tutorials/18-keep-use-cases.md) · [Tutorial 19](../tutorials/19-build-your-own-use-case.md) |
 
@@ -68,6 +76,13 @@ Measured = `software-test`. Host can still see the VM until Keep 0.2 + hardware.
 Guest vsock is healthy on QEMU `node22-agent` (musl-static guest-agent) and on
 Firecracker `node22-fc` (flat ext4 rootfs — see `scripts/keep-bake-fc-rootfs.sh`).
 The pilot gate prefers `node22-fc` when that template is registered.
+
+### Not verified live (2026-09-30)
+
+The controls listed above from "Policy changes" down were built and tested against fakes and, where noted, on real Linux outside a cell. These have
+**not** been run: the policy 409 and acknowledge flow, the OCSF export and `policy suggest` against a live runtime; per-program `binaries` and the
+seccomp filter in a real cell (and Chromium under the filter); a GPU cell on real hardware; the credential sources against a real Vault, AppRole or
+Kubernetes login; the Helm chart in a cluster. Several need the runtime's API token; see [TODO.md](TODO.md).
 
 ## What the demos e2e proves, and what it does not
 

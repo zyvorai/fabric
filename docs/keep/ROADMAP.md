@@ -15,6 +15,7 @@ Where each piece stands (what is left, in full: [REMAINING.md](REMAINING.md)). S
 | Keep 0.1 pilot | [Live gate](pilot-runs/README.md) passed twice (happy path and deny path) on a FluxVM host |
 | Keep 0.1 | BYO model socket, signed Sentinel policy, measured cell, phone approvals, pack / unpack, cockpit, PDF brief, host eBPF pin |
 | Keep Browser 0.3 | Split-sight pause, trajectory-as-code, origin taint lattice, vault-typed fill, goal-bound tabs, honesty badge |
+| Policy and egress controls (2026-09-30) | Risk check on policy changes, drafts from denials, MCP/JSON-RPC/GraphQL body rules, per-program `binaries`, an operator egress guard hook, OCSF audit export, a seccomp filter in the inner container, GPU cells, credentials from a file or Vault, a Helm chart. All tested against fakes; not yet run in a real cell, on a real GPU or against a real Vault ([REMAINING.md](REMAINING.md)) |
 
 ## Planned product surface
 
