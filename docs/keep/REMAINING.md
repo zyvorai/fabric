@@ -92,6 +92,14 @@ Approvals inside the agent chat; memory inside a cell; autonomous planning witho
 copying another product's claims into our docs unsourced; claiming a Mac or Windows client for someone else's product; a Mac or Windows desktop as the cell;
 silent training on trajectories. (See also [ROADMAP.md](ROADMAP.md#what-we-will-not-add).)
 
+**Landlock inside the cell (decided against, 2026-09-30).** FluxVM's `fluxvm-procbox` can apply Landlock file rules and a TCP connect allowlist, and
+a Keep cell could run its worker under it. It was left out on purpose. A cell's worker already runs in bubblewrap with a read-only root, a private
+`/tmp`, no capabilities, no new privileges and a seccomp filter, and the host's eBPF confinement already limits what the cell can reach on the
+network, so Landlock would add little. It needs the `procbox` binary baked into the cell image, which cannot be tested without a FluxVM bake, and a
+file allowlist has to name everything Chromium and Node touch, so a mistake breaks agents. The TCP connect rule needs a 6.7 or newer guest kernel.
+If a real gap shows up (for example an agent process reaching a port the host policy allows but the agent should not use), the cheapest useful
+step would be an opt-in flag that applies only the TCP connect allowlist to a Node-only agent, tested first in a real cell; not a file allowlist.
+
 ## 7. Housekeeping
 
 - **The test VM** `~/keepvm` on the lab host (nested KVM, built by `keep-up.sh`) stays until you say to delete it.
