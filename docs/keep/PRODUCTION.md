@@ -18,6 +18,29 @@ the demo template does not boot, it stops and says what to do. Re-running is saf
 
 Check a running install any time with `./scripts/keepctl doctor [--smoke]`.
 
+## Install Keep on Kubernetes
+
+`charts/zyvor-keep` runs the Keep runtime as a `hostNetwork` DaemonSet next to FluxVM on each node. It does not install
+FluxVM: install the `zyvor-fabric` chart (or run FluxVM yourself) on the same nodes, which need `/dev/kvm`.
+
+```bash
+# 1. build and push the runtime image (agent-runtime/Dockerfile), then:
+helm install keep charts/zyvor-keep -n keep --create-namespace \
+  --set global.imageRegistry=registry.example.com \
+  --set runtime.image.tag=0.3.0 \
+  --set 'keep.trustedSigners={<64-hex Ed25519 public key>}'
+```
+
+- Keep mode is on by default and the chart refuses to render without a well-formed trusted signer. The signing seed
+  never goes in values; only the public key does.
+- The API token is generated once and kept across upgrades, or supplied with `security.existingSecret` (key
+  `api-token`). The pod reads it from the Secret; it is not in the manifest.
+- The API listens on the node's loopback. Reach it with `kubectl port-forward pod/<name> 9096:9096`. The egress
+  broker and CONNECT proxy are bound on the node so cells can reach them; restrict them with the node firewall.
+- State lives on the node under `runtime.stateHostPath`. Deleting the release does not delete it.
+- The chart and the image have been rendered and schema-checked (`helm lint`, `kubeconform`); they have not been run
+  in a cluster, and the image has not been built.
+
 ## Keep 0.1 pilot — release gate
 
 Run on a customer-like FluxVM host with a registered agent template (`node22-agent` / `agent-node`; bake it with `./scripts/keep-bake-node22-agent.sh`):
