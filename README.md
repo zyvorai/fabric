@@ -170,6 +170,8 @@ make lint && make fmt
 
 ## License
 
+Commercial subscriptions and support: see [docs/SUBSCRIPTION-MODEL.md](docs/SUBSCRIPTION-MODEL.md).
+
 ### Open source (Apache-2.0)
 
 This repository is licensed under the [Apache License, Version 2.0](LICENSE), in full — there is no dual-licensing or separately-licensed core component.
