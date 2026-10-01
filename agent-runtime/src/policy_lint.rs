@@ -522,17 +522,24 @@ mod tests {
         .await;
         assert_eq!(st, 200, "{body}");
 
-        // Flipping the default to allow is refused, and says why.
-        let wide = "version: 1\ndefault_egress: allow\n";
+        // Flipping the default to allow is not enforced, so it is refused outright, ack or not.
+        let unenforced = "version: 1\ndefault_egress: allow\n";
+        let (st, body) = put(unenforced, true).await;
+        assert_eq!(st, 400, "{body}");
+        assert!(body.contains("not enforced"), "{body}");
+
+        // Adding a write method widens access: refused until acknowledged, and says why.
+        let wide =
+            "version: 1\nallow:\n  - { host: api.github.com, methods: [GET, POST], ask: always }\n";
         let (st, body) = put(wide, false).await;
         assert_eq!(st, 409, "{body}");
-        assert!(body.contains("default_egress_allow"), "{body}");
+        assert!(body.contains("methods_widened"), "{body}");
         assert!(body.contains("X-Keep-Policy-Ack-Risk"), "{body}");
 
         // The same change with the acknowledgement is applied and reports its risks.
         let (st, body) = put(wide, true).await;
         assert_eq!(st, 200, "{body}");
-        assert!(body.contains("default_egress_allow"), "{body}");
+        assert!(body.contains("methods_widened"), "{body}");
     }
 
     #[test]

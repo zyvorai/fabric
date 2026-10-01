@@ -2604,6 +2604,7 @@ async fn put_agent_policy(
         .await
         .ok_or_else(|| ApiError::not_found("agent not found"))?;
     let policy = crate::policy::KeepPolicy::from_yaml(&body).map_err(ApiError::bad_request)?;
+    policy.enforceable().map_err(ApiError::bad_request)?;
     let current = crate::policy::KeepPolicy::from_manifest(&agent.manifest);
     let risks = crate::policy_lint::review_change(Some(&current), &policy);
     let acked = headers

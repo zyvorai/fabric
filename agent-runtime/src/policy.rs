@@ -314,6 +314,37 @@ impl KeepPolicy {
         Ok(policy)
     }
 
+    /// Refuse policy fields the runtime does not enforce, so a signed intent is never silently dropped.
+    ///
+    /// `apply_to_manifest` has no place for `default_egress: allow` or for `deny[]`; egress is
+    /// default-deny and only `allow[]` hosts are reachable. A `deny` host that no `allow` entry
+    /// covers is already refused, so only an overlap needs rejecting.
+    pub fn enforceable(&self) -> Result<()> {
+        if self.default_egress != "deny" {
+            bail!(
+                "default_egress: {} is not enforced; egress is always default-deny",
+                self.default_egress
+            );
+        }
+        let bare = |h: &str| h.trim_start_matches("*.").to_ascii_lowercase();
+        for d in &self.deny {
+            let denied = bare(&d.host);
+            let overlap = self.allow.iter().find(|a| {
+                let allowed = bare(&a.host);
+                host_matches_list(&allowed, std::slice::from_ref(&denied))
+                    || host_matches_list(&denied, std::slice::from_ref(&allowed))
+            });
+            if let Some(a) = overlap {
+                bail!(
+                    "deny host {} overlaps allow host {}; deny is not enforced over allow, remove one",
+                    d.host,
+                    a.host
+                );
+            }
+        }
+        Ok(())
+    }
+
     pub fn apply_to_manifest(&self, m: &mut AgentManifest) {
         m.egress_allow_hosts = self.allow.iter().map(|a| a.host.clone()).collect();
         m.egress_rules = self
@@ -439,6 +470,39 @@ browser:
         p.apply_to_manifest(&mut m);
         assert_eq!(m.browser.as_ref().unwrap().max_tabs, 4);
         assert!(m.browser.as_ref().unwrap().block_file_url);
+    }
+
+    #[test]
+    fn enforceable_rejects_unenforced_fields() {
+        let ok = |y: &str| KeepPolicy::from_yaml(y).unwrap().enforceable();
+        assert!(
+            ok("version: 1\ndefault_egress: deny\nallow:\n  - { host: api.github.com }\n").is_ok()
+        );
+        assert!(ok("version: 1\ndefault_egress: allow\n").is_err());
+        // deny with no overlapping allow is already refused by default-deny
+        assert!(ok(
+            "version: 1\nallow:\n  - { host: api.github.com }\ndeny:\n  - { host: evil.com }\n"
+        )
+        .is_ok());
+        // exact and parent/child overlaps, either direction
+        assert!(ok(
+            "version: 1\nallow:\n  - { host: github.com }\ndeny:\n  - { host: github.com }\n"
+        )
+        .is_err());
+        assert!(ok(
+            "version: 1\nallow:\n  - { host: github.com }\ndeny:\n  - { host: gist.github.com }\n"
+        )
+        .is_err());
+        assert!(ok(
+            "version: 1\nallow:\n  - { host: gist.github.com }\ndeny:\n  - { host: github.com }\n"
+        )
+        .is_err());
+        assert!(ok("version: 1\nallow:\n  - { host: \"*.github.com\" }\ndeny:\n  - { host: gist.github.com }\n").is_err());
+        // a similar suffix that is not a subdomain does not overlap
+        assert!(ok(
+            "version: 1\nallow:\n  - { host: github.com }\ndeny:\n  - { host: notgithub.com }\n"
+        )
+        .is_ok());
     }
 
     #[test]
