@@ -246,6 +246,20 @@ SHOW="$("$KEEPCTL" policy show keep-desk)"
 check "policy show has stripe allow" "api.stripe.com" "$SHOW"
 check "policy show has github" "api.github.com" "$SHOW"
 
+echo "==> signed policy with fields the runtime does not enforce is refused"
+put_signed() { # $1 = yaml file; ack header so only the enforceability check can refuse
+  "$SIGN_BIN" sign "$SEED" "$1" >"$1.sig"
+  http_code -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/x-yaml' \
+    -H "X-Keep-Policy-Signature: $(tr -d ' \n' <"$1.sig")" -H 'X-Keep-Policy-Ack-Risk: 1' \
+    --data-binary @"$1" "$API/v1/agents/keep-desk/policy"
+}
+printf 'version: 1\ndefault_egress: allow\n' >"$W/unenforced-default.yaml"
+check "default_egress allow refused" 400 "$(put_signed "$W/unenforced-default.yaml")"
+check "  …says it is not enforced" "not enforced" "$(body)"
+printf 'version: 1\nallow:\n  - { host: github.com }\ndeny:\n  - { host: gist.github.com }\n' >"$W/unenforced-deny.yaml"
+check "deny overlapping allow refused" 400 "$(put_signed "$W/unenforced-deny.yaml")"
+check "  …names the overlap" "overlaps" "$(body)"
+
 echo "==> session through FluxVM client (stub) + cockpit"
 SID=$(curl -sf -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"agent":"keep-desk","input":{}}' "$API/v1/sessions" | json_get id)
